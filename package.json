@@ -1,7 +1,7 @@
 {
   "name": "xchain-vm",
   "description": "XChain Platform Virtual Machine (VM) runtime — deterministic smart contract execution in sandboxed V8 isolates",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "license": "SEE LICENSE IN LICENSE.md",
   "main": "src/index.js",
   "repository": {
@@ -44,6 +44,12 @@
     "mutation:custom:critical": "node stryker-xchain-vm-mutator/index.js --mutate 'src/gas.js,src/sandbox.js,src/metering.js,src/index.js'",
     "mutation:custom:dryrun": "node stryker-xchain-vm-mutator/index.js --dryRun",
     "mutation:report": "node scripts/mutation-report.js",
-    "mutation:ci": "stryker run --incremental --incrementalFile reports/mutation/.stryker-incremental.json"
+    "mutation:ci": "stryker run --incremental --incrementalFile reports/mutation/.stryker-incremental.json",
+    "test:regression:smoke": "mocha --timeout 10000 'test/regression/p0-smoke.regression.test.js'",
+    "test:regression:core": "mocha --timeout 30000 'test/regression/p0-smoke.regression.test.js' 'test/regression/p1-security.regression.test.js'",
+    "test:regression:full": "mocha --timeout 60000 'test/regression/**/*.regression.test.js'",
+    "test:regression:nightly": "mocha --timeout 120000 'test/regression/**/*.regression.test.js' 'test/e2e/**/*.e2e.test.js' 'test/fuzz/**/*.fuzz.test.js' 'test/chaos/phase1/**/*.chaos.test.js'",
+    "test:regression:release": "npm run test:all && npm run test:fuzz && npm run test:chaos && npm run mutation:critical",
+    "test:regression:bugfix": "mocha --timeout 30000 'test/regression/bugs/**/*.test.js'"
   }
 }

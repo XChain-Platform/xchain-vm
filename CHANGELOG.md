@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-04-03
+
+### Added
+- Regression test suite (`test/regression/`) — 152 tests across 4 priority tiers (P0-P3) covering all critical VM execution, security, and platform action functionality
+- Regression test helpers (`test/regression/helpers.js`) — shared VM factory, execute wrapper, determinism helpers, result shape/atomicity assertions, fail-loud isolated-vm check (regression tests never silently skip)
+- P0 smoke regression (`p0-smoke.regression.test.js`) — 11 tests: VM instantiation, sandbox activation, basic execution, method dispatch, emit pipeline, context accessors, deterministic math, syntax validation, revert atomicity
+- P1 security regression (`p1-security.regression.test.js`) — 34 tests: 15 blocked globals, constructor chain escapes, Function/eval blocking, Math.random removal, xchain/Math freeze, gas bypass prevention, __gas overwrite protection, error atomicity (revert/gas/throw), determinism verification across 3 runs
+- P2 functional regression (`p2-functional.regression.test.js`) — 73 tests: gas metering injection for all 13 AST node types, GasTracker unit regression, StateManager CRUD/validation/limits, EmissionCollector caps/copy/truncation, all 16 emit types with required field validation, ActionValidator allowlist, deterministic math (precision/large numbers/comparisons/division-by-zero/input length), syntax validation (ES2020/__gas/floats), error classes, full 16-type emit pipeline through real VM execution
+- P3 integration regression (`p3-integration.regression.test.js`) — 34 tests: resource limits (gas ceiling/memory/emissions/state keys/value size/code size with exact boundary), full execution pipeline (result shape/method routing/input params/gas charging), compilation cache consistency, gateway context (block/address/balance/require/logging), E2E critical path (multi-method deploy-execute lifecycle, state persistence, AMM contract), state isolation between contracts
+- NPM scripts: `test:regression:smoke` (P0, <5s), `test:regression:core` (P0+P1, <30s), `test:regression:full` (P0-P3, <60s), `test:regression:nightly` (regression + E2E + fuzz + chaos phase 1), `test:regression:release` (all tests + mutation), `test:regression:bugfix` (bug-fix specific regressions)
+- Regression testing plan report at `reports/XCHAIN_VM_REGRESSION_TESTING_PLAN.md` — scope definition, test selection criteria, execution strategy with tiered triggers, maintenance procedures, integration map with all 8 existing test phases
+
 ## [1.10.0] - 2026-04-03
 
 ### Added
