@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-04-03
+
+### Added
+- End-to-end test suite (`test/e2e/`) — 64 tests across 10 test files covering the full VM execution pipeline
+- E2E test infrastructure: MockLedger (in-memory ledger with balances, contract state, oracle, cross-chain, reorg rollback), MockIndexer (processes emitted actions against ledger), E2EHarness (orchestrates deploy/execute cycles with real XChainVM), assertion helpers (15 functions)
+- 9 E2E contract fixtures: token_sender, multi_method, amm, vesting, counter, multi_action, sandbox_escape, oracle_conditional, simple_func
+- Phase 1 tests: deploy/execute (E2E-001–005), deposit/withdraw lifecycle (E2E-020–023), error handling & recovery (E2E-050–055), state persistence & isolation (E2E-060–064)
+- Phase 2 tests: sandbox security enforcement (E2E-030–034), resource limits — gas/OOM/timeout/emission flood/state flood (E2E-040–046), determinism verification across 10 runs and block replay (E2E-080–082)
+- Phase 3 tests: AMM swap, vesting time-lock, multi-action emission, sequential counter, conditional branching (E2E-010–014), gas fee accounting (E2E-070–073)
+- Phase 4 tests: oracle price reads with conditional logic and staleness checks (E2E-090–091), cross-chain attestation and settlement (E2E-092)
+- `npm run test:e2e` script for running E2E tests independently
+- `npm run test:all` script for running unit + E2E tests together
+- E2E testing plan report at `reports/XCHAIN_VM_E2E_TESTING_PLAN.md`
+
+### Changed
+- `npm test` now runs only unit tests (`test/*.test.js`) to keep the default fast; use `test:all` for everything
+
 ## [1.3.0] - 2026-04-03
 
 ### Added

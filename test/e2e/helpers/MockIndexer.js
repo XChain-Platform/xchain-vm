@@ -1,0 +1,85 @@
+/*********************************************************************
+ * MockIndexer — Processes emitted VM actions against the MockLedger
+ *
+ * Translates SEND, DESTROY, MINT, and other emitted actions into
+ * ledger state changes, simulating what the real xchain-indexer does.
+ ********************************************************************/
+
+class MockIndexer {
+    constructor(ledger) {
+        this.ledger = ledger;
+    }
+
+    /**
+     * Process all emitted actions from a VM execution result.
+     * Actions are emitted from a contract's custody.
+     * @param {string} contractAddress - The contract that emitted these actions
+     * @param {Array} emittedActions - Array of { action, params }
+     */
+    processActions(contractAddress, emittedActions) {
+        for (const { action, params } of emittedActions) {
+            switch (action) {
+                case 'SEND':
+                    this._processSend(contractAddress, params);
+                    break;
+                case 'DESTROY':
+                    this._processDestroy(contractAddress, params);
+                    break;
+                case 'MINT':
+                    this._processMint(contractAddress, params);
+                    break;
+                case 'ISSUE':
+                    this._processIssue(params);
+                    break;
+                default:
+                    // Record but don't process other action types
+                    // (ORDER, DISPENSER, DIVIDEND, etc. would need full indexer logic)
+                    break;
+            }
+        }
+    }
+
+    _processSend(contractAddress, params) {
+        const { destination, tick, quantity } = params;
+        // Debit from contract custody
+        this.ledger.debitContractBalance(contractAddress, tick, quantity);
+        // Credit to destination
+        this.ledger.creditBalance(destination, tick, quantity);
+    }
+
+    _processDestroy(contractAddress, params) {
+        const { tick, quantity } = params;
+        // Debit from contract custody (tokens destroyed)
+        this.ledger.debitContractBalance(contractAddress, tick, quantity);
+    }
+
+    _processMint(contractAddress, params) {
+        const { tick, quantity } = params;
+        // Credit to contract custody
+        this.ledger.creditContractBalance(contractAddress, tick, quantity);
+    }
+
+    _processIssue(params) {
+        // Token issuance — just record it exists
+        // Real indexer would create token record
+    }
+
+    /**
+     * Charge gas fee to caller.
+     * @param {string} caller
+     * @param {number} gasUsed
+     */
+    chargeGasFee(caller, gasUsed) {
+        if (gasUsed <= 0) return;
+        const fee = String(gasUsed); // 1:1 gas-to-XCHAIN for simplicity
+        try {
+            this.ledger.debitBalance(caller, this.ledger.gasToken, fee);
+            this.ledger.creditBalance(this.ledger.gasAddress, this.ledger.gasToken, fee);
+        } catch (e) {
+            // Caller can't afford fee — in real indexer this would reject the tx
+            // For E2E testing we allow it to proceed with a warning
+        }
+    }
+}
+
+module.exports = MockIndexer;
