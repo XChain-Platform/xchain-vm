@@ -1,7 +1,7 @@
 {
   "name": "xchain-vm",
   "description": "XChain Platform Virtual Machine (VM) runtime — deterministic smart contract execution in sandboxed V8 isolates",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "license": "SEE LICENSE IN LICENSE.md",
   "main": "src/index.js",
   "repository": {
@@ -28,6 +28,10 @@
     "fuzz": "node test/fuzz/run.js",
     "bench:quick": "node bench/scenarios/pipeline.js && node bench/scenarios/gateway.js",
     "bench:full": "node bench/scenarios/pipeline.js && node bench/scenarios/gateway.js && node bench/scenarios/throughput.js && node bench/scenarios/cache.js",
-    "bench:soak": "node bench/scenarios/soak.js"
+    "bench:soak": "node bench/scenarios/soak.js",
+    "test:chaos": "mocha --timeout 120000 'test/chaos/**/*.chaos.test.js'",
+    "test:chaos:quick": "mocha --timeout 60000 'test/chaos/phase1/**/*.chaos.test.js'",
+    "test:chaos:phase2": "mocha --timeout 120000 'test/chaos/phase2/**/*.chaos.test.js'",
+    "test:chaos:phase3": "mocha --timeout 60000 'test/chaos/phase3/**/*.chaos.test.js'"
   }
 }

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-04-03
+
+### Added
+- Chaos engineering test suite (`test/chaos/`) — 93 tests across 10 experiments in 3 phases targeting VM resilience, fault tolerance, and recovery
+- Phase 1 critical tests: memory cliff OOM handling, gateway error atomicity, gateway callback hang, sandbox partial failure, corrupted state input
+- Phase 2 load tests: concurrent isolate exhaustion (20+ parallel executions), host process memory leak detection (1000+ sequential runs), rapid block cycling stress
+- Phase 3 edge case tests: acorn/V8 parser divergence (18 syntax constructs), mathjs precision boundaries (256-char limits, division by zero, accumulated precision)
+- Chaos test helpers (`test/chaos/helpers/`) — `ProgrammableMock` for fault-injectable oracle/crossChain accessors, `MemoryTracker` for heap snapshot analysis, `chaosAssertions` for recovery verification
+- Programmable mock providers (`test/chaos/helpers/programmable-mock.js`) — `ProgrammableOracleProvider` and `ProgrammableCrossChainProvider` with per-method fault rules
+- 4 adversarial test contracts (`test/chaos/contracts/`) — `memory_cliff.js`, `gateway_caller.js`, `math_extreme.js`, `parser_edge.js`
+- Chaos engineering plan report at `reports/XCHAIN_VM_CHAOS_ENGINEERING_PLAN.md` — 22 failure points, 10 experiment designs, prioritized roadmap, integration strategy
+- NPM scripts: `test:chaos` (full suite), `test:chaos:quick` (phase 1), `test:chaos:phase2`, `test:chaos:phase3`
+
 ## [1.8.0] - 2026-04-03
 
 ### Added
