@@ -1,0 +1,24 @@
+{
+  "name": "xchain-vm",
+  "description": "XChain VM runtime — deterministic smart contract execution in sandboxed V8 isolates",
+  "version": "1.0.0",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/XChain-platform/xchain-vm.git"
+  },
+  "dependencies": {
+    "acorn": "^8.16.0",
+    "acorn-walk": "^8.3.5",
+    "astring": "^1.9.0",
+    "isolated-vm": "^5.0.4",
+    "mathjs": "^13.2.3"
+  },
+  "devDependencies": {
+    "mocha": "^11.7.5"
+  },
+  "scripts": {
+    "test": "mocha --timeout 30000 'test/**/*.test.js'"
+  }
+}

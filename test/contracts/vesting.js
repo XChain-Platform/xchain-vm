@@ -1,0 +1,52 @@
+// Vesting contract: time-based token release using block height
+module.exports = {
+    initialize: function(xchain) {
+        xchain.state.set('beneficiary', xchain.getInputParam(0));
+        xchain.state.set('token', xchain.getInputParam(1));
+        xchain.state.set('totalAmount', xchain.getInputParam(2));
+        xchain.state.set('startBlock', String(xchain.getBlockHeight()));
+        xchain.state.set('cliffBlocks', xchain.getInputParam(3) || '100');
+        xchain.state.set('vestingBlocks', xchain.getInputParam(4) || '1000');
+        xchain.state.set('claimed', '0');
+        xchain.state.set('owner', xchain.getSourceAddress());
+    },
+    claim: function(xchain) {
+        var caller = xchain.getSourceAddress();
+        var beneficiary = xchain.state.get('beneficiary');
+        xchain.require(caller === beneficiary, 'only beneficiary can claim');
+
+        var currentBlock = xchain.getBlockHeight();
+        var startBlock = parseInt(xchain.state.get('startBlock'));
+        var cliffBlocks = parseInt(xchain.state.get('cliffBlocks'));
+        var vestingBlocks = parseInt(xchain.state.get('vestingBlocks'));
+        var totalAmount = xchain.state.get('totalAmount');
+        var claimed = xchain.state.get('claimed');
+
+        var elapsed = currentBlock - startBlock;
+        xchain.require(elapsed >= cliffBlocks, 'cliff not reached');
+
+        // Calculate vested amount
+        var vested;
+        if (elapsed >= vestingBlocks) {
+            vested = totalAmount;
+        } else {
+            vested = xchain.math.divide(
+                xchain.math.multiply(totalAmount, String(elapsed)),
+                String(vestingBlocks)
+            );
+        }
+
+        var claimable = xchain.math.subtract(vested, claimed);
+        xchain.require(xchain.math.gt(claimable, '0'), 'nothing to claim');
+
+        xchain.state.set('claimed', xchain.math.add(claimed, claimable));
+
+        xchain.emit.send({
+            destination: beneficiary,
+            tick: xchain.state.get('token'),
+            quantity: claimable
+        });
+
+        return claimable;
+    }
+};
