@@ -24,7 +24,7 @@ function validateSyntax(code) {
     // 1. V8 syntax check
     let testIsolate;
     try {
-        testIsolate = new ivm.Isolate({ memoryLimit: 4 });
+        testIsolate = new ivm.Isolate({ memoryLimit: 8 });
         testIsolate.compileScriptSync(code);
     } catch (e) {
         return { valid: false, error: 'syntax error: ' + e.message };

@@ -32,12 +32,25 @@ const { ContractRevertError, GasExhaustedError } = require('./errors.js');
  */
 const HARNESS_SOURCE = `
 (function() {
-    // Helper: wrap a host reference into a callable function
+    // Helper: wrap a host reference into a callable function.
+    // Arguments are JSON-serialized before crossing the isolate boundary;
+    // return values are JSON-deserialized after crossing back.
+    // This is required because isolated-vm only transfers primitives via applySync.
     function wrap(ref) {
         return function() {
-            return ref.applySync(undefined, Array.prototype.slice.call(arguments));
+            var jsonArgs = JSON.stringify(Array.prototype.slice.call(arguments));
+            var jsonResult = ref.applySync(undefined, [jsonArgs]);
+            if (jsonResult === undefined || jsonResult === null) return jsonResult;
+            if (typeof jsonResult === 'string' && jsonResult.charAt(0) === '\x01') {
+                return JSON.parse(jsonResult.substring(1));
+            }
+            return jsonResult;
         };
     }
+
+    // Wrap __gas Reference into a callable function for metered code
+    var __gasRef = globalThis.__gas;
+    globalThis.__gas = function() { __gasRef.applySync(undefined, []); };
 
     // Build the xchain object from injected references
     globalThis.xchain = Object.freeze({
@@ -96,9 +109,24 @@ const HARNESS_SOURCE = `
             message:   wrap(globalThis.__emit_message)
         }),
 
-        // Math (NOT wrapped — these are pure functions injected as copyable values)
-        // The math object is injected separately as __math and assigned here
-        math: globalThis.__math,
+        // Math (wrapped from individual host-side References)
+        math: Object.freeze({
+            add:      wrap(globalThis.__math_add),
+            subtract: wrap(globalThis.__math_subtract),
+            multiply: wrap(globalThis.__math_multiply),
+            divide:   wrap(globalThis.__math_divide),
+            mod:      wrap(globalThis.__math_mod),
+            compare:  wrap(globalThis.__math_compare),
+            gt:       wrap(globalThis.__math_gt),
+            gte:      wrap(globalThis.__math_gte),
+            lt:       wrap(globalThis.__math_lt),
+            lte:      wrap(globalThis.__math_lte),
+            eq:       wrap(globalThis.__math_eq),
+            min:      wrap(globalThis.__math_min),
+            max:      wrap(globalThis.__math_max),
+            abs:      wrap(globalThis.__math_abs),
+            isZero:   wrap(globalThis.__math_isZero)
+        }),
 
         // Control flow (gas-free)
         revert:  wrap(globalThis.__revert),
@@ -113,7 +141,7 @@ const HARNESS_SOURCE = `
     // Clean up injected references from global scope
     var names = Object.getOwnPropertyNames(globalThis);
     for (var i = 0; i < names.length; i++) {
-        if (names[i].indexOf('__') === 0 && names[i] !== '__gas') {
+        if (names[i].indexOf('__') === 0 && names[i] !== '__gas' && names[i] !== '__Function') {
             try { delete globalThis[names[i]]; } catch(e) {}
         }
     }
@@ -128,22 +156,30 @@ const HARNESS_SOURCE = `
 const CONTRACT_WRAPPER = `
 (function() {
     // Execute the contract code to get the exports
+    // Use __Function (saved by sandbox before stripping Function from global scope)
     var module = { exports: {} };
     var exports = module.exports;
-    (new Function('module', 'exports', 'xchain', __contractCode))(module, exports, xchain);
+    var __Fn = globalThis.__Function;
+    delete globalThis.__Function;
+    (new __Fn('module', 'exports', 'xchain', __contractCode))(module, exports, xchain);
     var contractExports = module.exports;
 
     // Invoke the method
+    var __result;
     if (typeof contractExports === 'function') {
-        return contractExports(xchain);
+        __result = contractExports(xchain);
     } else if (typeof contractExports === 'object' && contractExports !== null) {
         var method = contractExports[__methodName];
         if (typeof method !== 'function')
             throw new Error('unknown method: ' + __methodName);
-        return method(xchain);
+        __result = method(xchain);
     } else {
         throw new Error('contract must export a function or object');
     }
+    // JSON-serialize the return value inside the isolate so it can
+    // cross the boundary as a string (ivm only transfers primitives)
+    if (__result === undefined) return undefined;
+    return '\\x02' + JSON.stringify(__result);
 })();
 `;
 
@@ -243,7 +279,14 @@ class XChainVM {
 
             // Inject __gas callback for metering
             const gasRef = new ivm.Reference(function() {
-                gasTracker.chargeComputation();
+                try {
+                    gasTracker.chargeComputation();
+                } catch (e) {
+                    if (e instanceof GasExhaustedError) {
+                        throw new Error('\x03GAS:' + e.used + ':' + e.ceiling);
+                    }
+                    throw e;
+                }
             });
             context.global.setSync('__gas', gasRef);
 
@@ -294,16 +337,21 @@ class XChainVM {
             let returnValue = null;
             try {
                 const rawReturn = script.runSync(context, { timeout: this.limits.maxCpuTimeMs });
-                // Serialize return value
+                // The contract wrapper JSON-serializes non-null return values
+                // with a \x02 prefix inside the isolate
                 if (rawReturn !== undefined && rawReturn !== null) {
-                    try {
-                        const serialized = JSON.stringify(rawReturn);
-                        if (serialized !== undefined) {
-                            // Truncate to 64KB
-                            returnValue = serialized.length > 65536 ? serialized.substring(0, 65536) : serialized;
+                    if (typeof rawReturn === 'string' && rawReturn.charCodeAt(0) === 0x02) {
+                        const serialized = rawReturn.substring(1);
+                        returnValue = serialized.length > 65536 ? serialized.substring(0, 65536) : serialized;
+                    } else {
+                        try {
+                            const serialized = JSON.stringify(rawReturn);
+                            if (serialized !== undefined) {
+                                returnValue = serialized.length > 65536 ? serialized.substring(0, 65536) : serialized;
+                            }
+                        } catch (e) {
+                            returnValue = null;
                         }
-                    } catch (e) {
-                        returnValue = null;
                     }
                 }
             } catch (execError) {
@@ -348,67 +396,101 @@ class XChainVM {
      */
     _injectGateway(context, gateway) {
         const g = context.global;
-        const ref = (fn) => new ivm.Reference(fn);
+        // Bridge helper: wraps a host-side function so it can be called from the isolate.
+        // Arguments arrive as a single JSON string; non-primitive return values are
+        // prefixed with \x01 and JSON-encoded so they can cross the boundary.
+        const bridge = (fn) => new ivm.Reference(function(jsonArgs) {
+            const args = jsonArgs ? JSON.parse(jsonArgs) : [];
+            try {
+                const result = fn.apply(undefined, args);
+                if (result === null || result === undefined) return result;
+                if (typeof result === 'object') return '\x01' + JSON.stringify(result);
+                return result;
+            } catch (e) {
+                // Re-throw with a type prefix so the error can be classified
+                // after it loses its class crossing the isolate boundary
+                if (e instanceof ContractRevertError) {
+                    throw new Error('\x03REVERT:' + e.message);
+                }
+                if (e instanceof GasExhaustedError) {
+                    throw new Error('\x03GAS:' + e.used + ':' + e.ceiling);
+                }
+                throw e;
+            }
+        });
 
         // Context accessors (0 gas)
-        g.setSync('__getBlockHeight',     ref(gateway.getBlockHeight));
-        g.setSync('__getBlockTimestamp',   ref(gateway.getBlockTimestamp));
-        g.setSync('__getBlockHash',        ref(gateway.getBlockHash));
-        g.setSync('__getSourceAddress',    ref(gateway.getSourceAddress));
-        g.setSync('__getContractAddress',  ref(gateway.getContractAddress));
-        g.setSync('__getInputParams',      ref(gateway.getInputParams));
-        g.setSync('__getInputParam',       ref(gateway.getInputParam));
-        g.setSync('__getInputParamCount',  ref(gateway.getInputParamCount));
+        g.setSync('__getBlockHeight',     bridge(gateway.getBlockHeight));
+        g.setSync('__getBlockTimestamp',   bridge(gateway.getBlockTimestamp));
+        g.setSync('__getBlockHash',        bridge(gateway.getBlockHash));
+        g.setSync('__getSourceAddress',    bridge(gateway.getSourceAddress));
+        g.setSync('__getContractAddress',  bridge(gateway.getContractAddress));
+        g.setSync('__getInputParams',      bridge(gateway.getInputParams));
+        g.setSync('__getInputParam',       bridge(gateway.getInputParam));
+        g.setSync('__getInputParamCount',  bridge(gateway.getInputParamCount));
 
         // Ledger queries (metered)
-        g.setSync('__getBalance',   ref(gateway.getBalance));
-        g.setSync('__getTokenInfo', ref(gateway.getTokenInfo));
+        g.setSync('__getBalance',   bridge(gateway.getBalance));
+        g.setSync('__getTokenInfo', bridge(gateway.getTokenInfo));
 
         // State (metered)
-        g.setSync('__state_get',    ref(gateway.state.get));
-        g.setSync('__state_has',    ref(gateway.state.has));
-        g.setSync('__state_set',    ref(gateway.state.set));
-        g.setSync('__state_delete', ref(gateway.state.delete));
+        g.setSync('__state_get',    bridge(gateway.state.get));
+        g.setSync('__state_has',    bridge(gateway.state.has));
+        g.setSync('__state_set',    bridge(gateway.state.set));
+        g.setSync('__state_delete', bridge(gateway.state.delete));
 
         // Oracle (metered)
-        g.setSync('__oracle_getPrice',        ref(gateway.oracle.getPrice));
-        g.setSync('__oracle_getPriceAtRound',  ref(gateway.oracle.getPriceAtRound));
-        g.setSync('__oracle_getSnapshotAge',   ref(gateway.oracle.getSnapshotAge));
+        g.setSync('__oracle_getPrice',        bridge(gateway.oracle.getPrice));
+        g.setSync('__oracle_getPriceAtRound',  bridge(gateway.oracle.getPriceAtRound));
+        g.setSync('__oracle_getSnapshotAge',   bridge(gateway.oracle.getSnapshotAge));
 
         // Cross-chain (metered)
-        g.setSync('__crossChain_getAttestation', ref(gateway.crossChain.getAttestation));
-        g.setSync('__crossChain_isSettled',      ref(gateway.crossChain.isSettled));
+        g.setSync('__crossChain_getAttestation', bridge(gateway.crossChain.getAttestation));
+        g.setSync('__crossChain_isSettled',      bridge(gateway.crossChain.isSettled));
 
         // Emit (metered)
-        g.setSync('__emit_send',      ref(gateway.emit.send));
-        g.setSync('__emit_destroy',   ref(gateway.emit.destroy));
-        g.setSync('__emit_issue',     ref(gateway.emit.issue));
-        g.setSync('__emit_mint',      ref(gateway.emit.mint));
-        g.setSync('__emit_order',     ref(gateway.emit.order));
-        g.setSync('__emit_dispenser', ref(gateway.emit.dispenser));
-        g.setSync('__emit_dividend',  ref(gateway.emit.dividend));
-        g.setSync('__emit_airdrop',   ref(gateway.emit.airdrop));
-        g.setSync('__emit_callback',  ref(gateway.emit.callback));
-        g.setSync('__emit_file',      ref(gateway.emit.file));
-        g.setSync('__emit_list',      ref(gateway.emit.list));
-        g.setSync('__emit_coinpay',   ref(gateway.emit.coinpay));
-        g.setSync('__emit_sweep',     ref(gateway.emit.sweep));
-        g.setSync('__emit_link',      ref(gateway.emit.link));
-        g.setSync('__emit_broadcast', ref(gateway.emit.broadcast));
-        g.setSync('__emit_message',   ref(gateway.emit.message));
+        g.setSync('__emit_send',      bridge(gateway.emit.send));
+        g.setSync('__emit_destroy',   bridge(gateway.emit.destroy));
+        g.setSync('__emit_issue',     bridge(gateway.emit.issue));
+        g.setSync('__emit_mint',      bridge(gateway.emit.mint));
+        g.setSync('__emit_order',     bridge(gateway.emit.order));
+        g.setSync('__emit_dispenser', bridge(gateway.emit.dispenser));
+        g.setSync('__emit_dividend',  bridge(gateway.emit.dividend));
+        g.setSync('__emit_airdrop',   bridge(gateway.emit.airdrop));
+        g.setSync('__emit_callback',  bridge(gateway.emit.callback));
+        g.setSync('__emit_file',      bridge(gateway.emit.file));
+        g.setSync('__emit_list',      bridge(gateway.emit.list));
+        g.setSync('__emit_coinpay',   bridge(gateway.emit.coinpay));
+        g.setSync('__emit_sweep',     bridge(gateway.emit.sweep));
+        g.setSync('__emit_link',      bridge(gateway.emit.link));
+        g.setSync('__emit_broadcast', bridge(gateway.emit.broadcast));
+        g.setSync('__emit_message',   bridge(gateway.emit.message));
 
-        // Math — inject as a transferable object (not References, since math is pure)
-        // Build math results on the host side and copy them into the isolate
-        g.setSync('__math', new ivm.ExternalCopy(gateway.math).copyInto());
+        // Math
+        g.setSync('__math_add',      bridge(gateway.math.add));
+        g.setSync('__math_subtract', bridge(gateway.math.subtract));
+        g.setSync('__math_multiply', bridge(gateway.math.multiply));
+        g.setSync('__math_divide',   bridge(gateway.math.divide));
+        g.setSync('__math_mod',      bridge(gateway.math.mod));
+        g.setSync('__math_compare',  bridge(gateway.math.compare));
+        g.setSync('__math_gt',       bridge(gateway.math.gt));
+        g.setSync('__math_gte',      bridge(gateway.math.gte));
+        g.setSync('__math_lt',       bridge(gateway.math.lt));
+        g.setSync('__math_lte',      bridge(gateway.math.lte));
+        g.setSync('__math_eq',       bridge(gateway.math.eq));
+        g.setSync('__math_min',      bridge(gateway.math.min));
+        g.setSync('__math_max',      bridge(gateway.math.max));
+        g.setSync('__math_abs',      bridge(gateway.math.abs));
+        g.setSync('__math_isZero',   bridge(gateway.math.isZero));
 
         // Control flow (gas-free)
-        g.setSync('__revert',  ref(gateway.revert));
-        g.setSync('__require', ref(gateway.require));
+        g.setSync('__revert',  bridge(gateway.revert));
+        g.setSync('__require', bridge(gateway.require));
 
         // Logging (gas-free)
-        g.setSync('__log',         ref(gateway.log));
-        g.setSync('__isLogFull',   ref(gateway.isLogFull));
-        g.setSync('__getLogCount', ref(gateway.getLogCount));
+        g.setSync('__log',         bridge(gateway.log));
+        g.setSync('__isLogFull',   bridge(gateway.isLogFull));
+        g.setSync('__getLogCount', bridge(gateway.getLogCount));
     }
 
     /**
@@ -419,10 +501,23 @@ class XChainVM {
             return this._errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
         }
         if (error instanceof GasExhaustedError) {
-            return this._errorResult(gasTracker, emissionCollector, 'out_of_gas: used ' + error.used + ' of ' + error.ceiling);
+            return this._errorResult(gasTracker, emissionCollector,
+                'out_of_gas: used ' + error.used + ' of ' + error.ceiling);
+        }
+        // Detect typed errors that lost their class crossing the isolate boundary
+        const msg = error.message || '';
+        if (msg.charCodeAt(0) === 0x03) {
+            const payload = msg.substring(1);
+            if (payload.startsWith('REVERT:')) {
+                return this._errorResult(gasTracker, emissionCollector, 'revert: ' + payload.substring(7));
+            }
+            if (payload.startsWith('GAS:')) {
+                const parts = payload.substring(4).split(':');
+                return this._errorResult(gasTracker, emissionCollector,
+                    'out_of_gas: used ' + parts[0] + ' of ' + parts[1]);
+            }
         }
         // isolated-vm timeout errors
-        const msg = error.message || '';
         if (msg.includes('Script execution timed out') || msg.includes('disposed')) {
             // Wall-clock timeout — this is a consensus risk. Log at ERROR level.
             console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +

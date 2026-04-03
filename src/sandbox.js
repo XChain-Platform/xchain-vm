@@ -29,10 +29,11 @@ const STRIP_SCRIPT = `
     try { globalThis.eval = undefined; } catch(e) {}
     try {
         // Prevent new Function('return process')()
-        const OrigFunction = Function;
+        // Save a private reference for the contract wrapper to use
+        globalThis.__Function = Function;
         globalThis.Function = undefined;
         // Also kill the constructor on Function.prototype
-        try { Object.defineProperty(OrigFunction.prototype, 'constructor', { value: undefined }); } catch(e) {}
+        try { Object.defineProperty(globalThis.__Function.prototype, 'constructor', { value: undefined }); } catch(e) {}
     } catch(e) {}
 
     // Remove console (replaced by xchain.log)

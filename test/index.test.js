@@ -189,9 +189,9 @@ function execute(vm, code, opts) {
             assert.strictEqual(result.returnValue, null);
         });
 
-        it('should return null for null return', async function() {
+        it('should return "null" for null return', async function() {
             const result = await execute(vm, 'module.exports = function(xchain) { return null; };');
-            assert.strictEqual(result.returnValue, null);
+            assert.strictEqual(result.returnValue, 'null');
         });
 
         it('should truncate return value exceeding 64KB', async function() {

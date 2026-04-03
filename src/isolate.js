@@ -30,7 +30,7 @@ class IsolateManager {
      * @returns {{ isolate: ivm.Isolate }}
      */
     createThrowawayIsolate() {
-        return new ivm.Isolate({ memoryLimit: 4 });
+        return new ivm.Isolate({ memoryLimit: 8 });
     }
 
     /**

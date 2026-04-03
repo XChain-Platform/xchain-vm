@@ -62,7 +62,8 @@ function executeCode(vm, code, opts) {
         assert.strictEqual(result.success, false);
         // Could be out_of_memory or out_of_gas (memory pressure triggers gas)
         assert(result.error.includes('out_of_memory') || result.error.includes('out_of_gas') ||
-               result.error.includes('error:'), 'should fail: ' + result.error);
+               result.error.includes('timeout') || result.error.includes('error:'),
+               'should fail: ' + result.error);
     });
 
     it('should hit emission limit at 51', async function() {

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-03
+
+### Fixed
+- Replace `ivm.ExternalCopy` with JSON-based bridge protocol for isolate boundary crossing — fixes "could not be cloned" error when injecting math API functions
+- Serialize arguments and return values as JSON strings across isolate boundary, since `applySync` only transfers primitives
+- Encode `ContractRevertError` and `GasExhaustedError` type information in error messages so error classification survives isolate boundary crossing
+- Preserve `Function` constructor reference through sandbox stripping so `CONTRACT_WRAPPER` can compile contract code
+- Bump throwaway isolate `memoryLimit` from 4MB to 8MB (minimum required by current isolated-vm)
+- JSON-serialize contract return values inside isolate before crossing boundary, fixing null/object/array returns
+
+### Changed
+- Gateway methods injected as individual `bridge()` References instead of `ExternalCopy` bulk transfer
+- Math API injected as 15 individual bridge References instead of single `ExternalCopy` object
+- `__gas` Reference now encodes `GasExhaustedError` for correct error classification
+
 ## [1.1.0] - 2026-04-03
 
 ### Added
