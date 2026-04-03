@@ -4,9 +4,9 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/tests-81%20passing-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-unit%20%7C%20determinism%20%7C%20sandbox%20%7C%20gas%20%7C%20compilation-brightgreen" alt="Coverage">
+  <img src="https://img.shields.io/badge/version-1.11.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/tests-974%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-unit%20%7C%20e2e%20%7C%20security%20%7C%20fuzz%20%7C%20chaos%20%7C%20boundary%20%7C%20regression-brightgreen" alt="Coverage">
   <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node">
   <img src="https://img.shields.io/badge/license-Dankest%20Community-orange" alt="License">
 </p>
@@ -127,24 +127,84 @@ const result = await vm.execute({
 
 | Command | Description |
 |---|---|
-| `npm test` | Run all tests (81 tests, 30s timeout) |
+| `npm test` | Unit tests (580 tests, 30s timeout) |
+| `npm run test:all` | Unit + E2E tests (644 tests) |
+| `npm run test:e2e` | E2E tests only (64 tests) |
+| `npm run smoke` | Smoke tests (10 tests, < 5s) |
+| `npm run test:fuzz` | Fuzz / property-based tests (86 tests) |
+| `npm run test:chaos` | Chaos engineering tests (92 tests) |
+| `npm run test:regression:smoke` | P0 regression (11 tests, < 50ms) |
+| `npm run test:regression:core` | P0+P1 regression (45 tests, < 200ms) |
+| `npm run test:regression:full` | P0-P3 regression (152 tests, < 1s) |
+| `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 |
+| `npm run test:regression:release` | All tests + mutation testing |
+| `npm run mutation` | Mutation testing (Stryker, full suite) |
+| `npm run bench:quick` | Pipeline + gateway benchmarks |
+| `npm run bench:full` | All benchmarks except soak |
 
 ## Test Suite
 
-| Type | Tests | Description |
+### Unit Tests (580)
+
+| Category | Tests | Description |
 |---|---|---|
-| Metering | 28 | AST injection points, edge cases (arrow bodies, directive prologue, nested ternary, optional chaining, class methods) |
-| Gas | 7 | Ceiling enforcement, boundary conditions, cumulative charges |
-| Math | 16 | Precision (0.1+0.2=0.3), large numbers, comparisons, division by zero, string I/O |
-| State | 18 | CRUD, delete-then-set cycles, key count limits, value size limits, NaN/Infinity rejection |
-| Collector | 7 | Emission cap, log truncation, param copy isolation |
+| Metering | 40 | AST injection points, edge cases (arrow bodies, directive prologue, nested ternary, optional chaining, deep binary expressions) |
+| Gas | 15 | Ceiling enforcement, boundary conditions, cumulative charges, negative/float/non-number rejection |
+| Math | 28 | Precision (0.1+0.2=0.3), large numbers, comparisons, division by zero, string I/O, input length limits |
+| State | 34 | CRUD, delete-then-set cycles, key/value/key-size limits, NaN/Infinity rejection, UTF-8 handling, insertion order |
+| Collector | 15 | Emission cap, log truncation (byte-aware), param copy isolation, multi-byte truncation |
 | Compilation | 3 | Metering benchmark, worst-case 64KB contract compilation time |
-| Sandbox | 10 | process/require/eval/Date/Math.random/setTimeout blocking, constructor escape, prototype pollution |
-| Gateway | 20+ | State ops, emit queuing, math, revert/require, logging, method routing, oracle stubs |
-| Limits | 7 | Infinite loop (gas), memory bomb (OOM), emission flood, state flood, value size |
-| Determinism | 5 | Same input produces identical results across runs (hash comparison) |
-| Syntax | 9 | Valid/invalid code detection, ES2020 support, `__gas` rejection, float warnings |
-| **Total** | **81+** | Tests requiring isolated-vm are skipped if the native module is not compiled |
+| Sandbox | 26 | 18 blocked globals, constructor escapes, prototype chain, eval/Function, Math freeze, xchain freeze |
+| Gateway | 20 | State ops, emit queuing, math, revert/require, logging, method routing, oracle stubs |
+| Gateway-Emit | 49 | All 16 emit types, required field validation, gas charging, params copy/rejection |
+| Validator | 30 | Action allowlist, unknown action rejection, params type validation |
+| Limits | 9 | Infinite loop (gas), memory bomb (OOM), emission flood, state flood, value size, code size boundaries |
+| Determinism | 8 | Same input produces identical results across runs (SHA-256 hash comparison), fixture contracts |
+| Syntax | 21 | Valid/invalid code, ES2020 support, `__gas` rejection, float warnings, edge cases |
+| Errors | 12 | ContractRevertError, GasExhaustedError construction and instanceof checks |
+| Isolate | 10 | Isolate creation, compilation, disposal, cached data |
+| Index (Integration) | 72 | Full pipeline: result structure, atomicity, return values, method routing, error classification, context, all 16 emit types |
+| Security | 72 | Sandbox escape vectors (RISK-01–03), error spoofing (RISK-04), gas bypass (RISK-05–06), prototype pollution (RISK-10–11), math abuse (RISK-12), info leakage (RISK-15) |
+| Boundary | 106 | 15 sections: gas ceiling, timeout, memory, code size, state management, emissions, logs, return values, math, metering, sandbox, gateway, emit fields, compound interactions, determinism |
+| Smoke | 10 | VM instantiation, sandbox creation, basic execution, method dispatch, gateway, math, syntax, revert |
+
+### E2E Tests (64)
+
+| Category | Tests | Description |
+|---|---|---|
+| Deploy & Execute | 5 | Contract lifecycle, invalid syntax rejection, code size limits |
+| Deposit & Withdraw | 4 | Token custody transfers, balance tracking |
+| Error Handling | 6 | Revert recovery, gas exhaustion, runtime errors |
+| State Persistence | 5 | Cross-execution state, multi-contract isolation |
+| Security | 5 | Sandbox enforcement in full pipeline |
+| Resource Limits | 7 | Gas, OOM, timeout, emission/state floods |
+| Determinism | 3 | 10-run consistency, block replay |
+| Complex Workflows | 5 | AMM swap, vesting, multi-action, sequential counter |
+| Gas Fees | 4 | Fee accounting, gas charging on failure |
+| Oracle & Cross-chain | 3 | Oracle price reads, cross-chain attestation |
+
+### Fuzz Tests (86)
+
+Property-based and adversarial input testing across 8 categories: code mutation, argument injection, emission payloads, state operations, math properties, sandbox escapes, determinism verification, resource exhaustion.
+
+### Chaos Engineering Tests (92)
+
+3-phase resilience testing: Phase 1 (critical failures), Phase 2 (load and concurrency), Phase 3 (parser divergence and precision boundaries).
+
+### Regression Tests (152)
+
+| Tier | Tests | Target Time | Scope |
+|---|---|---|---|
+| P0 Smoke | 11 | < 50ms | VM boot, sandbox, basic execution, emit, revert |
+| P1 Security | 34 | < 200ms | 15 blocked globals, escape vectors, gas bypass, atomicity, determinism |
+| P2 Functional | 73 | < 300ms | Metering injection, state ops, all 16 emit types, math, validation |
+| P3 Integration | 34 | < 350ms | Resource limits, full pipeline, cache, E2E lifecycle, state isolation |
+
+### Mutation Tests
+
+Stryker 8.7.1 with Mocha runner + 5 custom VM-specific operators. 1,136 built-in mutants across 13 source modules.
+
+### **Total: 974 tests**
 
 ### Test Contracts
 
@@ -210,19 +270,16 @@ xchain-vm/
 │   ├── state.js          — contract state management
 │   ├── collector.js      — emission and log collection
 │   └── errors.js         — ContractRevertError, GasExhaustedError
-└── test/
-    ├── metering.test.js
-    ├── sandbox.test.js
-    ├── gas.test.js
-    ├── gateway.test.js
-    ├── limits.test.js
-    ├── determinism.test.js
-    ├── math.test.js
-    ├── state.test.js
-    ├── collector.test.js
-    ├── compilation.test.js
-    ├── syntax.test.js
-    └── contracts/        — test fixture contracts
+├── test/
+│   ├── *.test.js         — 19 unit test files (580 tests)
+│   ├── contracts/        — 13 test fixture contracts
+│   ├── e2e/              — 10 E2E test files (64 tests) + helpers + contracts
+│   ├── fuzz/             — 8 fuzz test files (86 tests) + harness + generators
+│   ├── chaos/            — 3-phase chaos tests (92 tests) + helpers + contracts
+│   └── regression/       — 4-tier regression suite (152 tests) + helpers
+├── bench/                — 5 benchmark scenarios + harness + contracts
+├── reports/              — 9 test plan reports
+└── stryker-xchain-vm-mutator/  — custom mutation testing operators
 ```
 
 ## Integration
