@@ -34,6 +34,11 @@ class StateManager {
     }
 
     set(key, value) {
+        // Enforce max key size
+        const maxKeySize = this.limits.maxStateKeySize || 1024;
+        if (typeof key === 'string' && Buffer.byteLength(key, 'utf8') > maxKeySize)
+            throw new Error('state key exceeds max size (' + maxKeySize + ' bytes)');
+
         // Reject null/undefined — use delete() to remove keys
         if (value === null || value === undefined)
             throw new Error('state value cannot be null or undefined — use state.delete() to remove keys');
@@ -61,6 +66,10 @@ class StateManager {
     }
 
     delete(key) {
+        const maxKeySize = this.limits.maxStateKeySize || 1024;
+        if (typeof key === 'string' && Buffer.byteLength(key, 'utf8') > maxKeySize)
+            throw new Error('state key exceeds max size (' + maxKeySize + ' bytes)');
+
         const isLive = this.has(key);
         if (isLive) {
             this.dirty.set(key, null);

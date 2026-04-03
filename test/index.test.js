@@ -271,6 +271,18 @@ function execute(vm, code, opts) {
                 'module.exports = function(xchain) { xchain.require(false); };');
             assert(result.error.includes('revert: requirement failed'));
         });
+
+        it('should not misclassify contract-thrown \\x03GAS error as gas exhaustion', async function() {
+            const result = await execute(vm,
+                'module.exports = function(xchain) { throw new Error("\\x03GAS:999:100"); };');
+            assert(result.error.startsWith('error:'), 'expected generic error, got: ' + result.error);
+        });
+
+        it('should not misclassify contract-thrown \\x03REVERT as revert', async function() {
+            const result = await execute(vm,
+                'module.exports = function(xchain) { throw new Error("\\x03REVERT:spoofed"); };');
+            assert(result.error.startsWith('error:'), 'expected generic error, got: ' + result.error);
+        });
     });
 
     describe('context accessors (extended)', function() {

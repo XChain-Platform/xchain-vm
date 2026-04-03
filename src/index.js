@@ -199,7 +199,8 @@ class XChainVM {
             maxEmissions:      50,
             maxStateKeys:      10000,
             maxStateValueSize: 65536,
-            maxCodeSize:       65536
+            maxCodeSize:       65536,
+            maxBlockCacheSize: 1000
         };
         this.isolateManager = new IsolateManager(this.limits);
         this.actionValidator = new ActionValidator();
@@ -246,8 +247,15 @@ class XChainVM {
         const gasTracker        = new GasTracker(this.gasSchedule, this.gasCeiling);
         const stateManager      = new StateManager(opts.state || {}, this.limits);
         const emissionCollector = new EmissionCollector(this.limits.maxEmissions);
+        const execContext       = { reverted: false };
 
         let isolate = null;
+
+        // Enforce max code size before any expensive work
+        if (Buffer.byteLength(opts.code || '', 'utf8') > this.limits.maxCodeSize) {
+            return this._errorResult(gasTracker, emissionCollector,
+                'error: code size exceeds limit (' + this.limits.maxCodeSize + ' bytes)');
+        }
 
         try {
             // Create isolate and context
@@ -271,7 +279,8 @@ class XChainVM {
                     oracleData:      opts.oracleData || null,
                     crossChainData:  opts.crossChainData || null
                 },
-                this.gasSchedule
+                this.gasSchedule,
+                execContext
             );
 
             // Inject gateway methods as ivm.Reference objects
@@ -324,7 +333,8 @@ class XChainVM {
             }
 
             // Store in compilation cache
-            if (this._blockCache && !this._blockCache.has(cacheKey)) {
+            if (this._blockCache && !this._blockCache.has(cacheKey) &&
+                this._blockCache.size < (this.limits.maxBlockCacheSize || 1000)) {
                 try {
                     const newCachedData = this.isolateManager.getCachedData(script);
                     this._blockCache.set(cacheKey, newCachedData);
@@ -356,7 +366,7 @@ class XChainVM {
                 }
             } catch (execError) {
                 // Classify the error
-                return this._classifyError(execError, gasTracker, emissionCollector, opts);
+                return this._classifyError(execError, gasTracker, emissionCollector, opts, execContext);
             }
 
             // Collect results
@@ -385,7 +395,7 @@ class XChainVM {
 
         } catch (outerError) {
             // Catch-all for unexpected errors
-            return this._classifyError(outerError, gasTracker, emissionCollector, opts);
+            return this._classifyError(outerError, gasTracker, emissionCollector, opts, execContext);
         } finally {
             if (isolate) this.isolateManager.dispose(isolate);
         }
@@ -397,15 +407,16 @@ class XChainVM {
     _injectGateway(context, gateway) {
         const g = context.global;
         // Bridge helper: wraps a host-side function so it can be called from the isolate.
-        // Arguments arrive as a single JSON string; non-primitive return values are
-        // prefixed with \x01 and JSON-encoded so they can cross the boundary.
+        // Arguments arrive as a single JSON string; ALL non-null/undefined return values
+        // are prefixed with \x01 and JSON-encoded so they can cross the boundary safely.
+        // This prevents user-supplied strings containing \x01 from being misinterpreted
+        // as protocol markers by the harness wrap() function.
         const bridge = (fn) => new ivm.Reference(function(jsonArgs) {
             const args = jsonArgs ? JSON.parse(jsonArgs) : [];
             try {
                 const result = fn.apply(undefined, args);
                 if (result === null || result === undefined) return result;
-                if (typeof result === 'object') return '\x01' + JSON.stringify(result);
-                return result;
+                return '\x01' + JSON.stringify(result);
             } catch (e) {
                 // Re-throw with a type prefix so the error can be classified
                 // after it loses its class crossing the isolate boundary
@@ -496,7 +507,7 @@ class XChainVM {
     /**
      * Classify an execution error and return the appropriate result.
      */
-    _classifyError(error, gasTracker, emissionCollector, opts) {
+    _classifyError(error, gasTracker, emissionCollector, opts, execContext) {
         if (error instanceof ContractRevertError) {
             return this._errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
         }
@@ -504,14 +515,16 @@ class XChainVM {
             return this._errorResult(gasTracker, emissionCollector,
                 'out_of_gas: used ' + error.used + ' of ' + error.ceiling);
         }
-        // Detect typed errors that lost their class crossing the isolate boundary
+        // Detect typed errors that lost their class crossing the isolate boundary.
+        // Only trust \x03-prefixed messages when the tracker/context confirms the classification,
+        // to prevent contracts from spoofing error types via throw new Error('\x03GAS:...').
         const msg = error.message || '';
         if (msg.charCodeAt(0) === 0x03) {
             const payload = msg.substring(1);
-            if (payload.startsWith('REVERT:')) {
+            if (payload.startsWith('REVERT:') && execContext && execContext.reverted) {
                 return this._errorResult(gasTracker, emissionCollector, 'revert: ' + payload.substring(7));
             }
-            if (payload.startsWith('GAS:')) {
+            if (payload.startsWith('GAS:') && gasTracker.used > gasTracker.ceiling) {
                 const parts = payload.substring(4).split(':');
                 return this._errorResult(gasTracker, emissionCollector,
                     'out_of_gas: used ' + parts[0] + ' of ' + parts[1]);

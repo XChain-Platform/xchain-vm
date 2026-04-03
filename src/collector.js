@@ -20,8 +20,9 @@ class EmissionCollector {
 
     addLog(message) {
         if (this.logs.length < 100) {
-            if (message.length > 1024)
-                message = message.substring(0, 1024) + '...(truncated)';
+            if (Buffer.byteLength(message, 'utf8') > 1024) {
+                message = Buffer.from(message, 'utf8').subarray(0, 1024).toString('utf8') + '...(truncated)';
+            }
             this.logs.push(message);
         }
     }

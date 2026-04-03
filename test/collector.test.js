@@ -109,4 +109,21 @@ describe('EmissionCollector', function() {
         const actions = ec.getActions();
         assert.strictEqual(actions, ec.getActions()); // Same reference
     });
+
+    it('should truncate multi-byte characters by byte length, not char count', function() {
+        const ec = new EmissionCollector(50);
+        // Each emoji is 4 UTF-8 bytes. 256 emojis = 1024 bytes exactly.
+        const emoji = '\u{1F600}';
+        const atLimit = emoji.repeat(256);
+        assert.strictEqual(Buffer.byteLength(atLimit, 'utf8'), 1024);
+        ec.addLog(atLimit);
+        assert(!ec.getLogs()[0].includes('truncated'), 'exactly 1024 bytes should not truncate');
+
+        // 257 emojis = 1028 bytes, over limit
+        const overLimit = emoji.repeat(257);
+        ec.addLog(overLimit);
+        assert(ec.getLogs()[1].includes('...(truncated)'), 'over 1024 bytes should truncate');
+        // Truncated result must not contain replacement characters
+        assert(!ec.getLogs()[1].includes('\uFFFD'), 'should not produce replacement characters');
+    });
 });

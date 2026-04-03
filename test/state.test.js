@@ -221,4 +221,26 @@ describe('StateManager', function() {
         const sm = new StateManager({}, LIMITS);
         assert.throws(() => sm.set('key', -Infinity), /NaN or Infinity/);
     });
+
+    it('should reject key exceeding maxStateKeySize', function() {
+        const sm = new StateManager({}, { ...LIMITS, maxStateKeySize: 16 });
+        assert.throws(() => sm.set('a'.repeat(17), 'value'), /key exceeds max size/);
+    });
+
+    it('should accept key at exactly maxStateKeySize', function() {
+        const sm = new StateManager({}, { ...LIMITS, maxStateKeySize: 16 });
+        sm.set('a'.repeat(16), 'value');
+        assert.strictEqual(sm.get('a'.repeat(16)), 'value');
+    });
+
+    it('should reject oversized key on delete', function() {
+        const sm = new StateManager({}, { ...LIMITS, maxStateKeySize: 16 });
+        assert.throws(() => sm.delete('a'.repeat(17)), /key exceeds max size/);
+    });
+
+    it('should use default 1024-byte key limit when maxStateKeySize not set', function() {
+        const sm = new StateManager({}, LIMITS); // LIMITS has no maxStateKeySize
+        assert.throws(() => sm.set('a'.repeat(1025), 'value'), /key exceeds max size/);
+        sm.set('a'.repeat(1024), 'value'); // at the limit — should pass
+    });
 });

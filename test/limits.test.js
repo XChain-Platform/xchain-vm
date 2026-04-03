@@ -122,4 +122,23 @@ function executeCode(vm, code, opts) {
         assert.strictEqual(result.stateChanges.length, 0);
         assert.strictEqual(result.emittedActions.length, 0);
     });
+
+    it('should reject code exceeding maxCodeSize', async function() {
+        const vm = createVM();
+        const oversized = '// ' + 'x'.repeat(65540);
+        const result = await executeCode(vm, oversized);
+        assert.strictEqual(result.success, false);
+        assert(result.error.includes('code size exceeds limit'), 'error: ' + result.error);
+    });
+
+    it('should accept code at exactly maxCodeSize', async function() {
+        const vm = createVM();
+        const header = 'module.exports = function(xchain) { /* ';
+        const footer = ' */ };';
+        const padding = 65536 - Buffer.byteLength(header + footer, 'utf8');
+        const code = header + 'x'.repeat(padding) + footer;
+        assert.strictEqual(Buffer.byteLength(code, 'utf8'), 65536);
+        const result = await executeCode(vm, code);
+        assert.strictEqual(result.success, true);
+    });
 });

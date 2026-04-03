@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-04-03
+
+### Added
+- Boundary test suite (`test/boundary.test.js`) — 106 tests across 15 sections covering gas ceiling, timeout, memory, code size, state management, emissions, logs, return values, math, metering, sandbox escapes, gateway parameters, emit fields, compound interactions, and determinism at boundaries
+- Boundary testing plan report at `reports/XCHAIN_VM_BOUNDARY_TESTING_PLAN.md`
+- Gas schedule validation — GasTracker constructor rejects non-negative-integer schedule values, `charge()` rejects negative amounts
+- State key size limit — new `maxStateKeySize` config (default 1,024 bytes), enforced on `set()` and `delete()`
+- Block cache size limit — new `maxBlockCacheSize` config (default 1,000 entries), prevents unbounded cache growth per block
+- Code size enforcement at execution — `maxCodeSize` is now checked in `execute()` before metering, not just at deploy time
+
+### Fixed
+- **Bridge control character collision** — `bridge()` now JSON-encodes all non-null/undefined return values with `\x01` prefix, preventing user-supplied strings containing `\x01` from being misinterpreted as protocol markers
+- **Error classification spoofing** — `_classifyError()` now verifies `\x03`-prefixed error messages against gas tracker state and an execution context revert flag, preventing contracts from spoofing `out_of_gas` or `revert` errors via `throw new Error('\x03GAS:...')`
+- **Log truncation byte-awareness** — `addLog()` now uses `Buffer.byteLength()` instead of `string.length` for the 1,024-byte cap, correctly handling multi-byte UTF-8 characters
+
+### Changed
+- `gateway.js` `buildGateway()` accepts a 6th `execContext` parameter for revert tracking
+- `_classifyError()` accepts a 5th `execContext` parameter for error verification
+
 ## [1.4.0] - 2026-04-03
 
 ### Added

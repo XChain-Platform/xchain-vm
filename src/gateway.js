@@ -20,9 +20,10 @@ const { buildMathAPI } = require('./math.js');
  * @param {EmissionCollector} emissionCollector
  * @param {object} readOnlyData - { caller, contractAddress, params, blockContext, balances, tokenInfo, oracleData, crossChainData }
  * @param {object} gasSchedule
+ * @param {object} execContext - Shared execution context { reverted: false }
  * @returns {object} The xchain gateway object
  */
-function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData, gasSchedule) {
+function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData, gasSchedule, execContext) {
     return {
         // Read-only context (0 gas)
         getBlockHeight:     () => readOnlyData.blockContext.height,
@@ -104,10 +105,14 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
 
         // Control flow (gas-free)
         revert: (reason) => {
+            if (execContext) execContext.reverted = true;
             throw new ContractRevertError(reason || 'reverted');
         },
         require: (condition, reason) => {
-            if (!condition) throw new ContractRevertError(reason || 'requirement failed');
+            if (!condition) {
+                if (execContext) execContext.reverted = true;
+                throw new ContractRevertError(reason || 'requirement failed');
+            }
         },
 
         // Debug logging (gas-free, capped at 100 entries)

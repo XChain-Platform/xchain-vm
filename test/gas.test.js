@@ -95,4 +95,21 @@ describe('GasTracker', function() {
         tracker.charge(500000);
         assert.strictEqual(tracker.getUsed(), 1000000);
     });
+
+    it('should reject negative gas charge', function() {
+        const tracker = new GasTracker(SCHEDULE, 1000);
+        assert.throws(() => tracker.charge(-1), /non-negative/);
+    });
+
+    it('should reject negative schedule value in constructor', function() {
+        assert.throws(() => new GasTracker({ ...SCHEDULE, VM_COMPUTATION: -1 }, 1000), /non-negative integer/);
+    });
+
+    it('should reject float schedule value in constructor', function() {
+        assert.throws(() => new GasTracker({ ...SCHEDULE, VM_COMPUTATION: 1.5 }, 1000), /non-negative integer/);
+    });
+
+    it('should reject non-number schedule value in constructor', function() {
+        assert.throws(() => new GasTracker({ ...SCHEDULE, VM_COMPUTATION: 'fast' }, 1000), /non-negative integer/);
+    });
 });
