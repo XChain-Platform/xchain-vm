@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-04-03
+
+### Added
+- Fuzz testing suite (`test/fuzz/`) — 86 property-based and adversarial tests across 8 categories using fast-check
+- Fuzz harness (`test/fuzz/harness.js`) — shared VM factory, execute wrapper, deterministic result hashing, configurable iteration count via `FUZZ_ITERATIONS` env var
+- 7 invariant checkers (`test/fuzz/invariants.js`) — result shape, atomicity, gas ceiling, emission cap, state limits, prototype pollution detection, determinism verification
+- 5 input generators (`test/fuzz/generators/`) — AST-mutated code (10 templates + 25 adversarial patterns), argument arrays, emission payloads for all 16 action types, state key/value adversarial inputs, math edge-case numerics
+- Code fuzz tests — gas/revert spoof detection, serialization boundary marker safety, AST mutation resilience
+- Argument fuzz tests — protocol marker injection, out-of-bounds param access, param shape invariants
+- Emission fuzz tests — valid/malformed/non-object params for all 16 methods, emission cap boundary enforcement
+- State fuzz tests — null/NaN/Infinity rejection, key/value size limits, prototype-poisoning key safety, delete-set cycle integrity, initial state isolation
+- Math fuzz tests — commutativity (add, multiply), antisymmetry (compare), additive identity, roundtrip identity (subtract(add(a,b),b)=a), no scientific notation in output
+- Sandbox fuzz tests — 20 static escape vectors (constructor chains, prototype walking, eval/Function, Proxy/WeakRef, JSON override, getter traps, globalThis enumeration) + property-based prototype pollution sweep
+- Determinism fuzz tests — dual-VM identical results for code, math, state, gas usage, block context
+- Resource exhaustion fuzz tests — 12 metering bypass attempts, 4 memory bombs, deep recursion, compilation bombs, wall-clock termination, return value truncation
+- CLI fuzz runner (`test/fuzz/run.js`) with per-category filtering
+- `npm run test:fuzz` and `npm run fuzz` scripts
+- Fuzz testing plan report at `reports/XCHAIN_VM_FUZZ_TESTING_PLAN.md`
+- `fast-check` dev dependency for property-based testing
+
 ## [1.5.0] - 2026-04-03
 
 ### Added
