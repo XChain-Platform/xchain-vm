@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: LicenseRef-Dankest-Community -->
 <!-- Copyright © 2025 Dankest, LLC -->
 
-# XChain Platform VM
+# XChain Platform Virtual Machine (VM)
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
@@ -28,7 +28,19 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 
 ## Documentation
 
-Full VM architecture and protocol details are available in the [xchain-documentation](https://github.com/XChain-platform/xchain-documentation) repository. The implementation plan is at `claude/reports/VM_RUNTIME_MODULE_PLAN.md`.
+Full VM architecture and protocol details are available in the [xchain-documentation](https://github.com/XChain-platform/xchain-documentation) repository:
+
+| Document | Description |
+|---|---|
+| [Smart Contracts](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/SMART_CONTRACTS.md) | VM architecture, contract model, bounded execution, use cases |
+| [Block Hashes](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/BLOCK_HASHES.md) | Ledger, actions, and contract hashes — how contract state is verified |
+| [Ledger](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/LEDGER.md) | Double-entry ledger — how contract derived addresses participate |
+| [DEPLOY](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/DEPLOY.md) | DEPLOY action spec — code encoding, api_version, gas costs |
+| [EXECUTE](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/EXECUTE.md) | EXECUTE action spec — method calls, params, gas metering |
+| [DEPOSIT](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/DEPOSIT.md) | DEPOSIT action spec — transferring tokens into contract custody |
+| [WITHDRAW](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/WITHDRAW.md) | WITHDRAW action spec — owner-initiated withdrawal from contract |
+| [Indexer Database](https://github.com/XChain-platform/xchain-documentation/blob/master/components/indexer/DATABASE.md) | Schema reference — contracts, contract_state, executions, emissions tables |
+| [Fee Schedule](https://github.com/XChain-platform/xchain-documentation/blob/master/components/indexer/CONFIGURATION.md) | Unified gas schedule — VM gas costs, GAS_PRICE, fee conversion |
 
 ## Quick Start
 

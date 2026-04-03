@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- README: add documentation table linking to xchain-documentation (action specs, concepts, indexer schema, fee schedule)
+
 ## [1.0.0] - 2026-04-03
 
 ### Added
