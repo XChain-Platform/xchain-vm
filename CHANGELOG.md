@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-04-03
+
+### Added
+- Performance benchmark suite (`bench/`) — harness, 7 benchmark contracts (4 tiers + 3 stress), and 5 scenario scripts
+- Pipeline microbenchmarks (`bench/scenarios/pipeline.js`) — measures metering, cold/warm execution, and stress contract latency per tier
+- Gateway method benchmarks (`bench/scenarios/gateway.js`) — isolates per-call overhead for context getters, state CRUD, emit, math, and logging
+- Block throughput benchmark (`bench/scenarios/throughput.js`) — simulates blocks of 50/200/1000 contracts with mixed complexity and cache comparison
+- Soak test (`bench/scenarios/soak.js`) — sustained load with memory and throughput stability monitoring, configurable duration
+- Cache effectiveness benchmark (`bench/scenarios/cache.js`) — measures compilation cache impact at 0%/50%/100% hit rates
+- NPM scripts: `bench:quick` (pipeline + gateway), `bench:full` (all except soak), `bench:soak` (sustained load)
+
 ## [1.7.0] - 2026-04-03
 
 ### Added
