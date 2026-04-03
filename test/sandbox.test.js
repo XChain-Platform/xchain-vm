@@ -133,4 +133,151 @@ function executeCode(vm, code) {
         // If we reach here, host was not affected
         assert(true);
     });
+
+    it('should block WeakRef', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof WeakRef; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block FinalizationRegistry', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof FinalizationRegistry; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block Proxy', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof Proxy; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block SharedArrayBuffer', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof SharedArrayBuffer; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block Atomics', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof Atomics; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block queueMicrotask', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof queueMicrotask; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block setInterval', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof setInterval; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block setImmediate', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof setImmediate; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should block console', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof console; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+    });
+
+    it('should keep Math.ceil', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return Math.ceil(3.2); };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 4);
+    });
+
+    it('should keep Math.abs', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return Math.abs(-7); };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 7);
+    });
+
+    it('should keep Math.PI', async function() {
+        const result = await executeCode(vm,
+            'module.exports = function(xchain) { return typeof Math.PI; };');
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'number');
+    });
+
+    it('should freeze Math object (no mutation)', async function() {
+        const result = await executeCode(vm, `
+            module.exports = function(xchain) {
+                try {
+                    Math.custom = function() {};
+                } catch(e) {
+                    return 'frozen';
+                }
+                return typeof Math.custom;
+            };
+        `);
+        assert.strictEqual(result.success, true);
+        const val = JSON.parse(result.returnValue);
+        assert(val === 'frozen' || val === 'undefined', 'Math should be frozen: ' + val);
+    });
+
+    it('should block indirect eval', async function() {
+        const result = await executeCode(vm, `
+            module.exports = function(xchain) {
+                try {
+                    var indirectEval = (0, eval);
+                    return typeof indirectEval;
+                } catch(e) {
+                    return 'blocked: ' + e.message;
+                }
+            };
+        `);
+        assert.strictEqual(result.success, true);
+        const val = JSON.parse(result.returnValue);
+        assert(val === 'undefined' || val.startsWith('blocked'), 'indirect eval should be blocked: ' + val);
+    });
+
+    it('should block Function constructor', async function() {
+        const result = await executeCode(vm, `
+            module.exports = function(xchain) {
+                try {
+                    var fn = Function('return 1');
+                    return fn();
+                } catch(e) {
+                    return 'blocked';
+                }
+            };
+        `);
+        assert.strictEqual(result.success, true);
+        assert.strictEqual(JSON.parse(result.returnValue), 'blocked');
+    });
+
+    it('should freeze the xchain object', async function() {
+        const result = await executeCode(vm, `
+            module.exports = function(xchain) {
+                try {
+                    xchain.custom = 'injected';
+                } catch(e) {
+                    return 'frozen';
+                }
+                return typeof xchain.custom;
+            };
+        `);
+        assert.strictEqual(result.success, true);
+        const val = JSON.parse(result.returnValue);
+        assert(val === 'frozen' || val === 'undefined', 'xchain should be frozen: ' + val);
+    });
 });

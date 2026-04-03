@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-03
+
+### Added
+- 5 new test files: errors.test.js, validator.test.js, gateway-emit.test.js, isolate.test.js, index.test.js
+- Unit tests for all 16 emit action types with required field validation coverage
+- Unit tests for ActionValidator (allowed/unknown actions, params validation)
+- Unit tests for ContractRevertError and GasExhaustedError error classes
+- Unit tests for IsolateManager (create, compile, dispose, cached data)
+- Comprehensive XChainVM orchestration tests (result structure, atomicity, return value serialization, method routing, error classification, context accessors, balance/tokenInfo, oracle, crossChain, logging, compilation cache, all 16 emit types integration)
+- Extended gas.test.js with zero/boundary charge tests
+- Extended math.test.js with precision, negative zero, scientific notation, mod edge cases
+- Extended state.test.js with exact limit boundaries, UTF-8, empty key, type coverage, insertion order
+- Extended collector.test.js with exact emission/log boundaries, truncation accuracy
+- Extended metering.test.js with deep binary expressions, combined constructs, arrow variants, directive prologues
+- Extended sandbox.test.js with WeakRef, Proxy, SharedArrayBuffer, Atomics, Math freeze, indirect eval, Function constructor, xchain freeze
+- Extended determinism.test.js with math ops, emit ops, 5-run consistency
+- Extended syntax.test.js with empty code, comments, __gas variants, ES2020 features
+- Unit testing plan report at reports/XCHAIN_VM_UNIT_TESTING_PLAN.md
+
 ### Changed
 - README: add documentation table linking to xchain-documentation (action specs, concepts, indexer schema, fee schedule)
 

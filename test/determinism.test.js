@@ -107,4 +107,46 @@ async function runTwice(vm, opts) {
         assert.strictEqual(hashResult(r1), hashResult(r2));
         assert.strictEqual(r1.success, false);
     });
+
+    it('should produce identical results for math operations', async function() {
+        const code = `module.exports = function(xchain) {
+            var a = xchain.math.divide('1', '3');
+            var b = xchain.math.multiply(a, '3');
+            var c = xchain.math.subtract(b, '1');
+            return { a: a, b: b, c: c };
+        };`;
+        const opts = { ...baseOpts, code };
+        const [r1, r2] = await runTwice(vm, opts);
+        assert.strictEqual(hashResult(r1), hashResult(r2));
+        assert.strictEqual(r1.success, true);
+    });
+
+    it('should produce identical results for emit operations', async function() {
+        const code = `module.exports = function(xchain) {
+            xchain.emit.send({ destination: 'addr1', tick: 'T', quantity: '100' });
+            xchain.emit.send({ destination: 'addr2', tick: 'T', quantity: '200' });
+            return 'done';
+        };`;
+        const opts = { ...baseOpts, code };
+        const [r1, r2] = await runTwice(vm, opts);
+        assert.strictEqual(hashResult(r1), hashResult(r2));
+        assert.strictEqual(r1.emittedActions.length, 2);
+    });
+
+    it('should produce identical results across 5 runs', async function() {
+        const code = `module.exports = function(xchain) {
+            for (var i = 0; i < 5; i++) {
+                xchain.state.set('k' + i, xchain.math.multiply(String(i), '10'));
+            }
+            return 'done';
+        };`;
+        const opts = { ...baseOpts, code, state: {} };
+        const hashes = [];
+        for (let i = 0; i < 5; i++) {
+            const result = await vm.execute(opts);
+            hashes.push(hashResult(result));
+        }
+        const allEqual = hashes.every(h => h === hashes[0]);
+        assert(allEqual, 'all 5 runs should produce identical results');
+    });
 });

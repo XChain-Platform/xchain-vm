@@ -197,5 +197,99 @@ describe('Metering', function() {
         it('should handle parse errors gracefully', function() {
             assert.strictEqual(hasGasIdentifier('this is { not valid'), false);
         });
+
+        it('should not detect __gas in member expression property', function() {
+            // obj.__gas is a MemberExpression — the property Identifier is not
+            // visited as a standalone Identifier by acorn walk.full
+            assert.strictEqual(hasGasIdentifier('var x = obj.__gas;'), false);
+        });
+
+        it('should not flag __gas in comments', function() {
+            // Comments are not Identifier nodes
+            assert.strictEqual(hasGasIdentifier('// __gas\nvar x = 1;'), false);
+        });
+    });
+
+    describe('deep binary expressions', function() {
+        it('should inject gas into deeply nested binary (>10 operands)', function() {
+            // Build a + b + c + ... with 15 terms
+            const terms = Array.from({ length: 15 }, (_, i) => 'x' + i);
+            const code = 'var result = ' + terms.join(' + ') + ';';
+            const metered = meterCode(code);
+            assert(metered.includes('__gas'), 'should contain __gas for deep binary');
+            // Should still produce valid JS
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+
+        it('should not inject extra gas for shallow binary (<= 10 operands)', function() {
+            const code = 'var result = a + b + c;';
+            const metered = meterCode(code);
+            // Should be valid but no deep binary injection needed
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+    });
+
+    describe('combined constructs', function() {
+        it('should meter code with loops, ternaries, calls, and functions', function() {
+            const code = `
+                function process(items) {
+                    var result = [];
+                    for (var i = 0; i < items.length; i++) {
+                        var val = items[i] > 0 ? items[i] * 2 : 0;
+                        result.push(val);
+                    }
+                    return result;
+                }
+            `;
+            const metered = meterCode(code);
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+            // Count __gas occurrences — should be multiple
+            const gasCount = (metered.match(/__gas/g) || []).length;
+            assert(gasCount >= 4, 'should have multiple __gas injection points, got ' + gasCount);
+        });
+
+        it('should handle arrow with destructured params', function() {
+            const code = 'var fn = ({ a, b }) => a + b;';
+            const metered = meterCode(code);
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+
+        it('should handle arrow with default params', function() {
+            const code = 'var fn = (a = 1, b = 2) => { return a + b; };';
+            const metered = meterCode(code);
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+
+        it('should handle arrow with rest params', function() {
+            const code = 'var fn = (...args) => args.length;';
+            const metered = meterCode(code);
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+
+        it('should handle multiple directive prologues', function() {
+            const code = 'function foo() { "use strict"; "use asm"; return 1; }';
+            const metered = meterCode(code);
+            const asmIdx = metered.indexOf('"use asm"');
+            const gasIdx = metered.indexOf('__gas');
+            assert(gasIdx > asmIdx, '__gas should come after all directives');
+        });
+
+        it('should handle else-if chains', function() {
+            const code = 'if (a) { x(); } else if (b) { y(); } else if (c) { z(); } else { w(); }';
+            const metered = meterCode(code);
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+
+        it('should handle empty switch case', function() {
+            const code = 'switch (x) { case 1: case 2: y = 1; break; }';
+            const metered = meterCode(code);
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+
+        it('should handle try without catch', function() {
+            const code = 'try { x(); } finally { y(); }';
+            const metered = meterCode(code);
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
     });
 });

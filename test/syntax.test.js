@@ -76,5 +76,70 @@ try {
             assert.strictEqual(warnings.length, 1);
             assert(warnings[0].includes('line 2'), warnings[0]);
         });
+
+        it('should report multiple float literals', function() {
+            const warnings = checkFloatWarnings('var x = 0.1;\nvar y = 0.2;\nvar z = 0.3;');
+            assert.strictEqual(warnings.length, 3);
+        });
+
+        it('should handle parse errors gracefully', function() {
+            const warnings = checkFloatWarnings('this is { not valid');
+            assert.strictEqual(warnings.length, 0);
+        });
+    });
+
+    describe('validateSyntax (extended)', function() {
+        it('should accept empty function body', function() {
+            const result = validateSyntax('function foo() {}');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should accept code with only comments', function() {
+            const result = validateSyntax('// nothing here');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should reject __gas as function name', function() {
+            const result = validateSyntax('function __gas() { return 1; }');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('__gas'));
+        });
+
+        it('should reject __gas as variable name in let', function() {
+            const result = validateSyntax('let __gas = 42;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('__gas'));
+        });
+
+        it('should accept code using string "__gas"', function() {
+            const result = validateSyntax('var x = "__gas";');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should accept arrow functions', function() {
+            const result = validateSyntax('var fn = (a, b) => a + b;');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should accept template literals', function() {
+            const result = validateSyntax('var x = `hello ${name}`;');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should accept destructuring', function() {
+            const result = validateSyntax('var { a, b } = obj;');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should accept for-of loops', function() {
+            const result = validateSyntax('for (var x of [1,2,3]) {}');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should reject completely empty string', function() {
+            // Empty string is valid JS
+            const result = validateSyntax('');
+            assert.strictEqual(result.valid, true);
+        });
     });
 });

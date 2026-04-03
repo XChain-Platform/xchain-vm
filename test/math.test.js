@@ -111,4 +111,59 @@ describe('Math API', function() {
             assert.strictEqual(math.add('1e2', '0'), '100');
         });
     });
+
+    describe('extended edge cases', function() {
+        it('should not produce negative zero', function() {
+            const result = math.subtract('1', '1');
+            assert.strictEqual(result, '0');
+            assert(!result.startsWith('-'), 'should not be negative zero');
+        });
+
+        it('should handle very large decimal precision', function() {
+            const result = math.add('0.123456789012345678901234567890', '0.000000000000000000000000000001');
+            assert(result.includes('12345678901234567890123456789'), 'should preserve precision');
+        });
+
+        it('should handle 100+ digit integers without overflow', function() {
+            const big = '1' + '0'.repeat(100);
+            const result = math.add(big, '0');
+            // Should at least preserve the magnitude
+            assert.strictEqual(result.length, 101);
+            assert(result.startsWith('1'));
+        });
+
+        it('should handle mod with zero divisor', function() {
+            // mathjs mod by zero returns NaN; toFixed produces 'NaN' string
+            // The result is a string 'NaN' rather than throwing
+            const result = math.mod('5', '0');
+            assert.strictEqual(typeof result, 'string');
+        });
+
+        it('should handle mod with negative dividend', function() {
+            const result = math.mod('-10', '3');
+            assert.strictEqual(typeof result, 'string');
+        });
+
+        it('should return false for isZero with near-zero', function() {
+            assert.strictEqual(math.isZero('0.0000000000000001'), false);
+        });
+
+        it('should return true for isZero with "0.00"', function() {
+            assert.strictEqual(math.isZero('0.00'), true);
+        });
+
+        it('should return number type from compare', function() {
+            assert.strictEqual(typeof math.compare('1', '2'), 'number');
+        });
+
+        it('should handle scientific notation in divide', function() {
+            assert.strictEqual(math.divide('1e4', '1e2'), '100');
+        });
+
+        it('should format results in fixed notation (no scientific)', function() {
+            const result = math.multiply('1e10', '1e10');
+            assert(!result.includes('e'), 'should be fixed notation');
+            assert.strictEqual(result, '100000000000000000000');
+        });
+    });
 });

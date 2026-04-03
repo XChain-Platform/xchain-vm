@@ -71,4 +71,28 @@ describe('GasTracker', function() {
             tracker.chargeComputation();
         }, GasExhaustedError);
     });
+
+    it('should handle zero gas charge', function() {
+        const tracker = new GasTracker(SCHEDULE, 100);
+        tracker.charge(0);
+        assert.strictEqual(tracker.getUsed(), 0);
+    });
+
+    it('should exhaust immediately with ceiling of 0', function() {
+        const tracker = new GasTracker(SCHEDULE, 0);
+        assert.throws(() => tracker.charge(1), GasExhaustedError);
+    });
+
+    it('should not throw for charge(0) with ceiling 0', function() {
+        const tracker = new GasTracker(SCHEDULE, 0);
+        tracker.charge(0);
+        assert.strictEqual(tracker.getUsed(), 0);
+    });
+
+    it('should accumulate large charges', function() {
+        const tracker = new GasTracker(SCHEDULE, 1000000);
+        tracker.charge(500000);
+        tracker.charge(500000);
+        assert.strictEqual(tracker.getUsed(), 1000000);
+    });
 });

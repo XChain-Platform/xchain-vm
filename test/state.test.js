@@ -135,4 +135,90 @@ describe('StateManager', function() {
         sm.set('c', '3');  // should succeed
         assert.strictEqual(sm.get('c'), '3');
     });
+
+    it('should allow setting exactly at maxStateKeys limit', function() {
+        const sm = new StateManager({}, { ...LIMITS, maxStateKeys: 3 });
+        sm.set('a', '1');
+        sm.set('b', '2');
+        sm.set('c', '3');
+        // All 3 should be readable
+        assert.strictEqual(sm.get('a'), '1');
+        assert.strictEqual(sm.get('b'), '2');
+        assert.strictEqual(sm.get('c'), '3');
+    });
+
+    it('should allow value at exactly maxStateValueSize', function() {
+        const sm = new StateManager({}, { ...LIMITS, maxStateValueSize: 10 });
+        // JSON.stringify('"xx"') = "xx" (4 bytes for a 2-char string with quotes)
+        // We need JSON byte length == 10: '"12345678"' is 10 bytes
+        sm.set('key', '12345678');
+        assert.strictEqual(sm.get('key'), '12345678');
+    });
+
+    it('should reject value one byte over maxStateValueSize', function() {
+        const sm = new StateManager({}, { ...LIMITS, maxStateValueSize: 10 });
+        // '"123456789"' is 11 bytes
+        assert.throws(() => sm.set('key', '123456789'), /max size/);
+    });
+
+    it('should handle multi-byte UTF-8 in value size check', function() {
+        // Emoji is 4 bytes in UTF-8. JSON.stringify adds quotes.
+        const sm = new StateManager({}, { ...LIMITS, maxStateValueSize: 20 });
+        // This should work if total byte length fits
+        sm.set('key', '\u{1F600}');
+        assert.strictEqual(sm.get('key'), '\u{1F600}');
+    });
+
+    it('should allow empty string key', function() {
+        const sm = new StateManager({}, LIMITS);
+        sm.set('', 'value');
+        assert.strictEqual(sm.get(''), 'value');
+        assert.strictEqual(sm.has(''), true);
+    });
+
+    it('should handle boolean values', function() {
+        const sm = new StateManager({}, LIMITS);
+        sm.set('flag', true);
+        assert.strictEqual(sm.get('flag'), true);
+    });
+
+    it('should handle number values', function() {
+        const sm = new StateManager({}, LIMITS);
+        sm.set('count', 42);
+        assert.strictEqual(sm.get('count'), 42);
+    });
+
+    it('should handle array values', function() {
+        const sm = new StateManager({}, LIMITS);
+        sm.set('list', [1, 2, 3]);
+        assert.deepStrictEqual(sm.get('list'), [1, 2, 3]);
+    });
+
+    it('should maintain key count after repeated delete-set on same key', function() {
+        const sm = new StateManager({}, { ...LIMITS, maxStateKeys: 2 });
+        sm.set('a', '1');
+        sm.set('b', '2');
+        // Delete a, set a again
+        sm.delete('a');
+        sm.set('a', 'new');
+        // Should still be at 2 keys, not 3
+        assert.strictEqual(sm.get('a'), 'new');
+        assert.throws(() => sm.set('c', '3'), /max state keys/);
+    });
+
+    it('should return changes in insertion order', function() {
+        const sm = new StateManager({}, LIMITS);
+        sm.set('z', '1');
+        sm.set('a', '2');
+        sm.set('m', '3');
+        const { changes } = sm.getChanges();
+        assert.strictEqual(changes[0].key, 'z');
+        assert.strictEqual(changes[1].key, 'a');
+        assert.strictEqual(changes[2].key, 'm');
+    });
+
+    it('should reject -Infinity values', function() {
+        const sm = new StateManager({}, LIMITS);
+        assert.throws(() => sm.set('key', -Infinity), /NaN or Infinity/);
+    });
 });
