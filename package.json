@@ -1,7 +1,7 @@
 {
   "name": "xchain-vm",
   "description": "XChain Platform Virtual Machine (VM) runtime — deterministic smart contract execution in sandboxed V8 isolates",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "license": "SEE LICENSE IN LICENSE.md",
   "main": "src/index.js",
   "repository": {
@@ -16,6 +16,8 @@
     "mathjs": "^13.2.3"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^8.7.1",
+    "@stryker-mutator/mocha-runner": "^8.7.1",
     "fast-check": "^4.6.0",
     "mocha": "^11.7.5"
   },
@@ -32,6 +34,16 @@
     "test:chaos": "mocha --timeout 120000 'test/chaos/**/*.chaos.test.js'",
     "test:chaos:quick": "mocha --timeout 60000 'test/chaos/phase1/**/*.chaos.test.js'",
     "test:chaos:phase2": "mocha --timeout 120000 'test/chaos/phase2/**/*.chaos.test.js'",
-    "test:chaos:phase3": "mocha --timeout 60000 'test/chaos/phase3/**/*.chaos.test.js'"
+    "test:chaos:phase3": "mocha --timeout 60000 'test/chaos/phase3/**/*.chaos.test.js'",
+    "mutation": "stryker run",
+    "mutation:critical": "stryker run --mutate 'src/gas.js,src/sandbox.js,src/metering.js,src/index.js'",
+    "mutation:high": "stryker run --mutate 'src/gateway.js,src/gateway-emit.js,src/state.js,src/math.js'",
+    "mutation:medium": "stryker run --mutate 'src/collector.js,src/validator.js,src/syntax.js'",
+    "mutation:quick": "stryker run --mutate 'src/gas.js,src/collector.js,src/errors.js,src/validator.js' --concurrency 2",
+    "mutation:custom": "node stryker-xchain-vm-mutator/index.js",
+    "mutation:custom:critical": "node stryker-xchain-vm-mutator/index.js --mutate 'src/gas.js,src/sandbox.js,src/metering.js,src/index.js'",
+    "mutation:custom:dryrun": "node stryker-xchain-vm-mutator/index.js --dryRun",
+    "mutation:report": "node scripts/mutation-report.js",
+    "mutation:ci": "stryker run --incremental --incrementalFile reports/mutation/.stryker-incremental.json"
   }
 }

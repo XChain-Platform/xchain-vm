@@ -1,2 +1,6 @@
 /node_modules
 .DS_Store
+
+# Stryker mutation testing
+.stryker-tmp/
+reports/mutation/

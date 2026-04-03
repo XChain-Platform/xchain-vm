@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-04-03
+
+### Added
+- Mutation testing infrastructure using Stryker 8.7.1 with Mocha runner — 1,136 built-in mutants across 13 source modules, `perTest` coverage analysis for efficient per-mutant test execution
+- Custom VM-specific mutation operators (`stryker-xchain-vm-mutator/`) — 5 operators targeting patterns Stryker's built-in mutators cannot reach:
+  - `ArrayElementDeletion` — removes individual elements from array literals (sandbox `toDelete` list, validator `ALLOWED_ACTIONS`, emit required fields)
+  - `StringPrefixSwap` — swaps `\x01`/`\x02`/`\x03` protocol prefix characters in cross-isolate communication
+  - `GuardDeletion` — removes `throw` statements inside `if` blocks (gas ceiling, state validation, input checks)
+  - `ObjectFreezeRemoval` — removes `Object.freeze`/`Object.defineProperty` calls (sandbox constructor neutering, `__gas` protection)
+  - `EmbeddedCodeMutation` — applies inner operators to JS code embedded in template literal strings (`STRIP_SCRIPT`, `HARNESS_SOURCE`, `CONTRACT_WRAPPER`)
+- Standalone custom mutation runner (`stryker-xchain-vm-mutator/index.js`) — applies 126 custom mutants, runs test suite per mutant, reports kill/survive with progress output
+- Mutation report generator (`scripts/mutation-report.js`) — merges Stryker JSON and custom runner results, produces `MUTATION_SUMMARY.md` with per-module scores, tier-based pass/fail, survived mutation details, and actionable recommendations
+- NPM scripts: `mutation` (full Stryker run), `mutation:critical` / `mutation:high` / `mutation:medium` (tier-scoped), `mutation:quick` (smallest modules), `mutation:custom` (VM-specific operators), `mutation:custom:dryrun` (preview), `mutation:report` (generate summary), `mutation:ci` (incremental mode)
+- Stryker configuration (`stryker.config.json`) with HTML/JSON/clear-text reporters, `StringLiteral` exclusion, tiered thresholds (break: 75%, low: 80%, high: 90%)
+- Mutation testing plan report at `reports/XCHAIN_VM_MUTATION_TESTING_PLAN.md`
+
 ## [1.9.0] - 2026-04-03
 
 ### Added

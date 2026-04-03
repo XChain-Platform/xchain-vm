@@ -1,0 +1,7 @@
+{
+  "name": "stryker-xchain-vm-mutator",
+  "version": "1.0.0",
+  "description": "VM-specific mutation operators for XChain VM mutation testing",
+  "main": "mutators.js",
+  "private": true
+}
