@@ -8,8 +8,9 @@
 
 class StateManager {
     constructor(initialState, limits) {
-        // Filter out any null/undefined values (defensive)
-        this.state = {};
+        // Use Object.create(null) to prevent prototype pollution (RISK-11).
+        // Keys like '__proto__', 'constructor', 'hasOwnProperty' are safe.
+        this.state = Object.create(null);
         for (const [key, value] of Object.entries(initialState)) {
             if (value !== null && value !== undefined)
                 this.state[key] = value;

@@ -48,9 +48,21 @@ const HARNESS_SOURCE = `
         };
     }
 
-    // Wrap __gas Reference into a callable function for metered code
+    // Wrap __gas Reference into a callable function for metered code.
+    // Use __defineProperty (saved by sandbox before stripping Object.defineProperty)
+    // to make __gas non-writable/non-configurable so contracts cannot overwrite it.
     var __gasRef = globalThis.__gas;
-    globalThis.__gas = function() { __gasRef.applySync(undefined, []); };
+    var __gasFunc = function() { __gasRef.applySync(undefined, []); };
+    var __defProp = globalThis.__defineProperty;
+    delete globalThis.__gas;
+    __defProp(globalThis, '__gas', {
+        value: __gasFunc,
+        writable: false,
+        configurable: false,
+        enumerable: false
+    });
+    // Clean up __defineProperty — no longer needed
+    delete globalThis.__defineProperty;
 
     // Build the xchain object from injected references
     globalThis.xchain = Object.freeze({
@@ -318,11 +330,12 @@ class XChainVM {
             if (this._blockCache && this._blockCache.has(cacheKey))
                 cachedData = this._blockCache.get(cacheKey);
 
-            // Compile the contract wrapper with the metered code injected as a string
+            // Compile the contract wrapper with the metered code injected as a string.
+            // Wrap in IIFE so __contractCode/__methodName are local, not global.
             const escapedCode = JSON.stringify(meteredCode);
             const escapedMethod = JSON.stringify(opts.method || 'default');
-            const fullSource = 'var __contractCode = ' + escapedCode + ';\n' +
-                               'var __methodName = ' + escapedMethod + ';\n' +
+            const fullSource = 'let __contractCode = ' + escapedCode + ';\n' +
+                               'let __methodName = ' + escapedMethod + ';\n' +
                                CONTRACT_WRAPPER;
 
             let script;
@@ -522,12 +535,15 @@ class XChainVM {
         if (msg.charCodeAt(0) === 0x03) {
             const payload = msg.substring(1);
             if (payload.startsWith('REVERT:') && execContext && execContext.reverted) {
-                return this._errorResult(gasTracker, emissionCollector, 'revert: ' + payload.substring(7));
+                // Use the stored revert reason from execContext, NOT the error message,
+                // to prevent spoofing via try { xchain.revert('real') } catch(e) {}
+                // followed by throw new Error('\x03REVERT:fake')
+                const reason = execContext.revertReason || payload.substring(7);
+                return this._errorResult(gasTracker, emissionCollector, 'revert: ' + reason);
             }
             if (payload.startsWith('GAS:') && gasTracker.used > gasTracker.ceiling) {
-                const parts = payload.substring(4).split(':');
                 return this._errorResult(gasTracker, emissionCollector,
-                    'out_of_gas: used ' + parts[0] + ' of ' + parts[1]);
+                    'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling);
             }
         }
         // isolated-vm timeout errors
@@ -541,8 +557,23 @@ class XChainVM {
         if (msg.includes('out of memory') || msg.includes('Array buffer allocation failed')) {
             return this._errorResult(gasTracker, emissionCollector, 'out_of_memory: isolate memory limit exceeded');
         }
-        // Generic contract error
-        return this._errorResult(gasTracker, emissionCollector, 'error: ' + msg);
+        // Generic contract error — sanitize to prevent information leakage (RISK-15).
+        // Strip stack traces, file paths, and internal details.
+        return this._errorResult(gasTracker, emissionCollector, 'error: ' + this._sanitizeError(msg));
+    }
+
+    /**
+     * Sanitize an error message to prevent information leakage.
+     * Returns only the first line, strips file paths and stack traces.
+     */
+    _sanitizeError(msg) {
+        if (!msg) return 'unknown error';
+        // Take only the first line
+        const firstLine = msg.split('\n')[0];
+        // Strip file paths (e.g., /home/user/.../file.js:123:45)
+        const sanitized = firstLine.replace(/\s*(\/[\w./-]+(?::\d+(?::\d+)?)?)/g, '');
+        // Truncate to 256 chars
+        return sanitized.length > 256 ? sanitized.substring(0, 256) : sanitized;
     }
 
     /**

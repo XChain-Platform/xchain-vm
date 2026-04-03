@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-04-03
+
+### Added
+- Security audit plan report at `reports/XCHAIN_VM_SECURITY_AUDIT_PLAN.md` — comprehensive risk register covering 19 risks across 7 categories with prioritized mitigations
+- Security test suite (`test/security.test.js`) — 75 tests covering sandbox escape vectors, error type spoofing, gas metering bypass, prototype pollution, emit type validation, math input limits, information leakage, and state isolation
+- Emit parameter type validation (`gateway-emit.js`) — `destination`, `tick`, `quantity`, `giveAmount`, `getAmount`, `dividendTick`, `coin1`, `coin2` fields enforced as strings
+- Math input length limit — inputs exceeding 256 characters rejected to prevent bignumber DoS (RISK-12/RISK-18)
+
+### Fixed
+- **Sandbox escape via prototype chain** (RISK-01) — neutered `Object.prototype.constructor`, `Array.prototype.constructor`, `String.prototype.constructor`, `Number.prototype.constructor`, `Boolean.prototype.constructor`, `RegExp.prototype.constructor` with `writable:false, configurable:false`
+- **Sandbox escape via function-type constructors** (RISK-02) — neutered `GeneratorFunction`, `AsyncFunction`, `AsyncGeneratorFunction` prototype constructors
+- **Reflect API available in sandbox** (RISK-03) — `Reflect` removed from isolate globals
+- **Error type spoofing via caught reverts** (RISK-04) — `execContext.revertReason` stores original reason; classifier uses stored reason instead of error message to prevent spoofing after `try { xchain.revert() } catch(e) {}`
+- **Gas metering bypass via __gas overwrite** (RISK-06) — `__gas` defined as `writable:false, configurable:false` on `globalThis`; contracts cannot overwrite or delete the metering callback
+- **Unmetered getter/setter traps** (RISK-05 partial) — `Object.defineProperty`, `Object.defineProperties` removed from sandbox; `Object.create` restricted to single-argument form
+- **RegExp catastrophic backtracking** (RISK-05/M-07) — `RegExp` global removed from sandbox; regex literals still work
+- **Prototype pollution in state store** (RISK-11) — `StateManager` uses `Object.create(null)` for state object
+- **Prototype pollution in emission params** (RISK-10) — `EmissionCollector.add()` copies params into `Object.create(null)` object, strips `__proto__` and `constructor` keys
+- **Information leakage via error messages** (RISK-15) — generic errors sanitized: first line only, file paths stripped, truncated to 256 characters
+- **Variable leakage to contract scope** — `__contractCode`/`__methodName` changed from `var` to `let` (block-scoped); `__defineProperty` cleaned up after harness use
+- **Null emit params crash** — `dispenser`/`file`/`list`/`broadcast` emit methods handle null params gracefully
+
+### Changed
+- `sandbox.js` STRIP_SCRIPT significantly expanded with constructor neutering, `Object.defineProperty` removal, and `__defineProperty` preservation for harness
+- `gateway.js` `revert()`/`require()` store reason in `execContext.revertReason`
+- `index.js` `_classifyError()` uses `execContext.revertReason` and `gasTracker` values instead of error message payloads
+- `index.js` adds `_sanitizeError()` method for generic error message sanitization
+- `math.js` adds `validateInput()` with 256-char length limit applied to all math operations
+
 ## [1.6.0] - 2026-04-03
 
 ### Added

@@ -15,7 +15,7 @@ const STRIP_SCRIPT = `
     const toDelete = [
         'Date', 'setTimeout', 'setInterval', 'setImmediate',
         'clearTimeout', 'clearInterval', 'clearImmediate',
-        'WeakRef', 'FinalizationRegistry', 'Proxy',
+        'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
         'fetch', 'XMLHttpRequest', 'WebSocket',
         'SharedArrayBuffer', 'Atomics',
         'queueMicrotask'
@@ -28,12 +28,77 @@ const STRIP_SCRIPT = `
     // Block eval and Function constructor
     try { globalThis.eval = undefined; } catch(e) {}
     try {
-        // Prevent new Function('return process')()
         // Save a private reference for the contract wrapper to use
         globalThis.__Function = Function;
         globalThis.Function = undefined;
-        // Also kill the constructor on Function.prototype
-        try { Object.defineProperty(globalThis.__Function.prototype, 'constructor', { value: undefined }); } catch(e) {}
+
+        // Neuter the constructor property on Function.prototype
+        try { Object.defineProperty(globalThis.__Function.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+
+        // Neuter GeneratorFunction, AsyncFunction, AsyncGeneratorFunction constructors.
+        // These are separate function types with their own prototype chains.
+        try {
+            var GeneratorFunction = Object.getPrototypeOf(function*(){}).constructor;
+            Object.defineProperty(GeneratorFunction.prototype, 'constructor', { value: undefined, writable: false, configurable: false });
+            // Also kill GeneratorFunction itself if accessible
+            try { Object.defineProperty(GeneratorFunction, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+        } catch(e) {}
+        try {
+            var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+            Object.defineProperty(AsyncFunction.prototype, 'constructor', { value: undefined, writable: false, configurable: false });
+            try { Object.defineProperty(AsyncFunction, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+        } catch(e) {}
+        try {
+            var AsyncGeneratorFunction = Object.getPrototypeOf(async function*(){}).constructor;
+            Object.defineProperty(AsyncGeneratorFunction.prototype, 'constructor', { value: undefined, writable: false, configurable: false });
+            try { Object.defineProperty(AsyncGeneratorFunction, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+        } catch(e) {}
+    } catch(e) {}
+
+    // Neuter Object.prototype.constructor to prevent prototype chain traversal
+    // e.g. ({}).__proto__.constructor('return process')()
+    try { Object.defineProperty(Object.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+
+    // Neuter Array/String/Number/Boolean/RegExp prototype constructors
+    try { Object.defineProperty(Array.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+    try { Object.defineProperty(String.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+    try { Object.defineProperty(Number.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+    try { Object.defineProperty(Boolean.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+    try { Object.defineProperty(RegExp.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+
+    // Neuter RegExp to prevent catastrophic backtracking (ReDoS)
+    // Contracts should not need regex; string operations suffice.
+    try { globalThis.RegExp = undefined; } catch(e) {}
+
+    // Save Object.defineProperty for the harness to use (it needs to lock __gas).
+    // Store as a non-enumerable global so harness can access it, then harness deletes it.
+    var _defineProperty = Object.defineProperty;
+    var _freeze = Object.freeze;
+    try {
+        _defineProperty(globalThis, '__defineProperty', {
+            value: _defineProperty,
+            writable: false,
+            configurable: true,  // harness will delete it after use
+            enumerable: false
+        });
+    } catch(e) {}
+
+    // Freeze Object.defineProperty/defineProperties to prevent getter/setter traps
+    // that could execute unmetered code via property access
+    try {
+        _defineProperty(Object, 'defineProperty', { value: undefined, writable: false, configurable: false });
+        _defineProperty(Object, 'defineProperties', { value: undefined, writable: false, configurable: false });
+        // Also block Object.create with property descriptors (second argument)
+        // Keep Object.create(null) working for prototype-free objects
+        var _origCreate = Object.create;
+        _defineProperty(Object, 'create', {
+            value: function(proto) {
+                if (arguments.length > 1) throw new Error('Object.create with property descriptors is not allowed');
+                return _origCreate(proto);
+            },
+            writable: false,
+            configurable: false
+        });
     } catch(e) {}
 
     // Remove console (replaced by xchain.log)
@@ -45,7 +110,7 @@ const STRIP_SCRIPT = `
     try { globalThis.importScripts = undefined; } catch(e) {}
 
     // Replace Math with deterministic subset (no Math.random)
-    const SafeMath = {
+    var SafeMath = {
         floor: Math.floor,
         ceil:  Math.ceil,
         round: Math.round,
@@ -62,7 +127,7 @@ const STRIP_SCRIPT = `
         PI:    Math.PI,
         E:     Math.E
     };
-    globalThis.Math = Object.freeze(SafeMath);
+    globalThis.Math = _freeze(SafeMath);
 })();
 `;
 

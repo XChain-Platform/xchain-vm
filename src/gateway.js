@@ -104,14 +104,24 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
         math: buildMathAPI(),
 
         // Control flow (gas-free)
+        // Store the revert reason in execContext so the error classifier can
+        // verify it matches — prevents spoofing via caught reverts (RISK-04).
         revert: (reason) => {
-            if (execContext) execContext.reverted = true;
-            throw new ContractRevertError(reason || 'reverted');
+            const r = reason || 'reverted';
+            if (execContext) {
+                execContext.reverted = true;
+                execContext.revertReason = r;
+            }
+            throw new ContractRevertError(r);
         },
         require: (condition, reason) => {
             if (!condition) {
-                if (execContext) execContext.reverted = true;
-                throw new ContractRevertError(reason || 'requirement failed');
+                const r = reason || 'requirement failed';
+                if (execContext) {
+                    execContext.reverted = true;
+                    execContext.revertReason = r;
+                }
+                throw new ContractRevertError(r);
             }
         },
 

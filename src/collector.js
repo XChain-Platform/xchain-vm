@@ -15,7 +15,14 @@ class EmissionCollector {
     add(actionType, params) {
         if (this.actions.length >= this.max)
             throw new Error('emission limit exceeded (' + this.max + ')');
-        this.actions.push({ action: actionType, params: { ...params } });
+        // Copy params into a prototype-free object to prevent prototype pollution (RISK-10).
+        // Strip __proto__ and constructor keys.
+        const safe = Object.create(null);
+        for (const key of Object.keys(params)) {
+            if (key === '__proto__' || key === 'constructor') continue;
+            safe[key] = params[key];
+        }
+        this.actions.push({ action: actionType, params: safe });
     }
 
     addLog(message) {

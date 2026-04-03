@@ -100,7 +100,8 @@ describe('EmissionCollector', function() {
     it('should handle empty params in add', function() {
         const ec = new EmissionCollector(50);
         ec.add('FILE', {});
-        assert.deepStrictEqual(ec.getActions()[0].params, {});
+        const params = ec.getActions()[0].params;
+        assert.strictEqual(Object.keys(params).length, 0);
     });
 
     it('should return actions array directly', function() {

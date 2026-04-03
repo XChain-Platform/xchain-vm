@@ -697,11 +697,11 @@ describe('Boundary: Math Operations', function() {
         assert.throws(() => math.divide('100', '0'), /Division by zero/);
     });
 
-    it('MA-2: extremely large numbers', function() {
-        const big = '9'.repeat(1000);
+    it('MA-2: extremely large numbers (within 256-char limit)', function() {
+        const big = '9'.repeat(200);
         const result = math.add(big, '1');
         assert(typeof result === 'string');
-        assert(result.length >= 1000);
+        assert(result.length >= 200);
     });
 
     it('MA-3: repeating decimal returns fixed notation', function() {
@@ -1099,13 +1099,13 @@ describe('Boundary: Metering', function() {
         assert.strictEqual(result.emittedActions[0].params.quantity, '-1');
     });
 
-    it('EA-3: SEND with non-string quantity passes gateway', async function() {
+    it('EA-3: SEND with non-string quantity rejected by type validation', async function() {
         const code = `module.exports = function(xchain) {
             xchain.emit.send({ destination: 'x', tick: 'T', quantity: 12345 });
         };`;
         const result = await executeCode(vm, code);
-        assert.strictEqual(result.success, true);
-        assert.strictEqual(result.emittedActions[0].params.quantity, 12345);
+        assert.strictEqual(result.success, false);
+        assert(result.error.includes('must be a string'), 'should reject non-string quantity: ' + result.error);
     });
 
     it('EA-4: ISSUE with tick "" passes gateway', async function() {
