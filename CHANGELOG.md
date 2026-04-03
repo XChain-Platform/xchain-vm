@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-04-03
+
+### Added
+- Smoke test suite (`test/smoke.test.js`) — 10 fast health-check assertions across 9 scenarios: VM instantiation, sandbox environment, basic contract execution, multi-method dispatch, gateway emit, context accessors, deterministic math, syntax validation, revert/atomicity
+- `npm run smoke` script for running smoke tests independently (32ms, < 5s target)
+- Smoke testing plan report at `reports/XCHAIN_VM_SMOKE_TESTING_PLAN.md`
+
 ## [1.2.0] - 2026-04-03
 
 ### Fixed
