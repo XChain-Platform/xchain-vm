@@ -1,5 +1,5 @@
 const assert = require('assert');
-const ActionValidator = require('../src/validator.js');
+const ActionValidator = require('../../src/validator.js');
 
 describe('ActionValidator', function() {
 

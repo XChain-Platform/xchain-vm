@@ -14,7 +14,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { generateAllMutants, ALL_OPERATORS } = require('./mutators.js');
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..', '..', '..');
 const DEFAULT_MUTATE = 'src/*.js';
 const DEFAULT_SPEC = 'test/*.test.js';
 const DEFAULT_TIMEOUT = 30000;

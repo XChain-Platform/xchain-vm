@@ -1,5 +1,5 @@
 const assert = require('assert');
-const StateManager = require('../src/state.js');
+const StateManager = require('../../src/state.js');
 
 describe('StateManager', function() {
 

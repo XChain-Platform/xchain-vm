@@ -1,5 +1,5 @@
 const assert = require('assert');
-const EmissionCollector = require('../src/collector.js');
+const EmissionCollector = require('../../src/collector.js');
 
 describe('EmissionCollector', function() {
 

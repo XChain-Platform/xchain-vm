@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-04-05
+
+### Changed
+- Moved `stryker.config.json` and `stryker-xchain-vm-mutator/` from project root into `test/mutation/`
+- Updated all `mutation*` npm scripts to reference new config and mutator paths
+- Reorganized flat `test/` files into subdirectories: `unit/` (11 files), `smoke/`, `integration/` (3 files), `boundary/` (2 files), `security/`, `regression/` (determinism)
+- Added npm scripts: `test:integration`, `test:boundary`, `test:security`
+- Default `npm test` now runs only unit tests
+
 ## [1.11.0] - 2026-04-03
 
 ### Added

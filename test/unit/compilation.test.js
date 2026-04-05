@@ -1,7 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { meterCode } = require('../src/metering.js');
+const { meterCode } = require('../../src/metering.js');
 
 let ivm;
 try {
@@ -13,7 +13,7 @@ try {
 describe('Compilation', function() {
 
     it('should meter compile_bomb.js without error', function() {
-        const code = fs.readFileSync(path.join(__dirname, 'contracts/compile_bomb.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../contracts/compile_bomb.js'), 'utf8');
         const start = Date.now();
         const metered = meterCode(code);
         const elapsed = Date.now() - start;
@@ -23,7 +23,7 @@ describe('Compilation', function() {
     });
 
     (ivm ? it : it.skip)('should compile metered code in isolate', function() {
-        const code = fs.readFileSync(path.join(__dirname, 'contracts/compile_bomb.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../contracts/compile_bomb.js'), 'utf8');
         const metered = meterCode(code);
         const isolate = new ivm.Isolate({ memoryLimit: 16 });
         try {
@@ -38,7 +38,7 @@ describe('Compilation', function() {
     });
 
     it('should meter typical contract code quickly', function() {
-        const code = fs.readFileSync(path.join(__dirname, 'contracts/state_counter.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../contracts/state_counter.js'), 'utf8');
         const start = Date.now();
         meterCode(code);
         const elapsed = Date.now() - start;

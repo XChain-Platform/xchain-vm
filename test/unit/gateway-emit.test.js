@@ -1,7 +1,7 @@
 const assert = require('assert');
-const { buildEmitAPI } = require('../src/gateway-emit.js');
-const GasTracker = require('../src/gas.js');
-const EmissionCollector = require('../src/collector.js');
+const { buildEmitAPI } = require('../../src/gateway-emit.js');
+const GasTracker = require('../../src/gas.js');
+const EmissionCollector = require('../../src/collector.js');
 
 const SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,

@@ -5,7 +5,7 @@ const path = require('path');
 // These tests require isolated-vm. Skip if not available.
 let XChainVM;
 try {
-    XChainVM = require('../src/index.js');
+    XChainVM = require('../../src/index.js');
 } catch (e) {
     console.log('Skipping sandbox tests — isolated-vm not available: ' + e.message);
 }
@@ -111,7 +111,7 @@ function executeCode(vm, code) {
     });
 
     it('should run sandbox_escape.js contract', async function() {
-        const code = fs.readFileSync(path.join(__dirname, 'contracts/sandbox_escape.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../contracts/sandbox_escape.js'), 'utf8');
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, true);
         // All escape attempts should report blocked or undefined

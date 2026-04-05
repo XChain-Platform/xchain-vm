@@ -12,7 +12,7 @@ const assert = require('assert');
 
 let XChainVM;
 try {
-    XChainVM = require('../src/index.js');
+    XChainVM = require('../../src/index.js');
 } catch (e) {
     console.log('Skipping smoke tests — isolated-vm not available: ' + e.message);
 }

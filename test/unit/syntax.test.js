@@ -2,7 +2,7 @@ const assert = require('assert');
 
 let validateSyntax, checkFloatWarnings;
 try {
-    const syntax = require('../src/syntax.js');
+    const syntax = require('../../src/syntax.js');
     validateSyntax = syntax.validateSyntax;
     checkFloatWarnings = syntax.checkFloatWarnings;
 } catch (e) {

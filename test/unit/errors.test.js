@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { ContractRevertError, GasExhaustedError } = require('../src/errors.js');
+const { ContractRevertError, GasExhaustedError } = require('../../src/errors.js');
 
 describe('Error Classes', function() {
 

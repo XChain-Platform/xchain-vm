@@ -2,13 +2,13 @@
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-schema.json",
 
   "mutate": [
-    "src/*.js"
+    "../../src/*.js"
   ],
 
   "testRunner": "mocha",
 
   "mochaOptions": {
-    "spec": ["test/*.test.js"]
+    "spec": ["../../test/unit/**/*.test.js"]
   },
 
   "plugins": [
@@ -24,11 +24,11 @@
   "reporters": ["html", "clear-text", "json", "progress"],
 
   "htmlReporter": {
-    "fileName": "reports/mutation/index.html"
+    "fileName": "../../reports/mutation/index.html"
   },
 
   "jsonReporter": {
-    "fileName": "reports/mutation/mutation-score.json"
+    "fileName": "../../reports/mutation/mutation-score.json"
   },
 
   "thresholds": {

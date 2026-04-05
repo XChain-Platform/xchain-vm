@@ -1,6 +1,6 @@
 const assert = require('assert');
-const GasTracker = require('../src/gas.js');
-const { GasExhaustedError } = require('../src/errors.js');
+const GasTracker = require('../../src/gas.js');
+const { GasExhaustedError } = require('../../src/errors.js');
 
 describe('GasTracker', function() {
 

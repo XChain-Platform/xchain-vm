@@ -24,17 +24,17 @@
  */
 
 const assert = require('assert');
-const GasTracker = require('../src/gas.js');
-const StateManager = require('../src/state.js');
-const EmissionCollector = require('../src/collector.js');
-const { meterCode, hasGasIdentifier } = require('../src/metering.js');
-const { buildMathAPI } = require('../src/math.js');
-const { ContractRevertError } = require('../src/errors.js');
-const { validateSyntax } = require('../src/syntax.js');
+const GasTracker = require('../../src/gas.js');
+const StateManager = require('../../src/state.js');
+const EmissionCollector = require('../../src/collector.js');
+const { meterCode, hasGasIdentifier } = require('../../src/metering.js');
+const { buildMathAPI } = require('../../src/math.js');
+const { ContractRevertError } = require('../../src/errors.js');
+const { validateSyntax } = require('../../src/syntax.js');
 
 let XChainVM;
 try {
-    XChainVM = require('../src/index.js');
+    XChainVM = require('../../src/index.js');
 } catch (e) {
     console.log('Skipping VM boundary tests — isolated-vm not available: ' + e.message);
 }

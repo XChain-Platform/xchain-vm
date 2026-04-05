@@ -2,7 +2,7 @@ const assert = require('assert');
 
 let XChainVM, vmWorking = false;
 try {
-    XChainVM = require('../src/index.js');
+    XChainVM = require('../../src/index.js');
 } catch (e) {
     console.log('Skipping index tests — isolated-vm not available: ' + e.message);
 }

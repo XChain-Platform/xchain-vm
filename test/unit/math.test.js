@@ -1,6 +1,6 @@
 const assert = require('assert');
-const { buildMathAPI } = require('../src/math.js');
-const { ContractRevertError } = require('../src/errors.js');
+const { buildMathAPI } = require('../../src/math.js');
+const { ContractRevertError } = require('../../src/errors.js');
 
 describe('Math API', function() {
 

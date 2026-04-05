@@ -14,7 +14,7 @@ const assert = require('assert');
 
 let XChainVM;
 try {
-    XChainVM = require('../src/index.js');
+    XChainVM = require('../../src/index.js');
 } catch (e) {
     console.log('Skipping security tests — isolated-vm not available: ' + e.message);
 }
@@ -612,7 +612,7 @@ function executeCode(vm, code, opts) {
     // --- RISK-11: State key prototype pollution ---
 
     describe('State key prototype pollution (RISK-11)', function() {
-        const StateManager = require('../src/state.js');
+        const StateManager = require('../../src/state.js');
 
         it('should safely handle __proto__ as a state key', function() {
             const sm = new StateManager({}, {
@@ -670,7 +670,7 @@ function executeCode(vm, code, opts) {
     // --- RISK-10: Emit parameter prototype pollution ---
 
     describe('Emit parameter prototype pollution (RISK-10)', function() {
-        const EmissionCollector = require('../src/collector.js');
+        const EmissionCollector = require('../../src/collector.js');
 
         it('should strip __proto__ from emission params', function() {
             const ec = new EmissionCollector(50);
@@ -938,7 +938,7 @@ function executeCode(vm, code, opts) {
 
     // Unit-level math validation
     describe('Math module unit tests', function() {
-        const { buildMathAPI } = require('../src/math.js');
+        const { buildMathAPI } = require('../../src/math.js');
         const math = buildMathAPI();
 
         it('should accept normal numeric strings', function() {

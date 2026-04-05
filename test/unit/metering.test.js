@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { meterCode, hasGasIdentifier } = require('../src/metering.js');
+const { meterCode, hasGasIdentifier } = require('../../src/metering.js');
 
 describe('Metering', function() {
 

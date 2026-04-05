@@ -4,7 +4,7 @@ const path = require('path');
 
 let XChainVM;
 try {
-    XChainVM = require('../src/index.js');
+    XChainVM = require('../../src/index.js');
 } catch (e) {
     console.log('Skipping limits tests — isolated-vm not available: ' + e.message);
 }
@@ -47,7 +47,7 @@ function executeCode(vm, code, opts) {
     it('should hit gas limit on infinite loop', async function() {
         this.timeout(10000);
         const vm = createVM({ gasCeiling: 1000 });
-        const code = fs.readFileSync(path.join(__dirname, 'contracts/infinite_loop.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../contracts/infinite_loop.js'), 'utf8');
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, false);
         assert(result.error.includes('out_of_gas'), 'should be out of gas: ' + result.error);
@@ -57,7 +57,7 @@ function executeCode(vm, code, opts) {
     it('should hit memory limit on memory bomb', async function() {
         this.timeout(10000);
         const vm = createVM({ maxMemory: 8 });
-        const code = fs.readFileSync(path.join(__dirname, 'contracts/memory_bomb.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../contracts/memory_bomb.js'), 'utf8');
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, false);
         // Could be out_of_memory or out_of_gas (memory pressure triggers gas)
@@ -68,7 +68,7 @@ function executeCode(vm, code, opts) {
 
     it('should hit emission limit at 51', async function() {
         const vm = createVM();
-        const code = fs.readFileSync(path.join(__dirname, 'contracts/emit_flood.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../contracts/emit_flood.js'), 'utf8');
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, false);
         assert(result.error.includes('emission limit'), 'should hit emission limit: ' + result.error);
