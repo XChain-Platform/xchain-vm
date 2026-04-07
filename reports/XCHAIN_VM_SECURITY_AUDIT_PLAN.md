@@ -1,8 +1,8 @@
 # XChain VM — Security Audit Plan
 
-**Component:** `xchain-vm`
-**Criticality:** Extremely High — compromised VM security could allow unauthorized state changes, sandbox escape, or platform-wide exploitation.
-**Date:** 2026-04-03
+**Component:** `xchain-vm`  
+**Criticality:** Extremely High — compromised VM security could allow unauthorized state changes, sandbox escape, or platform-wide exploitation.  
+**Date:** 2026-04-03  
 **Status:** Initial Audit Plan
 
 ---
@@ -176,11 +176,11 @@ Object.constructor('return process')()
 7. **`toString`/`valueOf` override** — Objects with custom `toString` that perform computation are invoked during string concatenation and comparison without gas metering.
 8. **RegExp backtracking** — While `Function` and `eval` are blocked, `RegExp` is available. Catastrophic backtracking: `/^(a+)+$/` on a long string could consume unbounded CPU.
 
-**Recommendation:**
-- **RegExp:** Either remove `RegExp` from the sandbox or meter regex operations. At minimum, test catastrophic backtracking patterns and verify the wall-clock timeout catches them.
-- **Property access chains:** Consider instrumenting MemberExpression nodes, or at least deeply nested chains.
-- **Getter/setter traps:** Freeze `Object.defineProperty` and `Object.defineProperties` inside the isolate to prevent runtime getter/setter creation. (Static getters in contract source would still be a risk — meter property access or limit object depth.)
-- **toString/valueOf:** Freeze `Object.prototype.toString` and `Object.prototype.valueOf`, or meter implicit coercions at string concatenation points.
+**Recommendation:**  
+- **RegExp:** Either remove `RegExp` from the sandbox or meter regex operations. At minimum, test catastrophic backtracking patterns and verify the wall-clock timeout catches them.  
+- **Property access chains:** Consider instrumenting MemberExpression nodes, or at least deeply nested chains.  
+- **Getter/setter traps:** Freeze `Object.defineProperty` and `Object.defineProperties` inside the isolate to prevent runtime getter/setter creation. (Static getters in contract source would still be a risk — meter property access or limit object depth.)  
+- **toString/valueOf:** Freeze `Object.prototype.toString` and `Object.prototype.valueOf`, or meter implicit coercions at string concatenation points.  
 - **Wall-clock timeout:** The 30-second timeout is the backstop. Verify it always fires even under extreme CPU pressure (e.g., tight regex backtracking or CPU-bound property access loops). Note: the timeout is labeled a "consensus risk" in the code — different nodes may time out at different wall-clock times, producing different execution results.
 
 #### RISK-06: `__gas` Identifier Collision
@@ -574,10 +574,10 @@ The XChain VM demonstrates a well-engineered security architecture with multiple
 
 However, several areas require attention before production deployment:
 
-- **Critical:** Prototype chain traversal to function constructors (RISK-01, RISK-02) — if `Object.constructor` still resolves to `Function`, the sandbox can be escaped.
-- **Critical:** Gas metering gaps for unmetered operations (RISK-05) — property access, getters, RegExp backtracking.
-- **Critical:** `__gas` callback overwritability (RISK-06) — contracts may be able to neuter metering.
-- **High:** Error spoofing via caught reverts (RISK-04) — `execContext.reverted` flag manipulation.
+- **Critical:** Prototype chain traversal to function constructors (RISK-01, RISK-02) — if `Object.constructor` still resolves to `Function`, the sandbox can be escaped.  
+- **Critical:** Gas metering gaps for unmetered operations (RISK-05) — property access, getters, RegExp backtracking.  
+- **Critical:** `__gas` callback overwritability (RISK-06) — contracts may be able to neuter metering.  
+- **High:** Error spoofing via caught reverts (RISK-04) — `execContext.reverted` flag manipulation.  
 - **High:** Input validation gaps in emit parameters and state keys (RISK-10, RISK-11).
 
 The recommended audit sequence is: **sandbox escape testing → gas metering verification → error spoofing testing → input validation review → determinism verification → dependency audit**.

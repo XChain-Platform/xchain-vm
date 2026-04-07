@@ -1,8 +1,8 @@
 # XChain VM -- Regression Testing Plan
 
-**Date:** 2026-04-03
-**Component:** `xchain-vm`
-**Version:** 1.10.0
+**Date:** 2026-04-03  
+**Component:** `xchain-vm`  
+**Version:** 1.10.0  
 **Criticality:** Extremely High -- core execution engine, security boundary, and consensus determinism
 
 ---

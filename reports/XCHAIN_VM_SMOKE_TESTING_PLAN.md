@@ -1,7 +1,7 @@
 # XChain VM — Smoke Testing Plan
 
-**Date:** 2026-04-03
-**Component:** `xchain-vm`
+**Date:** 2026-04-03  
+**Component:** `xchain-vm`  
 **Scope:** Minimal, fast health-check suite to confirm basic operational readiness after build or deployment.
 
 ---

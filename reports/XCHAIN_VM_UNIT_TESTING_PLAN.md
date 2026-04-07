@@ -1,8 +1,8 @@
 # XChain VM Unit Testing Plan
 
-**Date:** 2026-04-03
-**Component:** xchain-vm
-**Current Test Count:** 81+ tests across 11 test files
+**Date:** 2026-04-03  
+**Component:** xchain-vm  
+**Current Test Count:** 81+ tests across 11 test files  
 **Framework:** Mocha (--timeout 0)
 
 ---
@@ -245,10 +245,10 @@ Group tests by: **happy path** -> **boundary conditions** -> **error cases** -> 
 
 ### 3.4 Assertion Strategy
 
-- **Equality:** Use `assert.strictEqual` for primitives, `assert.deepStrictEqual` for objects/arrays.
-- **Errors:** Use `assert.throws` with error type and message matching. For async: `assert.rejects`.
-- **Gas accounting:** Assert exact gas values, not ranges — gas metering is deterministic.
-- **Determinism:** Run the same execution N times (N >= 3) and compare full result objects.
+- **Equality:** Use `assert.strictEqual` for primitives, `assert.deepStrictEqual` for objects/arrays.  
+- **Errors:** Use `assert.throws` with error type and message matching. For async: `assert.rejects`.  
+- **Gas accounting:** Assert exact gas values, not ranges — gas metering is deterministic.  
+- **Determinism:** Run the same execution N times (N >= 3) and compare full result objects.  
 - **Isolation:** Mutate inputs after passing them to the module — verify outputs are unaffected.
 
 ### 3.5 Test Independence

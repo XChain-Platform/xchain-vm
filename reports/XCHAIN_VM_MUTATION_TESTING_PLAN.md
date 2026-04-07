@@ -355,9 +355,9 @@ The VM test suite has 1,284+ tests with some tests taking 5-30 seconds (chaos, E
 
 ### 6.4 Phase 4: Ongoing Maintenance
 
-- **Per-PR:** Incremental mutation testing on changed files (Stryker diff mode)
-- **Weekly:** Full mutation run on critical tier only (~3-4 hours)
-- **Monthly:** Full mutation run on all tiers (~20-50 hours, overnight)
+- **Per-PR:** Incremental mutation testing on changed files (Stryker diff mode)  
+- **Weekly:** Full mutation run on critical tier only (~3-4 hours)  
+- **Monthly:** Full mutation run on all tiers (~20-50 hours, overnight)  
 - **On test changes:** Re-run mutation testing for the affected module to verify the new/changed tests actually kill more mutants
 
 ### 6.5 Reporting Format
@@ -391,10 +391,10 @@ reports/mutation/
 ## Survived Mutations (Action Required)
 
 ### [module.js:line] — Mutation Operator: [type]
-- **Original:** `code`
-- **Mutated:** `mutated code`
-- **Impact:** [what this mutation simulates]
-- **Recommendation:** [specific test to write or assertion to strengthen]
+- **Original:** `code`  
+- **Mutated:** `mutated code`  
+- **Impact:** [what this mutation simulates]  
+- **Recommendation:** [specific test to write or assertion to strengthen]  
 - **Priority:** [Critical / High / Medium / Low]
 ```
 
@@ -436,10 +436,10 @@ For a VM that executes untrusted contract code, mutation testing directly answer
 
 Based on the current test suite composition (1,284+ tests including boundary, security, chaos, and fuzz):
 
-- **gas.js:** Expected >98% — 15 focused unit tests directly target ceiling enforcement and accumulation
-- **sandbox.js:** Expected >90% — 27 unit tests + 68 security tests cover most escape vectors, but individual `toDelete` entries may not all be individually tested
-- **metering.js:** Expected >85% — 40 unit tests cover most AST node types, but some edge cases (Phase 2 binary depth, Phase 3 SequenceExpression) may have gaps
-- **state.js:** Expected >95% — 34 unit tests with explicit validation checks for each guard
+- **gas.js:** Expected >98% — 15 focused unit tests directly target ceiling enforcement and accumulation  
+- **sandbox.js:** Expected >90% — 27 unit tests + 68 security tests cover most escape vectors, but individual `toDelete` entries may not all be individually tested  
+- **metering.js:** Expected >85% — 40 unit tests cover most AST node types, but some edge cases (Phase 2 binary depth, Phase 3 SequenceExpression) may have gaps  
+- **state.js:** Expected >95% — 34 unit tests with explicit validation checks for each guard  
 - **index.js:** Expected >80% — 57 unit tests cover the main paths, but the error classification logic and prefix protocol have many branches
 
 The highest value will come from identifying the **10-15% of mutations that survive** — these represent the specific logic paths where a subtle bug could go undetected by the current suite.

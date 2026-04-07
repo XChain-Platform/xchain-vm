@@ -345,9 +345,9 @@ Proactively identify weaknesses in the `xchain-vm`'s resilience, fault tolerance
 
 ### 4.3 Test Environment Configuration
 
-- **Node.js flags:** Run chaos tests with `--expose-gc` (for forced GC in leak tests) and `--max-old-space-size=256` (to surface host memory pressure faster)
-- **Isolation:** Each chaos experiment should run in a fresh VM instance to prevent cross-experiment contamination
-- **Timeouts:** Use shortened timeouts (1-5s instead of 30s) for most experiments to keep suite runtime reasonable
+- **Node.js flags:** Run chaos tests with `--expose-gc` (for forced GC in leak tests) and `--max-old-space-size=256` (to surface host memory pressure faster)  
+- **Isolation:** Each chaos experiment should run in a fresh VM instance to prevent cross-experiment contamination  
+- **Timeouts:** Use shortened timeouts (1-5s instead of 30s) for most experiments to keep suite runtime reasonable  
 - **Reporting:** Each experiment outputs a structured JSON result: `{ experiment, hypothesis, injectedFault, observations, outcome, findings }`
 
 ---
@@ -389,9 +389,9 @@ These experiments harden the VM against subtle failure modes:
 
 After the initial experiments are established:
 
-- **Compound experiments:** Combine faults (e.g., memory pressure + gateway latency + corrupted state simultaneously)
-- **Chaos in e2e:** Inject faults during full-stack `xchain-e2e-test` runs with real decoder/indexer/explorer
-- **Regression chaos:** When a bug is found and fixed, add a targeted chaos experiment as a regression guard
+- **Compound experiments:** Combine faults (e.g., memory pressure + gateway latency + corrupted state simultaneously)  
+- **Chaos in e2e:** Inject faults during full-stack `xchain-e2e-test` runs with real decoder/indexer/explorer  
+- **Regression chaos:** When a bug is found and fixed, add a targeted chaos experiment as a regression guard  
 - **Game Day exercises:** Scheduled sessions where multiple random faults are injected simultaneously to test overall system resilience
 
 ---
@@ -517,9 +517,9 @@ Each chaos experiment produces a structured report:
 
 ### 7.3 Documentation
 
-- **Per-experiment reports:** Saved as JSON in `xchain-vm/test/chaos/results/` after each run
-- **Aggregate dashboard:** Summary of all experiments (pass/fail/findings) generated after each full suite run
-- **Finding tickets:** Critical and High findings documented as GitHub issues with reproduction steps, observed vs. expected behavior, and affected code paths
+- **Per-experiment reports:** Saved as JSON in `xchain-vm/test/chaos/results/` after each run  
+- **Aggregate dashboard:** Summary of all experiments (pass/fail/findings) generated after each full suite run  
+- **Finding tickets:** Critical and High findings documented as GitHub issues with reproduction steps, observed vs. expected behavior, and affected code paths  
 - **Retrospective:** After each Game Day, document: what failed, why, what was fixed, what new experiments to add
 
 ---
