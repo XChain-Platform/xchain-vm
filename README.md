@@ -4,11 +4,14 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.11.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.11.2-blue" alt="Version">
   <img src="https://img.shields.io/badge/tests-974%20passing-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-unit%20%7C%20e2e%20%7C%20security%20%7C%20fuzz%20%7C%20chaos%20%7C%20boundary%20%7C%20regression-brightgreen" alt="Coverage">
   <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node">
   <img src="https://img.shields.io/badge/license-Dankest%20Community-orange" alt="License">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/coverage-unit%20%7C%20e2e%20%7C%20security%20%7C%20fuzz%20%7C%20chaos%20%7C%20boundary%20%7C%20regression-brightgreen" alt="Coverage">
 </p>
 
 Deterministic smart contract execution engine for the XChain Platform. Runs JavaScript contracts in sandboxed V8 isolates with AST-based gas metering, ensuring identical results across all indexer nodes. Plugs into the XChain Indexer as the runtime for DEPLOY and EXECUTE actions.
