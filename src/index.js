@@ -101,6 +101,12 @@ const HARNESS_SOURCE = `
             isSettled:      wrap(globalThis.__crossChain_isSettled)
         }),
 
+        // External attestation framework (metered)
+        attestation: Object.freeze({
+            request:      wrap(globalThis.__attestation_request),
+            getResponse:  wrap(globalThis.__attestation_getResponse)
+        }),
+
         // Emit (metered)
         emit: Object.freeze({
             send:      wrap(globalThis.__emit_send),
@@ -284,12 +290,15 @@ class XChainVM {
                 {
                     caller:          opts.caller,
                     contractAddress: opts.contractAddress,
+                    contractIndex:   opts.contractIndex || null,
+                    txHash:          opts.txHash || '',
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
                     balances:        opts.balances || {},
                     tokenInfo:       opts.tokenInfo || {},
                     oracleData:      opts.oracleData || null,
-                    crossChainData:  opts.crossChainData || null
+                    crossChainData:  opts.crossChainData || null,
+                    attestationData: opts.attestationData || null
                 },
                 this.gasSchedule,
                 execContext
@@ -471,6 +480,9 @@ class XChainVM {
         // Cross-chain (metered)
         g.setSync('__crossChain_getAttestation', bridge(gateway.crossChain.getAttestation));
         g.setSync('__crossChain_isSettled',      bridge(gateway.crossChain.isSettled));
+
+        g.setSync('__attestation_request',     bridge(gateway.attestation.request));
+        g.setSync('__attestation_getResponse', bridge(gateway.attestation.getResponse));
 
         // Emit (metered)
         g.setSync('__emit_send',      bridge(gateway.emit.send));

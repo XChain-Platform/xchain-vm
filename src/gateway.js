@@ -9,6 +9,7 @@
  * before injecting into the isolate.
  ********************************************************************/
 
+const crypto = require('crypto');
 const { ContractRevertError } = require('./errors.js');
 const { buildEmitAPI } = require('./gateway-emit.js');
 const { buildMathAPI } = require('./math.js');
@@ -94,6 +95,72 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             isSettled: (chain, actionIndex) => {
                 gasTracker.charge(gasSchedule.VM_CROSSCHAIN_READ);
                 return readOnlyData.crossChainData?.isSettled(chain, actionIndex) || false;
+            }
+        },
+
+        // External attestation (Phase 1, metered)
+        // Spec: claude/reports/specs/2026-05-24_external-attestation-framework.md
+        attestation: {
+            // Emit an attestation request. Returns a deterministic request_id derived
+            // from sha256(tx_hash || contract_index || emission_index). The contract
+            // proceeds synchronously; the response arrives later via the callback method.
+            request: (providerId, requestPayload, callbackMethod, callbackParams, options) => {
+                gasTracker.charge(gasSchedule.VM_ATTESTATION_REQUEST);
+                gasTracker.charge(gasSchedule.VM_EMISSION);
+                if (typeof providerId !== 'string' || providerId.length === 0 || providerId.length > 32)
+                    throw new Error('attestation.request: providerId must be a non-empty string (max 32 bytes)');
+                if (typeof requestPayload !== 'string')
+                    throw new Error('attestation.request: requestPayload must be a string');
+                // Hard cap. Per-provider max enforced by indexer.
+                if (Buffer.byteLength(requestPayload, 'utf8') > 2048)
+                    throw new Error('attestation.request: requestPayload exceeds 2048 bytes');
+                if (typeof callbackMethod !== 'string' || callbackMethod.length === 0 || callbackMethod.length > 64)
+                    throw new Error('attestation.request: callbackMethod must be a non-empty string (max 64 bytes)');
+                if (!Array.isArray(callbackParams))
+                    throw new Error('attestation.request: callbackParams must be an array');
+                let callbackParamsJson;
+                try {
+                    callbackParamsJson = JSON.stringify(callbackParams);
+                } catch (e) {
+                    throw new Error('attestation.request: callbackParams must be JSON-serializable');
+                }
+                if (Buffer.byteLength(callbackParamsJson, 'utf8') > 1024)
+                    throw new Error('attestation.request: callbackParams JSON exceeds 1024 bytes');
+                let opts = options || {};
+                let redundancy     = opts.redundancy     !== undefined ? Number(opts.redundancy)     : 1;
+                let deadlineBlocks = opts.deadlineBlocks !== undefined ? Number(opts.deadlineBlocks) : 10;
+                if ([1, 3, 5].indexOf(redundancy) === -1)
+                    throw new Error('attestation.request: redundancy must be 1, 3, or 5');
+                if (!Number.isInteger(deadlineBlocks) || deadlineBlocks < 1 || deadlineBlocks > 100)
+                    throw new Error('attestation.request: deadlineBlocks must be an integer in [1, 100]');
+
+                // Derive deterministic request_id BEFORE pushing the emission so it
+                // reflects the current emission index, not the post-push index.
+                let txHash        = readOnlyData.txHash || '';
+                let contractIndex = readOnlyData.contractIndex || '';
+                let emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
+                let preimage = String(txHash) + ':' + String(contractIndex) + ':' + emissionIndex;
+                let requestId = crypto.createHash('sha256').update(preimage).digest('hex');
+
+                emissionCollector.add('ATTESTATION_REQUEST', {
+                    requestId:       requestId,
+                    providerId:      providerId,
+                    requestPayload:  requestPayload,
+                    callbackMethod:  callbackMethod,
+                    callbackParams:  callbackParamsJson,
+                    redundancy:      redundancy,
+                    deadlineBlocks:  deadlineBlocks
+                });
+
+                return requestId;
+            },
+            // Read a previously-stored attestation response for any request from this contract.
+            // Returns null if the request hasn't been fulfilled yet (or doesn't exist).
+            getResponse: (requestId) => {
+                gasTracker.charge(gasSchedule.VM_STATE_READ);
+                if (typeof requestId !== 'string') return null;
+                if (!readOnlyData.attestationData) return null;
+                return readOnlyData.attestationData.getResponse(requestId);
             }
         },
 
