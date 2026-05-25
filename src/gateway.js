@@ -111,9 +111,13 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     throw new Error('attestation.request: providerId must be a non-empty string (max 32 bytes)');
                 if (typeof requestPayload !== 'string')
                     throw new Error('attestation.request: requestPayload must be a string');
-                // Hard cap. Per-provider max enforced by indexer.
-                if (Buffer.byteLength(requestPayload, 'utf8') > 2048)
-                    throw new Error('attestation.request: requestPayload exceeds 2048 bytes');
+                // Platform-wide hard cap. Sized to the largest registered
+                // provider's max_request_bytes (llm = 8192). Per-provider
+                // ceiling is enforced by the indexer; this cap is a safety
+                // net so a contract can't emit a huge payload before
+                // governance has registered a provider that allows it.
+                if (Buffer.byteLength(requestPayload, 'utf8') > 8192)
+                    throw new Error('attestation.request: requestPayload exceeds 8192 bytes');
                 if (typeof callbackMethod !== 'string' || callbackMethod.length === 0 || callbackMethod.length > 64)
                     throw new Error('attestation.request: callbackMethod must be a non-empty string (max 64 bytes)');
                 if (!Array.isArray(callbackParams))
