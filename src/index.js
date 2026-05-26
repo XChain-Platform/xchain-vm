@@ -107,6 +107,16 @@ const HARNESS_SOURCE = `
             getResponse:  wrap(globalThis.__attestation_getResponse)
         }),
 
+        // Contract-targeted staking (metered)
+        // Scoped to the currently-executing contract — read-only access to its own
+        // stake table + a slash() primitive routing to the contract's locked destination.
+        contract: Object.freeze({
+            getStake:       wrap(globalThis.__contract_getStake),
+            getTotalStaked: wrap(globalThis.__contract_getTotalStaked),
+            getStakers:     wrap(globalThis.__contract_getStakers),
+            slash:          wrap(globalThis.__contract_slash)
+        }),
+
         // Emit (metered)
         emit: Object.freeze({
             send:      wrap(globalThis.__emit_send),
@@ -296,9 +306,10 @@ class XChainVM {
                     blockContext:    opts.blockContext,
                     balances:        opts.balances || {},
                     tokenInfo:       opts.tokenInfo || {},
-                    oracleData:      opts.oracleData || null,
-                    crossChainData:  opts.crossChainData || null,
-                    attestationData: opts.attestationData || null
+                    oracleData:        opts.oracleData || null,
+                    crossChainData:    opts.crossChainData || null,
+                    attestationData:   opts.attestationData || null,
+                    contractStakeData: opts.contractStakeData || null
                 },
                 this.gasSchedule,
                 execContext
@@ -483,6 +494,12 @@ class XChainVM {
 
         g.setSync('__attestation_request',     bridge(gateway.attestation.request));
         g.setSync('__attestation_getResponse', bridge(gateway.attestation.getResponse));
+
+        // Contract-targeted staking (metered)
+        g.setSync('__contract_getStake',       bridge(gateway.contract.getStake));
+        g.setSync('__contract_getTotalStaked', bridge(gateway.contract.getTotalStaked));
+        g.setSync('__contract_getStakers',     bridge(gateway.contract.getStakers));
+        g.setSync('__contract_slash',          bridge(gateway.contract.slash));
 
         // Emit (metered)
         g.setSync('__emit_send',      bridge(gateway.emit.send));

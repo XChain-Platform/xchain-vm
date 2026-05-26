@@ -168,6 +168,58 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             }
         },
 
+        // Contract-targeted staking — readable + slashable from inside the contract being staked TO.
+        // The contractStakeData accessor is pre-loaded by execute.js for ONLY the currently-executing
+        // contract's stakes — a contract cannot read/slash stakes targeting another contract.
+        contract: {
+            // Returns the SUM of active stake amounts for (pubkey, token) on THIS contract.
+            // Returns '0' if no active stake (also during pre-activation grace).
+            getStake: (pubkey, token) => {
+                gasTracker.charge(gasSchedule.VM_STATE_READ);
+                if (!readOnlyData.contractStakeData) return '0';
+                if (typeof pubkey !== 'string' || typeof token !== 'string') return '0';
+                return readOnlyData.contractStakeData.getStake(pubkey, token);
+            },
+            // Total active staked amount across all stakers for (token) on THIS contract.
+            getTotalStaked: (token) => {
+                gasTracker.charge(gasSchedule.VM_STATE_READ);
+                if (!readOnlyData.contractStakeData) return '0';
+                if (typeof token !== 'string') return '0';
+                return readOnlyData.contractStakeData.getTotalStaked(token);
+            },
+            // Array of { pubkey, amount } stakers on THIS contract for (token).
+            // Capped at 1000 entries, sorted by amount DESC. See plan §12.10.
+            getStakers: (token) => {
+                gasTracker.charge(gasSchedule.VM_STATE_READ);
+                if (!readOnlyData.contractStakeData) return [];
+                if (typeof token !== 'string') return [];
+                return readOnlyData.contractStakeData.getStakers(token);
+            },
+            // Slash a staker on THIS contract. Authorization is implicit: contractStakeData
+            // is scoped to the executing contract, and the emission carries contractIndex
+            // (from readOnlyData) for defense-in-depth verification in the indexer handler.
+            //
+            // Slashed tokens are routed to the contract's slash_destination (locked at DEPLOY
+            // time — see deploy.js). Reaches both active stakes AND cooldown-queued balances
+            // per the plan; over-slash is silently capped at available balance.
+            slash: (pubkey, token, amount) => {
+                gasTracker.charge(gasSchedule.VM_EMISSION);
+                if (typeof pubkey !== 'string' || !/^[0-9a-fA-F]{64}$/.test(pubkey))
+                    throw new Error('contract.slash: pubkey must be a 64-hex string');
+                if (typeof token !== 'string' || token.length === 0)
+                    throw new Error('contract.slash: token must be a non-empty string');
+                if (typeof amount !== 'string' || !/^[0-9]+(\.[0-9]{1,8})?$/.test(amount))
+                    throw new Error('contract.slash: amount must be a positive decimal string');
+                let contractIndex = readOnlyData.contractIndex;
+                emissionCollector.add('SLASH', {
+                    contractIndex: contractIndex,
+                    pubkey:        pubkey,
+                    token:         token,
+                    amount:        amount
+                });
+            }
+        },
+
         // Action emission (metered, 500 gas each)
         emit: buildEmitAPI(gasTracker, emissionCollector, gasSchedule),
 
