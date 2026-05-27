@@ -105,7 +105,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             // from sha256(tx_hash || contract_index || emission_index). The contract
             // proceeds synchronously; the response arrives later via the callback method.
             request: (providerId, requestPayload, callbackMethod, callbackParams, options) => {
-                gasTracker.charge(gasSchedule.VM_ATTESTATION_REQUEST);
+                gasTracker.charge(gasSchedule.VM_ATTEST_REQUEST);
                 gasTracker.charge(gasSchedule.VM_EMISSION);
                 if (typeof providerId !== 'string' || providerId.length === 0 || providerId.length > 32)
                     throw new Error('attestation.request: providerId must be a non-empty string (max 32 bytes)');
@@ -146,7 +146,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 let preimage = String(txHash) + ':' + String(contractIndex) + ':' + emissionIndex;
                 let requestId = crypto.createHash('sha256').update(preimage).digest('hex');
 
-                emissionCollector.add('ATTESTATION_REQUEST', {
+                emissionCollector.add('ATTEST', {
                     requestId:       requestId,
                     providerId:      providerId,
                     requestPayload:  requestPayload,

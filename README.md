@@ -22,7 +22,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **Deterministic execution** — all non-deterministic APIs (Date, Math.random, setTimeout, etc.) stripped; same input always produces same output
 - **AST-based gas metering** — acorn parses contract code and injects `__gas()` calls at control flow points; no V8 modifications required
 - **16 emittable actions** — contracts can emit SEND, DESTROY, ISSUE, MINT, ORDER, DISPENSER, DIVIDEND, AIRDROP, CALLBACK, FILE, LIST, COINPAY, SWEEP, LINK, BROADCAST, MESSAGE
-- **External attestation** — `xchain.attestation.request(...)` namespace lets contracts emit `ATTESTATION_REQUEST` against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTESTATION_RESPONSE` to invoke the contract's callback. Payload cap: 8192 bytes.
+- **External attestation** — `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
 - **Deterministic math** — `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point
 - **Contract state management** — key-value state with dirty tracking, key count limits, and value size limits
 - **Deploy-time validation** — syntax checking via V8 + acorn, reserved identifier detection, float usage warnings

@@ -20,7 +20,7 @@ const GAS_SCHEDULE = {
     VM_STATE_DELETE:        100,
     VM_ORACLE_READ:         100,
     VM_CROSSCHAIN_READ:     100,
-    VM_ATTESTATION_REQUEST: 5000,
+    VM_ATTEST_REQUEST: 5000,
     VM_EMISSION:            500
 };
 
@@ -59,7 +59,7 @@ function baseExecOpts(extra) {
 
     describe('request()', function () {
 
-        it('returns a 64-char hex request_id and charges at least VM_ATTESTATION_REQUEST + VM_EMISSION', async function () {
+        it('returns a 64-char hex request_id and charges at least VM_ATTEST_REQUEST + VM_EMISSION', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
                     return xchain.attestation.request(
@@ -76,11 +76,11 @@ function baseExecOpts(extra) {
             assert.strictEqual(typeof requestId, 'string');
             assert.strictEqual(requestId.length, 64);
             assert.match(requestId, /^[0-9a-f]{64}$/);
-            assert(result.gasUsed >= GAS_SCHEDULE.VM_ATTESTATION_REQUEST + GAS_SCHEDULE.VM_EMISSION,
+            assert(result.gasUsed >= GAS_SCHEDULE.VM_ATTEST_REQUEST + GAS_SCHEDULE.VM_EMISSION,
                 'gas should include at least the attestation+emission charges, got ' + result.gasUsed);
         });
 
-        it('queues an ATTESTATION_REQUEST emission with the expected shape', async function () {
+        it('queues an ATTEST v0 (request) emission with the expected shape', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
                     return xchain.attestation.request(
@@ -95,7 +95,7 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, true, 'execution should succeed: ' + result.error);
             assert.strictEqual(result.emittedActions.length, 1);
             let emission = result.emittedActions[0];
-            assert.strictEqual(emission.action, 'ATTESTATION_REQUEST');
+            assert.strictEqual(emission.action, 'ATTEST');
             assert.strictEqual(emission.params.providerId, 'http_get');
             assert.strictEqual(emission.params.requestPayload, 'https://example.com/bar');
             assert.strictEqual(emission.params.callbackMethod, 'handleResponse');
