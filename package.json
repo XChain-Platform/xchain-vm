@@ -13,7 +13,7 @@
     "acorn-walk": "^8.3.5",
     "astring": "^1.9.0",
     "isolated-vm": "^5.0.4",
-    "mathjs": "^13.2.3"
+    "mathjs": "^15.2.0"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^8.7.1",
