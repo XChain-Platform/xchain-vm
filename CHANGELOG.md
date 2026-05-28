@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.5] - 2026-05-28
+
+### Security
+- `src/gas.js` — `GasTracker.charge()` now rejects any non-finite amount (`undefined`/`NaN`), not just negatives. A missing `GAS_SCHEDULE` key resolves to `undefined`, and previously `used += undefined` set `used` to `NaN`, which made the `used > ceiling` comparison permanently false and silently disabled gas metering for the rest of that execution (effectively charging zero gas). The guard now throws immediately, so a config gap surfaces at runtime instead of being silently billed as free.
+
 ## [1.11.4] - 2026-05-28
 
 ### Security

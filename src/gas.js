@@ -21,8 +21,12 @@ class GasTracker {
     }
 
     charge(amount) {
-        if (amount < 0)
-            throw new Error('gas charge amount must be non-negative, got: ' + amount);
+        // A missing GAS_SCHEDULE key resolves to undefined; without this guard
+        // `used += undefined` becomes NaN and silently disables the ceiling for
+        // the rest of execution. Reject any non-finite amount so a config gap
+        // surfaces immediately instead of charging zero gas.
+        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)
+            throw new Error('gas charge amount must be a non-negative finite number, got: ' + amount);
         this.used += amount;
         if (this.used > this.ceiling)
             throw new GasExhaustedError(this.used, this.ceiling);
