@@ -9,7 +9,7 @@ const ALLOWED_ACTIONS = new Set([
     'SEND', 'DESTROY', 'ISSUE', 'MINT', 'ORDER',
     'DISPENSER', 'DIVIDEND', 'AIRDROP', 'CALLBACK',
     'FILE', 'LIST', 'COINPAY', 'SWEEP', 'LINK', 'BROADCAST', 'MESSAGE',
-    'ATTEST'
+    'ATTEST', 'SLASH'
 ]);
 
 class ActionValidator {

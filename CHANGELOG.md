@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.3] - 2026-05-28
+
+### Fixed
+- `SLASH` emission action was missing from `ActionValidator`'s allowlist, so every `xchain.contract.slash()` call failed post-execution validation and returned `success: false`, discarding all state changes and other emissions atomically. Added `SLASH` to the allowed-actions set, restoring `xchain.contract.slash()` end-to-end.
+
+### Changed
+- Validator unit test now drives its accept-cases from the full allowed-action set (now including `ATTEST` and `SLASH`), keeping the test allowlist in sync with the validator and guarding against silent allowlist drift.
+
 ## [1.11.2] - 2026-04-06
 
 ### Changed

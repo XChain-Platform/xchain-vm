@@ -9,7 +9,8 @@ describe('ActionValidator', function() {
     const ALLOWED_ACTIONS = [
         'SEND', 'DESTROY', 'ISSUE', 'MINT', 'ORDER',
         'DISPENSER', 'DIVIDEND', 'AIRDROP', 'CALLBACK',
-        'FILE', 'LIST', 'COINPAY', 'SWEEP', 'LINK', 'BROADCAST', 'MESSAGE'
+        'FILE', 'LIST', 'COINPAY', 'SWEEP', 'LINK', 'BROADCAST', 'MESSAGE',
+        'ATTEST', 'SLASH'
     ];
 
     describe('allowed actions', function() {
