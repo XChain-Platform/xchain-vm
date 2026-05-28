@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.6] - 2026-05-28
+
+### Security
+- Pin `tmp` to `>=0.2.3` via an `overrides` entry, remediating GHSA-ph9p-34f9-6g65 (path traversal: `tmp` constructed temp paths from unsanitized `prefix`/`postfix` options, allowing directory escape). The vulnerable `tmp@0.0.33` was pulled in transitively as a dev-only dependency via `external-editor` (under `@stryker-mutator`); the override forces a patched version (resolves to `0.2.7`) across all transitive paths, clearing the advisory from `npm audit`.
+
 ## [1.11.5] - 2026-05-28
 
 ### Security

@@ -1,7 +1,7 @@
 {
   "name": "xchain-vm",
   "description": "XChain Platform Virtual Machine (VM) runtime — deterministic smart contract execution in sandboxed V8 isolates",
-  "version": "1.11.5",
+  "version": "1.11.6",
   "license": "SEE LICENSE IN LICENSE.md",
   "main": "src/index.js",
   "repository": {
@@ -22,7 +22,8 @@
     "mocha": "^11.7.5"
   },
   "overrides": {
-    "qs": "^6.15.2"
+    "qs": "^6.15.2",
+    "tmp": ">=0.2.3"
   },
   "scripts": {
     "test": "mocha --timeout 30000 'test/unit/**/*.test.js'",
