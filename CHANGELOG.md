@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.10] - 2026-05-29
+
+### Security
+- `src/gas.js` — the `GasTracker` constructor now validates that the supplied gas schedule contains every key the VM charges against. A new `CANONICAL_GAS_KEYS` set enumerates the eight metered operations (`VM_COMPUTATION`, `VM_STATE_READ`, `VM_STATE_WRITE`, `VM_STATE_DELETE`, `VM_ORACLE_READ`, `VM_CROSSCHAIN_READ`, `VM_ATTEST_REQUEST`, `VM_EMISSION`); construction throws `gas schedule is missing required key: <key>` if any are absent. Previously a schedule that omitted a charged key passed validation and only failed later — when a contract first hit that operation deep in execution — which meant two operators whose schedules disagreed on a key could silently reach divergent contract outcomes (different `gasUsed`, different state) on the same block. The check turns that latent, execution-time, fleet-divergent failure into a deterministic, loud error at VM construction. Extra keys are intentionally tolerated: the VM is a generic library and its caller passes the full protocol fee schedule, which legitimately carries keys the VM never charges (e.g. `ISSUE`, `OWNERSHIP_ESCROW`, `VM_DEPLOY_*`). `CANONICAL_GAS_KEYS` is exported for callers/tests.
+- Added regression tests in `test/unit/gas.test.js` asserting that (a) a schedule missing any single canonical key throws at construction, (b) a schedule carrying extra non-charged keys is accepted, and (c) the complete canonical schedule is accepted. Test, integration, e2e, fuzz, chaos, boundary, security, smoke and bench harness schedules were updated to include `VM_ATTEST_REQUEST` so they continue to construct a complete schedule.
+
 ## [1.11.9] - 2026-05-29
 
 ### Security
