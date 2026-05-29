@@ -77,6 +77,58 @@ describe('Math API', function() {
         });
     });
 
+    describe('transcendental (deterministic bignumber)', function() {
+        it('should compute exact integer square roots', function() {
+            assert.strictEqual(math.sqrt('4'), '2');
+            assert.strictEqual(math.sqrt('144'), '12');
+        });
+
+        it('should compute sqrt of 2 deterministically', function() {
+            const result = math.sqrt('2');
+            // mathjs bignumber is pure software — identical on every architecture.
+            assert(result.startsWith('1.4142135623730950488'), result);
+        });
+
+        it('should compute integer powers exactly', function() {
+            assert.strictEqual(math.pow('2', '10'), '1024');
+            assert.strictEqual(math.pow('5', '3'), '125');
+        });
+
+        it('should treat fractional pow(x, 0.5) as sqrt', function() {
+            assert.strictEqual(math.pow('2', '0.5'), math.sqrt('2'));
+        });
+
+        it('should compute log2 and log10 of exact powers', function() {
+            assert.strictEqual(math.log2('8'), '3');
+            assert.strictEqual(math.log10('1000'), '3');
+        });
+
+        it('should compute natural log of 1 as 0', function() {
+            assert.strictEqual(math.log('1'), '0');
+        });
+
+        it('should return strings from transcendental functions', function() {
+            assert.strictEqual(typeof math.sqrt('9'), 'string');
+            assert.strictEqual(typeof math.pow('2', '8'), 'string');
+        });
+
+        it('should revert on sqrt of a negative number (complex result)', function() {
+            assert.throws(() => math.sqrt('-1'), ContractRevertError);
+        });
+
+        it('should revert on log of zero (non-finite result)', function() {
+            assert.throws(() => math.log('0'), ContractRevertError);
+        });
+
+        it('should revert on log of a negative number (complex result)', function() {
+            assert.throws(() => math.log('-5'), ContractRevertError);
+        });
+
+        it('should revert on fractional pow of a negative base (complex result)', function() {
+            assert.throws(() => math.pow('-2', '0.5'), ContractRevertError);
+        });
+    });
+
     describe('error handling', function() {
         it('should throw ContractRevertError on division by zero', function() {
             assert.throws(() => {

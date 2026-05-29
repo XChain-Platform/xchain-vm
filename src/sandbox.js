@@ -109,7 +109,22 @@ const STRIP_SCRIPT = `
     try { globalThis.require = undefined; } catch(e) {}
     try { globalThis.importScripts = undefined; } catch(e) {}
 
-    // Replace Math with deterministic subset (no Math.random)
+    // Replace Math with a deterministic, architecture-independent subset.
+    //
+    // Math.random is omitted (non-deterministic).
+    //
+    // The transcendental functions (sqrt, pow, log, log2, log10) are also
+    // INTENTIONALLY ABSENT. IEEE 754 only mandates correctly-rounded results
+    // for sqrt — not for pow, log, log2, or log10 — so the host libm can differ
+    // by 1 ULP in the last bit across CPU architectures (e.g. x86-64 vs ARM64).
+    // A 1-ULP difference in a serialized result is enough to produce divergent
+    // state hashes across a heterogeneous validator fleet, i.e. a consensus
+    // split. Contracts that need these must use xchain.math.* (mathjs bignumber
+    // — pure software arithmetic that is identical on every platform).
+    //
+    // The retained members (floor/ceil/round/abs/min/max/sign/trunc and the
+    // PI/E constants) are exact, spec-defined operations with no rounding
+    // ambiguity, so they are safe to expose directly.
     var SafeMath = {
         floor: Math.floor,
         ceil:  Math.ceil,
@@ -117,13 +132,8 @@ const STRIP_SCRIPT = `
         abs:   Math.abs,
         min:   Math.min,
         max:   Math.max,
-        sqrt:  Math.sqrt,
-        pow:   Math.pow,
         sign:  Math.sign,
         trunc: Math.trunc,
-        log:   Math.log,
-        log2:  Math.log2,
-        log10: Math.log10,
         PI:    Math.PI,
         E:     Math.E
     };

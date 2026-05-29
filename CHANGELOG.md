@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.7] - 2026-05-28
+
+### Security
+- Removed the IEEE 754 transcendental functions (`sqrt`, `pow`, `log`, `log2`, `log10`) from the sandbox's `SafeMath` object in `src/sandbox.js`. IEEE 754 only mandates correctly-rounded results for `sqrt` — not for `pow`/`log`/`log2`/`log10` — so the host libm can differ by 1 ULP across CPU architectures (e.g. x86-64 vs ARM64). A 1-ULP difference in a serialized contract result is enough to diverge state hashes across a heterogeneous validator fleet, i.e. split consensus. The retained `SafeMath` members (`floor`/`ceil`/`round`/`abs`/`min`/`max`/`sign`/`trunc` and the `PI`/`E` constants) are exact, spec-defined operations and remain available.
+- Added deterministic, architecture-independent replacements under `xchain.math`: `sqrt`, `pow`, `log`, `log2`, `log10`, backed by mathjs bignumber (pure-software arithmetic, bit-identical on every platform). Results that are not real and finite (e.g. `sqrt` of a negative, `log` of zero) revert with a `ContractRevertError` rather than returning a complex-number or `Infinity` string.
+- `validateSyntax()` now rejects contract source that references `Math.sqrt`/`Math.pow`/`Math.log`/`Math.log2`/`Math.log10` (both `Math.pow(...)` and `Math['pow']` forms) with a clear deploy-time error pointing to the `xchain.math.*` equivalent, turning what would otherwise be a silent runtime failure into an early, explicit rejection.
+
 ## [1.11.6] - 2026-05-28
 
 ### Security

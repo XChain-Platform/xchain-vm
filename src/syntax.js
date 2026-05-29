@@ -12,10 +12,11 @@ const { meterCode, hasGasIdentifier } = require('./metering.js');
 
 /**
  * Validate contract code syntax before deployment.
- * Runs three blocking checks in order:
+ * Runs four blocking checks in order:
  * 1. V8 syntax check (compileScriptSync in throwaway isolate)
  * 2. Acorn metering pass (ensures acorn can parse it — supported syntax = min(V8, acorn))
  * 3. Reserved identifier check (__gas)
+ * 4. Banned transcendental Math.* check (Math.sqrt/pow/log/log2/log10)
  *
  * @param {string} code - Contract source code
  * @returns {{ valid: boolean, error?: string }}
@@ -43,7 +44,64 @@ function validateSyntax(code) {
     if (hasGasIdentifier(code))
         return { valid: false, error: 'reserved identifier: __gas' };
 
+    // 4. Banned transcendental Math.* check
+    const banned = findBannedMathCalls(code);
+    if (banned.length > 0) {
+        const first = banned[0];
+        return {
+            valid: false,
+            error: 'banned API: Math.' + first.name + ' at line ' + first.line +
+                   ' — IEEE 754 floating-point transcendentals are non-deterministic ' +
+                   'across CPU architectures; use xchain.math.' + first.name + '() instead'
+        };
+    }
+
     return { valid: true };
+}
+
+// Transcendental Math members that are non-deterministic across architectures
+// and are no longer exposed in the sandbox. Calling them would fail at runtime;
+// rejecting at deploy time turns that into a clear, early error.
+const BANNED_MATH_MEMBERS = new Set(['sqrt', 'pow', 'log', 'log2', 'log10']);
+
+/**
+ * Scan contract code for references to banned transcendental Math members
+ * (Math.sqrt / Math.pow / Math.log / Math.log2 / Math.log10), in both dotted
+ * (Math.pow) and computed-string (Math['pow']) forms.
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{name: string, line: (number|string)}>}
+ */
+function findBannedMathCalls(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, {
+            ecmaVersion: 2020,
+            sourceType: 'script',
+            locations: true
+        });
+    } catch (e) {
+        // Parse failure — validateSyntax's earlier checks would have caught this.
+        return hits;
+    }
+    walk.simple(ast, {
+        MemberExpression(node) {
+            if (!node.object || node.object.type !== 'Identifier' || node.object.name !== 'Math')
+                return;
+            let member = null;
+            if (!node.computed && node.property && node.property.type === 'Identifier') {
+                member = node.property.name;                 // Math.pow
+            } else if (node.computed && node.property && node.property.type === 'Literal'
+                       && typeof node.property.value === 'string') {
+                member = node.property.value;                // Math['pow']
+            }
+            if (member && BANNED_MATH_MEMBERS.has(member)) {
+                hits.push({ name: member, line: node.loc ? node.loc.start.line : '?' });
+            }
+        }
+    });
+    return hits;
 }
 
 /**
@@ -79,4 +137,4 @@ function checkFloatWarnings(code) {
     return warnings;
 }
 
-module.exports = { validateSyntax, checkFloatWarnings };
+module.exports = { validateSyntax, checkFloatWarnings, findBannedMathCalls };

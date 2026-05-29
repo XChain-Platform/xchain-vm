@@ -8,6 +8,7 @@
 const { ContractRevertError } = require('./errors.js');
 const mathjs = require('mathjs');
 const { bignumber, add, subtract, multiply, divide, mod, compare } = mathjs;
+const { pow, sqrt, log, log2, log10 } = mathjs;
 
 // Maximum input length for math operations to prevent DoS via
 // extreme-precision bignumber parsing (RISK-12, RISK-18).
@@ -16,6 +17,21 @@ const MAX_MATH_INPUT_LENGTH = 256;
 // Format a bignumber result as a fixed-notation string (no scientific notation)
 function toFixed(val) {
     return mathjs.format(val, { notation: 'fixed' });
+}
+
+// Format a result that must be a real, finite number. Transcendental functions
+// (sqrt, pow, log, ...) can legitimately produce complex values (sqrt of a
+// negative, fractional pow of a negative) or non-finite values (log of zero).
+// Returning a "1+2i" or "Infinity" string from a numeric contract API is a
+// footgun, so we reject those here — safeMath() turns the throw into a clean
+// ContractRevertError.
+function toRealFixed(val) {
+    if (mathjs.isComplex(val))
+        throw new Error('result is not a real number');
+    const s = toFixed(val);
+    if (s === 'Infinity' || s === '-Infinity' || s === 'NaN')
+        throw new Error('result is not a finite number');
+    return s;
 }
 
 // Validate math input length
@@ -64,7 +80,17 @@ function buildMathAPI() {
         min:      safeMath((a, b) => { const ba = bignumber(validateInput(a)), bb = bignumber(validateInput(b)); return toFixed(cmp(a, b) <= 0 ? ba : bb); }),
         max:      safeMath((a, b) => { const ba = bignumber(validateInput(a)), bb = bignumber(validateInput(b)); return toFixed(cmp(a, b) >= 0 ? ba : bb); }),
         abs:      safeMath((a)    => toFixed(bignumber(validateInput(a)).abs())),
-        isZero:   safeMath((a)    => bignumber(validateInput(a)).isZero())
+        isZero:   safeMath((a)    => bignumber(validateInput(a)).isZero()),
+
+        // Transcendental functions — deterministic, architecture-independent
+        // replacements for the IEEE 754 Math.sqrt/pow/log/... that are no longer
+        // exposed in the sandbox. mathjs bignumber is pure-software arithmetic,
+        // so these produce bit-identical results on every CPU architecture.
+        sqrt:     safeMath((a)    => toRealFixed(sqrt(bignumber(validateInput(a))))),
+        pow:      safeMath((a, b) => toRealFixed(pow(bignumber(validateInput(a)), bignumber(validateInput(b))))),
+        log:      safeMath((a)    => toRealFixed(log(bignumber(validateInput(a))))),
+        log2:     safeMath((a)    => toRealFixed(log2(bignumber(validateInput(a))))),
+        log10:    safeMath((a)    => toRealFixed(log10(bignumber(validateInput(a)))))
     };
 }
 

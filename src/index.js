@@ -153,7 +153,12 @@ const HARNESS_SOURCE = `
             min:      wrap(globalThis.__math_min),
             max:      wrap(globalThis.__math_max),
             abs:      wrap(globalThis.__math_abs),
-            isZero:   wrap(globalThis.__math_isZero)
+            isZero:   wrap(globalThis.__math_isZero),
+            sqrt:     wrap(globalThis.__math_sqrt),
+            pow:      wrap(globalThis.__math_pow),
+            log:      wrap(globalThis.__math_log),
+            log2:     wrap(globalThis.__math_log2),
+            log10:    wrap(globalThis.__math_log10)
         }),
 
         // Control flow (gas-free)
@@ -535,6 +540,11 @@ class XChainVM {
         g.setSync('__math_max',      bridge(gateway.math.max));
         g.setSync('__math_abs',      bridge(gateway.math.abs));
         g.setSync('__math_isZero',   bridge(gateway.math.isZero));
+        g.setSync('__math_sqrt',     bridge(gateway.math.sqrt));
+        g.setSync('__math_pow',      bridge(gateway.math.pow));
+        g.setSync('__math_log',      bridge(gateway.math.log));
+        g.setSync('__math_log2',     bridge(gateway.math.log2));
+        g.setSync('__math_log10',    bridge(gateway.math.log10));
 
         // Control flow (gas-free)
         g.setSync('__revert',  bridge(gateway.revert));

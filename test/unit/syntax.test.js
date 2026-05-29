@@ -54,6 +54,48 @@ try {
         });
     });
 
+    describe('banned transcendental Math.* (blocking)', function() {
+        const banned = ['sqrt', 'pow', 'log', 'log2', 'log10'];
+
+        banned.forEach(function(name) {
+            it('should reject Math.' + name + ' (dotted form)', function() {
+                const result = validateSyntax('var x = Math.' + name + '(2, 3);');
+                assert.strictEqual(result.valid, false);
+                assert(result.error.includes('Math.' + name), result.error);
+                assert(result.error.includes('xchain.math.' + name), result.error);
+            });
+
+            it('should reject Math[\'' + name + '\'] (computed form)', function() {
+                const result = validateSyntax("var x = Math['" + name + "'](2);");
+                assert.strictEqual(result.valid, false);
+                assert(result.error.includes('Math.' + name), result.error);
+            });
+        });
+
+        it('should report the line number of the banned call', function() {
+            const result = validateSyntax('var a = 1;\nvar b = Math.sqrt(4);');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('line 2'), result.error);
+        });
+
+        it('should still allow retained Math members (floor/abs/min/max)', function() {
+            assert.strictEqual(validateSyntax('var x = Math.floor(1.5);').valid, true);
+            assert.strictEqual(validateSyntax('var x = Math.abs(-3);').valid, true);
+            assert.strictEqual(validateSyntax('var x = Math.max(1, 2);').valid, true);
+            assert.strictEqual(validateSyntax('var x = Math.PI;').valid, true);
+        });
+
+        it('should not reject a property named like a banned member on another object', function() {
+            const result = validateSyntax('var obj = { pow: function(){} }; obj.pow();');
+            assert.strictEqual(result.valid, true);
+        });
+
+        it('should not reject the string "Math.pow"', function() {
+            const result = validateSyntax('var x = "Math.pow";');
+            assert.strictEqual(result.valid, true);
+        });
+    });
+
     describe('checkFloatWarnings', function() {
         it('should warn on decimal literals', function() {
             const warnings = checkFloatWarnings('var x = 0.1;');
