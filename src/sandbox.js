@@ -18,7 +18,17 @@ const STRIP_SCRIPT = `
         'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
         'fetch', 'XMLHttpRequest', 'WebSocket',
         'SharedArrayBuffer', 'Atomics',
-        'queueMicrotask'
+        'queueMicrotask',
+        // Intl (ECMAScript 402) is locale-sensitive and its output depends on the
+        // ICU data compiled into the host binary (full-icu vs small-icu, and the
+        // ICU version that ships with each Node.js release). Two validators on
+        // different Node.js/ICU builds would format the same value differently,
+        // diverging state hashes across the fleet. Temporal and structuredClone
+        // are stripped pre-emptively: Temporal exposes time-zone-sensitive output,
+        // and structuredClone's serialization edge cases have varied across V8
+        // versions — both are non-deterministic risks if a future V8 build exposes
+        // them in the isolate.
+        'Intl', 'Temporal', 'structuredClone'
     ];
     for (const name of toDelete) {
         try { delete globalThis[name]; } catch(e) {}

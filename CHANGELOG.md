@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.9] - 2026-05-29
+
+### Security
+- Strip `Intl` from the sandbox isolate (`src/sandbox.js` `toDelete`). `Intl` (ECMAScript 402) is locale-sensitive and its output depends on the ICU data compiled into the host Node.js binary — full-icu vs small-icu builds, and the ICU version bundled with each Node.js release, format the same value differently (`new Intl.NumberFormat('de').format(1234.5)` yields `'1.234,5'` on one build and `'1,234.5'` on another). A contract using `Intl` would therefore diverge state hashes across a heterogeneous validator fleet, i.e. split consensus. It is now `undefined` inside the isolate alongside the other non-deterministic globals.
+- Pre-emptively strip `Temporal` and `structuredClone` for the same non-determinism class: `Temporal` exposes time-zone-sensitive output, and `structuredClone`'s serialization edge cases have varied across V8 versions. Neither is currently guaranteed present in the isolate, but stripping them now prevents a future V8 build from silently exposing a divergent surface.
+- Added runtime regression tests in `test/integration/sandbox.test.js` asserting `Intl`/`Temporal`/`structuredClone` are `undefined` inside the live isolate, plus an explicit check that `new Intl.NumberFormat('de').format(1234.5)` throws inside a contract.
+
 ## [1.11.8] - 2026-05-28
 
 ### Added

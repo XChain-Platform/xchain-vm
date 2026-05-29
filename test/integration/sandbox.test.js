@@ -223,6 +223,36 @@ function executeCode(vm, code) {
         assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
     });
 
+    // Intl (ECMAScript 402) output depends on the ICU data compiled into the host
+    // Node.js binary (full-icu vs small-icu, and per-release ICU version), so two
+    // validators on different builds would format the same value differently and
+    // diverge state hashes. Temporal and structuredClone are stripped pre-emptively
+    // for the same non-determinism class. These assert the strip at the live-isolate
+    // layer.
+    ['Intl', 'Temporal', 'structuredClone'].forEach(function(name) {
+        it('should block ' + name, async function() {
+            const result = await executeCode(vm,
+                'module.exports = function(xchain) { return typeof ' + name + '; };');
+            assert.strictEqual(result.success, true);
+            assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+        });
+    });
+
+    it('should make Intl.NumberFormat uncallable inside the sandbox', async function() {
+        const result = await executeCode(vm, `
+            module.exports = function(xchain) {
+                try {
+                    return 'called:' + new Intl.NumberFormat('de').format(1234.5);
+                } catch(e) {
+                    return 'threw';
+                }
+            };
+        `);
+        assert.strictEqual(result.success, true);
+        // Intl is undefined, so referencing Intl.NumberFormat throws inside the contract.
+        assert.strictEqual(JSON.parse(result.returnValue), 'threw');
+    });
+
     it('should block console', async function() {
         const result = await executeCode(vm,
             'module.exports = function(xchain) { return typeof console; };');
