@@ -72,6 +72,39 @@ function executeCode(vm, code) {
         assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
     });
 
+    // The transcendentals (pow/log/log2/log10/sqrt) are stripped from the
+    // sandbox Math because IEEE 754 does not mandate correctly-rounded results
+    // for them (sqrt is correctly-rounded by the spec but is removed alongside
+    // the others for a single, consistent surface). The host libm can differ by
+    // 1 ULP across CPU architectures, which would diverge state hashes across a
+    // heterogeneous validator fleet. Contracts must use the deterministic
+    // bignumber equivalents at xchain.math.{pow,log,log2,log10,sqrt}. These
+    // tests assert the strip at the live-isolate layer, independent of the
+    // deploy-time syntax validator.
+    ['pow', 'log', 'log2', 'log10', 'sqrt'].forEach(function(name) {
+        it('should strip non-deterministic Math.' + name, async function() {
+            const result = await executeCode(vm,
+                'module.exports = function(xchain) { return typeof Math.' + name + '; };');
+            assert.strictEqual(result.success, true);
+            assert.strictEqual(JSON.parse(result.returnValue), 'undefined');
+        });
+    });
+
+    it('should make Math.pow(2.1, 1.5) uncallable inside the sandbox', async function() {
+        const result = await executeCode(vm, `
+            module.exports = function(xchain) {
+                try {
+                    return 'called:' + Math.pow(2.1, 1.5);
+                } catch(e) {
+                    return 'threw';
+                }
+            };
+        `);
+        assert.strictEqual(result.success, true);
+        // Math.pow is undefined, so calling it throws a TypeError inside the contract.
+        assert.strictEqual(JSON.parse(result.returnValue), 'threw');
+    });
+
     it('should keep deterministic Math functions', async function() {
         const result = await executeCode(vm,
             'module.exports = function(xchain) { return Math.floor(3.7); };');

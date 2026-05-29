@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.8] - 2026-05-28
+
+### Added
+- Runtime regression tests in `test/integration/sandbox.test.js` asserting the stripped transcendentals (`pow`, `log`, `log2`, `log10`, `sqrt`) are `undefined` inside the live isolate, plus an explicit check that calling `Math.pow(2.1, 1.5)` throws inside a contract. This complements the existing deploy-time `validateSyntax()` rejection by verifying the `SafeMath` strip at the execution layer itself, so a reintroduction of any of these into the sandbox `Math` is caught even if the syntax validator is bypassed or changed.
+
 ## [1.11.7] - 2026-05-28
 
 ### Security
