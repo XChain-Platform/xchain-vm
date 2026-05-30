@@ -35,7 +35,14 @@ const STRIP_SCRIPT = `
         // and structuredClone's serialization edge cases have varied across V8
         // versions — both are non-deterministic risks if a future V8 build exposes
         // them in the isolate.
-        'Intl', 'Temporal', 'structuredClone'
+        //
+        // performance (the Web Performance API) is stripped for the same reason:
+        // performance.now() returns wall-clock microseconds, a pure non-determinism
+        // source equivalent to Date. A bare V8 isolate likely does not expose it
+        // today, but V8 10.4+ ships a minimal performance stub for Wasm tooling that
+        // may surface on newer host builds. The delete is a no-op if absent and a
+        // critical guard if present, so it is stripped pre-emptively.
+        'Intl', 'Temporal', 'structuredClone', 'performance'
     ];
     for (const name of toDelete) {
         try { delete globalThis[name]; } catch(e) {}

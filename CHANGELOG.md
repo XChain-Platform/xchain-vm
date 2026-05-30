@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.12] - 2026-05-30
+
+### Security
+- `src/sandbox.js` — added `'performance'` to the `STRIP_SCRIPT` `toDelete` list, so the Web Performance API is neutralised in the isolate alongside `Date`, `Intl`, `Temporal`, and `structuredClone`. `performance.now()` returns wall-clock microseconds — a pure non-determinism source that, if reachable inside a contract, would diverge state hashes across a heterogeneous validator fleet. A bare V8 isolate likely does not expose `performance` today, but V8 10.4+ ships a minimal `performance` stub for Wasm tooling that could surface on newer host builds; the strip is a no-op when the global is absent and a critical guard when present, so it is applied pre-emptively. Added integration tests in `test/integration/sandbox.test.js` asserting `typeof performance === 'undefined'` and that `performance.now()` is inaccessible inside a contract.
+
 ## [1.11.11] - 2026-05-29
 
 ### Fixed

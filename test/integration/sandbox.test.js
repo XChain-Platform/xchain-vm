@@ -227,9 +227,11 @@ function executeCode(vm, code) {
     // Node.js binary (full-icu vs small-icu, and per-release ICU version), so two
     // validators on different builds would format the same value differently and
     // diverge state hashes. Temporal and structuredClone are stripped pre-emptively
-    // for the same non-determinism class. These assert the strip at the live-isolate
-    // layer.
-    ['Intl', 'Temporal', 'structuredClone'].forEach(function(name) {
+    // for the same non-determinism class. performance (the Web Performance API) is
+    // stripped because performance.now() returns wall-clock microseconds — a pure
+    // non-determinism source like Date — which a future V8 host build could expose
+    // in the isolate. These assert the strip at the live-isolate layer.
+    ['Intl', 'Temporal', 'structuredClone', 'performance'].forEach(function(name) {
         it('should block ' + name, async function() {
             const result = await executeCode(vm,
                 'module.exports = function(xchain) { return typeof ' + name + '; };');
@@ -251,6 +253,20 @@ function executeCode(vm, code) {
         assert.strictEqual(result.success, true);
         // Intl is undefined, so referencing Intl.NumberFormat throws inside the contract.
         assert.strictEqual(JSON.parse(result.returnValue), 'threw');
+    });
+
+    it('should make performance.now() inaccessible inside the sandbox', async function() {
+        const result = await executeCode(vm, `
+            module.exports = function(xchain) {
+                try { return typeof performance + ':' + String(performance.now()); }
+                catch(e) { return 'blocked:' + e.message; }
+            };
+        `);
+        assert.strictEqual(result.success, true);
+        const val = JSON.parse(result.returnValue);
+        // performance is undefined, so performance.now() throws inside the contract.
+        assert(val.startsWith('blocked:') || val.startsWith('undefined:'),
+            'performance.now() should be inaccessible: ' + val);
     });
 
     it('should block console', async function() {
