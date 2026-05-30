@@ -16,7 +16,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping security tests — isolated-vm not available: ' + e.message);
+    console.log('Skipping security tests — isolated-vm not available:', e);
 }
 
 const GAS_SCHEDULE = {

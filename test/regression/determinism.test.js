@@ -7,7 +7,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping determinism tests — isolated-vm not available: ' + e.message);
+    console.log('Skipping determinism tests — isolated-vm not available:', e);
 }
 
 const GAS_SCHEDULE = {

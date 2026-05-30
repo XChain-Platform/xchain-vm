@@ -5,7 +5,7 @@ try {
     IsolateManager = require('../../src/isolate.js');
     ivm = require('isolated-vm');
 } catch (e) {
-    console.log('Skipping isolate tests — isolated-vm not available: ' + e.message);
+    console.log('Skipping isolate tests — isolated-vm not available:', e);
 }
 
 (IsolateManager && ivm ? describe : describe.skip)('IsolateManager', function() {
