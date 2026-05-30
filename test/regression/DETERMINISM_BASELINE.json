@@ -1,0 +1,9 @@
+{
+  "state_counter:increment": "a10b131be7d5c51b7c834eb7711f3126af1bb38668501376049676aa0259d831",
+  "simple_send:send": "40c23d93c4c17738ff1996bb12292d69f94c4325bcb64a9e501d2477c9606af0",
+  "amm_swap:swap": "4fcf1c3552b99aeab5874a94871d9c6361ee6d3c6454980645e29e71a65bec15",
+  "inline:math": "baff66e8bdad9d6eb75e93fcac1adc86afb7309b092479983e0927336da916f6",
+  "inline:emit": "f3d9e1a01acbc905568811bcc660a7ffe5191aabe9d60c29a2ef7684d1912d08",
+  "inline:revert": "6d3c7385cec5a07a06c94ba8077e4ecd48940ed53c46b88e232a36104674349d",
+  "inline:state-math-loop": "5f4a9517e5a0c9bfbc658f15567401655569303f6cd24d6c6aad25b6d1e4c5ff"
+}
