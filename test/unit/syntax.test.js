@@ -6,7 +6,7 @@ try {
     validateSyntax = syntax.validateSyntax;
     checkFloatWarnings = syntax.checkFloatWarnings;
 } catch (e) {
-    console.log('Skipping syntax tests — isolated-vm not available: ' + e.message);
+    console.log('Skipping syntax tests — isolated-vm not available:', e);
 }
 
 (validateSyntax ? describe : describe.skip)('Syntax Validation', function() {

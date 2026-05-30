@@ -85,6 +85,7 @@ const vm = new XChainVM({
         VM_STATE_DELETE: 100,
         VM_ORACLE_READ: 100,
         VM_CROSSCHAIN_READ: 100,
+        VM_ATTEST_REQUEST: 5000,
         VM_EMISSION: 500
     },
     gasCeiling: 1000000,

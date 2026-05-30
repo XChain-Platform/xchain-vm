@@ -14,6 +14,7 @@ const GAS_SCHEDULE = {
     VM_STATE_DELETE:    100,
     VM_ORACLE_READ:     100,
     VM_CROSSCHAIN_READ: 100,
+    VM_ATTEST_REQUEST:  5000,
     VM_EMISSION:        500
 };
 
@@ -39,9 +40,24 @@ try {
 
 const FUZZ_ITERATIONS = parseInt(process.env.FUZZ_ITERATIONS || '500', 10);
 
+// Reproducible fuzzing. fast-check only prints the seed it used ON FAILURE,
+// so a flake whose output scrolls away (or a non-endOnFailure run) is
+// unrecoverable. We therefore choose the seed ourselves, LOG it up front
+// every run, and let it be pinned via FC_SEED. A green run still logs its
+// seed, so when a future run goes red you can reproduce the exact input
+// stream with `FC_SEED=<that number> npm run test:fuzz`. Default stays
+// random for broad coverage; CI can pin for full determinism.
+const FC_SEED = process.env.FC_SEED
+    ? parseInt(process.env.FC_SEED, 10)
+    : (Date.now() >>> 0);
+// eslint-disable-next-line no-console
+console.log(`[fuzz] fast-check seed = ${FC_SEED}` +
+    (process.env.FC_SEED ? ' (pinned via FC_SEED)' : ' (random — pin with FC_SEED=<n> to reproduce)'));
+
 const FC_OPTIONS = {
-    numRuns:    FUZZ_ITERATIONS,
-    endOnFailure: true
+    numRuns:      FUZZ_ITERATIONS,
+    endOnFailure: true,
+    seed:         FC_SEED
 };
 
 function createVM(overrides) {
@@ -112,6 +128,7 @@ module.exports = {
     DEFAULT_BLOCK_CONTEXT,
     XChainVM,
     FUZZ_ITERATIONS,
+    FC_SEED,
     FC_OPTIONS,
     createVM,
     execute,

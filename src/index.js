@@ -305,7 +305,7 @@ class XChainVM {
                 {
                     caller:          opts.caller,
                     contractAddress: opts.contractAddress,
-                    contractIndex:   opts.contractIndex || null,
+                    contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
                     txHash:          opts.txHash || '',
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
@@ -350,7 +350,7 @@ class XChainVM {
 
             // Check compilation cache
             const codeHash = crypto.createHash('sha256').update(opts.code).digest('hex');
-            const cacheKey = (opts.contractIndex || '0') + ':' + codeHash;
+            const cacheKey = (opts.contractIndex != null ? opts.contractIndex : '0') + ':' + codeHash;
             let cachedData = null;
             if (this._blockCache && this._blockCache.has(cacheKey))
                 cachedData = this._blockCache.get(cacheKey);

@@ -1,19 +1,23 @@
 {
   "name": "xchain-vm",
   "description": "XChain Platform Virtual Machine (VM) runtime — deterministic smart contract execution in sandboxed V8 isolates",
-  "version": "1.11.9",
+  "version": "1.11.11",
   "license": "SEE LICENSE IN LICENSE.md",
   "main": "src/index.js",
+  "engines": {
+    "comment": "Canonical runtime is Node 22 — matches the indexer's node:22-bookworm image and the V8 the validator fleet runs. isolated-vm's native binding is V8-ABI-specific: run `npm rebuild isolated-vm --build-from-source` after switching Node versions. See .nvmrc.",
+    "node": ">=22.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/XChain-platform/xchain-vm.git"
   },
   "dependencies": {
-    "acorn": "^8.16.0",
+    "acorn": "8.16.0",
     "acorn-walk": "^8.3.5",
-    "astring": "^1.9.0",
-    "isolated-vm": "^5.0.4",
-    "mathjs": "^15.2.0"
+    "astring": "1.9.0",
+    "isolated-vm": "5.0.4",
+    "mathjs": "15.2.0"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^8.7.1",
@@ -24,10 +28,12 @@
   "overrides": {
     "qs": "^6.15.2",
     "tmp": ">=0.2.3",
-    "serialize-javascript": ">=6.0.4"
+    "serialize-javascript": ">=6.0.4",
+    "decimal.js": "10.4.3"
   },
   "scripts": {
-    "test": "mocha --timeout 30000 'test/unit/**/*.test.js'",
+    "test": "mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js'",
+    "test:preflight": "mocha --timeout 30000 'test/preflight.test.js'",
     "test:all": "mocha --timeout 60000 'test/**/*.test.js'",
     "test:integration": "mocha --timeout 60000 'test/integration/**/*.test.js'",
     "test:boundary": "mocha --timeout 30000 'test/boundary/**/*.test.js'",

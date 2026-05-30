@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.11] - 2026-05-29
+
+### Fixed
+- `src/gateway.js` / `src/index.js` — the deterministic attestation `request_id` is derived from a `(tx_hash, contract_index, emission_index)` preimage, but a falsy coercion (`contractIndex || ''` in `gateway.js`, `opts.contractIndex || null` in `index.js`) collapsed `contractIndex === 0` — the first contract in a block — into the same preimage as an absent `contractIndex`. Index 0 therefore produced a `request_id` indistinguishable from `undefined`, breaking the documented per-triple uniqueness guarantee. Both sites now use an explicit `!= null` check (`readOnlyData.contractIndex != null ? Number(...) : ''` and `opts.contractIndex != null ? Number(...) : null`), so index 0 contributes `'0'` to the preimage as intended. The fix must reach both sites together: `index.js` populates the `contractIndex` that `gateway.js` reads, so correcting only the gateway would have left index 0 coerced to `null` before it ever arrived. The compilation cache-key in `index.js` was switched to the same explicit form for consistency (no behavioural change there). Added a regression test in `test/integration/gateway-attestation.test.js` asserting that `contractIndex = 0` yields a `request_id` distinct from an omitted `contractIndex`. Must be deployed in lockstep with the indexer-side guard fix — a mixed-version fleet would disagree on the `request_id` for any contract at index 0.
+
+## [1.11.10] - 2026-05-29
+
+### Security
+- `src/gas.js` — the `GasTracker` constructor now validates that the supplied gas schedule contains every key the VM charges against. A new `CANONICAL_GAS_KEYS` set enumerates the eight metered operations (`VM_COMPUTATION`, `VM_STATE_READ`, `VM_STATE_WRITE`, `VM_STATE_DELETE`, `VM_ORACLE_READ`, `VM_CROSSCHAIN_READ`, `VM_ATTEST_REQUEST`, `VM_EMISSION`); construction throws `gas schedule is missing required key: <key>` if any are absent. Previously a schedule that omitted a charged key passed validation and only failed later — when a contract first hit that operation deep in execution — which meant two operators whose schedules disagreed on a key could silently reach divergent contract outcomes (different `gasUsed`, different state) on the same block. The check turns that latent, execution-time, fleet-divergent failure into a deterministic, loud error at VM construction. Extra keys are intentionally tolerated: the VM is a generic library and its caller passes the full protocol fee schedule, which legitimately carries keys the VM never charges (e.g. `ISSUE`, `OWNERSHIP_ESCROW`, `VM_DEPLOY_*`). `CANONICAL_GAS_KEYS` is exported for callers/tests.
+- Added regression tests in `test/unit/gas.test.js` asserting that (a) a schedule missing any single canonical key throws at construction, (b) a schedule carrying extra non-charged keys is accepted, and (c) the complete canonical schedule is accepted. Test, integration, e2e, fuzz, chaos, boundary, security, smoke and bench harness schedules were updated to include `VM_ATTEST_REQUEST` so they continue to construct a complete schedule.
+
 ## [1.11.9] - 2026-05-29
 
 ### Security

@@ -10,7 +10,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping attestation gateway tests — isolated-vm not available: ' + e.message);
+    console.log('Skipping attestation gateway tests — isolated-vm not available:', e);
 }
 
 const GAS_SCHEDULE = {
@@ -130,6 +130,26 @@ function baseExecOpts(extra) {
             assert.strictEqual(r2.success, true);
             assert.notStrictEqual(JSON.parse(r1.returnValue), JSON.parse(r2.returnValue),
                 'request_ids must diverge when tx_hash differs');
+        });
+
+        it('contractIndex=0 yields a request_id distinct from an omitted contractIndex', async function () {
+            // Regression: contractIndex 0 (the first contract in a block) must not
+            // collapse to the same preimage as an absent contractIndex. A falsy
+            // coercion (`contractIndex || ''`) made index 0 indistinguishable from
+            // undefined, breaking the (tx_hash, contract_index, emission_index)
+            // uniqueness guarantee for the request_id.
+            const code = `module.exports = function(xchain) {
+                return xchain.attestation.request('http_get', 'https://example.com/d', 'cb', [], { redundancy: 1 });
+            };`;
+            const rZero    = await vm.execute(baseExecOpts({ code, contractIndex: 0 }));
+            const rOmitted = await vm.execute(baseExecOpts({ code, contractIndex: undefined }));
+            assert.strictEqual(rZero.success, true, rZero.error);
+            assert.strictEqual(rOmitted.success, true, rOmitted.error);
+            assert.notStrictEqual(
+                JSON.parse(rZero.returnValue),
+                JSON.parse(rOmitted.returnValue),
+                'contractIndex=0 must not collide with an omitted contractIndex'
+            );
         });
 
         it('rejects redundancy values outside {1,3,5}', async function () {

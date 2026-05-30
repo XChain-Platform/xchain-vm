@@ -4,12 +4,12 @@ let XChainVM, vmWorking = false;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping index tests — isolated-vm not available: ' + e.message);
+    console.log('Skipping index tests — isolated-vm not available:', e);
 }
 
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
-    VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100,
+    VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000,
     VM_EMISSION: 500
 };
 
@@ -42,7 +42,7 @@ if (XChainVM) {
         // The before() hook below will do the actual async check.
         vmWorking = true;
     } catch (e) {
-        console.log('Skipping index tests — VM probe failed: ' + e.message);
+        console.log('Skipping index tests — VM probe failed:', e);
     }
 }
 

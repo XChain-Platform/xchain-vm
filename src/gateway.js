@@ -141,7 +141,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // Derive deterministic request_id BEFORE pushing the emission so it
                 // reflects the current emission index, not the post-push index.
                 let txHash        = readOnlyData.txHash || '';
-                let contractIndex = readOnlyData.contractIndex || '';
+                let contractIndex = readOnlyData.contractIndex != null ? Number(readOnlyData.contractIndex) : '';
                 let emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
                 let preimage = String(txHash) + ':' + String(contractIndex) + ':' + emissionIndex;
                 let requestId = crypto.createHash('sha256').update(preimage).digest('hex');

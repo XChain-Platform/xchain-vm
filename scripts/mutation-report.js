@@ -73,7 +73,7 @@ function loadJSON(filepath) {
     try {
         return JSON.parse(fs.readFileSync(filepath, 'utf8'));
     } catch (e) {
-        console.error('WARNING: Failed to parse ' + filepath + ': ' + e.message);
+        console.error('WARNING: Failed to parse ' + filepath + ':', e);
         return null;
     }
 }

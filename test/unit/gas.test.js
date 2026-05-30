@@ -11,6 +11,7 @@ describe('GasTracker', function() {
         VM_STATE_DELETE:   100,
         VM_ORACLE_READ:    100,
         VM_CROSSCHAIN_READ: 100,
+        VM_ATTEST_REQUEST: 5000,
         VM_EMISSION:       500
     };
 
@@ -111,5 +112,47 @@ describe('GasTracker', function() {
 
     it('should reject non-number schedule value in constructor', function() {
         assert.throws(() => new GasTracker({ ...SCHEDULE, VM_COMPUTATION: 'fast' }, 1000), /non-negative integer/);
+    });
+
+    // Canonical key-set enforcement: a schedule that omits a key the VM charges
+    // against would otherwise pass validation and only fail mid-execution (or, on
+    // a divergent operator, silently produce a different gasUsed). Construction
+    // must reject any missing canonical key.
+    it('should reject a schedule missing a canonical key in constructor', function() {
+        const incomplete = { ...SCHEDULE };
+        delete incomplete.VM_ATTEST_REQUEST;
+        assert.throws(() => new GasTracker(incomplete, 1000), /missing required key: VM_ATTEST_REQUEST/);
+    });
+
+    it('should reject a schedule missing any canonical key in constructor', function() {
+        for (const key of GasTracker.CANONICAL_GAS_KEYS) {
+            const incomplete = { ...SCHEDULE };
+            delete incomplete[key];
+            assert.throws(
+                () => new GasTracker(incomplete, 1000),
+                new RegExp('missing required key: ' + key),
+                'expected construction to throw when ' + key + ' is absent'
+            );
+        }
+    });
+
+    // Extra keys are tolerated by design: the VM receives the full protocol fee
+    // schedule from the indexer, which carries keys the VM never charges.
+    it('should accept a schedule carrying extra (non-charged) keys', function() {
+        const withExtras = {
+            ...SCHEDULE,
+            ISSUE:              100000,
+            OWNERSHIP_ESCROW:   50000,
+            VM_DEPLOY_BASE:     100000,
+            VM_DEPLOY_PER_BYTE: 10,
+            VM_EXECUTE_BASE:    1000
+        };
+        const tracker = new GasTracker(withExtras, 1000);
+        assert.strictEqual(tracker.getUsed(), 0);
+    });
+
+    it('should accept the complete canonical schedule', function() {
+        const tracker = new GasTracker(SCHEDULE, 1000);
+        assert.strictEqual(tracker.getUsed(), 0);
     });
 });
