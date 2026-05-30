@@ -56,7 +56,54 @@ function validateSyntax(code) {
         };
     }
 
+    // 5. Banned native-DoS literals (BigInt + RegExp).
+    // The AST gas meter charges per __gas() point, not for the cost INSIDE a single
+    // native operation, so BigInt arithmetic (`2n ** 5000000n`) and catastrophic regex
+    // backtracking (`/(a+)+$/`) burn heavy CPU for ~0 gas — a block packed with such
+    // EXECUTEs can exceed the indexer's block watchdog and halt the chain. The BigInt
+    // global and RegExp constructor are stripped at runtime; literals can only be
+    // blocked at the syntax layer.
+    const lits = findBannedLiterals(code);
+    if (lits.length > 0) {
+        const first = lits[0];
+        const advice = first.kind === 'bigint'
+            ? 'BigInt is unmetered native arithmetic; use the xchain.math bignumber API instead'
+            : 'regular-expression literals can backtrack catastrophically and are unmetered';
+        return {
+            valid: false,
+            error: 'banned literal: ' + first.kind + ' literal at line ' + first.line +
+                   ' — ' + advice
+        };
+    }
+
     return { valid: true };
+}
+
+/**
+ * Scan contract code for BigInt literals (10n) and RegExp literals (/.../), both of
+ * which expose unmetered native computation. acorn marks BigInt literals with a
+ * `bigint` property and RegExp literals with a `regex` property on the Literal node.
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{kind: string, line: (number|string)}>}
+ */
+function findBannedLiterals(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: 2020, sourceType: 'script', locations: true });
+    } catch (e) {
+        return hits;
+    }
+    walk.simple(ast, {
+        Literal(node) {
+            if (node.bigint !== undefined && node.bigint !== null)
+                hits.push({ kind: 'bigint', line: node.loc ? node.loc.start.line : '?' });
+            else if (node.regex !== undefined && node.regex !== null)
+                hits.push({ kind: 'regex', line: node.loc ? node.loc.start.line : '?' });
+        }
+    });
+    return hits;
 }
 
 // Transcendental Math members that are non-deterministic across architectures
@@ -137,4 +184,4 @@ function checkFloatWarnings(code) {
     return warnings;
 }
 
-module.exports = { validateSyntax, checkFloatWarnings, findBannedMathCalls };
+module.exports = { validateSyntax, checkFloatWarnings, findBannedMathCalls, findBannedLiterals };

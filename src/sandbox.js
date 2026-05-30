@@ -19,6 +19,13 @@ const STRIP_SCRIPT = `
         'fetch', 'XMLHttpRequest', 'WebSocket',
         'SharedArrayBuffer', 'Atomics',
         'queueMicrotask',
+        // BigInt arithmetic (** / *) is a native operation whose cost is super-linear
+        // in operand size but is invisible to the AST gas meter -- e.g. 2n ** 5000000n
+        // costs ~2 gas yet burns heavy CPU under the memory limit. Removed to close the
+        // unmetered-CPU DoS surface; contracts use the metered xchain.math bignumber API
+        // for large-number arithmetic. BigInt literals (10n) are rejected at deploy time
+        // (see syntax.js) since a global delete cannot disable literal syntax.
+        'BigInt',
         // Intl (ECMAScript 402) is locale-sensitive and its output depends on the
         // ICU data compiled into the host binary (full-icu vs small-icu, and the
         // ICU version that ships with each Node.js release). Two validators on
