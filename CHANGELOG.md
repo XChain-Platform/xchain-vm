@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.11] - 2026-05-29
+
+### Fixed
+- `src/gateway.js` / `src/index.js` — the deterministic attestation `request_id` is derived from a `(tx_hash, contract_index, emission_index)` preimage, but a falsy coercion (`contractIndex || ''` in `gateway.js`, `opts.contractIndex || null` in `index.js`) collapsed `contractIndex === 0` — the first contract in a block — into the same preimage as an absent `contractIndex`. Index 0 therefore produced a `request_id` indistinguishable from `undefined`, breaking the documented per-triple uniqueness guarantee. Both sites now use an explicit `!= null` check (`readOnlyData.contractIndex != null ? Number(...) : ''` and `opts.contractIndex != null ? Number(...) : null`), so index 0 contributes `'0'` to the preimage as intended. The fix must reach both sites together: `index.js` populates the `contractIndex` that `gateway.js` reads, so correcting only the gateway would have left index 0 coerced to `null` before it ever arrived. The compilation cache-key in `index.js` was switched to the same explicit form for consistency (no behavioural change there). Added a regression test in `test/integration/gateway-attestation.test.js` asserting that `contractIndex = 0` yields a `request_id` distinct from an omitted `contractIndex`. Must be deployed in lockstep with the indexer-side guard fix — a mixed-version fleet would disagree on the `request_id` for any contract at index 0.
+
 ## [1.11.10] - 2026-05-29
 
 ### Security
