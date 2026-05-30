@@ -23,7 +23,8 @@
   },
   "overrides": {
     "qs": "^6.15.2",
-    "tmp": ">=0.2.3"
+    "tmp": ">=0.2.3",
+    "serialize-javascript": ">=6.0.4"
   },
   "scripts": {
     "test": "mocha --timeout 30000 'test/unit/**/*.test.js'",

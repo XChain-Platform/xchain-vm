@@ -142,15 +142,15 @@ function baseExecOpts(extra) {
             assert.match(result.error || '', /redundancy must be 1, 3, or 5/);
         });
 
-        it('rejects requestPayload over 2048 bytes', async function () {
+        it('rejects requestPayload over 8192 bytes', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
-                    var big = 'x'.repeat(3000);
+                    var big = 'x'.repeat(9000);
                     return xchain.attestation.request('http_get', big, 'cb', [], { redundancy: 1 });
                 };`
             }));
             assert.strictEqual(result.success, false);
-            assert.match(result.error || '', /requestPayload exceeds 2048 bytes/);
+            assert.match(result.error || '', /requestPayload exceeds 8192 bytes/);
         });
 
         it('rejects callbackParams over 1024 bytes when JSON-stringified', async function () {
