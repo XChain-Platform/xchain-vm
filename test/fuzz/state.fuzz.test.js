@@ -133,7 +133,13 @@ const {
             fc.string({ minLength: 1, maxLength: 20 }),
             fc.string({ minLength: 1, maxLength: 100 }),
             async (key, value) => {
-                const state = {};
+                // Build initialState with a null prototype so adversarial keys
+                // like "__proto__" become genuine own properties. A plain {}
+                // would route state["__proto__"] = "str" through the __proto__
+                // setter (a no-op for non-object values), silently dropping the
+                // key before it ever reaches the VM — a false failure that masks
+                // what we actually want to test: round-trip fidelity for every key.
+                const state = Object.create(null);
                 state[key] = value;
                 const code = `module.exports = function(xchain) {
                     return xchain.state.get(${JSON.stringify(key)});
