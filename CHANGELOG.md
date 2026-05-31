@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.13] - 2026-05-30
+
+### Fixed
+- `src/metering.js` — `meterCode` now charges gas at the top-level script entry point. The metered source is executed as a function body (`new __Fn('module', 'exports', 'xchain', meteredCode)`), but Phase 1 only injected `__gas()` into the bodies of `FunctionDeclaration` / `FunctionExpression` / `ArrowFunctionExpression` — never into the top-level `Program.body`. As a result, pure top-level statements with no embedded calls (variable declarations, object-literal initializers, plain assignments — e.g. `const lookup = { a: 1, …, z: 26 };`) executed entirely uncharged. Function calls in top-level code were already charged by Phase 3's `CallExpression` wrapping, so the gap was confined to call-free top-level initializers — a mild denial-of-service vector for contracts that front-load computation into module-scope initializers. The fix inserts a single `insertGasAfterDirectives(ast.body)` call at the start of Phase 1, reusing the same helper already applied to function bodies (so any top-level directive prologue such as `"use strict"` is correctly skipped). The change is deterministic and applied identically on every node, so there is no consensus-divergence risk; the practical blast radius was already bounded by the 64 KB code-size cap enforced before metering runs. Added regression tests in `test/unit/metering.test.js` asserting a call-free top-level declaration is gas-charged and that the entry-point charge follows a top-level `"use strict"` directive. Regenerated `test/regression/DETERMINISM_BASELINE.json` — every corpus contract's `gasUsed` rises by exactly the one new entry-point charge.
+
 ## [1.11.12] - 2026-05-30
 
 ### Security

@@ -1,7 +1,7 @@
 {
   "name": "xchain-vm",
   "description": "XChain Platform Virtual Machine (VM) runtime — deterministic smart contract execution in sandboxed V8 isolates",
-  "version": "1.11.12",
+  "version": "1.11.13",
   "license": "SEE LICENSE IN LICENSE.md",
   "main": "src/index.js",
   "engines": {

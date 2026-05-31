@@ -83,13 +83,37 @@ describe('Metering', function() {
             assert(metered.includes('__gas'), 'should contain __gas calls');
         });
 
+        it('should inject gas at the top-level script entry point', function() {
+            // Pure top-level declaration with no calls — must still be charged
+            const code = 'const lookup = { a: 1, b: 2, c: 3 };';
+            const metered = meterCode(code);
+            assert(metered.includes('__gas'), 'should contain __gas calls');
+            // The entry-point gas charge must precede the declaration it guards
+            const gasIdx = metered.indexOf('__gas');
+            const declIdx = metered.indexOf('lookup');
+            assert(gasIdx !== -1 && gasIdx < declIdx,
+                '__gas should come before the top-level declaration');
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
+
+        it('should inject top-level gas after a script directive prologue', function() {
+            const code = '"use strict";\nvar x = 1;';
+            const metered = meterCode(code);
+            const strictIdx = metered.indexOf('"use strict"');
+            const gasIdx = metered.indexOf('__gas');
+            assert(gasIdx > strictIdx,
+                'top-level __gas should come after the "use strict" directive');
+        });
+
         it('should handle directive prologue (use strict)', function() {
             const code = 'function foo() { "use strict"; return 1; }';
             const metered = meterCode(code);
-            // __gas should be after "use strict", not before
+            // The function-body __gas should be after "use strict", not before.
+            // (A top-level entry-point __gas precedes the whole script, so search
+            // for the gas charge that follows the directive.)
             const strictIdx = metered.indexOf('"use strict"');
-            const gasIdx = metered.indexOf('__gas');
-            assert(gasIdx > strictIdx, '__gas should come after "use strict"');
+            const gasIdx = metered.indexOf('__gas', strictIdx);
+            assert(gasIdx > strictIdx, 'function-body __gas should come after "use strict"');
         });
 
         it('should handle nested ternaries', function() {
@@ -270,8 +294,8 @@ describe('Metering', function() {
             const code = 'function foo() { "use strict"; "use asm"; return 1; }';
             const metered = meterCode(code);
             const asmIdx = metered.indexOf('"use asm"');
-            const gasIdx = metered.indexOf('__gas');
-            assert(gasIdx > asmIdx, '__gas should come after all directives');
+            const gasIdx = metered.indexOf('__gas', asmIdx);
+            assert(gasIdx > asmIdx, 'function-body __gas should come after all directives');
         });
 
         it('should handle else-if chains', function() {

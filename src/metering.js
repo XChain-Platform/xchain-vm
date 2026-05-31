@@ -96,6 +96,13 @@ function meterCode(source) {
     // Track nodes we've already processed to avoid double-injection
     const processed = new WeakSet();
 
+    // Charge gas at the top-level script entry point. The metered source runs
+    // as a function body (new __Fn(..., meteredCode)), so top-level statements —
+    // variable declarations, object-literal initializers, plain assignments —
+    // would otherwise execute uncharged unless they happen to contain a call.
+    // Inject after any directive prologue, exactly as function bodies are handled.
+    insertGasAfterDirectives(ast.body);
+
     // Phase 1: Inject into function bodies, loop bodies, try/switch/if blocks
     walk.simple(ast, {
         // Function declarations and expressions — inject at entry
