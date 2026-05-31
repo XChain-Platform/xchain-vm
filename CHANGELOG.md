@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `src/index.js` — the contract code-size limit (`maxCodeSize`, 64 KiB) is now declared as an exported module constant `MAX_CODE_SIZE` and referenced from the default `limits` object instead of an inline literal. No behavior change — the value is identical — but the constant is now importable, so the cross-service regression suite can assert it has not drifted from the canonical protocol value in `xchain-documentation/protocol/constants.js` (kept equal across the SDK, indexer, and VM).
+
 ## [1.11.13] - 2026-05-30
 
 ### Fixed

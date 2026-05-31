@@ -216,6 +216,12 @@ const CONTRACT_WRAPPER = `
 })();
 `;
 
+// Maximum smart-contract code size (64 KiB). Canonical value:
+// xchain-documentation/protocol/constants.js (MAX_CODE_SIZE); kept equal to the
+// SDK and indexer by the cross-service regression suite (exported at the bottom
+// of this module).
+const MAX_CODE_SIZE = 65536;
+
 class XChainVM {
     /**
      * @param {object} config
@@ -232,8 +238,7 @@ class XChainVM {
             maxEmissions:      50,
             maxStateKeys:      10000,
             maxStateValueSize: 65536,
-            // Canonical MAX_CODE_SIZE: xchain-documentation/protocol/constants.js
-            maxCodeSize:       65536,
+            maxCodeSize:       MAX_CODE_SIZE,
             maxBlockCacheSize: 1000
         };
         this.isolateManager = new IsolateManager(this.limits);
@@ -653,3 +658,6 @@ class XChainVM {
 }
 
 module.exports = XChainVM;
+// Expose the canonical code-size cap so the cross-service regression suite can
+// assert it has not drifted from the protocol constant.
+module.exports.MAX_CODE_SIZE = MAX_CODE_SIZE;
