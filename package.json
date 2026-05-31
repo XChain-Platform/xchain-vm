@@ -33,6 +33,7 @@
   },
   "scripts": {
     "test": "mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js'",
+    "ci": "mocha --timeout 30000 --exit 'test/preflight.test.js' 'test/unit/**/*.test.js'",
     "test:preflight": "mocha --timeout 30000 'test/preflight.test.js'",
     "test:all": "mocha --timeout 60000 'test/**/*.test.js'",
     "test:integration": "mocha --timeout 60000 'test/integration/**/*.test.js'",
