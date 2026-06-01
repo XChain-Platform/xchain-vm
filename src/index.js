@@ -280,6 +280,8 @@ class XChainVM {
      * @param {object} [opts.oracleData]     - Oracle accessor
      * @param {object} [opts.crossChainData] - Cross-chain accessor
      * @param {number} [opts.contractIndex]  - For compilation cache key
+     * @param {object} [opts.providerDeadlines] - { [providerId]: maxDeadlineBlocks } map; enforces
+     *                                            the per-provider deadline window inside attestation.request()
      * @returns {Promise<object>} Execution result
      */
     async execute(opts) {
@@ -320,7 +322,8 @@ class XChainVM {
                     oracleData:        opts.oracleData || null,
                     crossChainData:    opts.crossChainData || null,
                     attestationData:   opts.attestationData || null,
-                    contractStakeData: opts.contractStakeData || null
+                    contractStakeData: opts.contractStakeData || null,
+                    providerDeadlines: opts.providerDeadlines || null
                 },
                 this.gasSchedule,
                 execContext

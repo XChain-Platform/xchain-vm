@@ -205,6 +205,57 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /deadlineBlocks must be an integer in \[1, 100\]/);
         });
+
+        // Regression: a per-provider deadline window narrower than the global
+        // [1, 100] cap must be enforced at call time. Without injection, an
+        // `llm` request (window 20) with deadlineBlocks 50 passed VM validation,
+        // landed on-chain, and was then silently dead-lettered by the indexer's
+        // DEADLINE check — the contract callback was never invoked.
+        const PROVIDER_DEADLINES = { http_get: 100, llm: 20 };
+
+        it('rejects deadlineBlocks above the injected per-provider window (llm=20, requested 50)', async function () {
+            const result = await vm.execute(baseExecOpts({
+                providerDeadlines: PROVIDER_DEADLINES,
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request('llm', 'judge this', 'cb', [], { redundancy: 1, deadlineBlocks: 50 });
+                };`
+            }));
+            assert.strictEqual(result.success, false, 'over-limit llm deadline must throw at call time');
+            assert.match(result.error || '', /deadlineBlocks 50 exceeds the "llm" provider window of 20 blocks/);
+            assert.strictEqual(result.emittedActions.length, 0, 'no ATTEST emission should be queued when the deadline is rejected');
+        });
+
+        it('accepts deadlineBlocks at the per-provider window limit (llm=20, requested 20)', async function () {
+            const result = await vm.execute(baseExecOpts({
+                providerDeadlines: PROVIDER_DEADLINES,
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request('llm', 'judge this', 'cb', [], { redundancy: 1, deadlineBlocks: 20 });
+                };`
+            }));
+            assert.strictEqual(result.success, true, 'deadline at the provider limit should succeed: ' + result.error);
+            assert.strictEqual(result.emittedActions.length, 1);
+        });
+
+        it('still allows a wider provider window (http_get=100, requested 100) under the same injected map', async function () {
+            const result = await vm.execute(baseExecOpts({
+                providerDeadlines: PROVIDER_DEADLINES,
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request('http_get', 'https://example.com/', 'cb', [], { redundancy: 1, deadlineBlocks: 100 });
+                };`
+            }));
+            assert.strictEqual(result.success, true, 'http_get within its 100-block window should succeed: ' + result.error);
+            assert.strictEqual(result.emittedActions.length, 1);
+        });
+
+        it('falls back to the global [1, 100] cap when no per-provider map is injected', async function () {
+            const result = await vm.execute(baseExecOpts({
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request('llm', 'judge this', 'cb', [], { redundancy: 1, deadlineBlocks: 50 });
+                };`
+            }));
+            assert.strictEqual(result.success, true, 'without injection only the global cap applies: ' + result.error);
+            assert.strictEqual(result.emittedActions.length, 1);
+        });
     });
 
     describe('getResponse()', function () {

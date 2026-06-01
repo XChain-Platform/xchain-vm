@@ -19,7 +19,9 @@ const { buildMathAPI } = require('./math.js');
  * @param {GasTracker} gasTracker
  * @param {StateManager} stateManager
  * @param {EmissionCollector} emissionCollector
- * @param {object} readOnlyData - { caller, contractAddress, params, blockContext, balances, tokenInfo, oracleData, crossChainData }
+ * @param {object} readOnlyData - { caller, contractAddress, params, blockContext, balances, tokenInfo, oracleData, crossChainData, providerDeadlines }
+ *   providerDeadlines: optional { [providerId]: maxDeadlineBlocks } map, injected
+ *   by the host so attestation.request() enforces the per-provider window at call time.
  * @param {object} gasSchedule
  * @param {object} execContext - Shared execution context { reverted: false }
  * @returns {object} The xchain gateway object
@@ -137,6 +139,20 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     throw new Error('attestation.request: redundancy must be 1, 3, or 5');
                 if (!Number.isInteger(deadlineBlocks) || deadlineBlocks < 1 || deadlineBlocks > 100)
                     throw new Error('attestation.request: deadlineBlocks must be an integer in [1, 100]');
+                // Per-provider deadline ceiling, injected by the host at execution
+                // setup (readOnlyData.providerDeadlines). The [1, 100] check above is
+                // a platform-wide safety net; this enforces the named provider's
+                // actual window so a contract gets a throw at call time instead of a
+                // silent host-side DEADLINE rejection that strands the callback. The
+                // map mirrors the host's provider registry; an unknown providerId is
+                // left to the host's own known-provider check.
+                let providerDeadlines = readOnlyData.providerDeadlines;
+                if (providerDeadlines && Object.prototype.hasOwnProperty.call(providerDeadlines, providerId)) {
+                    let providerLimit = Number(providerDeadlines[providerId]);
+                    if (Number.isFinite(providerLimit) && deadlineBlocks > providerLimit)
+                        throw new Error('attestation.request: deadlineBlocks ' + deadlineBlocks +
+                            ' exceeds the "' + providerId + '" provider window of ' + providerLimit + ' blocks');
+                }
 
                 // Derive deterministic request_id BEFORE pushing the emission so it
                 // reflects the current emission index, not the post-push index.
