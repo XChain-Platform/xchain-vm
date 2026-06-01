@@ -50,7 +50,7 @@ const FUZZ_ITERATIONS = parseInt(process.env.FUZZ_ITERATIONS || '500', 10);
 const FC_SEED = process.env.FC_SEED
     ? parseInt(process.env.FC_SEED, 10)
     : (Date.now() >>> 0);
-// eslint-disable-next-line no-console
+// eslint-disable-next-line no-console -- fuzz harness logs the chosen seed for reproducibility
 console.log(`[fuzz] fast-check seed = ${FC_SEED}` +
     (process.env.FC_SEED ? ' (pinned via FC_SEED)' : ' (random — pin with FC_SEED=<n> to reproduce)'));
 
