@@ -2,6 +2,7 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { CONTRACT_HOST_FIXTURES } = require('./contract-host-fixtures.js');
 
 let XChainVM;
 try {
@@ -100,7 +101,11 @@ const CORPUS = [
             return 'done';
         };`,
         state: {}
-    }
+    },
+    // Contract-targeted staking + external attestation host methods. Shared with
+    // determinism.test.js via contract-host-fixtures.js so the run-twice suite and
+    // this pinned-baseline suite exercise byte-identical code + injected accessors.
+    ...CONTRACT_HOST_FIXTURES
 ];
 
 const BASELINE_PATH = path.join(__dirname, 'DETERMINISM_BASELINE.json');
@@ -115,7 +120,10 @@ function optsFor(c) {
         code,
         method: ('method' in c) ? c.method : baseOpts.method,
         params: ('params' in c) ? c.params : baseOpts.params,
-        state: ('state' in c) ? c.state : baseOpts.state
+        state: ('state' in c) ? c.state : baseOpts.state,
+        // Host-method fixtures inject accessor data (contractStakeData /
+        // attestationData) plus stable txHash/contractIndex via `extra`.
+        ...(c.extra || {})
     };
 }
 

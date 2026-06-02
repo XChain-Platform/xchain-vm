@@ -2,6 +2,7 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { CONTRACT_HOST_FIXTURES } = require('./contract-host-fixtures.js');
 
 let XChainVM;
 try {
@@ -131,6 +132,20 @@ async function runTwice(vm, opts) {
         const [r1, r2] = await runTwice(vm, opts);
         assert.strictEqual(hashResult(r1), hashResult(r2));
         assert.strictEqual(r1.emittedActions.length, 2);
+    });
+
+    // Contract-targeted staking + external attestation host methods. These run
+    // on every chain in the indexer EXECUTE path, so a gas-charging,
+    // response-serialisation, or __gas-injection regression here must fail CI
+    // rather than silently diverge an on-chain block hash. Fixtures (code +
+    // injected accessors) are shared with determinism-baseline.test.js.
+    CONTRACT_HOST_FIXTURES.forEach(function(f) {
+        it(`should produce identical results for ${f.name}`, async function() {
+            const opts = { ...baseOpts, code: f.code, ...(f.extra || {}) };
+            const [r1, r2] = await runTwice(vm, opts);
+            assert.strictEqual(hashResult(r1), hashResult(r2));
+            assert.strictEqual(r1.success, true, r1.error);
+        });
     });
 
     it('should produce identical results across 5 runs', async function() {

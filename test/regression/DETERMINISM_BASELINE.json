@@ -5,5 +5,9 @@
   "inline:math": "332d55a6f09f38d294b81c98ead0c554751c7fa98331f5743e8afbfa971542f9",
   "inline:emit": "88ff0e20ecb1800c1419af03be8f55f049a22eaf2c2f0ff9990375e440b5b488",
   "inline:revert": "7e03290bc632e5334691a85b810dc4e156d3885b885018f56532cd024eff84b9",
-  "inline:state-math-loop": "42ac10b9da23754a15ae23e6bf98d88728eab5e5d3a4bdf519cd257e79b4a137"
+  "inline:state-math-loop": "42ac10b9da23754a15ae23e6bf98d88728eab5e5d3a4bdf519cd257e79b4a137",
+  "inline:contract-stake-reads": "23437c274fe4043f97d88d9a43bca5b8923bbe8a9a9b5a30acf538bbbc633774",
+  "inline:contract-slash": "e3c83c7bc1612e8685d16fa955317b4c9ff258e571fef659ac121c49f8c4532f",
+  "inline:attestation-request": "72f7ed23a60d79e04ab4de81424712517c68bb2a731129b0a531480b4591bcb9",
+  "inline:attestation-getresponse": "9cfb30247cd64e2b8835aa85562d7a7db5b0602f8cc18de27f31f4812cc14783"
 }

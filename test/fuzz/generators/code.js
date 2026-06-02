@@ -91,6 +91,38 @@ const VALID_TEMPLATES = [
         xchain.log('hello', 'world');
         xchain.log('count:', xchain.getLogCount());
         return xchain.getLogCount();
+    };`,
+
+    // Contract-targeted staking reads (getStake / getTotalStaked / getStakers).
+    // Without injected stake data these return '0'/'0'/[] — the point is to fuzz
+    // the gas-charging + serialisation around the host call sites.
+    `module.exports = function(xchain) {
+        var pk = 'a'.repeat(64);
+        return {
+            stake: xchain.contract.getStake(pk, 'TOKEN'),
+            total: xchain.contract.getTotalStaked('TOKEN'),
+            stakers: xchain.contract.getStakers('TOKEN').length
+        };
+    };`,
+
+    // Contract slash emission (routes a SLASH action; charges VM_EMISSION)
+    `module.exports = function(xchain) {
+        xchain.contract.slash('a'.repeat(64), 'TOKEN', '10.00000000');
+        return 'slashed';
+    };`,
+
+    // Attestation request emission (charges VM_ATTEST_REQUEST + VM_EMISSION,
+    // returns a deterministic request_id)
+    `module.exports = function(xchain) {
+        return xchain.attestation.request(
+            'http_get', 'https://example.com', 'cb', ['p'], { redundancy: 1, deadlineBlocks: 5 }
+        );
+    };`,
+
+    // Attestation response read (charges VM_STATE_READ; null without injected data)
+    `module.exports = function(xchain) {
+        var r = xchain.attestation.getResponse('abc123');
+        return r === null ? 'none' : 'have';
     };`
 ];
 
