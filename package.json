@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "acorn": "8.16.0",
-    "acorn-walk": "^8.3.5",
+    "acorn-walk": "8.3.5",
     "astring": "1.9.0",
     "isolated-vm": "5.0.4",
     "mathjs": "15.2.0"
