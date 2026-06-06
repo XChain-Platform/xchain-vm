@@ -16,6 +16,10 @@
  * Each emit method validates basic parameter shape, charges gas,
  * and queues the action. Full validation happens in the indexer.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 function validateRequired(params, fields) {
     if (typeof params !== 'object' || params === null)

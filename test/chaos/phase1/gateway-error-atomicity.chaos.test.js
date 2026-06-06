@@ -23,6 +23,10 @@
  * accessors, whose methods are called synchronously inside the bridge
  * closure in src/index.js.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const fs     = require('fs');

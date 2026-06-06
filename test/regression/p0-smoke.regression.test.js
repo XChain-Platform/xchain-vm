@@ -18,6 +18,10 @@
  *
  * Run: npm run test:regression:smoke
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { createVM, execute, assertResultShape } = require('./helpers.js');

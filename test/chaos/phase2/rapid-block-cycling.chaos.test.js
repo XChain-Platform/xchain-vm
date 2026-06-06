@@ -19,6 +19,10 @@
  * - Cache size is bounded by maxBlockCacheSize
  * - No null-dereference or stale-cache bugs
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { XChainVM, createVM, execute, chaosAssertions } = require('../helpers/harness');

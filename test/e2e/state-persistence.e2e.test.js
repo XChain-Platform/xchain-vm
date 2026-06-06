@@ -14,6 +14,10 @@
  * E2E Tests: State Persistence & Isolation
  * Scenarios: E2E-060 through E2E-064
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

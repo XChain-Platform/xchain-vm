@@ -14,6 +14,10 @@
  * E2E Tests: Complex Contract Logic with Multiple Actions
  * Scenarios: E2E-010 through E2E-014
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

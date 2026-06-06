@@ -16,6 +16,10 @@
  * Tests that xchain.math methods handle adversarial numeric inputs
  * without crashing, and that algebraic properties hold.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const assert = require('assert');

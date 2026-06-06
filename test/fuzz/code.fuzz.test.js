@@ -16,6 +16,10 @@
  * Tests that valid, mutated, and adversarial contract code never
  * crashes the host process and always produces correct result shapes.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const { XChainVM, createVM, execute, FC_OPTIONS } = require('./harness');

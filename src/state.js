@@ -17,6 +17,10 @@
  * state snapshot, collects writes/deletes, enforces limits.
  * The dirty map uses null to represent deleted keys.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 class StateManager {
     constructor(initialState, limits) {

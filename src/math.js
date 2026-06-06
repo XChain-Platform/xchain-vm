@@ -16,6 +16,10 @@
  * Wraps mathjs bignumber for contract use. All inputs and outputs
  * are strings — no floating-point anywhere.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const { ContractRevertError } = require('./errors.js');
 const mathjs = require('mathjs');

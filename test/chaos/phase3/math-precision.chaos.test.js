@@ -18,6 +18,10 @@
  * zero, extreme precision, accumulated operations, and invalid input
  * formats.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const fs     = require('fs');

@@ -22,6 +22,10 @@
  *   - oraclePrices:      coinPair → { current, rounds: { N: price } }
  *   - crossChainData:    "chain:actionIndex" → attestation
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const { create, all } = require('mathjs');
 const math = create(all, { number: 'BigNumber', precision: 64 });

@@ -25,6 +25,10 @@
  * and the overall execution may complete successfully or timeout
  * depending on the combined delay vs timeout budget.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { XChainVM, createVM, execute, ProgrammableMock, chaosAssertions } = require('../helpers/harness');

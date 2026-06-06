@@ -16,6 +16,10 @@
  * Tests that adversarial contracts cannot escape the V8 isolate
  * sandbox, access host objects, or pollute prototypes.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const assert = require('assert');

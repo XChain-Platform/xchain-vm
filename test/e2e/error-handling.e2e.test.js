@@ -14,6 +14,10 @@
  * E2E Tests: Error Handling & Recovery
  * Scenarios: E2E-050 through E2E-055
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

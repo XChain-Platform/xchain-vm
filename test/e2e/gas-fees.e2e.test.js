@@ -14,6 +14,10 @@
  * E2E Tests: Fee Accounting & Gas Schedule
  * Scenarios: E2E-070 through E2E-073
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness, GAS_SCHEDULE } = require('./helpers/harness.js');

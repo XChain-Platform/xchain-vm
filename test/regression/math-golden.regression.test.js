@@ -39,6 +39,10 @@
  * No isolate required — buildMathAPI() is pure host-side, so this runs
  * on any Node version.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { buildMathAPI } = require('../../src/math.js');

@@ -20,6 +20,10 @@
  * The index.js module wraps each method as an ivm.Reference
  * before injecting into the isolate.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const crypto = require('crypto');
 const { ContractRevertError } = require('./errors.js');

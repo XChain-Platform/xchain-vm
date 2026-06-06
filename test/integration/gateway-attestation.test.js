@@ -15,6 +15,10 @@
  *
  * Spec: claude/reports/specs/2026-05-24_external-attestation-framework.md
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 

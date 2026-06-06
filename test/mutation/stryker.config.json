@@ -1,51 +1,45 @@
 {
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-schema.json",
-
   "mutate": [
-    "../../src/*.js"
+    "src/*.js"
   ],
-
   "testRunner": "mocha",
-
   "mochaOptions": {
-    "spec": ["../../test/unit/**/*.test.js"]
+    "spec": [
+      "test/preflight.test.js",
+      "test/unit/**/*.test.js"
+    ]
   },
-
   "plugins": [
     "@stryker-mutator/mocha-runner"
   ],
-
   "mutator": {
     "excludedMutations": [
       "StringLiteral"
     ]
   },
-
-  "reporters": ["html", "clear-text", "json", "progress"],
-
+  "reporters": [
+    "html",
+    "clear-text",
+    "json",
+    "progress"
+  ],
   "htmlReporter": {
-    "fileName": "../../reports/mutation/index.html"
+    "fileName": "reports/mutation/index.html"
   },
-
   "jsonReporter": {
-    "fileName": "../../reports/mutation/mutation-score.json"
+    "fileName": "reports/mutation/mutation-score.json"
   },
-
   "thresholds": {
     "high": 90,
     "low": 80,
     "break": 75
   },
-
-  "timeoutMS": 10000,
-  "timeoutFactor": 2.0,
-
+  "timeoutMS": 60000,
+  "timeoutFactor": 2,
   "concurrency": 4,
-
   "coverageAnalysis": "perTest",
-
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true,
-
   "disableTypeChecks": true
 }

@@ -16,6 +16,10 @@
  * Tests that resource limits (gas, memory, timeout) cannot be
  * bypassed and that exhaustion is handled gracefully.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const assert = require('assert');

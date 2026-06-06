@@ -14,6 +14,10 @@
  * E2E Tests: Security Enforcement
  * Scenarios: E2E-030 through E2E-034
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

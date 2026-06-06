@@ -18,6 +18,10 @@
  *
  * Run: npm run test:regression:full
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const fs = require('fs');

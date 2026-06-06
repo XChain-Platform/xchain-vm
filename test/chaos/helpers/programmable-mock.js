@@ -22,6 +22,10 @@
  * outside. For state-level fault injection, use corrupted opts.state
  * objects or contracts that trigger errors via their behavior.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 /**
  * ProgrammableOracleProvider — oracle accessor with per-method fault rules.

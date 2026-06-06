@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "generatedOn": "arm64-node22-v8_12.4.254.21-node.56",
+  "note": "Verified by golden.determinism.test.js on every platform. Resource-tier hazards (memory ceiling) are observed, not asserted byte-equal.",
+  "scenarios": [
+    {
+      "id": "amm_swap/addLiquidity",
+      "tier": "invariant",
+      "hash": "4a693be7f4cacf08fa37d798e146ab2518babd9c2b0027a4570b83c60f0d8af1",
+      "gasUsed": 611,
+      "error": null
+    },
+    {
+      "id": "bad_math/native_vs_safe",
+      "tier": "invariant",
+      "hash": "a9d436b37ed11fb5d4cb03e7eeb59bc7b7b1b1251c0803188b63ab732c5081d6",
+      "gasUsed": 7,
+      "error": null
+    },
+    {
+      "id": "compile_bomb/deep_nesting",
+      "tier": "invariant",
+      "hash": "d98deeb431818860b087fc194ef2b4d24ec233be55b2eeea58a80da7d63cf39c",
+      "gasUsed": 272,
+      "error": null
+    },
+    {
+      "id": "emit_flood/emission_limit",
+      "tier": "resource",
+      "hash": "e3cad3c1bade764e353544df4dfc711d1fa7a4a33e5ae5dfb6de56f7fc0da824",
+      "gasUsed": 25654,
+      "error": "error: emission limit exceeded (50)"
+    },
+    {
+      "id": "infinite_loop/out_of_gas",
+      "tier": "resource",
+      "hash": "fff475e67349a524fbc16bb1a7f0b29bba346f4b03952fb5ece64984a8d0afac",
+      "gasUsed": 1000001,
+      "error": "out_of_gas: used 1000001 of 1000000"
+    },
+    {
+      "id": "memory_bomb/memory_limit",
+      "tier": "resource",
+      "hash": "15f06251fe94531209afcb120f114801154880e194c7c97e022ed939afb5577f",
+      "gasUsed": 1000000,
+      "error": "timeout: wall-clock safety net triggered",
+      "hazard": "memory-ceiling-nondeterminism"
+    },
+    {
+      "id": "multi_method/increment",
+      "tier": "invariant",
+      "hash": "0bfba5219bb1f0435daedf97a954886391d0f63aa9e1bd1da41696d05c32534d",
+      "gasUsed": 305,
+      "error": null
+    },
+    {
+      "id": "oracle_read/no_oracle",
+      "tier": "invariant",
+      "hash": "2e214e8bf32d752622169fd5e8705580dc6a4c0b298fb01a4ce89e5e08791661",
+      "gasUsed": 110,
+      "error": null
+    },
+    {
+      "id": "oracle_read/with_price",
+      "tier": "invariant",
+      "hash": "ef5ad6926ea7ae6f7c3ec77249759d56e60a0c3a396acac6afe07c076648e020",
+      "gasUsed": 109,
+      "error": null
+    },
+    {
+      "id": "sandbox_escape/all_blocked",
+      "tier": "invariant",
+      "hash": "c9625174b3581312e62623d96565a7c880e7bc6953504dcde59dc5f7b8743824",
+      "gasUsed": 55,
+      "error": null
+    },
+    {
+      "id": "simple_send/send",
+      "tier": "invariant",
+      "hash": "5991acb500bfc7209e9faeecfa76de9f40d1edf8d64f33be1cb703662120a3b3",
+      "gasUsed": 609,
+      "error": null
+    },
+    {
+      "id": "state_counter/decrement_at_zero_reverts",
+      "tier": "invariant",
+      "hash": "3e6311d1c1d13950a11c5225a0921b8acd38a3a24c4fc6b950913c3e771e867d",
+      "gasUsed": 105,
+      "error": "revert: counter is zero"
+    },
+    {
+      "id": "state_counter/increment",
+      "tier": "invariant",
+      "hash": "8f30508b8e0af7029336250e207c391ce0fde4ee75f4c6045e81fac5f67ad33b",
+      "gasUsed": 305,
+      "error": null
+    },
+    {
+      "id": "state_flood/key_limit",
+      "tier": "resource",
+      "hash": "8c10a777552288c09508cb685e8de88621370d744f71e83167839c73ba51f244",
+      "gasUsed": 1000182,
+      "error": "out_of_gas: used 1000182 of 1000000"
+    }
+  ]
+}

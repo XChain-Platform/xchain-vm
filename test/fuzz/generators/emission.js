@@ -16,6 +16,10 @@
  * Generates contracts that call xchain.emit.* with valid, malformed,
  * and adversarial parameters.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 

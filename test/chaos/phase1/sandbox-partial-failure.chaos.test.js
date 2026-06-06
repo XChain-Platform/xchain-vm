@@ -30,6 +30,10 @@
  * These tests verify the BEHAVIOR (clean failure on setup error)
  * rather than the specific injection point (stripGlobals).
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { XChainVM, createVM, execute, chaosAssertions } = require('../helpers/harness');

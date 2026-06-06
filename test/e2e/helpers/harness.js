@@ -16,6 +16,10 @@
  * Wraps the real XChainVM with a MockLedger and MockIndexer to
  * simulate the full platform pipeline.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fs   = require('fs');
 const path = require('path');

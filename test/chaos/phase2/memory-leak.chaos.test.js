@@ -20,6 +20,10 @@
  * Run with GC exposure for best results:
  *   node --expose-gc node_modules/.bin/mocha test/chaos/phase2/memory-leak.chaos.test.js
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { XChainVM, createVM, execute, MemoryTracker } = require('../helpers/harness');

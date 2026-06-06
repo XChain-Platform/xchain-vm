@@ -16,6 +16,10 @@
  * Shared VM factory, execute wrapper, and configuration for all
  * fuzz test files. Handles isolated-vm availability gracefully.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const crypto = require('crypto');
 

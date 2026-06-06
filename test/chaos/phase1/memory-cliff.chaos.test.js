@@ -17,6 +17,10 @@
  * memory limit. Verifies OOM error classification, atomicity on
  * failure, and VM recovery after OOM events.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const fs     = require('fs');

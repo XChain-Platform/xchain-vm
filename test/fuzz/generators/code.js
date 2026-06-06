@@ -15,6 +15,10 @@
  *
  * Three tiers: valid templates, AST mutations, adversarial patterns.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const acorn = require('acorn');

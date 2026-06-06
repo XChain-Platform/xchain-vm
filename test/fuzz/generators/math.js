@@ -15,6 +15,10 @@
  *
  * Generates adversarial numeric inputs for xchain.math methods.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 

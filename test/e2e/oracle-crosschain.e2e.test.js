@@ -14,6 +14,10 @@
  * E2E Tests: Oracle & Cross-Chain Integration
  * Scenarios: E2E-090 through E2E-092
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

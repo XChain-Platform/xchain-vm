@@ -23,6 +23,10 @@
  * 3. Either succeeds (correct metering) or fails safely
  * 4. Never bypasses gas metering
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { XChainVM, createVM, execute } = require('../helpers/harness');

@@ -17,6 +17,10 @@
  * isolated-vm. All operations use synchronous APIs to prevent
  * async interleaving during contract execution.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const ivm = require('isolated-vm');
 

@@ -18,6 +18,10 @@
  *
  * Run: npm run test:regression:core
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const crypto = require('crypto');

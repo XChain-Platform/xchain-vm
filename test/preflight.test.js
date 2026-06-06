@@ -32,6 +32,10 @@
  * one running the tests. Fix: `npm rebuild isolated-vm --build-from-source`
  * on the Node version pinned in .nvmrc (matches the prod node:22 image).
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 

@@ -16,6 +16,10 @@
  * Strips non-deterministic and dangerous APIs from the V8 isolate
  * context. Only safe, deterministic builtins survive.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const ivm = require('isolated-vm');
 

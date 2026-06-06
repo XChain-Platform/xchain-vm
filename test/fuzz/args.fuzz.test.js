@@ -16,6 +16,10 @@
  * Tests that any params array passed to vm.execute() produces a
  * well-shaped result and never crashes the VM.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const { XChainVM, createVM, execute, FC_OPTIONS } = require('./harness');

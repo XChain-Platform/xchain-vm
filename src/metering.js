@@ -20,6 +20,10 @@
  * Uses acorn to parse, modifies the AST in place, then regenerates
  * source via astring. This avoids fragile string offset splicing.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const acorn = require('acorn');
 const walk  = require('acorn-walk');

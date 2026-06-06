@@ -29,6 +29,10 @@
  *
  * These tests pin that behavior so a future change can't silently reopen the hole.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 

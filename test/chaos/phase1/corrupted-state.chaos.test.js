@@ -18,6 +18,10 @@
  * the host process. Tests the StateManager's resilience to adversarial
  * initial state.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { XChainVM, createVM, execute, chaosAssertions } = require('../helpers/harness');

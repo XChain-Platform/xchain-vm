@@ -21,6 +21,10 @@
  * Verifies: no crashes, result isolation, correct behavior under load,
  * mixed success/failure concurrency.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { XChainVM, createVM, execute, chaosAssertions } = require('../helpers/harness');

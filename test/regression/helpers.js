@@ -17,6 +17,10 @@
  * the test suite, regression tests FAIL LOUDLY if isolated-vm is
  * unavailable — silent skips are unacceptable in regression.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 

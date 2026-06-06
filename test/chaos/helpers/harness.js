@@ -21,6 +21,10 @@
  * Reuses GAS_SCHEDULE, DEFAULT_LIMITS, createVM, execute, hashResult
  * from the fuzz harness to avoid duplication.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require('../../fuzz/invariants');

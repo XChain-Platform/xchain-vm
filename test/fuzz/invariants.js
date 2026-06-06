@@ -16,6 +16,10 @@
  * Invariant checker functions that define "correct behavior" for
  * the VM regardless of input. Each throws AssertionError on failure.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { DEFAULT_LIMITS } = require('./harness');

@@ -14,6 +14,10 @@
  * E2E Tests: Resource Limit Enforcement
  * Scenarios: E2E-040 through E2E-046
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

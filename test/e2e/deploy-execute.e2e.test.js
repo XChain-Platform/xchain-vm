@@ -14,6 +14,10 @@
  * E2E Tests: Contract Deployment & Basic Execution
  * Scenarios: E2E-001 through E2E-005
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

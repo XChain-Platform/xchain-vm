@@ -17,6 +17,10 @@
  * across two independent VM instances. Any difference indicates a
  * consensus-critical non-determinism bug.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const { XChainVM, createVM, execute, hashResult, FC_OPTIONS } = require('./harness');

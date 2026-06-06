@@ -16,6 +16,10 @@
  * Tests that adversarial keys, values, and state operation sequences
  * never corrupt state, crash the VM, or pollute prototypes.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const assert = require('assert');

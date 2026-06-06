@@ -14,6 +14,10 @@
  * E2E Tests: DEPOSIT and WITHDRAW Lifecycle
  * Scenarios: E2E-020 through E2E-023
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');

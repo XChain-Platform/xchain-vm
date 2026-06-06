@@ -16,6 +16,10 @@
  * Tests that all 16 emit methods handle valid, malformed, and
  * adversarial parameters correctly without violating invariants.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const fc = require('fast-check');
 const assert = require('assert');

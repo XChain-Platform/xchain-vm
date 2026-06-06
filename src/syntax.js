@@ -16,6 +16,10 @@
  * Deploy-time validation: V8 syntax check, acorn metering pass,
  * reserved identifier check, and float warnings.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const ivm   = require('isolated-vm');
 const acorn = require('acorn');

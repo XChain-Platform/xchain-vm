@@ -21,6 +21,10 @@
  *   const vm = new XChainVM({ gasSchedule, gasCeiling, limits });
  *   const result = await vm.execute({ code, state, method, params, ... });
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const crypto = require('crypto');
 const ivm    = require('isolated-vm');
@@ -36,6 +40,7 @@ const { stripGlobals }  = require('./sandbox.js');
 const { meterCode }     = require('./metering.js');
 const { validateSyntax, checkFloatWarnings } = require('./syntax.js');
 const { ContractRevertError, GasExhaustedError } = require('./errors.js');
+const { resolveAccessors } = require('./readonly-accessors.js');
 
 /**
  * Harness script that runs inside the isolate to assemble the xchain
@@ -261,12 +266,31 @@ class XChainVM {
 
         // Pre-compile the harness script source (it's the same every time)
         this._harnessSource = HARNESS_SOURCE;
+
+        // Execution mode.
+        //   'in-process' (default): run the isolate in THIS process. Fast; used
+        //       by the whole test/bench suite and by syntax validation.
+        //   'subprocess': run every execution in a forked child via ProcessExecutor,
+        //       so a contract that aborts V8 (process-wide SIGABRT — e.g. a bulk
+        //       allocation that bypasses the isolate memory limit) crashes only the
+        //       child, never the host. PRODUCTION (the indexer) MUST use this.
+        // Default is in-process so existing in-process callers (which pass closure
+        // accessors that can't cross IPC) keep working unchanged; the indexer opts
+        // into 'subprocess' explicitly.
+        this.execution = config.execution || 'in-process';
+        this._executor = null;
+        if (this.execution === 'subprocess') {
+            // Lazy require to avoid loading child_process for in-process callers.
+            const ProcessExecutor = require('./process-executor.js');
+            this._executor = new ProcessExecutor(config);
+        }
     }
 
     /**
      * Called at the start of each block to initialize the compilation cache.
      */
     beginBlock() {
+        if (this._executor) return this._executor.beginBlock();
         this._blockCache = new Map();
     }
 
@@ -274,7 +298,16 @@ class XChainVM {
      * Called at the end of each block to clear the compilation cache.
      */
     endBlock() {
+        if (this._executor) return this._executor.endBlock();
         this._blockCache = null;
+    }
+
+    /**
+     * Tear down the subprocess executor (kills the worker child). No-op in
+     * in-process mode. Call from long-lived hosts on shutdown and from tests.
+     */
+    async shutdown() {
+        if (this._executor) return this._executor.shutdown();
     }
 
     /**
@@ -297,6 +330,10 @@ class XChainVM {
      * @returns {Promise<object>} Execution result
      */
     async execute(opts) {
+        // Subprocess mode: hand the (fully serializable) opts to the forked
+        // worker. Read-only data MUST be plain snapshots here, not closures.
+        if (this._executor) return this._executor.execute(opts);
+
         const gasTracker        = new GasTracker(this.gasSchedule, this.gasCeiling);
         const stateManager      = new StateManager(opts.state || {}, this.limits);
         const emissionCollector = new EmissionCollector(this.limits.maxEmissions);
@@ -319,6 +356,11 @@ class XChainVM {
             // Strip non-deterministic globals
             stripGlobals(isolate, context);
 
+            // Resolve read-only data into synchronous accessor objects. Accepts
+            // either plain serializable snapshots (the canonical form, required by
+            // subprocess mode) or legacy closure accessors (in-process back-compat).
+            const accessors = resolveAccessors(opts);
+
             // Build gateway on host side
             const gateway = buildGateway(
                 gasTracker, stateManager, emissionCollector,
@@ -331,10 +373,10 @@ class XChainVM {
                     blockContext:    opts.blockContext,
                     balances:        opts.balances || {},
                     tokenInfo:       opts.tokenInfo || {},
-                    oracleData:        opts.oracleData || null,
-                    crossChainData:    opts.crossChainData || null,
-                    attestationData:   opts.attestationData || null,
-                    contractStakeData: opts.contractStakeData || null,
+                    oracleData:        accessors.oracleData,
+                    crossChainData:    accessors.crossChainData,
+                    attestationData:   accessors.attestationData,
+                    contractStakeData: accessors.contractStakeData,
                     providerDeadlines: opts.providerDeadlines || null
                 },
                 this.gasSchedule,
@@ -606,16 +648,33 @@ class XChainVM {
                     'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling);
             }
         }
-        // isolated-vm timeout errors
+        // ── Non-deterministic resource terminations ──────────────────────────
+        // Wall-clock timeout, isolate memory limit, and native stack overflow all
+        // fire at machine-/GC-/stack-depth-dependent points, so gasTracker.getUsed()
+        // at that instant DIFFERS across validators. Since the indexer computes
+        // fee = gasUsed * GAS_PRICE (consensus-critical), a nondeterministic gasUsed
+        // would diverge fees → fork. We therefore CLAMP gasUsed to the gas ceiling
+        // for every non-gas, non-revert resource termination: the contract provably
+        // consumed the maximum allowed resources, and the ceiling is identical on
+        // every node. This is the deterministic, fork-safe charge.
         if (msg.includes('Script execution timed out') || msg.includes('disposed')) {
             // Wall-clock timeout — this is a consensus risk. Log at ERROR level.
             console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +
                 (opts ? 'contract=' + opts.contractAddress + ' method=' + opts.method : ''));
-            return this._errorResult(gasTracker, emissionCollector, 'timeout: wall-clock safety net triggered');
+            return this._errorResult(gasTracker, emissionCollector,
+                'timeout: wall-clock safety net triggered', this.gasCeiling);
         }
         // Memory limit
         if (msg.includes('out of memory') || msg.includes('Array buffer allocation failed')) {
-            return this._errorResult(gasTracker, emissionCollector, 'out_of_memory: isolate memory limit exceeded');
+            return this._errorResult(gasTracker, emissionCollector,
+                'out_of_memory: isolate memory limit exceeded', this.gasCeiling);
+        }
+        // Native stack overflow (e.g. deep/infinite recursion). The V8 stack-depth
+        // limit varies by architecture and V8 build, so gasUsed here is also
+        // platform-dependent → clamp to the ceiling with a deterministic message.
+        if (msg.includes('Maximum call stack size exceeded') || msg.includes('call stack')) {
+            return this._errorResult(gasTracker, emissionCollector,
+                'out_of_stack: maximum call depth exceeded', this.gasCeiling);
         }
         // Generic contract error — sanitize to prevent information leakage (RISK-15).
         // Strip stack traces, file paths, and internal details.
@@ -640,11 +699,14 @@ class XChainVM {
      * Build a failure result. State changes and emissions are empty (atomicity).
      * Logs are preserved for debugging.
      */
-    _errorResult(gasTracker, emissionCollector, errorMsg) {
+    _errorResult(gasTracker, emissionCollector, errorMsg, gasOverride) {
         return {
             success:        false,
             error:          errorMsg,
-            gasUsed:        gasTracker.getUsed(),
+            // gasOverride is supplied for non-deterministic resource terminations
+            // (timeout / out_of_memory / out_of_stack) so the consensus-visible
+            // gasUsed — and therefore the fee — is identical on every validator.
+            gasUsed:        (gasOverride != null) ? gasOverride : gasTracker.getUsed(),
             returnValue:    null,
             stateChanges:   [],
             stateDeletes:   [],

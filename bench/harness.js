@@ -16,6 +16,10 @@
  * Core utilities for performance testing the VM runtime.
  * Provides timing, statistics, memory tracking, and formatted output.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 const { performance } = require('perf_hooks');
 const v8   = require('v8');

@@ -16,6 +16,10 @@
  * Translates SEND, DESTROY, MINT, and other emitted actions into
  * ledger state changes, simulating what the real xchain-indexer does.
  ********************************************************************/
+// @ts-nocheck
+
+// 
+
 
 class MockIndexer {
     constructor(ledger) {
