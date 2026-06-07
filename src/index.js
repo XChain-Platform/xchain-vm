@@ -264,10 +264,14 @@ const HARNESS_SOURCE = `
             return orig.apply(this, arguments);
         });
     };
-    // Array — native scan / order / copy / serialize without a per-element callback.
+    // Array — native scan / order / copy / mutate without a per-element callback.
     // (fill is owned by F3; map/filter/etc. are callback-metered — both excluded.)
+    // Includes the O(n) mutators (splice/unshift/shift shift every element) and
+    // the ES2023 copying methods (toSorted/toReversed/toSpliced/with allocate a
+    // full copy). __meterLen no-ops for any absent on the host V8.
     ['indexOf', 'lastIndexOf', 'includes', 'join', 'reverse', 'sort',
-     'flat', 'slice', 'copyWithin'].forEach(function(m) { __meterLen(Array.prototype, m); });
+     'flat', 'slice', 'copyWithin', 'splice', 'unshift', 'shift',
+     'toSorted', 'toReversed', 'toSpliced', 'with'].forEach(function(m) { __meterLen(Array.prototype, m); });
     // String — native scan / copy (regex literals are banned at deploy time; the
     // locale-sensitive case methods are neutered in sandbox.js). repeat/padStart/
     // padEnd are owned by F3.
@@ -315,6 +319,30 @@ const HARNESS_SOURCE = `
             return __jparse.apply(this, arguments);
         });
     }
+
+    // Object statics that enumerate every own property in native code without a
+    // callback. The property count is not cheaply known before enumerating, so
+    // (like JSON.stringify) charge AFTER by the result size — which still bounds
+    // a reuse loop after one pass and bounds a single pass by the gas already
+    // paid to build the object. Uses captured natives so the size probe does not
+    // re-enter a wrapper. (Object.create with descriptors is already blocked in
+    // sandbox.js; getOwnPropertyDescriptors is the remaining bulk enumerator.)
+    var __okeys = Object.keys;
+    var __meterObjStatic = function(name, toLen) {
+        var orig = Object[name];
+        if (typeof orig !== 'function') return;
+        __lockMethod(Object, name, function() {
+            var r = orig.apply(Object, arguments);
+            try { __allocGas(toLen(r)); } catch (e) {}
+            return r;
+        });
+    };
+    var __lenArr = function(r) { return (r && typeof r.length === 'number') ? r.length : 0; };
+    var __lenObj = function(r) { return (r && typeof r === 'object') ? __okeys(r).length : 0; };
+    ['keys', 'values', 'entries', 'getOwnPropertyNames', 'getOwnPropertySymbols']
+        .forEach(function(n) { __meterObjStatic(n, __lenArr); });
+    ['assign', 'getOwnPropertyDescriptors', 'fromEntries']
+        .forEach(function(n) { __meterObjStatic(n, __lenObj); });
     // ----- end G1 -----
 })();
 `;

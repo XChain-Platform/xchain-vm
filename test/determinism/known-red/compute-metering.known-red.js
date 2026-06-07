@@ -75,7 +75,17 @@ describe('compute builtins must be size-metered (was KNOWN-RED)', function () {
         { id: 'JSON.stringify',
           mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++)t+=JSON.stringify(a).length;return t;` },
         { id: 'String.prototype.split',
-          mk: `var s=('7,').repeat(${K});var t=0;for(var i=0;i<${C};i++)t+=s.split(',').length;return t;` }
+          mk: `var s=('7,').repeat(${K});var t=0;for(var i=0;i<${C};i++)t+=s.split(',').length;return t;` },
+        // Mutators (O(n) shift/copy) and ES2023 copying methods — added after the
+        // metering-completeness sweep found them un-metered by the initial G1 list.
+        { id: 'Array.prototype.splice',
+          mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++){a.splice(0,0,1);t+=a.length;}return t;` },
+        { id: 'Array.prototype.unshift',
+          mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++)t+=a.unshift(1);return t;` },
+        { id: 'Array.prototype.toSorted',
+          mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++)t+=a.toSorted().length;return t;` },
+        { id: 'Array.prototype.with',
+          mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++)t+=a.with(0,9).length;return t;` }
     ];
 
     for (const b of BUILTINS) {
@@ -83,6 +93,43 @@ describe('compute builtins must be size-metered (was KNOWN-RED)', function () {
             assertGasBounded(b.id, await run(wrap(b.mk)));
         });
     }
+});
+
+describe('Object statics must be size-metered (was KNOWN-RED)', function () {
+    this.timeout(120000);
+
+    // Smaller object working set: a very large key count + enumeration can exceed
+    // the 8 MB isolate limit and, in-process, hit the host-abort OOM path (a
+    // separate Finding-A residual, contained out-of-process). KO*CO touches still
+    // far exceed the 1,000,000 ceiling.
+    const KO = 20000;
+    const CO = 100;
+    const OBJ = `var o={};for(var j=0;j<${KO};j++)o['k'+j]=j;`;
+
+    const STATICS = [
+        { id: 'Object.keys',    mk: `${OBJ}var t=0;for(var i=0;i<${CO};i++)t+=Object.keys(o).length;return t;` },
+        { id: 'Object.values',  mk: `${OBJ}var t=0;for(var i=0;i<${CO};i++)t+=Object.values(o).length;return t;` },
+        { id: 'Object.entries', mk: `${OBJ}var t=0;for(var i=0;i<${CO};i++)t+=Object.entries(o).length;return t;` },
+        { id: 'Object.assign',  mk: `${OBJ}var t=0;for(var i=0;i<${CO};i++)t+=Object.keys(Object.assign({},o)).length;return t;` }
+    ];
+
+    for (const b of STATICS) {
+        it(`${b.id}: O(n) enumeration must consume gas (out_of_gas under budget)`, async function () {
+            const r = await run(wrap(b.mk));
+            assert(
+                r.success === false && /out_of_gas/.test(r.error || ''),
+                `${b.id}: ${CO} x O(${KO}) enumerations resolved as success=${r.success} ` +
+                `error=${JSON.stringify(r.error)} gasUsed=${r.gasUsed}; expected out_of_gas.`
+            );
+        });
+    }
+
+    // RESIDUAL (syntax, not a method — like the `+` operator): array/string spread
+    // [...x] allocates an O(n) copy for ~1 gas and cannot be wrapped at the
+    // prototype level. Bounded by the isolate memory ceiling (deterministic
+    // out_of_resource); closing the loop-amplification needs AST-level metering of
+    // SpreadElement, tracked alongside the `+`-operator decision.
+    it.skip('RESIDUAL: spread [...x] is syntax-level (like `+`) — needs AST metering, bounded by memory ceiling', function () {});
 });
 
 describe('cheap-gas / expensive-CPU witness (was KNOWN-RED)', function () {
