@@ -67,7 +67,8 @@ class ProcessExecutor {
         this._watchdogMs = cpu + 5000;
 
         this._child = null;
-        this._pending = new Map();   // id -> { resolve, timer }
+        this._pending = new Map();   // dispatched: id -> { resolve, timer }
+        this._queue = [];            // accepted, not yet dispatched: { id, opts, resolve, timer }
         this._nextId = 1;
         this._inBlock = false;       // re-issue beginBlock to a respawned child
         this._shuttingDown = false;
@@ -110,6 +111,9 @@ class ProcessExecutor {
         if (msg.type === 'ready') {
             this._sawReady = true;
             this._consecutiveSpawnFailures = 0;
+            // A fresh worker is now dispatchable — send it any queued executions
+            // (e.g. the contract that followed a crashed/killed one in this block).
+            this._flush();
             return;
         }
         if (msg.type === 'result') {
@@ -121,12 +125,30 @@ class ProcessExecutor {
         }
     }
 
+    // Dispatch queued executions to the worker, but ONLY once it has signaled
+    // 'ready'. Gating on readiness (not merely channel-connected) is what makes
+    // recovery deterministic: a contract that has not started executing always
+    // runs on a fresh, ready worker on every validator, instead of racing a dying
+    // worker — which would resolve it as a host-termination on some nodes and run
+    // it on others → divergent result → fork.
+    _flush() {
+        while (this._queue.length && this._child && this._sawReady && this._child.connected) {
+            const entry = this._queue[0];
+            if (!this._send({ type: 'execute', id: entry.id, opts: entry.opts })) break;
+            this._queue.shift();
+            this._pending.set(entry.id, { resolve: entry.resolve, timer: entry.timer });
+        }
+    }
+
     _onExit(code, signal) {
         const child = this._child;
         this._child = null;
 
-        // Resolve every in-flight request deterministically — a crash here means
-        // a contract aborted the host. The block must still advance.
+        // Resolve only DISPATCHED (in-flight) requests deterministically — a crash
+        // here means the contract that was actually executing aborted the host. The
+        // block must still advance. Queued (not-yet-dispatched) requests are left
+        // intact: they never started, so they re-dispatch to the respawned worker
+        // (_flush on its 'ready') and run normally — identical on every validator.
         const kind = signal ? ('signal ' + signal) : ('exit ' + code);
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
@@ -143,6 +165,13 @@ class ProcessExecutor {
         }
         if (this._consecutiveSpawnFailures >= 3) {
             this._broken = true;
+            // The worker can't start — drain queued (never-dispatched) executions to
+            // the same deterministic result so callers don't hang until their watchdog.
+            for (const entry of this._queue) {
+                if (entry.timer) clearTimeout(entry.timer);
+                entry.resolve(hostTerminatedResult(this._gasCeiling, 'executor unavailable'));
+            }
+            this._queue = [];
             return;
         }
         this._spawn();
@@ -164,27 +193,31 @@ class ProcessExecutor {
         }
         const id = this._nextId++;
         return new Promise((resolve) => {
+            // Watchdog started at acceptance so it bounds queue-wait + execution — a
+            // deterministic upper time bound regardless of where the request sits.
             const timer = setTimeout(() => {
+                // Still queued (never dispatched): the worker never became ready in
+                // time. Resolve deterministically; there is no worker to kill.
+                const qi = this._queue.findIndex((e) => e.id === id);
+                if (qi !== -1) {
+                    this._queue.splice(qi, 1);
+                    resolve(hostTerminatedResult(this._gasCeiling, 'watchdog timeout'));
+                    return;
+                }
+                // Dispatched but unresponsive: kill the worker (triggers _onExit →
+                // respawn) and return the deterministic result for THIS request.
                 if (!this._pending.has(id)) return;
                 this._pending.delete(id);
-                // The child is unresponsive — kill it (triggers _onExit → respawn)
-                // and return the deterministic result for THIS request now.
                 resolve(hostTerminatedResult(this._gasCeiling, 'watchdog timeout'));
                 const child = this._child;
                 if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
             }, this._watchdogMs);
 
-            this._pending.set(id, { resolve, timer });
-
-            if (!this._send({ type: 'execute', id, opts })) {
-                // Channel not available (mid-respawn) — fail deterministically.
-                const entry = this._pending.get(id);
-                if (entry) {
-                    this._pending.delete(id);
-                    clearTimeout(entry.timer);
-                    resolve(hostTerminatedResult(this._gasCeiling, 'no execution host'));
-                }
-            }
+            // Accept into the queue, then dispatch only if a ready worker exists.
+            // Never send to a worker that has not signaled 'ready' (a fresh or dying
+            // one) — that is the determinism-breaking race this fix closes.
+            this._queue.push({ id, opts, resolve, timer });
+            this._flush();
         });
     }
 
@@ -195,6 +228,11 @@ class ProcessExecutor {
             entry.resolve(hostTerminatedResult(this._gasCeiling, 'shutdown'));
         }
         this._pending.clear();
+        for (const entry of this._queue) {
+            if (entry.timer) clearTimeout(entry.timer);
+            entry.resolve(hostTerminatedResult(this._gasCeiling, 'shutdown'));
+        }
+        this._queue = [];
         const child = this._child;
         this._child = null;
         if (child) {

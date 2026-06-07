@@ -125,4 +125,34 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         const ok = await vm.execute({ ...BASE, code: `module.exports = function(){ return 1; };` });
         assert.strictEqual(ok.success, true, 'still serving after repeated crashes');
     });
+
+    // F2 regression — deterministic dispatch after a worker death.
+    //
+    // When a worker dies, WHICH backstop kills it is arch/timing-dependent: a V8
+    // abort (SIGABRT) on some platforms, the parent watchdog (SIGKILL) on others
+    // (e.g. x86, where the bulk allocation runs past the isolate timeout). The
+    // indexer runs contracts sequentially, so the contract IMMEDIATELY after the
+    // dead one must still run — on the respawned worker — and return its real
+    // result on every validator. Before the ready-gated-dispatch fix, that next
+    // contract could be sent to the dying worker and resolve as a host-termination
+    // (SIGKILL) on the watchdog path → a nondeterministic result for the following
+    // contract → fork. The short maxCpuTimeMs pushes the bomb toward the watchdog
+    // path so this exercises the previously-racy branch on the validator arch.
+    it('F2: a contract following a worker death always runs on a fresh worker', async function () {
+        const limits = { ...LIMITS, maxCpuTimeMs: 300 };
+        vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits, execution: 'subprocess' });
+        vm.beginBlock();
+        const bomb   = `module.exports = function(){ var a = new Array(100000000).fill('x'); return a.length; };`;
+        const benign = `module.exports = function(){ return 'alive'; };`;
+        for (let i = 0; i < 3; i++) {
+            const r = await vm.execute({ ...BASE, code: bomb });
+            assert.strictEqual(r.success, false, 'bomb #' + i + ' must fail');
+            assert.strictEqual(r.gasUsed, GAS_CEILING, 'bomb #' + i + ' must charge the ceiling (fork-safe fee)');
+            // Issued back-to-back, exactly as the indexer would for the next action.
+            const ok = await vm.execute({ ...BASE, code: benign });
+            assert.strictEqual(ok.success, true,
+                'contract after worker death #' + i + ' must run, not be host-terminated; got: ' + ok.error);
+            assert.strictEqual(ok.returnValue, '"alive"');
+        }
+    });
 });
