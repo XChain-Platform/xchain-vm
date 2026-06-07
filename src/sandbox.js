@@ -110,6 +110,36 @@ const STRIP_SCRIPT = `
     // Contracts should not need regex; string operations suffice.
     try { globalThis.RegExp = undefined; } catch(e) {}
 
+    // Neuter locale/ICU-sensitive PROTOTYPE METHODS (consensus determinism).
+    // Deleting the Intl global above does NOT disable these — they live on the
+    // built-in prototypes and work without Intl. Their output depends on the ICU
+    // data/version compiled into the host (which varies across Node.js/V8 builds),
+    // so a contract that returns or stores their result would route an
+    // ICU-version-dependent value into hashed state -> divergent Merkle root
+    // across a heterogeneous validator fleet -> consensus fork. Neuter them so a
+    // contract that calls one fails DETERMINISTICALLY (TypeError) instead.
+    //   - String.prototype.normalize          (ICU normalization tables)
+    //   - String.prototype.localeCompare       (ICU collation order/sign)
+    //   - String.prototype.toLocaleLowerCase/UpperCase (locale case mapping)
+    //   - Number/Array/Object.prototype.toLocaleString (locale separators)
+    (function() {
+        var locale = [
+            [String.prototype, 'normalize'],
+            [String.prototype, 'localeCompare'],
+            [String.prototype, 'toLocaleLowerCase'],
+            [String.prototype, 'toLocaleUpperCase'],
+            [Number.prototype, 'toLocaleString'],
+            [Array.prototype,  'toLocaleString'],
+            [Object.prototype, 'toLocaleString']
+        ];
+        for (var i = 0; i < locale.length; i++) {
+            try {
+                Object.defineProperty(locale[i][0], locale[i][1],
+                    { value: undefined, writable: false, configurable: false });
+            } catch(e) {}
+        }
+    })();
+
     // Save Object.defineProperty for the harness to use (it needs to lock __gas).
     // Store as a non-enumerable global so harness can access it, then harness deletes it.
     var _defineProperty = Object.defineProperty;

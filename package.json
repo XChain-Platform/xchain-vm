@@ -40,6 +40,7 @@
     "test:boundary": "mocha --timeout 30000 'test/preflight.test.js' 'test/boundary/**/*.test.js'",
     "test:security": "mocha --timeout 30000 'test/preflight.test.js' 'test/security/**/*.test.js'",
     "test:determinism": "mocha --timeout 60000 'test/preflight.test.js' 'test/determinism/**/*.test.js'",
+    "test:known-red": "mocha --timeout 120000 'test/preflight.test.js' 'test/determinism/known-red/*.known-red.js'",
     "test:e2e": "mocha --timeout 60000 'test/preflight.test.js' 'test/e2e/**/*.e2e.test.js'",
     "smoke": "mocha --timeout 10000 'test/preflight.test.js' 'test/smoke/**/*.test.js'",
     "test:fuzz": "mocha --timeout 120000 'test/preflight.test.js' 'test/fuzz/**/*.fuzz.test.js'",
