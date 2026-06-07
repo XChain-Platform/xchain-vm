@@ -125,7 +125,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             request: (providerId, requestPayload, callbackMethod, callbackParams, options) => {
                 gasTracker.charge(gasSchedule.VM_ATTEST_REQUEST);
                 gasTracker.charge(gasSchedule.VM_EMISSION);
-                if (typeof providerId !== 'string' || providerId.length === 0 || providerId.length > 32)
+                if (typeof providerId !== 'string' || providerId.length === 0 || Buffer.byteLength(providerId, 'utf8') > 32)
                     throw new Error('attestation.request: providerId must be a non-empty string (max 32 bytes)');
                 if (typeof requestPayload !== 'string')
                     throw new Error('attestation.request: requestPayload must be a string');
@@ -136,7 +136,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // governance has registered a provider that allows it.
                 if (Buffer.byteLength(requestPayload, 'utf8') > 8192)
                     throw new Error('attestation.request: requestPayload exceeds 8192 bytes');
-                if (typeof callbackMethod !== 'string' || callbackMethod.length === 0 || callbackMethod.length > 64)
+                if (typeof callbackMethod !== 'string' || callbackMethod.length === 0 || Buffer.byteLength(callbackMethod, 'utf8') > 64)
                     throw new Error('attestation.request: callbackMethod must be a non-empty string (max 64 bytes)');
                 if (!Array.isArray(callbackParams))
                     throw new Error('attestation.request: callbackParams must be an array');

@@ -212,6 +212,32 @@ function baseExecOpts(extra) {
             assert.match(result.error || '', /callbackMethod must be/);
         });
 
+        // The limit is BYTES, not characters: a multibyte name under the 64-char
+        // count but over 64 UTF-8 bytes must still be rejected (regression for the
+        // chars-vs-bytes mismatch — providerId/callbackMethod were checking .length
+        // while requestPayload/callbackParams used byte length).
+        it('rejects a multibyte callbackMethod that is <= 64 chars but > 64 bytes', async function () {
+            const result = await vm.execute(baseExecOpts({
+                code: `module.exports = function(xchain) {
+                    var m = '\\u20AC'.repeat(40); // 40 chars, 120 UTF-8 bytes
+                    return xchain.attestation.request('http_get', 'u', m, [], { redundancy: 1 });
+                };`
+            }));
+            assert.strictEqual(result.success, false);
+            assert.match(result.error || '', /callbackMethod must be/);
+        });
+
+        it('rejects a multibyte providerId that is <= 32 chars but > 32 bytes', async function () {
+            const result = await vm.execute(baseExecOpts({
+                code: `module.exports = function(xchain) {
+                    var p = '\\u20AC'.repeat(20); // 20 chars, 60 UTF-8 bytes
+                    return xchain.attestation.request(p, 'u', 'cb', [], { redundancy: 1 });
+                };`
+            }));
+            assert.strictEqual(result.success, false);
+            assert.match(result.error || '', /providerId must be/);
+        });
+
         it('rejects deadlineBlocks outside [1, 100]', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
