@@ -30,4 +30,20 @@ class GasExhaustedError extends Error {
     }
 }
 
-module.exports = { ContractRevertError, GasExhaustedError };
+// A LOCAL host fault — the out-of-process executor cannot run a contract on
+// THIS machine at all (the worker process can never start: fork EAGAIN,
+// isolated-vm load failure, etc.). This is NOT a contract outcome: it is not a
+// deterministic property of the contract (a contract cannot make fork() fail),
+// so it must NEVER be fabricated into a consensus result. A fabricated
+// out_of_resource here would diverge from the fleet (which runs the contract
+// normally) → unilateral fork. Callers must HALT (not commit) and retry. The
+// `code` lets the indexer recognise it without importing the class.
+class HostFaultError extends Error {
+    constructor(reason) {
+        super(reason || 'executor unavailable');
+        this.name = 'HostFaultError';
+        this.code = 'EXECUTOR_UNAVAILABLE';
+    }
+}
+
+module.exports = { ContractRevertError, GasExhaustedError, HostFaultError };

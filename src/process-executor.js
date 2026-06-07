@@ -32,8 +32,14 @@
 
 const path = require('path');
 const { fork } = require('child_process');
+const { HostFaultError } = require('./errors.js');
 
 const WORKER_PATH = path.join(__dirname, 'vm-worker.js');
+
+// Minimum spacing between respawn attempts once the executor is broken, so a
+// host that can never start a worker doesn't fork-spin. Each subsequent
+// execute() retries a spawn at most this often before rejecting as a host fault.
+const BROKEN_RESPAWN_BACKOFF_MS = 2000;
 
 // Deterministic result for any non-gas host termination (crash / hang).
 // gasUsed = ceiling matches src/index.js's timeout/OOM/stack clamp so the
@@ -67,13 +73,15 @@ class ProcessExecutor {
         this._watchdogMs = cpu + 5000;
 
         this._child = null;
-        this._pending = new Map();   // dispatched: id -> { resolve, timer }
-        this._queue = [];            // accepted, not yet dispatched: { id, opts, resolve, timer }
+        this._pending = new Map();   // dispatched: id -> { resolve, reject, timer }
+        this._queue = [];            // accepted, not yet dispatched: { id, opts, resolve, reject, timer }
         this._nextId = 1;
         this._inBlock = false;       // re-issue beginBlock to a respawned child
         this._shuttingDown = false;
         this._consecutiveSpawnFailures = 0;
         this._sawReady = false;
+        this._broken = false;        // host fault latch: worker can't start (recoverable)
+        this._lastBrokenRetryAt = 0; // backoff gate for broken-state recovery probes
 
         this._spawn();
     }
@@ -136,7 +144,7 @@ class ProcessExecutor {
             const entry = this._queue[0];
             if (!this._send({ type: 'execute', id: entry.id, opts: entry.opts })) break;
             this._queue.shift();
-            this._pending.set(entry.id, { resolve: entry.resolve, timer: entry.timer });
+            this._pending.set(entry.id, { resolve: entry.resolve, reject: entry.reject, timer: entry.timer });
         }
     }
 
@@ -165,11 +173,14 @@ class ProcessExecutor {
         }
         if (this._consecutiveSpawnFailures >= 3) {
             this._broken = true;
-            // The worker can't start — drain queued (never-dispatched) executions to
-            // the same deterministic result so callers don't hang until their watchdog.
+            // The worker can't start — this is a LOCAL host fault, not a contract
+            // outcome (a contract cannot make fork() fail). REJECT queued
+            // (never-dispatched) executions with a host fault so the caller HALTS
+            // and retries, instead of fabricating out_of_resource for work the
+            // fleet runs normally (which would fork this node off the chain).
             for (const entry of this._queue) {
                 if (entry.timer) clearTimeout(entry.timer);
-                entry.resolve(hostTerminatedResult(this._gasCeiling, 'executor unavailable'));
+                entry.reject(new HostFaultError('executor unavailable'));
             }
             this._queue = [];
             return;
@@ -189,10 +200,26 @@ class ProcessExecutor {
 
     execute(opts) {
         if (this._broken) {
-            return Promise.resolve(hostTerminatedResult(this._gasCeiling, 'executor unavailable'));
+            // The worker could not be started (host fault — fork EAGAIN,
+            // isolated-vm load failure). This is NOT a contract outcome and must
+            // never be fabricated into a consensus result (it would fork). Try to
+            // recover on a backoff so a TRANSIENT fault self-heals without a
+            // process restart: clear the latch and probe a fresh spawn, then let
+            // the request queue normally. If the probe also fails the worker
+            // re-breaks and _onExit rejects the queued request (below); if it
+            // succeeds the request dispatches and runs. Within the backoff window
+            // we reject immediately so a persistent fault doesn't fork-spin.
+            const now = Date.now();
+            if (now - (this._lastBrokenRetryAt || 0) < BROKEN_RESPAWN_BACKOFF_MS) {
+                return Promise.reject(new HostFaultError('executor unavailable'));
+            }
+            this._lastBrokenRetryAt = now;
+            this._broken = false;
+            this._spawn();
+            // fall through and queue; _flush dispatches once/if the probe is ready.
         }
         const id = this._nextId++;
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             // Watchdog started at acceptance so it bounds queue-wait + execution — a
             // deterministic upper time bound regardless of where the request sits.
             const timer = setTimeout(() => {
@@ -223,7 +250,7 @@ class ProcessExecutor {
             // Accept into the queue, then dispatch only if a ready worker exists.
             // Never send to a worker that has not signaled 'ready' (a fresh or dying
             // one) — that is the determinism-breaking race this fix closes.
-            this._queue.push({ id, opts, resolve, timer });
+            this._queue.push({ id, opts, resolve, reject, timer });
             this._flush();
         });
     }

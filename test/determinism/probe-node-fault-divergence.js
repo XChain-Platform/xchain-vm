@@ -71,39 +71,51 @@ async function onHealthyNode() {
 
 async function onLocallyFaultedNode() {
     // Simulate a machine where the worker can never start (isolated-vm load
-    // failure, fork EAGAIN under resource pressure, …): the executor trips its
-    // _broken latch and fabricates a host-termination for every execution.
+    // failure, fork EAGAIN under resource pressure, …): the executor is in its
+    // permanent _broken latch and is inside the recovery backoff window (a fresh
+    // spawn was just tried and failed), so execute() cannot run the contract.
     const vm = new XChainVM(CFG);
     vm.beginBlock();
-    vm._executor._broken = true;           // the permanent-fault state the executor enters after repeated spawn failures
-    const r = await vm.execute(runOpts(CONTRACT));
+    vm._executor._broken = true;
+    vm._executor._lastBrokenRetryAt = Date.now(); // within the recovery backoff → no spawn, host fault
+    let result = null, halted = false, faultErr = null;
+    try {
+        result = await vm.execute(runOpts(CONTRACT));
+    } catch (e) {
+        halted = true; faultErr = e;            // POST-FIX: execute() rejects with HostFaultError → caller HALTS
+    }
     vm.endBlock(); await vm.shutdown();
-    return r;
+    return { result, halted, faultErr };
 }
 
 async function main() {
-    process.stdout.write(`Node-fault divergence probe (FABRICATE stance)\n${'='.repeat(78)}\n`);
+    process.stdout.write(`Node-fault stance probe (HALT vs FABRICATE)\n${'='.repeat(78)}\n`);
     const healthy = await onHealthyNode();
     const faulted = await onLocallyFaultedNode();
 
     const hStatus = consensusStatus(healthy);
-    const fStatus = consensusStatus(faulted);
     process.stdout.write(`\nHEALTHY node:  success=${healthy.success} return=${JSON.stringify(healthy.returnValue)} ` +
-        `gasUsed=${healthy.gasUsed} → STATUS=${hStatus}\n`);
-    process.stdout.write(`FAULTED node:  success=${faulted.success} error=${JSON.stringify(faulted.error)} ` +
-        `gasUsed=${faulted.gasUsed} → STATUS=${fStatus}\n`);
+        `gasUsed=${healthy.gasUsed} → STATUS=${hStatus} (committed)\n`);
 
-    const diverged = hStatus !== fStatus || healthy.success !== faulted.success;
-    process.stdout.write(`\n${'='.repeat(78)}\n`);
-    process.stdout.write(`consensus STATUS diverges: ${diverged ? 'YES *** UNILATERAL FORK ***' : 'no'} ` +
-        `(${hStatus} vs ${fStatus})\n`);
-    if (diverged) {
-        process.stdout.write(`\nFINDING: a locally-faulted node fabricates out_of_resource for a contract\n` +
-            `the fleet completes → different status_id → different contract_hash → the\n` +
-            `faulted node forks off the fleet while still producing. Fabricate favors\n` +
-            `liveness; safety needs a HALT path (executor _broken → indexer halt + alert,\n` +
-            `and/or consensus-layer state-root divergence → halt) instead of silent commit.\n`);
+    if (faulted.halted) {
+        process.stdout.write(`FAULTED node:  execute() REJECTED with ${faulted.faultErr.name} ` +
+            `(code ${faulted.faultErr.code}) → the node HALTS, commits nothing.\n`);
+        process.stdout.write(`\n${'='.repeat(78)}\n`);
+        process.stdout.write(`consensus STATUS diverges: no — the faulted node never commits a result.\n`);
+        process.stdout.write(`\nFIXED: a permanently-broken executor no longer fabricates out_of_resource\n` +
+            `for work the fleet completes (which would fork). It rejects → the indexer\n` +
+            `halts block processing (defer-retry) + alerts, and self-heals once the host\n` +
+            `recovers. Safety (no silent fork) over liveness for an un-runnable node.\n`);
+        process.exit(0);
     }
+
+    // Pre-fix path (should not happen after the fix): a fabricated divergent commit.
+    const fStatus = consensusStatus(faulted.result);
+    const diverged = hStatus !== fStatus || healthy.success !== faulted.result.success;
+    process.stdout.write(`FAULTED node:  success=${faulted.result.success} ` +
+        `error=${JSON.stringify(faulted.result.error)} → STATUS=${fStatus} (committed)\n`);
+    process.stdout.write(`\nconsensus STATUS diverges: ${diverged ? 'YES *** UNILATERAL FORK *** (regression!)' : 'no'} ` +
+        `(${hStatus} vs ${fStatus})\n`);
     process.exit(diverged ? 2 : 0);
 }
 

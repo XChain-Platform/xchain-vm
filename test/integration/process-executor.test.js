@@ -169,4 +169,64 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
             await exec.shutdown();
         }
     });
+
+    // Halt-vs-fabricate — a PERMANENTLY broken executor (worker can never start)
+    // must REJECT, not fabricate. Fabricating out_of_resource for work the fleet
+    // runs would fork this node off the chain (a host fault is not a contract
+    // property). The indexer turns the rejection into a halt-and-retry.
+    it('host fault: a permanently-broken executor REJECTS with HostFaultError', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const { HostFaultError } = require('../../src/errors.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        try {
+            // Permanent fault, inside the recovery backoff window → no spawn, host fault.
+            exec._broken = true;
+            exec._lastBrokenRetryAt = Date.now();
+            await assert.rejects(
+                exec.execute({ ...BASE, code: `module.exports = function(){ return 1; };` }),
+                (e) => e instanceof HostFaultError && e.code === 'EXECUTOR_UNAVAILABLE',
+                'a broken executor must reject (halt), not fabricate out_of_resource'
+            );
+        } finally {
+            await exec.shutdown();
+        }
+    });
+
+    it('host fault: a broken executor SELF-HEALS once the host recovers', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        try {
+            // Broken, but the backoff has elapsed → execute() probes a fresh spawn,
+            // which succeeds (the host is actually fine here) → the request runs.
+            exec._broken = true;
+            exec._lastBrokenRetryAt = 0;
+            const r = await exec.execute({ ...BASE, code: `module.exports = function(){ return 'healed'; };` });
+            assert.strictEqual(r.success, true, 'recovery probe should run the contract: ' + r.error);
+            assert.strictEqual(r.returnValue, '"healed"');
+            assert.strictEqual(exec._broken, false, '_broken must clear after a successful recovery');
+        } finally {
+            await exec.shutdown();
+        }
+    });
+
+    // The deterministic case is UNCHANGED: a single worker death during an
+    // in-flight execution still RESOLVES a fabricated host-termination (every
+    // validator sees the same poisoned-contract outcome) — it must NOT reject.
+    it('a single in-flight worker death still FABRICATES (resolves), not rejects', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        try {
+            await exec.execute({ ...BASE, code: `module.exports = function(){ return 1; };` }); // ensure ready
+            const inFlight = exec.execute({ ...BASE, code: `module.exports = function(){ return 2; };` });
+            if (exec._child) exec._child.kill('SIGKILL'); // crash mid-flight (not _broken)
+            const r = await inFlight;
+            assert.strictEqual(r.success, false, 'in-flight crash should resolve a host-termination');
+            assert.strictEqual(r.gasUsed, GAS_CEILING, 'fabricated result clamps gasUsed to the ceiling');
+        } finally {
+            await exec.shutdown();
+        }
+    });
 });

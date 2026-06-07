@@ -1016,3 +1016,7 @@ const consensusRuntime = require('./consensus-runtime.js');
 module.exports.CONSENSUS_RUNTIME = consensusRuntime.PINNED;
 module.exports.checkConsensusRuntime = consensusRuntime.checkConsensusRuntime;
 module.exports.describeRuntimeMismatch = consensusRuntime.describeMismatch;
+// Expose HostFaultError so a host that cannot run contracts (permanently broken
+// subprocess executor) is recognisable by callers — they must HALT, not commit
+// a fabricated result that would fork the chain.
+module.exports.HostFaultError = require('./errors.js').HostFaultError;
