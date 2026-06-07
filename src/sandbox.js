@@ -140,6 +140,28 @@ const STRIP_SCRIPT = `
         }
     })();
 
+    // Neuter Error stack traces (consensus determinism + info leak).
+    // A contract can catch its own errors and return/store e.stack, which lands
+    // in hashed state. V8's stack text is non-deterministic across builds and
+    // leaks isolate-internal frame data: line/column offsets into the harness
+    // wrapper (e.g. "<isolated-vm>:11:6"), frame formatting, and depth — all of
+    // which change between V8 patch releases and whenever HARNESS_SOURCE is
+    // edited. Force it to a constant: stackTraceLimit=0 plus a frozen
+    // prepareStackTrace hook so every e.stack is the empty string, and lock both
+    // so a contract cannot restore richer stacks. (NB: must run BEFORE
+    // Object.defineProperty is stripped below.) The error MESSAGE text is a
+    // V8-set own property on native throws and cannot be intercepted here; that
+    // residual exposure is mitigated operationally by pinning the exact V8/ICU
+    // build as a consensus parameter — see the cross-version determinism gate.
+    try {
+        Object.defineProperty(Error, 'stackTraceLimit', { value: 0, writable: false, configurable: false });
+    } catch(e) {}
+    try {
+        Object.defineProperty(Error, 'prepareStackTrace', {
+            value: function() { return ''; }, writable: false, configurable: false
+        });
+    } catch(e) {}
+
     // Save Object.defineProperty for the harness to use (it needs to lock __gas).
     // Store as a non-enumerable global so harness can access it, then harness deletes it.
     var _defineProperty = Object.defineProperty;

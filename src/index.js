@@ -571,8 +571,25 @@ class XChainVM {
                 }
             }
 
-            // Execute
+            // Execute. Suppress HOST-side stack capture for the duration of the
+            // synchronous contract run. When contract recursion overflows the OS
+            // stack, V8 cannot run the isolate's prepareStackTrace hook and falls
+            // back to its default formatter; because every metered call crosses
+            // into the host via __gas/applySync, the overflow trace is captured
+            // host-side and includes HOST frames with real filesystem paths and
+            // per-deployment line numbers. A contract can read that through
+            // `catch (e) { return e.stack }`, leaking host paths into hashed state
+            // (info-leak + per-validator nondeterminism -> fork). Forcing the host
+            // limit to 0 + a constant prepareStackTrace makes any host-captured
+            // trace empty, leaving only deterministic isolate frames. Restored in
+            // finally; execute() runs contracts strictly sequentially, so this
+            // window overlaps no other host work. (The in-isolate stackTraceLimit
+            // set by sandbox.js covers the normal, non-overflow path.)
             let returnValue = null;
+            const __hostStackLimit = Error.stackTraceLimit;
+            const __hostPrepare = Error.prepareStackTrace;
+            Error.stackTraceLimit = 0;
+            Error.prepareStackTrace = function() { return ''; };
             try {
                 const rawReturn = script.runSync(context, { timeout: this.limits.maxCpuTimeMs });
                 // The contract wrapper JSON-serializes non-null return values
@@ -595,6 +612,10 @@ class XChainVM {
             } catch (execError) {
                 // Classify the error
                 return this._classifyError(execError, gasTracker, emissionCollector, opts, execContext);
+            } finally {
+                // Restore host stack-capture settings (see note above).
+                Error.stackTraceLimit = __hostStackLimit;
+                Error.prepareStackTrace = __hostPrepare;
             }
 
             // Collect results
