@@ -63,7 +63,9 @@ function executeCode(vm, code, opts) {
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, false);
         assert(result.error.includes('out_of_gas'), 'should be out of gas: ' + result.error);
-        assert(result.gasUsed > 1000, 'should have used gas before failing');
+        // gasUsed clamps to the ceiling on exhaustion (a single charge can overshoot,
+        // but the caller is never billed beyond their committed ceiling).
+        assert.strictEqual(result.gasUsed, 1000, 'gasUsed should clamp to the ceiling: ' + result.gasUsed);
     });
 
     it('should hit memory limit on memory bomb', async function() {

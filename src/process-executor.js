@@ -211,6 +211,13 @@ class ProcessExecutor {
                 resolve(hostTerminatedResult(this._gasCeiling, 'watchdog timeout'));
                 const child = this._child;
                 if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
+                // Mark the killed worker un-dispatchable NOW, synchronously, so the
+                // NEXT execute() in this block queues until the respawn is 'ready'
+                // instead of racing the dying worker before _onExit fires (the
+                // window that would otherwise host-terminate the next contract
+                // nondeterministically). Safe vs the spawn-failure counter: the
+                // watchdog only fires long after spawn, past _onExit's <2s guard.
+                this._sawReady = false;
             }, this._watchdogMs);
 
             // Accept into the queue, then dispatch only if a ready worker exists.

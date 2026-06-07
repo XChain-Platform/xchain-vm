@@ -29,14 +29,17 @@
 const assert = require('assert');
 const { createVM, execute, XChainVM } = require('../fuzz/harness');
 
-// Each contract is bounded by a NON-gas, NON-deterministic ceiling.
+// Each contract is bounded by a NON-gas, NON-deterministic ceiling. (The bulk
+// allocators new Array().fill / repeat / Array.from are now gas-bounded by F3, so
+// the wall-clock vector uses a SPREAD of a holey array — F3 can't wrap spread
+// syntax, so this path still terminates via the isolate wall-clock / host backstop
+// and exercises the clamp.) out_of_gas is clamped to the ceiling too (F3), so all
+// three families report gasUsed == ceiling deterministically.
 const VECTORS = [
     {
-        id: 'wall-clock timeout (allocation loop)',
-        match: /^timeout:/,
-        code: `module.exports = function(xchain) {
-            var a = []; for (var i = 0; i < 1000000; i++) { a.push(new Array(10000).fill('x')); }
-        };`
+        id: 'wall-clock / host termination (spread of a holey array)',
+        match: /^(timeout|out_of_memory|out_of_resource):/,
+        code: `module.exports = function(xchain) { var a = [...new Array(100000000)]; return a.length; };`
     },
     {
         id: 'native stack overflow (infinite recursion)',
@@ -67,6 +70,8 @@ describe('determinism: resource-termination gasUsed is clamped (fork-safe fee)',
                 if (typeof vm.endBlock === 'function') vm.endBlock();
                 assert.strictEqual(r.success, false, `${v.id} must fail`);
                 assert.match(r.error, v.match, `${v.id} produced unexpected error: ${r.error}`);
+                assert.strictEqual(r.gasUsed, 1000000,
+                    `${v.id} gasUsed must clamp to the ceiling, got ${r.gasUsed}`);
                 lastError = r.error;
                 seen.add(r.gasUsed);
             }

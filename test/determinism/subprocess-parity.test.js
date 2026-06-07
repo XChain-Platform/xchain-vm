@@ -68,16 +68,20 @@ function makeSubprocessVM() {
         });
     }
 
-    it('CONTAINMENT: a host-aborting contract cannot crash the host', async function () {
+    it('CONTAINMENT: a hostile bulk-allocation contract cannot crash the host', async function () {
         const bomb = `module.exports = function(){ var a = new Array(100000000).fill('x'); return a.length; };`;
         const r = await vm.execute({
             code: bomb, method: 'default', params: [], state: {},
             blockContext: BLOCK, contractIndex: 1
         });
         assert.strictEqual(r.success, false);
-        assert.match(r.error, /out_of_resource|out_of_memory|timeout/,
-            'host abort must map to a deterministic resource failure, got: ' + r.error);
-        assert.strictEqual(r.gasUsed, GAS_CEILING, 'crash charges the ceiling → fork-safe fee');
+        // F3 allocation metering now charges the fill by size → out_of_gas before V8
+        // allocates (so it no longer aborts the worker at all). On a path F3 can't
+        // wrap it would still be a contained host termination. Either way: a
+        // deterministic resource failure at the ceiling.
+        assert.match(r.error, /out_of_resource|out_of_memory|timeout|out_of_gas/,
+            'must map to a deterministic resource failure, got: ' + r.error);
+        assert.strictEqual(r.gasUsed, GAS_CEILING, 'charges the ceiling → fork-safe fee');
         // Still serving after the crash (executor respawned the worker).
         const ok = await vm.execute({
             code: `module.exports = function(){ return 'alive'; };`,

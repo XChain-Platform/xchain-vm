@@ -86,14 +86,17 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         vm = makeVM('subprocess');
         vm.beginBlock();
 
-        // This bulk allocation aborts V8 (SIGABRT) in the child ~reliably.
+        // A hostile bulk allocation. With F3 allocation metering it is charged by
+        // size and hits the gas ceiling (out_of_gas) BEFORE V8 services it, so it no
+        // longer aborts the worker; either way it is contained as a deterministic
+        // resource failure at the ceiling and the executor keeps serving.
         const bomb = `module.exports = function(xchain){ var a = new Array(100000000).fill('x'); return a.length; };`;
         const r = await vm.execute({ ...BASE, code: bomb });
 
-        assert.strictEqual(r.success, false, 'aborting contract must fail');
-        assert.match(r.error, /out_of_resource|out_of_memory|timeout/,
-            'host abort must map to a deterministic resource failure, got: ' + r.error);
-        assert.strictEqual(r.gasUsed, GAS_CEILING, 'crash must charge the gas ceiling (fork-safe fee)');
+        assert.strictEqual(r.success, false, 'hostile allocation must fail');
+        assert.match(r.error, /out_of_resource|out_of_memory|timeout|out_of_gas/,
+            'must map to a deterministic resource failure, got: ' + r.error);
+        assert.strictEqual(r.gasUsed, GAS_CEILING, 'must charge the gas ceiling (fork-safe fee)');
 
         // The executor must have respawned — a normal contract still works.
         const ok = await vm.execute({ ...BASE, code: `module.exports = function(){ return 'alive'; };` });
@@ -128,31 +131,42 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 
     // F2 regression — deterministic dispatch after a worker death.
     //
-    // When a worker dies, WHICH backstop kills it is arch/timing-dependent: a V8
-    // abort (SIGABRT) on some platforms, the parent watchdog (SIGKILL) on others
-    // (e.g. x86, where the bulk allocation runs past the isolate timeout). The
-    // indexer runs contracts sequentially, so the contract IMMEDIATELY after the
-    // dead one must still run — on the respawned worker — and return its real
-    // result on every validator. Before the ready-gated-dispatch fix, that next
-    // contract could be sent to the dying worker and resolve as a host-termination
-    // (SIGKILL) on the watchdog path → a nondeterministic result for the following
-    // contract → fork. The short maxCpuTimeMs pushes the bomb toward the watchdog
-    // path so this exercises the previously-racy branch on the validator arch.
-    it('F2: a contract following a worker death always runs on a fresh worker', async function () {
-        const limits = { ...LIMITS, maxCpuTimeMs: 300 };
-        vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits, execution: 'subprocess' });
-        vm.beginBlock();
-        const bomb   = `module.exports = function(){ var a = new Array(100000000).fill('x'); return a.length; };`;
-        const benign = `module.exports = function(){ return 'alive'; };`;
-        for (let i = 0; i < 3; i++) {
-            const r = await vm.execute({ ...BASE, code: bomb });
-            assert.strictEqual(r.success, false, 'bomb #' + i + ' must fail');
-            assert.strictEqual(r.gasUsed, GAS_CEILING, 'bomb #' + i + ' must charge the ceiling (fork-safe fee)');
-            // Issued back-to-back, exactly as the indexer would for the next action.
-            const ok = await vm.execute({ ...BASE, code: benign });
-            assert.strictEqual(ok.success, true,
-                'contract after worker death #' + i + ' must run, not be host-terminated; got: ' + ok.error);
-            assert.strictEqual(ok.returnValue, '"alive"');
+    // The indexer runs contracts sequentially, so the contract IMMEDIATELY after one
+    // that killed its worker must still run — on the RESPAWNED worker — and return
+    // its real result on every validator. Before the ready-gated-dispatch fix, that
+    // next contract could be sent to the dying worker (in the window after the
+    // watchdog kills it but before 'exit'/respawn) and resolve as a host-termination
+    // (SIGKILL) → a nondeterministic result for the following contract → fork.
+    //
+    // We exercise this at the EXECUTOR level (a contract can no longer reliably kill
+    // the worker now that F3 gas-bounds bulk allocations): drive a worker death the
+    // way the watchdog does — kill the child and mark it un-dispatchable
+    // (_sawReady=false, exactly what the watchdog callback now sets) — then dispatch
+    // the next request. It MUST queue and run on the respawn, never be host-terminated.
+    it('F2: executor queues+recovers the next request after a worker death', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        const job = (ret) => ({ ...BASE, code: `module.exports = function(){ return '${ret}'; };` });
+        try {
+            const r1 = await exec.execute(job('a'));
+            assert.strictEqual(r1.returnValue, '"a"', 'baseline: executor serves');
+
+            // Simulate the watchdog firing on an unresponsive worker.
+            exec._child.kill('SIGKILL');
+            exec._sawReady = false;
+
+            const r2 = await exec.execute(job('b'));
+            assert.strictEqual(r2.success, true,
+                'a request issued during the kill→respawn window must run on the respawn, ' +
+                'not be host-terminated: ' + r2.error);
+            assert.strictEqual(r2.returnValue, '"b"');
+
+            // And the executor keeps serving afterwards.
+            const r3 = await exec.execute(job('c'));
+            assert.strictEqual(r3.returnValue, '"c"');
+        } finally {
+            await exec.shutdown();
         }
     });
 });

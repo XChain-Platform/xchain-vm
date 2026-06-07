@@ -69,7 +69,9 @@ const HARNESS_SOURCE = `
     // Use __defineProperty (saved by sandbox before stripping Object.defineProperty)
     // to make __gas non-writable/non-configurable so contracts cannot overwrite it.
     var __gasRef = globalThis.__gas;
-    var __gasFunc = function() { __gasRef.applySync(undefined, []); };
+    // Forward the charge amount: 1 for the AST meter's __gas(1) (control flow),
+    // or the allocation size for the bulk-allocation wrappers below.
+    var __gasFunc = function(n) { __gasRef.applySync(undefined, [(typeof n === 'number' && n > 1) ? n : 1]); };
     var __defProp = globalThis.__defineProperty;
     delete globalThis.__gas;
     __defProp(globalThis, '__gas', {
@@ -78,6 +80,45 @@ const HARNESS_SOURCE = `
         configurable: false,
         enumerable: false
     });
+
+    // ----- Allocation-size gas metering (F3) -----
+    // Charge gas proportional to the number of elements/chars a bulk-allocation
+    // builtin will materialize, BEFORE delegating to the native — so a hostile
+    // allocation (new Array(1e8).fill('x'), 'x'.repeat(1e9), Array.from({length:1e8}))
+    // trips the deterministic gas ceiling instead of reaching V8's allocator (which
+    // would burn ~28s to the wall-clock timeout, or abort the worker). Installed at
+    // the PROTOTYPE level so it is aliasing-proof: var f=[].fill; f.call(arr,x) gets
+    // the metered wrapper, and the native (captured in a closure) is unreachable.
+    // Defense-in-depth — the out-of-process executor remains the load-bearing
+    // containment for paths that cannot be wrapped (spread, infinite-generator).
+    var __lockMethod = function(obj, name, fn) {
+        try { __defProp(obj, name, { value: fn, writable: false, configurable: false, enumerable: false }); } catch(e) {}
+    };
+    var __allocGas = function(n) { var x = +n; if (x > 1) __gas(x); };
+
+    var __fill = Array.prototype.fill;
+    if (typeof __fill === 'function') __lockMethod(Array.prototype, 'fill', function() {
+        __allocGas(this == null ? 0 : this.length); return __fill.apply(this, arguments);
+    });
+    var __from = Array.from;
+    if (typeof __from === 'function') __lockMethod(Array, 'from', function(src) {
+        if (src && typeof src.length === 'number') __allocGas(src.length);
+        return __from.apply(this, arguments);
+    });
+    var __repeat = String.prototype.repeat;
+    if (typeof __repeat === 'function') __lockMethod(String.prototype, 'repeat', function(count) {
+        var c = +count; if (c > 0) __allocGas(c * this.length); return __repeat.apply(this, arguments);
+    });
+    var __padStart = String.prototype.padStart;
+    if (typeof __padStart === 'function') __lockMethod(String.prototype, 'padStart', function(len) {
+        __allocGas(len); return __padStart.apply(this, arguments);
+    });
+    var __padEnd = String.prototype.padEnd;
+    if (typeof __padEnd === 'function') __lockMethod(String.prototype, 'padEnd', function(len) {
+        __allocGas(len); return __padEnd.apply(this, arguments);
+    });
+    // ----- end F3 -----
+
     // Clean up __defineProperty — no longer needed
     delete globalThis.__defineProperty;
 
@@ -386,10 +427,16 @@ class XChainVM {
             // Inject gateway methods as ivm.Reference objects
             this._injectGateway(context, gateway);
 
-            // Inject __gas callback for metering
-            const gasRef = new ivm.Reference(function() {
+            // Inject __gas callback for metering. `units` is the number of
+            // computation steps to charge: the AST meter passes 1 (control flow);
+            // the allocation-metering wrappers (harness) pass the requested
+            // allocation size, so a bulk allocation trips the gas ceiling BEFORE V8
+            // services it. Sanitize to a positive integer (default 1); a huge units
+            // deterministically throws GasExhaustedError at the ceiling.
+            const gasRef = new ivm.Reference(function(units) {
                 try {
-                    gasTracker.chargeComputation();
+                    const n = (typeof units === 'number' && isFinite(units) && units >= 1) ? Math.floor(units) : 1;
+                    gasTracker.charge(gasTracker.schedule.VM_COMPUTATION * n);
                 } catch (e) {
                     if (e instanceof GasExhaustedError) {
                         throw new Error('\x03GAS:' + e.used + ':' + e.ceiling);
@@ -627,8 +674,14 @@ class XChainVM {
             return this._errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
         }
         if (error instanceof GasExhaustedError) {
+            // Clamp the consensus-visible gasUsed to the ceiling. A single charge can
+            // overshoot the ceiling by a lot (the allocation wrappers charge the full
+            // requested size, e.g. 1e8 for Array(1e8).fill), but a contract allotted
+            // `ceiling` gas must never be billed beyond it — otherwise fee = gasUsed *
+            // GAS_PRICE could exceed the caller's committed budget and drive balances
+            // negative. The raw `used` stays in the (un-hashed) error message for debugging.
             return this._errorResult(gasTracker, emissionCollector,
-                'out_of_gas: used ' + error.used + ' of ' + error.ceiling);
+                'out_of_gas: used ' + error.used + ' of ' + error.ceiling, this.gasCeiling);
         }
         // Detect typed errors that lost their class crossing the isolate boundary.
         // Only trust \x03-prefixed messages when the tracker/context confirms the classification,
@@ -645,7 +698,7 @@ class XChainVM {
             }
             if (payload.startsWith('GAS:') && gasTracker.used > gasTracker.ceiling) {
                 return this._errorResult(gasTracker, emissionCollector,
-                    'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling);
+                    'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, this.gasCeiling);
             }
         }
         // ── Non-deterministic resource terminations ──────────────────────────
@@ -703,9 +756,11 @@ class XChainVM {
         return {
             success:        false,
             error:          errorMsg,
-            // gasOverride is supplied for non-deterministic resource terminations
-            // (timeout / out_of_memory / out_of_stack) so the consensus-visible
-            // gasUsed — and therefore the fee — is identical on every validator.
+            // gasOverride bounds the consensus-visible gasUsed to the gas ceiling:
+            // for non-deterministic resource terminations (timeout / out_of_memory /
+            // out_of_stack) so gasUsed — and therefore the fee — is identical on every
+            // validator, and for out_of_gas so a single over-ceiling charge (the
+            // allocation wrappers) can never bill the caller beyond their committed budget.
             gasUsed:        (gasOverride != null) ? gasOverride : gasTracker.getUsed(),
             returnValue:    null,
             stateChanges:   [],
