@@ -1010,3 +1010,9 @@ module.exports = XChainVM;
 // Expose the canonical code-size cap so the cross-service regression suite can
 // assert it has not drifted from the protocol constant.
 module.exports.MAX_CODE_SIZE = MAX_CODE_SIZE;
+// Expose the pinned consensus runtime + checker so the indexer (and any
+// validator process bundling the VM) can gate the engine version it runs on.
+const consensusRuntime = require('./consensus-runtime.js');
+module.exports.CONSENSUS_RUNTIME = consensusRuntime.PINNED;
+module.exports.checkConsensusRuntime = consensusRuntime.checkConsensusRuntime;
+module.exports.describeRuntimeMismatch = consensusRuntime.describeMismatch;
