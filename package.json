@@ -48,6 +48,7 @@
     "bench:quick": "node bench/scenarios/pipeline.js && node bench/scenarios/gateway.js",
     "bench:full": "node bench/scenarios/pipeline.js && node bench/scenarios/gateway.js && node bench/scenarios/throughput.js && node bench/scenarios/cache.js",
     "bench:soak": "node bench/scenarios/soak.js",
+    "test:soak:executor": "node --expose-gc test/soak/executor-respawn-soak.js",
     "test:chaos": "mocha --timeout 120000 'test/preflight.test.js' 'test/chaos/**/*.chaos.test.js'",
     "test:chaos:quick": "mocha --timeout 60000 'test/preflight.test.js' 'test/chaos/phase1/**/*.chaos.test.js'",
     "test:chaos:phase2": "mocha --timeout 120000 'test/preflight.test.js' 'test/chaos/phase2/**/*.chaos.test.js'",
