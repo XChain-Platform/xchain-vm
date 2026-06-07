@@ -1,13 +1,13 @@
 {
-  "state_counter:increment": "ac3286b02a67bfac245dc12c6c4bdc4891a216affd9f14f5d04d0e7a83f1449e",
-  "simple_send:send": "e0b64aa870e2322f054e1536d87d4a8d3c891f6531522d0619cef511267a209b",
-  "amm_swap:swap": "c86e8f4ae444211cd308724a293438b00788a2fbb9f7954fc52e3af383420306",
-  "inline:math": "332d55a6f09f38d294b81c98ead0c554751c7fa98331f5743e8afbfa971542f9",
-  "inline:emit": "88ff0e20ecb1800c1419af03be8f55f049a22eaf2c2f0ff9990375e440b5b488",
-  "inline:revert": "7e03290bc632e5334691a85b810dc4e156d3885b885018f56532cd024eff84b9",
-  "inline:state-math-loop": "42ac10b9da23754a15ae23e6bf98d88728eab5e5d3a4bdf519cd257e79b4a137",
-  "inline:contract-stake-reads": "23437c274fe4043f97d88d9a43bca5b8923bbe8a9a9b5a30acf538bbbc633774",
-  "inline:contract-slash": "e3c83c7bc1612e8685d16fa955317b4c9ff258e571fef659ac121c49f8c4532f",
-  "inline:attestation-request": "72f7ed23a60d79e04ab4de81424712517c68bb2a731129b0a531480b4591bcb9",
-  "inline:attestation-getresponse": "9cfb30247cd64e2b8835aa85562d7a7db5b0602f8cc18de27f31f4812cc14783"
+  "state_counter:increment": "b6cc71a0d98a57ba14a2f7e9a9e76fd6c8a3c55bd57f0ee7c3efd83a382360c8",
+  "simple_send:send": "f69ed6476285db3091335399d93637b015b6dc3cc06979dadb3814491724214c",
+  "amm_swap:swap": "0275a35a70e29190d5a4fea9553998bd96c0c5e85d2e8aedf73b30475f5a4edd",
+  "inline:math": "59cbaf8c8ca0e6a2d279a0160ace35b72612ddd151b99b1f8fb8418ee09685a0",
+  "inline:emit": "164437a0160010aba8e5a4262cab1fe31771f4144ecf1f32c277617134390643",
+  "inline:revert": "f24a6a0cedfd0ef91f17ab952cf0d5c7adddf207a68264fab7e0b8a5dacae436",
+  "inline:state-math-loop": "63e45241455c4c697694d04a4f8b2f2fe84abb281d2834323dd3935c570c4398",
+  "inline:contract-stake-reads": "89ea9c6aacb889cd1a5e5ab3c52a63b53222a67f15d40929d3978d03285903fa",
+  "inline:contract-slash": "86a20c5de3b8db672574d7dba890f991027b6868be7142413ae4ff746911ae9a",
+  "inline:attestation-request": "f39763d8debae8a530000332f3066d4395a50944529188aff6110072b2004aac",
+  "inline:attestation-getresponse": "257433b13fce66d93d23863de6516c0ba8f6fd90ea5b97986d4f412da4a7ca4d"
 }

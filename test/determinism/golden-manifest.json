@@ -6,29 +6,29 @@
     {
       "id": "amm_swap/addLiquidity",
       "tier": "invariant",
-      "hash": "4a693be7f4cacf08fa37d798e146ab2518babd9c2b0027a4570b83c60f0d8af1",
-      "gasUsed": 611,
+      "hash": "55f32d3c1f0a4732e3b6486ab008988d04b582b3065a4a5736169e99d59a2060",
+      "gasUsed": 806,
       "error": null
     },
     {
       "id": "bad_math/native_vs_safe",
       "tier": "invariant",
-      "hash": "a9d436b37ed11fb5d4cb03e7eeb59bc7b7b1b1251c0803188b63ab732c5081d6",
-      "gasUsed": 7,
+      "hash": "099a8dd871397bb5d67c5a5333542f62cd7e1b9692a80f9f61b707d49ac334d0",
+      "gasUsed": 159,
       "error": null
     },
     {
       "id": "compile_bomb/deep_nesting",
       "tier": "invariant",
-      "hash": "d98deeb431818860b087fc194ef2b4d24ec233be55b2eeea58a80da7d63cf39c",
-      "gasUsed": 272,
+      "hash": "70d97dd490c617cb18928e41e97a65943423895f6c8efc83633f065a4ab1e2ec",
+      "gasUsed": 304,
       "error": null
     },
     {
       "id": "emit_flood/emission_limit",
       "tier": "resource",
-      "hash": "e3cad3c1bade764e353544df4dfc711d1fa7a4a33e5ae5dfb6de56f7fc0da824",
-      "gasUsed": 25654,
+      "hash": "85f552c512e0414b7b98fe84a5291b8960b40fff6d91f37081b3deb3c049dbd3",
+      "gasUsed": 28500,
       "error": "error: emission limit exceeded (50)"
     },
     {
@@ -49,58 +49,58 @@
     {
       "id": "multi_method/increment",
       "tier": "invariant",
-      "hash": "0bfba5219bb1f0435daedf97a954886391d0f63aa9e1bd1da41696d05c32534d",
-      "gasUsed": 305,
+      "hash": "4c2bdd1ef20e9482e058eb17c98684023df7c6b8c2ba5a7dbcd9d87ab5933407",
+      "gasUsed": 361,
       "error": null
     },
     {
       "id": "oracle_read/no_oracle",
       "tier": "invariant",
-      "hash": "2e214e8bf32d752622169fd5e8705580dc6a4c0b298fb01a4ce89e5e08791661",
-      "gasUsed": 110,
+      "hash": "29b885a34d35f82734a2aa53e27c5e813f51ca272c17dc5be83dc5219a888c9e",
+      "gasUsed": 243,
       "error": null
     },
     {
       "id": "oracle_read/with_price",
       "tier": "invariant",
-      "hash": "ef5ad6926ea7ae6f7c3ec77249759d56e60a0c3a396acac6afe07c076648e020",
-      "gasUsed": 109,
+      "hash": "eb11133e5b7e00594f43747d030294538c1e0e09de592cb3bd1378a051dbfa0d",
+      "gasUsed": 268,
       "error": null
     },
     {
       "id": "sandbox_escape/all_blocked",
       "tier": "invariant",
-      "hash": "c9625174b3581312e62623d96565a7c880e7bc6953504dcde59dc5f7b8743824",
-      "gasUsed": 55,
+      "hash": "70e7a0618c8e8bbe251dba051cd827a2dfa5200c0e465ce454417fbb7464ebdd",
+      "gasUsed": 486,
       "error": null
     },
     {
       "id": "simple_send/send",
       "tier": "invariant",
-      "hash": "5991acb500bfc7209e9faeecfa76de9f40d1edf8d64f33be1cb703662120a3b3",
-      "gasUsed": 609,
+      "hash": "502bb72f087699115f8d26033dd4c8b4392ab4a5278210d5f27097daf96013d6",
+      "gasUsed": 960,
       "error": null
     },
     {
       "id": "state_counter/decrement_at_zero_reverts",
       "tier": "invariant",
-      "hash": "3e6311d1c1d13950a11c5225a0921b8acd38a3a24c4fc6b950913c3e771e867d",
-      "gasUsed": 105,
+      "hash": "2152e2fdb2c2a7b84b469f2675bc7c9cfb8890f7d7631e4e852515c79f04bff5",
+      "gasUsed": 172,
       "error": "revert: counter is zero"
     },
     {
       "id": "state_counter/increment",
       "tier": "invariant",
-      "hash": "8f30508b8e0af7029336250e207c391ce0fde4ee75f4c6045e81fac5f67ad33b",
-      "gasUsed": 305,
+      "hash": "6a6769601a7049863b8d2262e89f16883c9cd1eecd45584553ffb32c2e628b92",
+      "gasUsed": 368,
       "error": null
     },
     {
       "id": "state_flood/key_limit",
       "tier": "resource",
-      "hash": "a6f93977c1e13d133076aa5204e0bbafd3c6c4d720db122f1f356a03c19297be",
+      "hash": "dc85efe48448c7e02d219b91c3a753b33d07f570c9dbcd0c7f06730de89b4fe7",
       "gasUsed": 1000000,
-      "error": "out_of_gas: used 1000182 of 1000000"
+      "error": "out_of_gas: used 1000141 of 1000000"
     }
   ]
 }

@@ -236,6 +236,86 @@ const HARNESS_SOURCE = `
             try { delete globalThis[names[i]]; } catch(e) {}
         }
     }
+
+    // ----- Compute/iteration-size gas metering (G1) -----
+    // F3 (above) bounded the ALLOCATION builtins; this bounds the COMPUTE/
+    // ITERATION builtins that scan / order / serialize a whole collection in
+    // native code for a single call site. Pre-fix, a.indexOf(x) / s.split(',') /
+    // JSON.stringify(a) over a large working set cost ~1 gas while doing O(n)
+    // native work (~66,000 element-touches per gas measured) — a cheap-gas /
+    // expensive-CPU throughput attack: a one-fee tx grinds every validator to
+    // the wall-clock backstop. We charge gas proportional to the collection
+    // length BEFORE delegating, so the deterministic gas ceiling — not the
+    // wall-clock net — is the binding constraint. Installed AFTER the reference
+    // cleanup above so harness init (which uses indexOf) is not itself charged.
+    //
+    // Methods that take a per-element JS CALLBACK (map/filter/reduce/forEach/
+    // some/every/find/findIndex/flatMap) are already metered by their callback
+    // body and are intentionally NOT wrapped. The `+` string-concat operator is
+    // not a method and cannot be wrapped here; an oversized `+` build is bounded
+    // by the isolate memory ceiling / V8 max-string-length (deterministic
+    // out_of_resource post-F1), and its only amplification path — feeding the
+    // result to an O(n) consumer — is closed by the wrappers below.
+    var __meterLen = function(obj, name) {
+        var orig = obj[name];
+        if (typeof orig !== 'function') return;
+        __lockMethod(obj, name, function() {
+            __allocGas(this == null ? 0 : this.length);
+            return orig.apply(this, arguments);
+        });
+    };
+    // Array — native scan / order / copy / serialize without a per-element callback.
+    // (fill is owned by F3; map/filter/etc. are callback-metered — both excluded.)
+    ['indexOf', 'lastIndexOf', 'includes', 'join', 'reverse', 'sort',
+     'flat', 'slice', 'copyWithin'].forEach(function(m) { __meterLen(Array.prototype, m); });
+    // String — native scan / copy (regex literals are banned at deploy time; the
+    // locale-sensitive case methods are neutered in sandbox.js). repeat/padStart/
+    // padEnd are owned by F3.
+    ['indexOf', 'lastIndexOf', 'includes', 'startsWith', 'endsWith', 'slice',
+     'substring', 'substr', 'split', 'replace', 'replaceAll', 'trim',
+     'trimStart', 'trimEnd', 'toLowerCase', 'toUpperCase'].forEach(function(m) { __meterLen(String.prototype, m); });
+
+    // Variadic concat — charge the receiver length plus each argument's length.
+    var __aconcat = Array.prototype.concat;
+    if (typeof __aconcat === 'function') __lockMethod(Array.prototype, 'concat', function() {
+        var n = (this == null ? 0 : this.length);
+        for (var i = 0; i < arguments.length; i++) {
+            var a = arguments[i];
+            n += (a && typeof a.length === 'number') ? a.length : 1;
+        }
+        __allocGas(n); return __aconcat.apply(this, arguments);
+    });
+    var __sconcat = String.prototype.concat;
+    if (typeof __sconcat === 'function') __lockMethod(String.prototype, 'concat', function() {
+        var n = (this == null ? 0 : this.length);
+        for (var i = 0; i < arguments.length; i++) {
+            var a = arguments[i];
+            n += (typeof a === 'string') ? a.length : 1;
+        }
+        __allocGas(n); return __sconcat.apply(this, arguments);
+    });
+
+    // JSON — parse cost scales with the input string; stringify with the output.
+    // parse is charged BEFORE (input length is known); stringify is charged AFTER
+    // (the only cheap size signal is the result), which still bounds a loop after
+    // one pass and bounds a single pass by the gas already paid to allocate the
+    // structure. Charging stringify also covers the host-call arg marshaling and
+    // return-value serialization — deterministic, and bounded by the 64 KB state
+    // and return-value caps.
+    if (typeof JSON !== 'undefined') {
+        var __jstr = JSON.stringify;
+        if (typeof __jstr === 'function') __lockMethod(JSON, 'stringify', function() {
+            var r = __jstr.apply(this, arguments);
+            if (typeof r === 'string') __allocGas(r.length);
+            return r;
+        });
+        var __jparse = JSON.parse;
+        if (typeof __jparse === 'function') __lockMethod(JSON, 'parse', function(text) {
+            if (typeof text === 'string') __allocGas(text.length);
+            return __jparse.apply(this, arguments);
+        });
+    }
+    // ----- end G1 -----
 })();
 `;
 
