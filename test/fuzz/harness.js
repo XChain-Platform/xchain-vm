@@ -124,10 +124,26 @@ async function execute(vm, code, extraOpts) {
     }
 }
 
+// Consensus-status projection of a VM error. The resource-exhaustion family
+// (out_of_gas / timeout / out_of_memory / out_of_stack / out_of_resource) is a
+// host-timing race over WHICH ceiling fires (gas ceiling vs wall-clock net vs
+// parent watchdog) — not a consensus input. The indexer collapses the whole
+// family to one status_id (xchain-indexer src/utility.js vmFailureStatus), which
+// is what actually gets hashed into contract_hash. The determinism guard hashes
+// the SAME collapsed projection so it asserts the real consensus invariant
+// instead of flaking on the race. revert / runtime-error / null text is left
+// untouched (those are deterministic and not host-timing races).
+function consensusError(error) {
+    if (/^(out_of_gas|timeout|out_of_memory|out_of_stack|out_of_resource)\b/.test(String(error || ''))) {
+        return 'out_of_resource';
+    }
+    return error;
+}
+
 function hashResult(result) {
     const normalized = {
         success:        result.success,
-        error:          result.error,
+        error:          consensusError(result.error),
         gasUsed:        result.gasUsed,
         returnValue:    result.returnValue,
         stateChanges:   (result.stateChanges || []).slice().sort((a, b) => (a.key || '').localeCompare(b.key || '')),
@@ -148,5 +164,6 @@ module.exports = {
     FC_OPTIONS,
     createVM,
     execute,
-    hashResult
+    hashResult,
+    consensusError
 };

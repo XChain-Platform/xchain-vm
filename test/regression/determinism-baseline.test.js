@@ -47,11 +47,23 @@ function createVM() {
     });
 }
 
+// Resource-exhaustion family (out_of_gas / timeout / out_of_memory /
+// out_of_stack / out_of_resource) is a host-timing race over which ceiling
+// fires, not a consensus input; the indexer collapses it to one status_id.
+// Project the hashed error the same way (kept byte-identical to
+// test/fuzz/harness.js consensusError). revert/runtime-error/null untouched.
+function consensusError(error) {
+    if (/^(out_of_gas|timeout|out_of_memory|out_of_stack|out_of_resource)\b/.test(String(error || ''))) {
+        return 'out_of_resource';
+    }
+    return error;
+}
+
 function hashResult(result) {
     // Normalize for comparison: sort state changes by key
     const normalized = {
         success: result.success,
-        error: result.error,
+        error: consensusError(result.error),
         gasUsed: result.gasUsed,
         returnValue: result.returnValue,
         stateChanges: [...result.stateChanges].sort((a, b) => a.key.localeCompare(b.key)),

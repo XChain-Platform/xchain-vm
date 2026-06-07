@@ -34,14 +34,14 @@
     {
       "id": "infinite_loop/out_of_gas",
       "tier": "resource",
-      "hash": "1b5ebdcfc823f8e1a02a0fb3abf9b2abb8864300069d823a287dca8448b6e1f0",
+      "hash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
       "gasUsed": 1000000,
       "error": "out_of_gas: used 1000001 of 1000000"
     },
     {
       "id": "memory_bomb/memory_limit",
       "tier": "resource",
-      "hash": "cbbec6377e41c0d2cdeb83a0eb9341abefa38ecd8789c3ac601a130cafde2645",
+      "hash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
       "gasUsed": 1000000,
       "error": "out_of_gas: used 1000401 of 1000000",
       "hazard": "memory-ceiling-nondeterminism"
@@ -98,7 +98,7 @@
     {
       "id": "state_flood/key_limit",
       "tier": "resource",
-      "hash": "dc85efe48448c7e02d219b91c3a753b33d07f570c9dbcd0c7f06730de89b4fe7",
+      "hash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
       "gasUsed": 1000000,
       "error": "out_of_gas: used 1000141 of 1000000"
     }
