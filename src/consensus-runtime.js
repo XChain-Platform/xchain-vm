@@ -65,6 +65,28 @@ const PINNED = Object.freeze({
 // gate's failure message can name the canonical release to install.
 const REFERENCE_NODE = 'v22.22.3';
 
+// The declared consensus epoch. ONE number that covers the whole consensus
+// surface frozen with the wire format (LAUNCH-PLAN track 8): this PINNED
+// runtime, the indexer's GAS_SCHEDULE + GAS_PRICE, and the status vocabulary
+// below. Bumping it is a CONSENSUS EVENT — it must accompany a new golden in
+// both repos and (post-launch) a protocol_changes.js block-height activation.
+// The indexer asserts the bundled VM's CONSENSUS_VERSION equals its expected
+// value (test/unit/consensus-params.test.js), so a VM consensus change cannot
+// ship without an explicit indexer bump.
+const CONSENSUS_VERSION = '1';
+
+// The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
+// indexer may intern into index_statuses and hash into contract_hash
+// (utility.vmFailureStatus). The whole resource-exhaustion family collapses to
+// 'out_of_resource' (the gas-vs-wallclock fork fix) — adding/splitting a token
+// is a consensus change. STATUS_ERROR_PREFIXES documents the raw error prefixes
+// the VM's _classifyError (+ process-executor) can emit, which the indexer maps
+// into the tokens above; the cross-service parity test locks the mapping.
+const CONSENSUS_STATUS_TOKENS = Object.freeze(['reverted', 'out_of_resource', 'failed']);
+const STATUS_ERROR_PREFIXES = Object.freeze([
+    'revert', 'out_of_gas', 'timeout', 'out_of_memory', 'out_of_stack', 'out_of_resource', 'error'
+]);
+
 /**
  * Compare a process.versions-shaped object against the pinned consensus
  * runtime. Pure (no throw, no I/O) so callers decide how to react.
@@ -106,4 +128,8 @@ function describeMismatch(result) {
     );
 }
 
-module.exports = { PINNED, REFERENCE_NODE, checkConsensusRuntime, describeMismatch };
+module.exports = {
+    PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
+    CONSENSUS_STATUS_TOKENS, STATUS_ERROR_PREFIXES,
+    checkConsensusRuntime, describeMismatch
+};

@@ -932,6 +932,13 @@ class XChainVM {
 
     /**
      * Classify an execution error and return the appropriate result.
+     *
+     * The error STRING prefixes emitted here (revert/out_of_gas/timeout/
+     * out_of_memory/out_of_stack/error; out_of_resource from process-executor)
+     * are the frozen STATUS_ERROR_PREFIXES in consensus-runtime.js — the indexer
+     * collapses them into CONSENSUS_STATUS_TOKENS (utility.vmFailureStatus).
+     * Changing a prefix is a consensus change; guarded by the consensus-params
+     * tests in both repos.
      */
     _classifyError(error, gasTracker, emissionCollector, opts, execContext) {
         if (error instanceof ContractRevertError) {
@@ -1061,6 +1068,9 @@ module.exports.MAX_CODE_SIZE = MAX_CODE_SIZE;
 // validator process bundling the VM) can gate the engine version it runs on.
 const consensusRuntime = require('./consensus-runtime.js');
 module.exports.CONSENSUS_RUNTIME = consensusRuntime.PINNED;
+module.exports.CONSENSUS_VERSION = consensusRuntime.CONSENSUS_VERSION;
+module.exports.CONSENSUS_STATUS_TOKENS = consensusRuntime.CONSENSUS_STATUS_TOKENS;
+module.exports.STATUS_ERROR_PREFIXES = consensusRuntime.STATUS_ERROR_PREFIXES;
 module.exports.checkConsensusRuntime = consensusRuntime.checkConsensusRuntime;
 module.exports.describeRuntimeMismatch = consensusRuntime.describeMismatch;
 // Expose HostFaultError so a host that cannot run contracts (permanently broken
