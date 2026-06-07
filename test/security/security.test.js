@@ -1171,12 +1171,17 @@ function executeCode(vm, code, opts) {
     }
 
     it('should verify no __* globals leak to contract scope', async function() {
+        // __gas and the allocator metering helpers (__concat/__tmpl/__arrspread/
+        // __objspread) are intentional, locked (non-writable/non-configurable)
+        // metering hooks the AST pass emits calls to; they are also reserved at
+        // deploy time. Everything else __* must be cleaned from the contract scope.
         const result = await executeCode(vm, `
             module.exports = function(xchain) {
+                var allow = { __gas: 1, __concat: 1, __tmpl: 1, __arrspread: 1, __objspread: 1 };
                 var leaks = [];
                 var names = Object.getOwnPropertyNames(globalThis);
                 for (var i = 0; i < names.length; i++) {
-                    if (names[i].indexOf('__') === 0 && names[i] !== '__gas') {
+                    if (names[i].indexOf('__') === 0 && !allow[names[i]]) {
                         leaks.push(names[i]);
                     }
                 }
@@ -1186,6 +1191,6 @@ function executeCode(vm, code, opts) {
         assert.strictEqual(result.success, true);
         const leaks = JSON.parse(result.returnValue);
         assert.deepStrictEqual(leaks, [],
-            'no __* globals should be visible except __gas, found: ' + leaks.join(', '));
+            'no __* globals should be visible except metering hooks, found: ' + leaks.join(', '));
     });
 });

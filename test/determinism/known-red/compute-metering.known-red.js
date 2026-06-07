@@ -124,34 +124,79 @@ describe('Object statics must be size-metered (was KNOWN-RED)', function () {
         });
     }
 
-    // RESIDUAL (syntax, not a method — like the `+` operator): array/string spread
-    // [...x] allocates an O(n) copy for ~1 gas and cannot be wrapped at the
-    // prototype level. Bounded by the isolate memory ceiling (deterministic
-    // out_of_resource); closing the loop-amplification needs AST-level metering of
-    // SpreadElement, tracked alongside the `+`-operator decision.
-    it.skip('RESIDUAL: spread [...x] is syntax-level (like `+`) — needs AST metering, bounded by memory ceiling', function () {});
+    // Syntax-level allocators (G4): the metering pass rewrites these into the
+    // harness helpers (__concat/__tmpl/__arrspread/__objspread), so a loop that
+    // copies a large working set via spread is now gas-bounded, not CPU-bounded.
+    const SYNTAX = [
+        { id: 'array spread [...a]',
+          mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++){t+=[...a].length;}return t;` },
+        { id: 'object spread {...o}',
+          mk: `var o={};for(var j=0;j<20000;j++)o['k'+j]=j;var t=0;for(var i=0;i<300;i++){var z={...o};t+=1;}return t;` }
+    ];
+    for (const b of SYNTAX) {
+        it(`${b.id}: O(n) copy must consume gas (out_of_gas under budget)`, async function () {
+            // default ceiling (no override) so the loop trips out_of_gas
+            const vm = createVM({ maxCpuTimeMs: CPU_MS });
+            if (typeof vm.beginBlock === 'function') vm.beginBlock();
+            const r = await execute(vm, wrap(b.mk), { method: 'default' });
+            if (typeof vm.endBlock === 'function') vm.endBlock();
+            assert(
+                r.success === false && /out_of_gas/.test(r.error || ''),
+                `${b.id} resolved as success=${r.success} error=${JSON.stringify(r.error)} ` +
+                `gasUsed=${r.gasUsed}; expected out_of_gas.`
+            );
+        });
+    }
 });
 
-describe('cheap-gas / expensive-CPU witness (was KNOWN-RED)', function () {
+describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {
     this.timeout(60000);
 
-    it('string-`+` build fed to split must be gas-bounded, not CPU-bounded', async function () {
-        // ~21 `+` doublings build a ~2M-char string for ~tens of gas (the `+`
-        // operator is not metered — bounded by the memory / max-string ceiling).
-        // Pre-fix, split-ing it 200x burned >5 s of CPU for ~644 gas. Post-fix,
-        // the first split charges ~2M gas and the work trips out_of_gas.
-        const vm = createVM({ maxCpuTimeMs: CPU_MS });
+    async function runDefault(code) {
+        const vm = createVM({ maxCpuTimeMs: CPU_MS }); // default 1,000,000 gas ceiling
         if (typeof vm.beginBlock === 'function') vm.beginBlock();
         const t0 = process.hrtime.bigint();
-        const r = await execute(vm,
-            wrap(`var s='7';for(var i=0;i<21;i++)s=s+','+s;var t=0;for(var i=0;i<200;i++)t+=s.split(',').length;return t;`),
-            { method: 'default' });
+        const r = await execute(vm, wrap(code), { method: 'default' });
         const wallMs = Number(process.hrtime.bigint() - t0) / 1e6;
         if (typeof vm.endBlock === 'function') vm.endBlock();
+        return { r, wallMs };
+    }
+
+    // The metering pass rewrites + / += into __concat and template literals into
+    // __tmpl, charging by bytes grown beyond the largest operand — so doubling a
+    // string trips out_of_gas instead of building megabytes for ~tens of gas.
+    const BOMBS = [
+        { id: '+ doubling (s = s + s)',          code: `var s='7';for(var i=0;i<25;i++)s=s+s;return s.length;` },
+        { id: '+= doubling (s += s)',            code: `var s='7';for(var i=0;i<25;i++)s+=s;return s.length;` },
+        { id: 'template doubling (`${s}${s}`)',  code: 'var s=\'7\';for(var i=0;i<25;i++)s=`${s}${s}`;return s.length;' }
+    ];
+    for (const b of BOMBS) {
+        it(`${b.id}: gas-bounded, not memory-bounded`, async function () {
+            const { r } = await runDefault(b.code);
+            assert(
+                r.success === false && /out_of_gas/.test(r.error || ''),
+                `${b.id} resolved as success=${r.success} error=${JSON.stringify(r.error)} ` +
+                `gasUsed=${r.gasUsed}; expected out_of_gas.`
+            );
+        });
+    }
+
+    it('cheap-gas / expensive-CPU witness: + build fed to split is gas-bounded', async function () {
+        // Pre-fix this burned >5 s of CPU for ~644 gas (cheap + build, un-metered
+        // split). Now both the + build (__concat) and the split (G1) are metered.
+        const { r, wallMs } = await runDefault(
+            `var s='7';for(var i=0;i<21;i++)s=s+','+s;var t=0;for(var i=0;i<200;i++)t+=s.split(',').length;return t;`);
         assert(
             r.success === false && /out_of_gas/.test(r.error || ''),
             `witness resolved as success=${r.success} error=${JSON.stringify(r.error)} ` +
             `gasUsed=${r.gasUsed} after ${wallMs.toFixed(0)} ms CPU. Expected out_of_gas.`
         );
+    });
+
+    it('normal numeric + and small strings are unaffected (cheap success)', async function () {
+        const { r } = await runDefault(`var n=0;for(var i=0;i<100;i++)n=n+i;return 'sum_'+n;`);
+        assert.strictEqual(r.success, true, `expected success, got ${r.error}`);
+        assert.strictEqual(r.returnValue, '"sum_4950"');
+        assert(r.gasUsed < 10000, `numeric +/small strings must stay cheap, got ${r.gasUsed}`);
     });
 });

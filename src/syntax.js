@@ -24,14 +24,14 @@
 const ivm   = require('isolated-vm');
 const acorn = require('acorn');
 const walk  = require('acorn-walk');
-const { meterCode, hasGasIdentifier } = require('./metering.js');
+const { meterCode, findReservedIdentifier } = require('./metering.js');
 
 /**
  * Validate contract code syntax before deployment.
  * Runs four blocking checks in order:
  * 1. V8 syntax check (compileScriptSync in throwaway isolate)
  * 2. Acorn metering pass (ensures acorn can parse it — supported syntax = min(V8, acorn))
- * 3. Reserved identifier check (__gas)
+ * 3. Reserved identifier check (__gas + allocator metering helpers)
  * 4. Banned transcendental Math.* check (Math.sqrt/pow/log/log2/log10)
  *
  * @param {string} code - Contract source code
@@ -56,9 +56,12 @@ function validateSyntax(code) {
         return { valid: false, error: 'unsupported syntax (ES2020 maximum): ' + e.message };
     }
 
-    // 3. Reserved identifier check
-    if (hasGasIdentifier(code))
-        return { valid: false, error: 'reserved identifier: __gas' };
+    // 3. Reserved identifier check (__gas + the allocator metering helpers
+    //    __concat/__tmpl/__arrspread/__objspread — referencing them could
+    //    bypass or forge size metering)
+    const reserved = findReservedIdentifier(code);
+    if (reserved)
+        return { valid: false, error: 'reserved identifier: ' + reserved };
 
     // 4. Banned transcendental Math.* check
     const banned = findBannedMathCalls(code);

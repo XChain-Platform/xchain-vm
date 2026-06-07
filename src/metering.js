@@ -97,6 +97,121 @@ function binaryDepth(node) {
     return depth;
 }
 
+// Harness-injected helpers (src/index.js) that meter syntax-level allocators.
+// The pass below rewrites operators/syntax into calls to these; they must never
+// be wrapped as ordinary call sites, and contract source may not reference them.
+const ALLOC_HELPERS = ['__concat', '__tmpl', '__arrspread', '__objspread'];
+const RESERVED_IDENTIFIERS = ['__gas'].concat(ALLOC_HELPERS);
+const HELPER_SET = new Set(ALLOC_HELPERS);
+
+// Small AST builders for the allocator rewrite.
+function _ident(name) { return { type: 'Identifier', name: name }; }
+function _lit(value)  { return { type: 'Literal', value: value }; }
+function _arr(elements) { return { type: 'ArrayExpression', elements: elements }; }
+function _call(name, args) {
+    return { type: 'CallExpression', callee: _ident(name), arguments: args, optional: false };
+}
+function _clone(node) { return JSON.parse(JSON.stringify(node)); }
+
+// A `+=` target is safe to rewrite as `lhs = __concat(lhs, rhs)` only when reading
+// the lhs twice has no observable side effect: a bare identifier, or a
+// non-computed member on an identifier/this (e.g. obj.s, this.s).
+function _isSimpleAssignTarget(node) {
+    if (node.type === 'Identifier') return true;
+    if (node.type === 'MemberExpression' && !node.computed &&
+        (node.object.type === 'Identifier' || node.object.type === 'ThisExpression')) return true;
+    return false;
+}
+
+/**
+ * Rewrite the syntax-level allocators (string +/+=, template literals, array and
+ * object spread) into calls to the harness metering helpers. Post-order so nested
+ * forms (a + b + c) are converted leaf-up. Mutates the AST in place.
+ *
+ * Out of scope (left unmetered — rare, and otherwise bounded): tagged templates,
+ * `+=` with a computed/complex LHS, arrays with holes mixed with spread, and
+ * object spread alongside accessor/method properties. Call spread f(...x) is
+ * bounded by V8's argument-count limit (RangeError).
+ */
+function transformAllocators(ast) {
+    // Tagged-template quasis must stay raw (the tag receives the template object),
+    // so collect them up front and skip converting those TemplateLiterals.
+    const taggedQuasis = new WeakSet();
+    walk.simple(ast, { TaggedTemplateExpression: function (n) { taggedQuasis.add(n.quasi); } });
+
+    function convert(node) {
+        // string concatenation: a + b
+        if (node.type === 'BinaryExpression' && node.operator === '+') {
+            return _call('__concat', [node.left, node.right]);
+        }
+        // compound assign: lhs += rhs  ->  lhs = __concat(lhs, rhs)
+        if (node.type === 'AssignmentExpression' && node.operator === '+=' &&
+            _isSimpleAssignTarget(node.left)) {
+            return {
+                type: 'AssignmentExpression', operator: '=', left: node.left,
+                right: _call('__concat', [_clone(node.left), node.right])
+            };
+        }
+        // template literal: `q0${e0}q1...`  ->  __tmpl([q0, e0, q1, ...])
+        if (node.type === 'TemplateLiteral' && !taggedQuasis.has(node)) {
+            const parts = [];
+            for (let i = 0; i < node.quasis.length; i++) {
+                parts.push(_lit(node.quasis[i].value.cooked));
+                if (i < node.expressions.length) parts.push(node.expressions[i]);
+            }
+            return _call('__tmpl', [_arr(parts)]);
+        }
+        // array spread: [a, ...x]  ->  __arrspread([['e',a], ['s',x]])
+        if (node.type === 'ArrayExpression' &&
+            node.elements.some(function (e) { return e && e.type === 'SpreadElement'; })) {
+            if (node.elements.some(function (e) { return e === null; })) return node; // holes: skip
+            const segs = node.elements.map(function (e) {
+                return e.type === 'SpreadElement'
+                    ? _arr([_lit('s'), e.argument])
+                    : _arr([_lit('e'), e]);
+            });
+            return _call('__arrspread', [_arr(segs)]);
+        }
+        // object spread: {...x, k: v}  ->  __objspread([['s',x], ['p',['k',v]]])
+        if (node.type === 'ObjectExpression' &&
+            node.properties.some(function (p) { return p.type === 'SpreadElement'; })) {
+            const simple = node.properties.every(function (p) {
+                return p.type === 'SpreadElement' ||
+                    (p.type === 'Property' && p.kind === 'init' && !p.method);
+            });
+            if (!simple) return node; // accessors/methods + spread: skip
+            const segs = node.properties.map(function (p) {
+                if (p.type === 'SpreadElement') return _arr([_lit('s'), p.argument]);
+                const keyExpr = p.computed ? p.key
+                    : (p.key.type === 'Identifier' ? _lit(p.key.name) : _lit(p.key.value));
+                return _arr([_lit('p'), _arr([keyExpr, p.value])]);
+            });
+            return _call('__objspread', [_arr(segs)]);
+        }
+        return node;
+    }
+
+    function recur(node) {
+        if (!node || typeof node.type !== 'string') return node;
+        const keys = Object.keys(node);
+        for (let k = 0; k < keys.length; k++) {
+            const key = keys[k];
+            if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue;
+            const child = node[key];
+            if (Array.isArray(child)) {
+                for (let i = 0; i < child.length; i++) {
+                    if (child[i] && typeof child[i].type === 'string') child[i] = recur(child[i]);
+                }
+            } else if (child && typeof child.type === 'string') {
+                node[key] = recur(child);
+            }
+        }
+        return convert(node);
+    }
+
+    recur(ast);
+}
+
 /**
  * Transform contract source code by injecting gas metering calls.
  * @param {string} source - Original contract source code
@@ -108,6 +223,11 @@ function meterCode(source) {
         sourceType: 'script',
         locations: true
     });
+
+    // Phase 0: rewrite syntax-level allocators (string +/+=, template literals,
+    // array/object spread) into metered helper calls, on the pristine AST before
+    // any __gas() insertion. The helper calls are exempted from Phase 3 below.
+    transformAllocators(ast);
 
     // Track nodes we've already processed to avoid double-injection
     const processed = new WeakSet();
@@ -235,8 +355,10 @@ function meterCode(source) {
     walk.ancestor(ast, {
         CallExpression(node, ancestors) {
             if (processed.has(node)) return;
-            // Don't inject into our own __gas calls
-            if (node.callee.type === 'Identifier' && node.callee.name === '__gas') return;
+            // Don't inject into our own __gas call or the allocator metering helpers
+            // (__concat/__tmpl/__arrspread/__objspread), which already charge by size.
+            if (node.callee.type === 'Identifier' &&
+                (node.callee.name === '__gas' || HELPER_SET.has(node.callee.name))) return;
             // Don't inject into member calls on __gas (shouldn't exist, but defensive)
             if (node.callee.type === 'MemberExpression' &&
                 node.callee.object.type === 'Identifier' &&
@@ -271,26 +393,33 @@ function meterCode(source) {
 }
 
 /**
- * Check if source code contains the reserved __gas identifier.
+ * Find the first reserved identifier used in the source, if any. Reserved names
+ * are the harness-injected metering hooks (__gas + the allocator helpers); a
+ * contract may not define or reference them or it could bypass/forge metering.
  * @param {string} source - Contract source code
- * @returns {boolean} true if __gas identifier is found
+ * @returns {string|null} the offending reserved name, or null if none
  */
-function hasGasIdentifier(source) {
+function findReservedIdentifier(source) {
     try {
         const ast = acorn.parse(source, {
             ecmaVersion: 2020,
             sourceType: 'script'
         });
-        let found = false;
+        let found = null;
         // walk.full visits every node in the AST including nested Identifiers
         walk.full(ast, (node) => {
-            if (node.type === 'Identifier' && node.name === '__gas') found = true;
+            if (!found && node.type === 'Identifier' && RESERVED_IDENTIFIERS.indexOf(node.name) !== -1) {
+                found = node.name;
+            }
         });
         return found;
     } catch (e) {
         // If parsing fails, let validateSyntax handle it
-        return false;
+        return null;
     }
 }
 
-module.exports = { meterCode, hasGasIdentifier };
+// Back-compat boolean form (the __gas-only check callers may still use).
+function hasGasIdentifier(source) { return findReservedIdentifier(source) !== null; }
+
+module.exports = { meterCode, hasGasIdentifier, findReservedIdentifier, RESERVED_IDENTIFIERS };

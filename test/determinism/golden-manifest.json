@@ -20,8 +20,8 @@
     {
       "id": "compile_bomb/deep_nesting",
       "tier": "invariant",
-      "hash": "70d97dd490c617cb18928e41e97a65943423895f6c8efc83633f065a4ab1e2ec",
-      "gasUsed": 304,
+      "hash": "293b00c4ccdd4c185a5a7e9507ceaf3acf1d426be0b347f12a285a9ae192a1ab",
+      "gasUsed": 37,
       "error": null
     },
     {

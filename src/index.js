@@ -251,8 +251,8 @@ const HARNESS_SOURCE = `
     //
     // Methods that take a per-element JS CALLBACK (map/filter/reduce/forEach/
     // some/every/find/findIndex/flatMap) are already metered by their callback
-    // body and are intentionally NOT wrapped. The `+` string-concat operator is
-    // not a method and cannot be wrapped here; an oversized `+` build is bounded
+    // body and are intentionally NOT wrapped. The + string-concat operator is
+    // not a method and cannot be wrapped here; an oversized + build is bounded
     // by the isolate memory ceiling / V8 max-string-length (deterministic
     // out_of_resource post-F1), and its only amplification path — feeding the
     // result to an O(n) consumer — is closed by the wrappers below.
@@ -344,6 +344,94 @@ const HARNESS_SOURCE = `
     ['assign', 'getOwnPropertyDescriptors', 'fromEntries']
         .forEach(function(n) { __meterObjStatic(n, __lenObj); });
     // ----- end G1 -----
+
+    // ----- Syntax-level allocation metering (G4): + / += / template / spread -----
+    // These operators/syntax allocate strings/arrays/objects of size proportional
+    // to their inputs but are invisible to the AST gas meter and cannot be wrapped
+    // at the prototype level. The metering pass (metering.js) rewrites them into
+    // calls to the helpers below. Each charges gas for the bytes/elements grown
+    // BEYOND the largest operand (so doubling — s = s + s — costs O(n) gas total,
+    // while incremental append, already loop-metered, is not over-charged), above
+    // a threshold so numeric + and small literals cost nothing. Installed as locked
+    // globals (like __gas) AFTER the reference cleanup so transformed contract code
+    // can call them but cannot overwrite them and harness init is not charged.
+    var __GROW_THRESHOLD = 256;
+    var __lockGlobal = function(name, fn) {
+        try { __defProp(globalThis, name, { value: fn, writable: false, configurable: false, enumerable: false }); } catch(e) {}
+    };
+    var __slen = function(v) { return (typeof v === 'string') ? v.length : 0; };
+
+    // String + and += (concat / compound assign)  ->  __concat(a, b)
+    __lockGlobal('__concat', function(a, b) {
+        var r = a + b;
+        if (typeof r === 'string') {
+            var la = __slen(a), lb = __slen(b);
+            var grew = r.length - (la > lb ? la : lb);
+            if (grew > __GROW_THRESHOLD) __gas(grew);
+        }
+        return r;
+    });
+
+    // Template literal  ->  __tmpl([quasi0, expr0, quasi1, ...])
+    // Joins with native + (this helper's source is NOT transformed, so no
+    // recursion) and coerces each part with '' + p (ToString; throws on Symbol,
+    // matching real template semantics).
+    __lockGlobal('__tmpl', function(parts) {
+        var r = '', maxLen = 0;
+        for (var i = 0; i < parts.length; i++) {
+            var s = '' + parts[i];
+            r = r + s;
+            if (s.length > maxLen) maxLen = s.length;
+        }
+        var grew = r.length - maxLen;
+        if (grew > __GROW_THRESHOLD) __gas(grew);
+        return r;
+    });
+
+    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], ['s',x], ['e',b]])
+    // Unlike string + (V8 cons-strings make raw concat cheap), array spread is a
+    // genuine O(n) element COPY, so charge by the TOTAL elements spread (every one
+    // is allocated/copied), not "grown beyond largest". Native [...val] does the
+    // copy (helper source not transformed); charged after (a single spread is
+    // bounded by the gas paid to build its source, a loop trips out_of_gas).
+    __lockGlobal('__arrspread', function(segments) {
+        var r = [], spread = 0;
+        for (var i = 0; i < segments.length; i++) {
+            var kind = segments[i][0], val = segments[i][1];
+            if (kind === 's') {
+                var a = [...val];
+                spread += a.length;
+                for (var j = 0; j < a.length; j++) r.push(a[j]);
+            } else {
+                r.push(val);
+            }
+        }
+        if (spread > __GROW_THRESHOLD) __gas(spread);
+        return r;
+    });
+
+    // Object spread  {...x, k: v}  ->  __objspread([['s',x], ['p',['k',v]]])
+    // Parallels the G1 Object.assign wrapper (which does not catch {...x} syntax).
+    // Charge by total own-keys copied from spread sources (O(n) copy). Uses the
+    // captured native __okeys to avoid re-entering the wrapped Object.keys.
+    __lockGlobal('__objspread', function(targets) {
+        var r = {}, spread = 0;
+        for (var i = 0; i < targets.length; i++) {
+            var kind = targets[i][0], val = targets[i][1];
+            if (kind === 's') {
+                if (val != null) {
+                    var ks = __okeys(val);
+                    spread += ks.length;
+                    for (var j = 0; j < ks.length; j++) r[ks[j]] = val[ks[j]];
+                }
+            } else {
+                r[val[0]] = val[1];
+            }
+        }
+        if (spread > __GROW_THRESHOLD) __gas(spread);
+        return r;
+    });
+    // ----- end G4 -----
 })();
 `;
 

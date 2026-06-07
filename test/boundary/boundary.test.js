@@ -783,9 +783,11 @@ describe('Boundary: Math Operations', function() {
 describe('Boundary: Metering', function() {
 
     it('ME-1: binary expression depth exactly 10 does not inject extra gas', function() {
-        // 10 operands = depth 9, which is <= 10 threshold
-        const operands = Array.from({ length: 10 }, (_, i) => String(i));
-        const expr = operands.join(' + ');
+        // 10 operands = depth 9, which is <= 10 threshold. Uses * (not +): the
+        // metering pass rewrites + into __concat, so deep-binary Phase 2 metering
+        // is exercised with a non-+ operator (deep + is metered by __concat).
+        const operands = Array.from({ length: 10 }, (_, i) => String(i + 1));
+        const expr = operands.join(' * ');
         const code = 'var result = ' + expr + ';';
         const metered = meterCode(code);
         // Count __gas occurrences — should only have function-level injection, not binary depth injection
@@ -796,14 +798,14 @@ describe('Boundary: Metering', function() {
     });
 
     it('ME-2: binary expression depth 11+ injects extra gas', function() {
-        // 12 operands = depth 11, which is > 10 threshold
-        const operands = Array.from({ length: 12 }, (_, i) => String(i));
-        const expr = operands.join(' + ');
+        // 12 operands = depth 11, which is > 10 threshold. Uses * (see ME-1).
+        const operands = Array.from({ length: 12 }, (_, i) => String(i + 1));
+        const expr = operands.join(' * ');
         const code = 'var result = ' + expr + ';';
         const metered = meterCode(code);
 
         // Compare with a shallow expression
-        const shallowExpr = Array.from({ length: 5 }, (_, i) => String(i)).join(' + ');
+        const shallowExpr = Array.from({ length: 5 }, (_, i) => String(i + 1)).join(' * ');
         const shallowCode = 'var result = ' + shallowExpr + ';';
         const shallowMetered = meterCode(shallowCode);
 

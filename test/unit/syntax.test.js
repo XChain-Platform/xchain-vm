@@ -41,6 +41,14 @@ try {
             assert(result.error.includes('__gas'), result.error);
         });
 
+        it('should reject the allocator metering helpers as reserved', function() {
+            for (const id of ['__concat', '__tmpl', '__arrspread', '__objspread']) {
+                const result = validateSyntax('var x = ' + id + ';');
+                assert.strictEqual(result.valid, false, id + ' should be reserved');
+                assert(result.error.includes(id), result.error);
+            }
+        });
+
         it('should accept ES2020 features', function() {
             const result = validateSyntax('var x = a?.b ?? "default";');
             assert.strictEqual(result.valid, true);
