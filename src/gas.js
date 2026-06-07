@@ -50,6 +50,11 @@ class GasTracker {
         // Validate schedule: all values must be non-negative integers
         for (const key in gasSchedule) {
             const val = gasSchedule[key];
+            // `typeof val !== 'number'` is redundant defense: Number.isInteger
+            // never coerces, so !Number.isInteger(val) already rejects every
+            // non-number. Kept for clarity/intent. Equivalent mutant — proven
+            // exhaustively, see test/unit/gas.test.js boundary tests.
+            // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
             if (typeof val !== 'number' || !Number.isInteger(val) || val < 0)
                 throw new Error('gas schedule value for ' + key + ' must be a non-negative integer, got: ' + val);
         }
@@ -69,6 +74,10 @@ class GasTracker {
         // `used += undefined` becomes NaN and silently disables the ceiling for
         // the rest of execution. Reject any non-finite amount so a config gap
         // surfaces immediately instead of charging zero gas.
+        // `typeof amount !== 'number'` is redundant defense: Number.isFinite
+        // never coerces, so !Number.isFinite(amount) already rejects every
+        // non-number (and NaN/Infinity). Kept for intent. Equivalent mutant.
+        // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
         if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)
             throw new Error('gas charge amount must be a non-negative finite number, got: ' + amount);
         this.used += amount;

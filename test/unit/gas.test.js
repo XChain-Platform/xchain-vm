@@ -114,8 +114,41 @@ describe('GasTracker', function() {
         assert.throws(() => tracker.charge(-1), /non-negative/);
     });
 
+    // The charge() guard is `typeof amount !== 'number' || !Number.isFinite(amount)
+    // || amount < 0`. A NaN slips past the type and sign checks (typeof NaN ===
+    // 'number', NaN < 0 is false) — only the !Number.isFinite arm rejects it.
+    // Without this, a missing GAS_SCHEDULE key (→ undefined → NaN) would silently
+    // disable the ceiling for the rest of execution: a non-deterministic gasUsed
+    // → fork. Pins the !Number.isFinite arm (kills the `||`→`&&` mutant on line 72).
+    it('should reject a NaN gas charge', function() {
+        const tracker = new GasTracker(SCHEDULE, 1000);
+        assert.throws(() => tracker.charge(NaN), /non-negative finite number/);
+    });
+
+    it('should reject an Infinity gas charge', function() {
+        const tracker = new GasTracker(SCHEDULE, 1000);
+        assert.throws(() => tracker.charge(Infinity), /non-negative finite number/);
+        assert.throws(() => tracker.charge(-Infinity), /non-negative finite number/);
+    });
+
+    it('should reject a non-number gas charge', function() {
+        const tracker = new GasTracker(SCHEDULE, 1000);
+        assert.throws(() => tracker.charge('100'), /non-negative finite number/);
+    });
+
     it('should reject negative schedule value in constructor', function() {
         assert.throws(() => new GasTracker({ ...SCHEDULE, VM_COMPUTATION: -1 }, 1000), /non-negative integer/);
+    });
+
+    // Lower-boundary: a schedule value of exactly 0 is VALID (the guard is
+    // `val < 0`, not `val <= 0`). A token that legitimately costs no gas (e.g. a
+    // governance-zeroed line item) must construct cleanly. Pins the `< 0`
+    // boundary (kills the `<`→`<=` EqualityOperator mutant on line 53).
+    it('should accept a schedule value of exactly 0 (lower boundary)', function() {
+        const tracker = new GasTracker({ ...SCHEDULE, VM_COMPUTATION: 0 }, 1000);
+        assert.strictEqual(tracker.getUsed(), 0);
+        tracker.chargeComputation(); // charges the zeroed VM_COMPUTATION
+        assert.strictEqual(tracker.getUsed(), 0);
     });
 
     it('should reject float schedule value in constructor', function() {

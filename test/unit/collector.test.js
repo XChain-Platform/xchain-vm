@@ -38,6 +38,32 @@ describe('EmissionCollector', function() {
         assert.strictEqual(ec.getActions()[0].params.quantity, '10');
     });
 
+    // RISK-10 prototype-pollution guard: `if (key === '__proto__' || key ===
+    // 'constructor') continue;`. The realistic vector is JSON-sourced params —
+    // a contract emits JSON, and JSON.parse creates REAL own-enumerable
+    // __proto__ / constructor keys (an object literal would not). Both keys must
+    // be dropped from the copied params; the benign key survives. Pins both arms
+    // of the OR and the conditional itself (kills the line-34 survivors:
+    // `||`→`&&`, right-operand→false, whole-condition→false).
+    it('should strip __proto__ and constructor keys from emitted params', function() {
+        const ec = new EmissionCollector(50);
+        const params = JSON.parse('{"__proto__":"polluted","constructor":"polluted","destination":"addr"}');
+        // Sanity: JSON.parse really produced own-enumerable dangerous keys.
+        assert.ok(Object.keys(params).includes('__proto__'));
+        assert.ok(Object.keys(params).includes('constructor'));
+
+        ec.add('SEND', params);
+        const out = ec.getActions()[0].params;
+
+        assert.ok(!Object.prototype.hasOwnProperty.call(out, '__proto__'),
+            '__proto__ must be stripped from emitted params');
+        assert.ok(!Object.prototype.hasOwnProperty.call(out, 'constructor'),
+            'constructor must be stripped from emitted params');
+        assert.strictEqual(out.destination, 'addr', 'benign keys must survive');
+        // No pollution leaked onto the global Object prototype.
+        assert.strictEqual(({}).polluted, undefined);
+    });
+
     it('should collect logs', function() {
         const ec = new EmissionCollector(50);
         ec.addLog('hello world');
