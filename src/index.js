@@ -360,8 +360,9 @@ const HARNESS_SOURCE = `
         try { __defProp(globalThis, name, { value: fn, writable: false, configurable: false, enumerable: false }); } catch(e) {}
     };
     var __slen = function(v) { return (typeof v === 'string') ? v.length : 0; };
+    var __freeze = Object.freeze;   // unwrapped (only keys/values/assign/... are G1-metered)
 
-    // String + and += (concat / compound assign)  ->  __concat(a, b)
+    // String + and += on a bare identifier  ->  __concat(a, b)
     __lockGlobal('__concat', function(a, b) {
         var r = a + b;
         if (typeof r === 'string') {
@@ -370,6 +371,52 @@ const HARNESS_SOURCE = `
             if (grew > __GROW_THRESHOLD) __gas(grew);
         }
         return r;
+    });
+
+    // Compound-assign on a member lhs  obj[k] += b / a.b.c += b  ->  __setconcat(obj, k, b)
+    // The metering pass evaluates obj and k once at the call site; this helper does
+    // the read/charge/write so a computed/complex lhs (which can't be safely re-read
+    // in place) is byte-metered like __concat. Get-once -> charge -> set-once matches
+    // native += ordering.
+    __lockGlobal('__setconcat', function(obj, key, b) {
+        var a = obj[key];
+        var r = a + b;
+        if (typeof r === 'string') {
+            var la = __slen(a), lb = __slen(b);
+            var grew = r.length - (la > lb ? la : lb);
+            if (grew > __GROW_THRESHOLD) __gas(grew);
+        }
+        obj[key] = r;
+        return r;
+    });
+
+    // Tagged template  tag-backtick...  ->  __tmpltag(fn, cooked, raw, [e0,...])      (this=undefined)
+    //                  obj.m-backtick...->  __tmpltagm(obj, key, cooked, raw, [...])  (this=obj)
+    // Rebuilds the frozen strings template object (cooked array + frozen .raw, as
+    // the language produces), charges by string-growth of the parts (string-typed
+    // only — never coerces, so we don't fire a toString the tag itself wouldn't),
+    // then invokes the tag with the correct receiver. The fn lookup (obj[key]) is
+    // resolved here, after the substitutions were evaluated when this call's
+    // argument list was built — a benign reorder vs the spec (fn-ref before
+    // substitutions) that is identical on every node. The strings object is rebuilt
+    // per evaluation rather than cached per call-site; also deterministic.
+    var __tagInvoke = function(thisArg, fn, cooked, raw, exprs) {
+        __defProp(cooked, 'raw', { value: __freeze(raw), enumerable: false, writable: false, configurable: false });
+        __freeze(cooked);
+        var total = 0, maxLen = 0, i, L;
+        for (i = 0; i < cooked.length; i++) { L = __slen(cooked[i]); total += L; if (L > maxLen) maxLen = L; }
+        for (i = 0; i < exprs.length; i++) { L = __slen(exprs[i]); total += L; if (L > maxLen) maxLen = L; }
+        var grew = total - maxLen;
+        if (grew > __GROW_THRESHOLD) __gas(grew);
+        var args = [cooked];
+        for (i = 0; i < exprs.length; i++) args.push(exprs[i]);
+        return fn.apply(thisArg, args);
+    };
+    __lockGlobal('__tmpltag', function(fn, cooked, raw, exprs) {
+        return __tagInvoke(undefined, fn, cooked, raw, exprs);
+    });
+    __lockGlobal('__tmpltagm', function(obj, key, cooked, raw, exprs) {
+        return __tagInvoke(obj, obj[key], cooked, raw, exprs);
     });
 
     // Template literal  ->  __tmpl([quasi0, expr0, quasi1, ...])

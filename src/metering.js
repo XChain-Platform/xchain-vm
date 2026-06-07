@@ -100,7 +100,7 @@ function binaryDepth(node) {
 // Harness-injected helpers (src/index.js) that meter syntax-level allocators.
 // The pass below rewrites operators/syntax into calls to these; they must never
 // be wrapped as ordinary call sites, and contract source may not reference them.
-const ALLOC_HELPERS = ['__concat', '__tmpl', '__arrspread', '__objspread'];
+const ALLOC_HELPERS = ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread'];
 const RESERVED_IDENTIFIERS = ['__gas'].concat(ALLOC_HELPERS);
 const HELPER_SET = new Set(ALLOC_HELPERS);
 
@@ -112,30 +112,30 @@ function _call(name, args) {
     return { type: 'CallExpression', callee: _ident(name), arguments: args, optional: false };
 }
 function _clone(node) { return JSON.parse(JSON.stringify(node)); }
-
-// A `+=` target is safe to rewrite as `lhs = __concat(lhs, rhs)` only when reading
-// the lhs twice has no observable side effect: a bare identifier, or a
-// non-computed member on an identifier/this (e.g. obj.s, this.s).
-function _isSimpleAssignTarget(node) {
-    if (node.type === 'Identifier') return true;
-    if (node.type === 'MemberExpression' && !node.computed &&
-        (node.object.type === 'Identifier' || node.object.type === 'ThisExpression')) return true;
-    return false;
+function _void0() { return { type: 'UnaryExpression', operator: 'void', prefix: true, argument: _lit(0) }; }
+// The property key of a member expression, as an expression evaluated once:
+// the raw key for computed `o[k]`, or a string literal for `o.k` / `o['k']`.
+function _memberKey(member) {
+    return member.computed ? member.property
+        : (member.property.type === 'Identifier' ? _lit(member.property.name) : _lit(member.property.value));
 }
 
 /**
- * Rewrite the syntax-level allocators (string +/+=, template literals, array and
- * object spread) into calls to the harness metering helpers. Post-order so nested
- * forms (a + b + c) are converted leaf-up. Mutates the AST in place.
+ * Rewrite the syntax-level allocators (string +/+=, template literals — tagged and
+ * untagged, array and object spread) into calls to the harness metering helpers.
+ * Post-order so nested forms (a + b + c) are converted leaf-up. Mutates the AST in
+ * place.
  *
- * Out of scope (left unmetered — rare, and otherwise bounded): tagged templates,
- * `+=` with a computed/complex LHS, arrays with holes mixed with spread, and
- * object spread alongside accessor/method properties. Call spread f(...x) is
- * bounded by V8's argument-count limit (RangeError).
+ * Out of scope (left unmetered — rare, and otherwise bounded): arrays with holes
+ * mixed with spread, and object spread alongside accessor/method properties. Call
+ * spread f(...x) is bounded by V8's argument-count limit (RangeError).
  */
 function transformAllocators(ast) {
-    // Tagged-template quasis must stay raw (the tag receives the template object),
-    // so collect them up front and skip converting those TemplateLiterals.
+    // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's
+    // quasi must NOT be (the tag receives the raw template strings object); we
+    // collect those quasis up front, skip converting them here, and instead rewrite
+    // the whole TaggedTemplateExpression (below) into a metered helper that rebuilds
+    // the strings object and invokes the tag with the correct `this`.
     const taggedQuasis = new WeakSet();
     walk.simple(ast, { TaggedTemplateExpression: function (n) { taggedQuasis.add(n.quasi); } });
 
@@ -144,13 +144,41 @@ function transformAllocators(ast) {
         if (node.type === 'BinaryExpression' && node.operator === '+') {
             return _call('__concat', [node.left, node.right]);
         }
-        // compound assign: lhs += rhs  ->  lhs = __concat(lhs, rhs)
-        if (node.type === 'AssignmentExpression' && node.operator === '+=' &&
-            _isSimpleAssignTarget(node.left)) {
-            return {
-                type: 'AssignmentExpression', operator: '=', left: node.left,
-                right: _call('__concat', [_clone(node.left), node.right])
-            };
+        // compound assign: lhs += rhs
+        if (node.type === 'AssignmentExpression' && node.operator === '+=') {
+            // bare identifier: re-reading the lhs is side-effect-free, so charge
+            // in place via  id = __concat(id, rhs).
+            if (node.left.type === 'Identifier') {
+                return {
+                    type: 'AssignmentExpression', operator: '=', left: node.left,
+                    right: _call('__concat', [_clone(node.left), node.right])
+                };
+            }
+            // member lhs (computed o[k] or complex a.b.c): evaluate the object and
+            // key EXACTLY ONCE here, then let __setconcat do read/charge/write —
+            // re-reading the lhs in place could double-fire getters / re-evaluate k.
+            if (node.left.type === 'MemberExpression') {
+                return _call('__setconcat', [node.left.object, _memberKey(node.left), node.right]);
+            }
+        }
+        // tagged template: tag`q0${e0}q1...`  ->  __tmpltag[m](tag/obj[,key], cooked, raw, [e0,...])
+        // The quasi was skipped above (still raw); its expressions were already
+        // recursed (metered). Rebuild cooked/raw as literal arrays (cooked may be
+        // null for an invalid escape in a tagged template -> void 0 == undefined).
+        if (node.type === 'TaggedTemplateExpression') {
+            const tl = node.quasi;
+            const cooked = tl.quasis.map(function (q) {
+                return q.value.cooked == null ? _void0() : _lit(q.value.cooked);
+            });
+            const raw = tl.quasis.map(function (q) { return _lit(q.value.raw); });
+            const exprs = _arr(tl.expressions);
+            // member tag (String.raw`...`, obj.m`...`, obj[k]`...`): this = object.
+            if (node.tag.type === 'MemberExpression') {
+                return _call('__tmpltagm',
+                    [node.tag.object, _memberKey(node.tag), _arr(cooked), _arr(raw), exprs]);
+            }
+            // plain tag (tag`...`, (0,f)`...`, getTag()`...`): this = undefined.
+            return _call('__tmpltag', [node.tag, _arr(cooked), _arr(raw), exprs]);
         }
         // template literal: `q0${e0}q1...`  ->  __tmpl([q0, e0, q1, ...])
         if (node.type === 'TemplateLiteral' && !taggedQuasis.has(node)) {

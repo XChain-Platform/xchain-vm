@@ -199,4 +199,71 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
         assert.strictEqual(r.returnValue, '"sum_4950"');
         assert(r.gasUsed < 10000, `numeric +/small strings must stay cheap, got ${r.gasUsed}`);
     });
+
+    // ---- item #6: member-lhs += and tagged-template residuals are now gas-bound ----
+    // Before the __setconcat / __tmpltag[m] fix these escaped the byte meter: a
+    // doubling loop built a multi-megabyte string for ~tens of gas and tripped the
+    // V8 max-string-length RangeError (gasUsed ~ 59), NOT out_of_gas — gas was not
+    // the binding constraint. Now each rewrite charges by bytes grown -> out_of_gas.
+    const MEMBER_TMPL_BOMBS = [
+        { id: 'computed-LHS += doubling (o[k] += o[k])',
+          code: `var o={k:'7'};for(var i=0;i<25;i++)o['k']+=o['k'];return o.k.length;` },
+        { id: 'complex-LHS += doubling (o.a.b += o.a.b)',
+          code: `var o={a:{b:'7'}};for(var i=0;i<25;i++)o.a.b+=o.a.b;return o.a.b.length;` },
+        { id: 'tagged-template doubling (String.raw`${s}${s}`)',
+          code: 'var s=\'7\';for(var i=0;i<25;i++)s=String.raw`${s}${s}`;return s.length;' }
+    ];
+    for (const b of MEMBER_TMPL_BOMBS) {
+        it(`${b.id}: gas-bounded, not memory-bounded`, async function () {
+            const { r } = await runDefault(b.code);
+            assert(
+                r.success === false && /out_of_gas/.test(r.error || ''),
+                `${b.id} resolved as success=${r.success} error=${JSON.stringify(r.error)} ` +
+                `gasUsed=${r.gasUsed}; expected out_of_gas.`
+            );
+        });
+    }
+
+    // Correctness guards — the rewrites must preserve JS semantics exactly.
+    it('member += evaluates object + computed key + rhs exactly once', async function () {
+        // computed key: o[k()] += rhs -> k() must fire once (native ref semantics).
+        const { r } = await runDefault(
+            `var n=0;function k(){n++;return 'x';}var o={x:'a'};o[k()]+='b';return n+'|'+o.x;`);
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(r.returnValue, '"1|ab"');
+    });
+    it('member += on a complex object evaluates the object expr once', async function () {
+        const { r } = await runDefault(
+            `var n=0;var o={x:'a'};function g(){n++;return o;}g().x+='b';return n+'|'+o.x;`);
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(r.returnValue, '"1|ab"');
+    });
+    it('single small member += stays cheap success (no over-charge)', async function () {
+        const { r } = await runDefault(`var o={x:'a'};for(var i=0;i<100;i++)o['x']+='b';return o.x.length;`);
+        assert.strictEqual(r.success, true, r.error);
+        assert(r.gasUsed < 10000, `small member += must stay cheap, got ${r.gasUsed}`);
+    });
+    it('tagged template: tag receives frozen strings object, raw, and correct this', async function () {
+        const { r } = await runDefault(
+            `var obj={name:'N',tag:function(strings){var ex=[];for(var i=1;i<arguments.length;i++)ex.push(arguments[i]);` +
+            `var ok=strings.length===3&&strings[0]==='p'&&strings[1]==='q\\t'&&strings[2]==='r'&&` +
+            `strings.raw[1]==='q\\\\t'&&ex.length===2&&ex[0]===1&&ex[1]===2&&this.name==='N'&&` +
+            `Object.isFrozen(strings)&&Object.isFrozen(strings.raw);` +
+            `return ok?'OK':('BAD '+strings.length+' '+JSON.stringify(strings)+' '+JSON.stringify(strings.raw));}};` +
+            `var x=1,y=2;return obj.tag\`p\${x}q\\t\${y}r\`;`);
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(r.returnValue, '"OK"');
+    });
+    it('String.raw via the metered helper is byte-identical to native', async function () {
+        const s = 'X';
+        const expected = String.raw`a\n${s}b`;   // native, in the test runtime
+        const { r } = await runDefault(`var s='X';return String.raw\`a\\n\${s}b\`;`);
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(r.returnValue, JSON.stringify(expected));
+    });
+    it('single tagged template stays cheap success', async function () {
+        const { r } = await runDefault('var s=\'hi\';return String.raw`a${s}b`;');
+        assert.strictEqual(r.success, true, r.error);
+        assert(r.gasUsed < 10000, `single tagged template must stay cheap, got ${r.gasUsed}`);
+    });
 });
