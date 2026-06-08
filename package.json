@@ -39,6 +39,7 @@
     "test:integration": "mocha --timeout 60000 'test/preflight.test.js' 'test/integration/**/*.test.js'",
     "test:boundary": "mocha --timeout 30000 'test/preflight.test.js' 'test/boundary/**/*.test.js'",
     "test:security": "mocha --timeout 30000 'test/preflight.test.js' 'test/security/**/*.test.js'",
+    "test:performance": "mocha --timeout 60000 'test/performance/**/*.perf.test.js'",
     "test:determinism": "mocha --timeout 60000 'test/preflight.test.js' 'test/determinism/**/*.test.js'",
     "test:known-red": "mocha --timeout 120000 'test/preflight.test.js' 'test/determinism/known-red/*.known-red.js'",
     "test:e2e": "mocha --timeout 60000 'test/preflight.test.js' 'test/e2e/**/*.e2e.test.js'",
