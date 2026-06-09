@@ -385,4 +385,113 @@ describe('Metering', function() {
                 'while-loop of ' + N + ' iterations should charge N x VM_COMPUTATION');
         });
     });
+
+    // ─── Allocator transforms (Phase 0) ──────────────────────────────────
+    // transformAllocators rewrites syntax-level allocators into metered helper
+    // calls before gas injection. Each construct emits a distinct helper marker.
+    describe('allocator transforms', function() {
+
+        it('rewrites a plain tagged template to __tmpltag', function() {
+            const metered = meterCode('var s = tag`hello ${name} world`;');
+            assert(metered.includes('__tmpltag('), 'plain tag → __tmpltag');
+        });
+
+        it('rewrites a member tagged template to __tmpltagm', function() {
+            const metered = meterCode('var s = String.raw`a${b}c`;');
+            assert(metered.includes('__tmpltagm('), 'member tag → __tmpltagm');
+        });
+
+        it('handles a tagged template with an invalid cooked escape (cooked == null)', function() {
+            // \\unicode is an invalid escape; cooked is null in a tagged template → void 0.
+            const metered = meterCode('var s = tag`\\unicode`;');
+            assert(metered.includes('__tmpltag('), 'still rewrites; cooked null path exercised');
+        });
+
+        it('rewrites an untagged template literal to __tmpl', function() {
+            const metered = meterCode('var s = `q0${e0}q1${e1}q2`;');
+            assert(metered.includes('__tmpl('), 'template literal → __tmpl');
+        });
+
+        it('rewrites array spread to __arrspread', function() {
+            const metered = meterCode('var a = [x, ...rest, y];');
+            assert(metered.includes('__arrspread('), 'array spread → __arrspread');
+        });
+
+        it('skips array spread when the array has holes', function() {
+            const metered = meterCode('var a = [x, , ...rest];');
+            assert(!metered.includes('__arrspread('), 'holes → left untransformed');
+        });
+
+        it('rewrites object spread to __objspread', function() {
+            const metered = meterCode('var o = {...base, k: v, [c]: d};');
+            assert(metered.includes('__objspread('), 'object spread → __objspread');
+        });
+
+        it('skips object spread when combined with a method/accessor', function() {
+            const metered = meterCode('var o = {...base, m() { return 1; }};');
+            assert(!metered.includes('__objspread('), 'method + spread → left untransformed');
+        });
+
+        it('rewrites a member += concat to __setconcat', function() {
+            const metered = meterCode('obj.prop += "x";');
+            assert(metered.includes('__setconcat('), 'member concat-assign → __setconcat');
+        });
+
+        it('rewrites a computed-member += concat to __setconcat', function() {
+            // obj[k] += "x" — computed member key path of _memberKey.
+            const metered = meterCode('obj[k] += "x";');
+            assert(metered.includes('__setconcat('), 'computed member concat-assign → __setconcat');
+        });
+
+        it('rewrites object spread with a string-literal key', function() {
+            // non-computed Literal key → _lit(p.key.value) branch.
+            const metered = meterCode('var o = {...base, "strkey": v};');
+            assert(metered.includes('__objspread('), 'string-literal key handled');
+        });
+    });
+
+    // ─── Braceless (single-statement) bodies → ensureBlock ────────────────
+    describe('ensureBlock (braceless bodies)', function() {
+
+        it('wraps a braceless if/else body and injects gas', function() {
+            const metered = meterCode('if (x) y = 1; else y = 2;');
+            assert(metered.includes('{'), 'braceless consequent/alternate wrapped in a block');
+            assert(metered.includes('__gas'));
+        });
+
+        it('wraps a braceless for-loop body', function() {
+            const metered = meterCode('for (var i = 0; i < 3; i++) x++;');
+            assert(metered.includes('__gas'));
+        });
+
+        it('wraps a braceless while-loop body', function() {
+            const metered = meterCode('while (x) x--;');
+            assert(metered.includes('__gas'));
+        });
+    });
+
+    // ─── Deeply nested binary expressions (Phase 2) ───────────────────────
+    // NB: '+' is rewritten to __concat in Phase 0, so a deep '+' chain leaves no
+    // BinaryExpression nodes. Use '*' (not an allocator op) to keep them binary.
+    describe('deep binary-expression gas injection', function() {
+
+        it('injects gas into a binary chain deeper than 10 (* operator)', function() {
+            const expr = Array.from({ length: 13 }, (_, i) => 'a' + i).join(' * ');
+            const metered = meterCode('var z = ' + expr + ';');
+            assert(metered.includes('__gas'), 'deep chain instrumented without throwing');
+        });
+
+        it('leaves a shallow binary chain to the normal path', function() {
+            const metered = meterCode('var z = a * b * c;');
+            assert(typeof metered === 'string' && metered.length > 0);
+        });
+    });
+
+    // ─── Call-as-argument: Phase 3 replaces a node held in a parent array ──
+    it('wraps a nested call that sits in its parent call\'s argument array', function() {
+        // inner() is an element of outer()'s `arguments` array → the array-index
+        // replacement branch of the Phase 3 call wrapper.
+        const metered = meterCode('var r = outer(inner());');
+        assert(metered.includes('__gas'), 'both calls instrumented');
+    });
 });
