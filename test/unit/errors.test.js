@@ -11,7 +11,7 @@
 // contact legal@dankest.llc.
 
 const assert = require('assert');
-const { ContractRevertError, GasExhaustedError } = require('../../src/errors.js');
+const { ContractRevertError, GasExhaustedError, HostFaultError } = require('../../src/errors.js');
 
 describe('Error Classes', function() {
 
@@ -77,6 +77,38 @@ describe('Error Classes', function() {
 
         it('should have a stack trace', function() {
             const err = new GasExhaustedError(100, 50);
+            assert(typeof err.stack === 'string');
+        });
+    });
+
+    describe('HostFaultError', function() {
+        it('should be an instance of Error', function() {
+            const err = new HostFaultError();
+            assert(err instanceof Error);
+        });
+
+        it('should have name HostFaultError', function() {
+            const err = new HostFaultError();
+            assert.strictEqual(err.name, 'HostFaultError');
+        });
+
+        it('should have code EXECUTOR_UNAVAILABLE', function() {
+            const err = new HostFaultError();
+            assert.strictEqual(err.code, 'EXECUTOR_UNAVAILABLE');
+        });
+
+        it('should default message to "executor unavailable"', function() {
+            const err = new HostFaultError();
+            assert.strictEqual(err.message, 'executor unavailable');
+        });
+
+        it('should use custom reason as message', function() {
+            const err = new HostFaultError('boom');
+            assert.strictEqual(err.message, 'boom');
+        });
+
+        it('should have a stack trace', function() {
+            const err = new HostFaultError();
             assert(typeof err.stack === 'string');
         });
     });

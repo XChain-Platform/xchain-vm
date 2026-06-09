@@ -22,6 +22,7 @@
   "devDependencies": {
     "@stryker-mutator/core": "^8.7.1",
     "@stryker-mutator/mocha-runner": "^8.7.1",
+    "c8": "^11.0.0",
     "fast-check": "^4.6.0",
     "mocha": "^11.7.5"
   },
@@ -33,6 +34,7 @@
   },
   "scripts": {
     "test": "mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js'",
+    "coverage": "c8 --reporter=text --reporter=html --include 'src/**/*.js' mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js' --exit",
     "ci": "mocha --timeout 60000 --exit 'test/preflight.test.js' 'test/unit/**/*.test.js' 'test/smoke/**/*.test.js' 'test/security/**/*.test.js' 'test/boundary/**/*.test.js' 'test/determinism/**/*.test.js' 'test/determinism/known-red/*.known-red.js' 'test/regression/p0-smoke.regression.test.js' 'test/regression/p1-security.regression.test.js'",
     "test:preflight": "mocha --timeout 30000 'test/preflight.test.js'",
     "test:all": "mocha --timeout 60000 'test/**/*.test.js'",

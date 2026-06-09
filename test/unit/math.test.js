@@ -230,4 +230,49 @@ describe('Math API', function() {
             assert.strictEqual(result, '100000000000000000000');
         });
     });
+
+    describe('input length guard (MAX_MATH_INPUT_LENGTH)', function() {
+        it('should throw ContractRevertError when input exceeds 256 chars', function() {
+            const longNum = '1'.repeat(257);
+            assert.throws(() => math.add(longNum, '1'), ContractRevertError);
+        });
+
+        it('should accept input exactly at 256 chars', function() {
+            // 256 '0's followed by nothing is just '0' repeated
+            const maxNum = '1' + '0'.repeat(255); // 256 chars
+            const result = math.add(maxNum, '0');
+            assert.strictEqual(typeof result, 'string');
+        });
+
+        it('should throw ContractRevertError when second input exceeds 256 chars', function() {
+            const longNum = '9'.repeat(257);
+            assert.throws(() => math.subtract('1', longNum), ContractRevertError);
+        });
+    });
+
+    describe('min/max both branch orderings', function() {
+        it('min should return a when a <= b', function() {
+            assert.strictEqual(math.min('3', '7'), '3');
+        });
+
+        it('min should return b when a > b', function() {
+            assert.strictEqual(math.min('9', '4'), '4');
+        });
+
+        it('min should return either when a === b', function() {
+            assert.strictEqual(math.min('5', '5'), '5');
+        });
+
+        it('max should return b when a <= b', function() {
+            assert.strictEqual(math.max('3', '7'), '7');
+        });
+
+        it('max should return a when a > b', function() {
+            assert.strictEqual(math.max('9', '4'), '9');
+        });
+
+        it('max should return either when a === b', function() {
+            assert.strictEqual(math.max('5', '5'), '5');
+        });
+    });
 });

@@ -255,4 +255,21 @@ describe('StateManager', function() {
         assert.throws(() => sm.set('a'.repeat(1025), 'value'), /key exceeds max size/);
         sm.set('a'.repeat(1024), 'value'); // at the limit — should pass
     });
+
+    it('should reject non-JSON-serializable values (function)', function() {
+        const sm = new StateManager({}, LIMITS);
+        assert.throws(() => sm.set('k', () => {}), /JSON-serializable/);
+    });
+
+    it('should reject non-JSON-serializable values (undefined via JSON.stringify)', function() {
+        // JSON.stringify wraps the value — a plain undefined arg produces ""undefined""
+        // but JSON.stringify(undefined) itself returns undefined (not a string).
+        // We need a value that makes JSON.stringify(value) === undefined.
+        // Functions are the canonical way; verify the error message.
+        const sm = new StateManager({}, LIMITS);
+        let caught;
+        try { sm.set('k', function foo() {}); } catch (e) { caught = e; }
+        assert(caught, 'should have thrown');
+        assert(/JSON-serializable/.test(caught.message), caught.message);
+    });
 });

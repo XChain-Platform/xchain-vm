@@ -345,4 +345,106 @@ describe('Emit API', function() {
             assert.strictEqual(collector.getActions()[0].params.quantity, '1');
         });
     });
+
+    describe('non-object params default branch (dispenser / file / list / broadcast)', function() {
+        it('dispenser: non-object params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.dispenser('not an object');
+            assert.strictEqual(collector.getActions()[0].action, 'DISPENSER');
+        });
+
+        it('dispenser: null params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.dispenser(null);
+            assert.strictEqual(collector.getActions()[0].action, 'DISPENSER');
+        });
+
+        it('file: non-object params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.file(42);
+            assert.strictEqual(collector.getActions()[0].action, 'FILE');
+        });
+
+        it('file: null params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.file(null);
+            assert.strictEqual(collector.getActions()[0].action, 'FILE');
+        });
+
+        it('list: non-object params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.list('bad');
+            assert.strictEqual(collector.getActions()[0].action, 'LIST');
+        });
+
+        it('list: null params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.list(null);
+            assert.strictEqual(collector.getActions()[0].action, 'LIST');
+        });
+
+        it('broadcast: non-object params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.broadcast(true);
+            assert.strictEqual(collector.getActions()[0].action, 'BROADCAST');
+        });
+
+        it('broadcast: null params defaults to {}', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.broadcast(null);
+            assert.strictEqual(collector.getActions()[0].action, 'BROADCAST');
+        });
+    });
+
+    describe('type validation throws (validateTypes)', function() {
+        it('send: should throw on non-string destination', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.send({ destination: 123, tick: 'T', quantity: '1' }), /destination must be a string/);
+        });
+
+        it('send: should throw on non-string tick', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.send({ destination: 'a', tick: 99, quantity: '1' }), /tick must be a string/);
+        });
+
+        it('send: should throw on non-string quantity', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.send({ destination: 'a', tick: 'T', quantity: 100 }), /quantity must be a string/);
+        });
+
+        it('destroy: should throw on non-string tick', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.destroy({ tick: 5, quantity: '1' }), /tick must be a string/);
+        });
+
+        it('order: should throw on non-string giveAmount', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.order({ giveAmount: 100, getAmount: '50' }), /giveAmount must be a string/);
+        });
+
+        it('order: should throw on non-string getAmount', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.order({ giveAmount: '100', getAmount: 50 }), /getAmount must be a string/);
+        });
+
+        it('sweep: should throw on non-string destination', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.sweep({ destination: 99 }), /destination must be a string/);
+        });
+
+        it('link: should throw on non-string coin1', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.link({ coin1: 42, coin1ActionIndex: 1, coin2: 'D', coin2ActionIndex: 2 }), /coin1 must be a string/);
+        });
+
+        it('link: should throw on non-string coin2', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.link({ coin1: 'B', coin1ActionIndex: 1, coin2: 99, coin2ActionIndex: 2 }), /coin2 must be a string/);
+        });
+
+        it('message: should throw on non-string destination', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.message({ destination: 42 }), /destination must be a string/);
+        });
+    });
 });

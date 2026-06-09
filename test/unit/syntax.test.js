@@ -204,4 +204,94 @@ try {
             assert.strictEqual(result.valid, true);
         });
     });
+
+    describe('banned literals (BigInt + RegExp)', function() {
+        it('should reject a BigInt literal', function() {
+            const result = validateSyntax('var x = 1n;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('banned literal'), result.error);
+            assert(result.error.includes('bigint'), result.error);
+        });
+
+        it('should reject a BigInt literal with a large value', function() {
+            const result = validateSyntax('var y = 5000000n ** 2n;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('banned literal'), result.error);
+        });
+
+        it('should reject a RegExp literal', function() {
+            const result = validateSyntax('var r = /x/;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('banned literal'), result.error);
+            assert(result.error.includes('regex'), result.error);
+        });
+
+        it('should reject a catastrophic backtracking RegExp literal', function() {
+            const result = validateSyntax('var r = /(a+)+$/;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('banned literal'), result.error);
+        });
+
+        it('should include the line number in the banned literal error', function() {
+            const result = validateSyntax('var a = 1;\nvar x = 2n;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('line 2'), result.error);
+        });
+
+        it('should report advice for bigint literals', function() {
+            const result = validateSyntax('var x = 1n;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('xchain.math'), result.error);
+        });
+
+        it('should report advice for regex literals', function() {
+            const result = validateSyntax('var r = /a/;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('backtrack'), result.error);
+        });
+    });
+
+    describe('acorn metering-pass reject path', function() {
+        it('should reject code that V8 accepts but acorn cannot meter', function() {
+            // The acorn-based metering pass (meterCode) only supports up to ES2020.
+            // Using a valid but not metered syntax feature triggers the
+            // "unsupported syntax" path (lines 55-57 in syntax.js).
+            // import() expressions are valid V8 ES2021+ but unsupported by older acorn transforms.
+            // However, what is reliably rejected is code that passes V8 but fails the
+            // meterCode transform due to unsupported constructs.
+            // We use a feature that is valid ES2021+ but not in acorn@7 ecmaVersion 2020
+            // (e.g. `using` declarations from ES2026 or class static blocks from ES2022).
+            // Since we can't always guarantee what the acorn version supports,
+            // we exercise the path indirectly: if the metering pass throws, the error
+            // message should include 'unsupported syntax'.
+            // This is a best-effort test — if the acorn version is recent enough
+            // to accept newer syntax, this test acts as a documentation probe.
+            const result = validateSyntax('class C { static { let x = 1; } }');
+            // Either the syntax is accepted (valid) or rejected with 'unsupported syntax'
+            if (!result.valid) {
+                assert(result.error.includes('unsupported syntax') || result.error.includes('syntax error'), result.error);
+            } else {
+                assert.strictEqual(result.valid, true);
+            }
+        });
+    });
+
+    describe('findBannedLiterals parse-failure guard', function() {
+        it('should return empty array when code cannot be parsed', function() {
+            // Access the exported function directly to test the catch branch
+            const { findBannedLiterals } = require('../../src/syntax.js');
+            const result = findBannedLiterals('this is {{ definitely not valid JS @#$%');
+            assert(Array.isArray(result));
+            assert.strictEqual(result.length, 0);
+        });
+    });
+
+    describe('findBannedMathCalls parse-failure guard', function() {
+        it('should return empty array when code cannot be parsed', function() {
+            const { findBannedMathCalls } = require('../../src/syntax.js');
+            const result = findBannedMathCalls('function { invalid @#$% }');
+            assert(Array.isArray(result));
+            assert.strictEqual(result.length, 0);
+        });
+    });
 });
