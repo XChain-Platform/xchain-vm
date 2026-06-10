@@ -211,6 +211,73 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         }
     });
 
+    // Watchdog must bound EXECUTION, not queue-wait + execution. Started at
+    // acceptance it also counted time spent queued, so a validator whose queue
+    // was backed up (many contracts in a block, slow disk, a respawn in
+    // progress) fabricated out_of_resource for a contract every other
+    // validator executed normally → divergent contract status → fork. A
+    // request that waits in the queue for many watchdog windows must still
+    // run and succeed once the worker is dispatchable.
+    it('a queued request never times out on queue wait (watchdog starts at dispatch)', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        try {
+            // Warm-up also guarantees the worker reached 'ready'.
+            const r0 = await exec.execute({ ...BASE, code: `module.exports = function(){ return 'warm'; };` });
+            assert.strictEqual(r0.returnValue, '"warm"');
+
+            // Shrink the watchdog so queue wait spans several windows, then
+            // hold dispatch closed (exactly the backed-up/respawning state).
+            exec._watchdogMs = 250;
+            exec._sawReady = false;
+
+            const queued = exec.execute({ ...BASE, code: `module.exports = function(){ return 'queued'; };` });
+
+            await new Promise((r) => setTimeout(r, 800));
+            assert.strictEqual(exec._queue.length, 1,
+                'request must still be queued after 3+ watchdog windows, not resolved');
+
+            // Worker becomes dispatchable again → the contract must RUN.
+            exec._sawReady = true;
+            exec._flush();
+            const r = await queued;
+            assert.strictEqual(r.success, true,
+                'queue wait must never produce out_of_resource (fork risk): ' + r.error);
+            assert.strictEqual(r.returnValue, '"queued"');
+        } finally {
+            await exec.shutdown();
+        }
+    });
+
+    // The dispatch-time watchdog still catches a genuinely stuck worker: a
+    // dispatched request on a frozen child resolves the deterministic
+    // resource-failure clamp and the executor recovers for subsequent work.
+    it('the dispatch-time watchdog still kills a hung worker (deterministic clamp)', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        try {
+            await exec.execute({ ...BASE, code: `module.exports = function(){ return 'warm'; };` });
+
+            // Freeze (don't kill) the child so the next dispatch can never
+            // complete — the stuck-isolate / native-deadlock shape.
+            exec._watchdogMs = 300;
+            exec._child.kill('SIGSTOP');
+
+            const r = await exec.execute({ ...BASE, code: `module.exports = function(){ return 'never'; };` });
+            assert.strictEqual(r.success, false, 'hung dispatch must be watchdog-terminated');
+            assert.ok(/watchdog timeout/.test(r.error), 'error should cite the watchdog: ' + r.error);
+            assert.strictEqual(r.gasUsed, GAS_CEILING, 'fabricated result clamps gasUsed to the ceiling');
+
+            // And the executor respawns and keeps serving.
+            const r2 = await exec.execute({ ...BASE, code: `module.exports = function(){ return 'after'; };` });
+            assert.strictEqual(r2.returnValue, '"after"');
+        } finally {
+            await exec.shutdown();
+        }
+    });
+
     // The deterministic case is UNCHANGED: a single worker death during an
     // in-flight execution still RESOLVES a fabricated host-termination (every
     // validator sees the same poisoned-contract outcome) — it must NOT reject.

@@ -41,6 +41,13 @@ const WORKER_PATH = path.join(__dirname, 'vm-worker.js');
 // execute() retries a spawn at most this often before rejecting as a host fault.
 const BROKEN_RESPAWN_BACKOFF_MS = 2000;
 
+// A spawned worker must signal 'ready' within this window or it is killed and
+// counted as a spawn failure (worker init is a require + isolated-vm load —
+// normally well under 2s). This keeps a child that hangs BEFORE ready inside
+// the spawn-failure → HostFaultError machinery (halt and retry, a local
+// fault), now that the per-request watchdog no longer covers queue wait.
+const WORKER_READY_TIMEOUT_MS = 30000;
+
 // Deterministic result for any non-gas host termination (crash / hang).
 // gasUsed = ceiling matches src/index.js's timeout/OOM/stack clamp so the
 // indexer's fee = gasUsed * GAS_PRICE is identical on every validator.
@@ -69,6 +76,8 @@ class ProcessExecutor {
         // Watchdog: belt over the isolate's own maxCpuTimeMs in case the child
         // hangs (stuck isolate, native deadlock). Generous buffer above the
         // in-isolate timeout so the isolate's deterministic timeout wins normally.
+        // Started at DISPATCH (see _flush), so it bounds one contract's
+        // execution only — never queue wait, which varies per host.
         const cpu = (config.limits && config.limits.maxCpuTimeMs) || 30000;
         this._watchdogMs = cpu + 5000;
 
@@ -100,6 +109,16 @@ class ProcessExecutor {
         child.on('exit', (code, signal) => this._onExit(code, signal));
         child.on('error', () => { /* surfaced via 'exit' */ });
 
+        // A child that hangs before 'ready' would otherwise stall the queue
+        // forever (no exit event, nothing dispatched). Kill it and count it as
+        // a spawn failure so the broken-latch path takes over.
+        this._readyTimer = setTimeout(() => {
+            if (!this._sawReady && this._child === child) {
+                this._consecutiveSpawnFailures++;
+                try { child.kill('SIGKILL'); } catch (e) {}
+            }
+        }, WORKER_READY_TIMEOUT_MS);
+
         // Initialize the worker's VM.
         this._send({ type: 'init', config: this._config });
         // A respawn mid-block must restore the worker's block state (cache only —
@@ -119,6 +138,7 @@ class ProcessExecutor {
         if (msg.type === 'ready') {
             this._sawReady = true;
             this._consecutiveSpawnFailures = 0;
+            if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
             // A fresh worker is now dispatchable — send it any queued executions
             // (e.g. the contract that followed a crashed/killed one in this block).
             this._flush();
@@ -144,13 +164,44 @@ class ProcessExecutor {
             const entry = this._queue[0];
             if (!this._send({ type: 'execute', id: entry.id, opts: entry.opts })) break;
             this._queue.shift();
+            // Watchdog starts at DISPATCH, not acceptance. The timeout must
+            // bound ONE contract's execution: started at acceptance it also
+            // counted queue wait, so a validator whose queue was backed up
+            // (many contracts in a block, slow disk, a respawn in progress)
+            // fabricated out_of_resource for a contract every other validator
+            // executed normally → divergent contract status → fork. A queued
+            // request that never dispatches is bounded by the worker readiness
+            // timeout + spawn-failure machinery instead (HostFaultError →
+            // halt and retry), which is a local fault, not a consensus result.
+            entry.timer = setTimeout(() => this._onWatchdog(entry.id), this._watchdogMs);
             this._pending.set(entry.id, { resolve: entry.resolve, reject: entry.reject, timer: entry.timer });
         }
+    }
+
+    // Dispatched but unresponsive past the in-isolate timeout + buffer: the
+    // worker is stuck (hung isolate, native deadlock). Kill it (triggers
+    // _onExit → respawn) and resolve THIS request deterministically — the same
+    // resource-failure clamp the in-isolate timeout would have produced.
+    _onWatchdog(id) {
+        const entry = this._pending.get(id);
+        if (!entry) return;
+        this._pending.delete(id);
+        entry.resolve(hostTerminatedResult(this._gasCeiling, 'watchdog timeout'));
+        const child = this._child;
+        if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
+        // Mark the killed worker un-dispatchable NOW, synchronously, so the
+        // NEXT execute() in this block queues until the respawn is 'ready'
+        // instead of racing the dying worker before _onExit fires (the
+        // window that would otherwise host-terminate the next contract
+        // nondeterministically). Safe vs the spawn-failure counter: the
+        // watchdog only fires long after spawn, past _onExit's <2s guard.
+        this._sawReady = false;
     }
 
     _onExit(code, signal) {
         const child = this._child;
         this._child = null;
+        if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
 
         // Resolve only DISPATCHED (in-flight) requests deterministically — a crash
         // here means the contract that was actually executing aborted the host. The
@@ -220,43 +271,22 @@ class ProcessExecutor {
         }
         const id = this._nextId++;
         return new Promise((resolve, reject) => {
-            // Watchdog started at acceptance so it bounds queue-wait + execution — a
-            // deterministic upper time bound regardless of where the request sits.
-            const timer = setTimeout(() => {
-                // Still queued (never dispatched): the worker never became ready in
-                // time. Resolve deterministically; there is no worker to kill.
-                const qi = this._queue.findIndex((e) => e.id === id);
-                if (qi !== -1) {
-                    this._queue.splice(qi, 1);
-                    resolve(hostTerminatedResult(this._gasCeiling, 'watchdog timeout'));
-                    return;
-                }
-                // Dispatched but unresponsive: kill the worker (triggers _onExit →
-                // respawn) and return the deterministic result for THIS request.
-                if (!this._pending.has(id)) return;
-                this._pending.delete(id);
-                resolve(hostTerminatedResult(this._gasCeiling, 'watchdog timeout'));
-                const child = this._child;
-                if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
-                // Mark the killed worker un-dispatchable NOW, synchronously, so the
-                // NEXT execute() in this block queues until the respawn is 'ready'
-                // instead of racing the dying worker before _onExit fires (the
-                // window that would otherwise host-terminate the next contract
-                // nondeterministically). Safe vs the spawn-failure counter: the
-                // watchdog only fires long after spawn, past _onExit's <2s guard.
-                this._sawReady = false;
-            }, this._watchdogMs);
-
+            // No timer here: the watchdog starts when the request DISPATCHES
+            // (_flush), so queue wait — which differs per host — is never part
+            // of the bound. Queued requests are cleaned up by _onExit (broken
+            // latch → HostFaultError) or shutdown().
+            //
             // Accept into the queue, then dispatch only if a ready worker exists.
             // Never send to a worker that has not signaled 'ready' (a fresh or dying
             // one) — that is the determinism-breaking race this fix closes.
-            this._queue.push({ id, opts, resolve, reject, timer });
+            this._queue.push({ id, opts, resolve, reject, timer: null });
             this._flush();
         });
     }
 
     async shutdown() {
         this._shuttingDown = true;
+        if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
             entry.resolve(hostTerminatedResult(this._gasCeiling, 'shutdown'));
