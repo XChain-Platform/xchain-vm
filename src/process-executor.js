@@ -33,6 +33,7 @@
 const path = require('path');
 const { fork } = require('child_process');
 const { HostFaultError } = require('./errors.js');
+const { effectiveCeiling } = require('./gas.js');
 
 const WORKER_PATH = path.join(__dirname, 'vm-worker.js');
 
@@ -174,7 +175,7 @@ class ProcessExecutor {
             // timeout + spawn-failure machinery instead (HostFaultError →
             // halt and retry), which is a local fault, not a consensus result.
             entry.timer = setTimeout(() => this._onWatchdog(entry.id), this._watchdogMs);
-            this._pending.set(entry.id, { resolve: entry.resolve, reject: entry.reject, timer: entry.timer });
+            this._pending.set(entry.id, { resolve: entry.resolve, reject: entry.reject, timer: entry.timer, ceiling: entry.ceiling });
         }
     }
 
@@ -186,7 +187,10 @@ class ProcessExecutor {
         const entry = this._pending.get(id);
         if (!entry) return;
         this._pending.delete(id);
-        entry.resolve(hostTerminatedResult(this._gasCeiling, 'watchdog timeout'));
+        // Per-entry ceiling: a host-terminated nested (cross-contract) call must
+        // clamp to its caller-funded reservation, exactly like the in-isolate
+        // clamps — a 1M charge against a 50k reservation would diverge the fee.
+        entry.resolve(hostTerminatedResult(entry.ceiling, 'watchdog timeout'));
         const child = this._child;
         if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
         // Mark the killed worker un-dispatchable NOW, synchronously, so the
@@ -211,7 +215,7 @@ class ProcessExecutor {
         const kind = signal ? ('signal ' + signal) : ('exit ' + code);
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
-            entry.resolve(hostTerminatedResult(this._gasCeiling, kind));
+            entry.resolve(hostTerminatedResult(entry.ceiling, kind));
         }
         this._pending.clear();
 
@@ -270,6 +274,10 @@ class ProcessExecutor {
             // fall through and queue; _flush dispatches once/if the probe is ready.
         }
         const id = this._nextId++;
+        // Resolve the per-call ceiling NOW (same helper as the in-process path in
+        // index.js) so every termination clamp for this entry uses the callee's
+        // caller-funded reservation, not the config ceiling.
+        const ceiling = effectiveCeiling(opts && opts.gasCeiling, this._gasCeiling);
         return new Promise((resolve, reject) => {
             // No timer here: the watchdog starts when the request DISPATCHES
             // (_flush), so queue wait — which differs per host — is never part
@@ -279,7 +287,7 @@ class ProcessExecutor {
             // Accept into the queue, then dispatch only if a ready worker exists.
             // Never send to a worker that has not signaled 'ready' (a fresh or dying
             // one) — that is the determinism-breaking race this fix closes.
-            this._queue.push({ id, opts, resolve, reject, timer: null });
+            this._queue.push({ id, opts, resolve, reject, timer: null, ceiling });
             this._flush();
         });
     }
@@ -289,12 +297,12 @@ class ProcessExecutor {
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
-            entry.resolve(hostTerminatedResult(this._gasCeiling, 'shutdown'));
+            entry.resolve(hostTerminatedResult(entry.ceiling, 'shutdown'));
         }
         this._pending.clear();
         for (const entry of this._queue) {
             if (entry.timer) clearTimeout(entry.timer);
-            entry.resolve(hostTerminatedResult(this._gasCeiling, 'shutdown'));
+            entry.resolve(hostTerminatedResult(entry.ceiling, 'shutdown'));
         }
         this._queue = [];
         const child = this._child;

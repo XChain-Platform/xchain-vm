@@ -195,7 +195,7 @@ describe('Gateway (host-function surface)', function () {
         it('emits ATTEST and returns a deterministic request_id', function () {
             const { gw, collector, gas } = build();
             const id = gw.attestation.request('llm', 'prompt', 'onResult', ['x'], { redundancy: 3, deadlineBlocks: 15 });
-            const expected = crypto.createHash('sha256').update('abc123:7:0').digest('hex');
+            const expected = crypto.createHash('sha256').update('abc123::7:0').digest('hex');
             assert.strictEqual(id, expected);
             assert.strictEqual(collector.actions.length, 1);
             assert.strictEqual(collector.actions[0].action, 'ATTEST');
@@ -220,7 +220,7 @@ describe('Gateway (host-function surface)', function () {
             const collector = { add: (a, p) => captured.push({ a, p }) }; // no .actions
             const gw = buildGateway(gas, mkState(), collector, baseReadOnly(), SCHEDULE, { reverted: false });
             const id = gw.attestation.request('llm', 'p', 'cb', []);
-            assert.strictEqual(id, crypto.createHash('sha256').update('abc123:7:0').digest('hex'));
+            assert.strictEqual(id, crypto.createHash('sha256').update('abc123::7:0').digest('hex'));
             assert.strictEqual(captured.length, 1);
         });
 
@@ -228,14 +228,22 @@ describe('Gateway (host-function surface)', function () {
             const { gw, collector } = build();
             gw.attestation.request('llm', 'p', 'cb', []);            // emissionIndex 0
             const id2 = gw.attestation.request('llm', 'p', 'cb', []); // emissionIndex 1
-            assert.strictEqual(id2, crypto.createHash('sha256').update('abc123:7:1').digest('hex'));
+            assert.strictEqual(id2, crypto.createHash('sha256').update('abc123::7:1').digest('hex'));
             assert.strictEqual(collector.actions.length, 2);
         });
 
         it('handles empty txHash / null contractIndex in the preimage', function () {
             const { gw } = build({ txHash: undefined, contractIndex: null });
             const id = gw.attestation.request('llm', 'p', 'cb', []);
-            assert.strictEqual(id, crypto.createHash('sha256').update(':' + ':' + '0').digest('hex'));
+            assert.strictEqual(id, crypto.createHash('sha256').update(':' + ':' + ':' + '0').digest('hex'));
+        });
+
+        it('includes the executing action_index in the preimage (nested-run disambiguation)', function () {
+            // Cross-contract calls can run the SAME contract twice in the SAME tx —
+            // the EXECUTE's own action_index is what keeps their request_ids distinct.
+            const { gw } = build({ actionIndex: 55 });
+            const id = gw.attestation.request('llm', 'p', 'cb', []);
+            assert.strictEqual(id, crypto.createHash('sha256').update('abc123:55:7:0').digest('hex'));
         });
 
         const bad = [

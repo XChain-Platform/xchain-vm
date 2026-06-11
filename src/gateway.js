@@ -53,6 +53,10 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
         getInputParams:      () => [...readOnlyData.params],
         getInputParam:       (i) => readOnlyData.params[i] !== undefined ? readOnlyData.params[i] : null,
         getInputParamCount:  () => readOnlyData.params.length,
+        // Cross-contract call depth: 0 for a user-submitted EXECUTE, parent+1 for
+        // a run reached via emit.execute. Lets library contracts guard themselves
+        // before emit.execute throws at the max-depth gate.
+        getCallDepth:        () => Number.isInteger(readOnlyData.callDepth) ? readOnlyData.callDepth : 0,
 
         // Read-only ledger queries (100 gas each)
         getBalance: (address, tick) => {
@@ -172,10 +176,18 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
 
                 // Derive deterministic request_id BEFORE pushing the emission so it
                 // reflects the current emission index, not the post-push index.
+                // The executing EXECUTE's own action_index is part of the preimage:
+                // without it, two nested emit.execute runs of the SAME contract in
+                // the SAME tx (same tx_hash, same contract_index, same emission
+                // index 0) would derive IDENTICAL request_ids. The action_index is
+                // unique per execution row, so it disambiguates every run in a call
+                // tree. MUST byte-match the indexer's re-derivation in
+                // xchain-indexer/src/actions/attest.js (_parseRequest).
                 let txHash        = readOnlyData.txHash || '';
+                let actionIndex   = readOnlyData.actionIndex != null ? Number(readOnlyData.actionIndex) : '';
                 let contractIndex = readOnlyData.contractIndex != null ? Number(readOnlyData.contractIndex) : '';
                 let emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
-                let preimage = String(txHash) + ':' + String(contractIndex) + ':' + emissionIndex;
+                let preimage = String(txHash) + ':' + String(actionIndex) + ':' + String(contractIndex) + ':' + emissionIndex;
                 let requestId = crypto.createHash('sha256').update(preimage).digest('hex');
 
                 emissionCollector.add('ATTEST', {
@@ -252,8 +264,13 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             }
         },
 
-        // Action emission (metered, 500 gas each)
-        emit: buildEmitAPI(gasTracker, emissionCollector, gasSchedule),
+        // Action emission (metered, 500 gas each; emit.execute additionally
+        // reserves the callee's gasLimit — see gateway-emit.js)
+        emit: buildEmitAPI(gasTracker, emissionCollector, gasSchedule, {
+            callDepth:    readOnlyData.callDepth,
+            maxCallDepth: readOnlyData.maxCallDepth,
+            minCallGas:   readOnlyData.minCallGas
+        }),
 
         // Deterministic math (wraps mathjs bignumber)
         math: buildMathAPI(),

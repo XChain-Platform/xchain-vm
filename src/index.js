@@ -32,6 +32,7 @@ const fs     = require('fs');
 
 const IsolateManager    = require('./isolate.js');
 const GasTracker        = require('./gas.js');
+const { effectiveCeiling } = require('./gas.js');
 const StateManager      = require('./state.js');
 const EmissionCollector = require('./collector.js');
 const ActionValidator   = require('./validator.js');
@@ -133,6 +134,7 @@ const HARNESS_SOURCE = `
         getInputParams:      wrap(globalThis.__getInputParams),
         getInputParam:       wrap(globalThis.__getInputParam),
         getInputParamCount:  wrap(globalThis.__getInputParamCount),
+        getCallDepth:        wrap(globalThis.__getCallDepth),
 
         // Ledger queries (metered)
         getBalance:    wrap(globalThis.__getBalance),
@@ -192,7 +194,8 @@ const HARNESS_SOURCE = `
             sweep:     wrap(globalThis.__emit_sweep),
             link:      wrap(globalThis.__emit_link),
             broadcast: wrap(globalThis.__emit_broadcast),
-            message:   wrap(globalThis.__emit_message)
+            message:   wrap(globalThis.__emit_message),
+            execute:   wrap(globalThis.__emit_execute)
         }),
 
         // Math (wrapped from individual host-side References)
@@ -523,6 +526,14 @@ const CONTRACT_WRAPPER = `
 // of this module).
 const MAX_CODE_SIZE = 65536;
 
+// Cross-contract call protocol constants. Canonical values:
+// xchain-documentation/protocol/constants.js (VM_MAX_CALL_DEPTH /
+// VM_MIN_CALL_GAS); the indexer re-validates both host-side
+// (xchain-indexer/src/actions/execute.js) so an older bundled VM cannot
+// bypass them. Exported below for the cross-service regression suite.
+const MAX_CALL_DEPTH = 4;
+const MIN_CALL_GAS   = 5000;
+
 class XChainVM {
     /**
      * @param {object} config
@@ -542,6 +553,10 @@ class XChainVM {
             maxCodeSize:       MAX_CODE_SIZE,
             maxBlockCacheSize: 1000
         };
+        // Cross-contract call limits: default the protocol constants when the
+        // caller's limits object predates them (additive, non-breaking).
+        if (!Number.isInteger(this.limits.maxCallDepth)) this.limits.maxCallDepth = MAX_CALL_DEPTH;
+        if (!Number.isInteger(this.limits.minCallGas))   this.limits.minCallGas   = MIN_CALL_GAS;
         this.isolateManager = new IsolateManager(this.limits);
         this.actionValidator = new ActionValidator();
 
@@ -632,6 +647,12 @@ class XChainVM {
      * @param {number} [opts.contractIndex]  - For compilation cache key
      * @param {object} [opts.providerDeadlines] - { [providerId]: maxDeadlineBlocks } map; enforces
      *                                            the per-provider deadline window inside attestation.request()
+     * @param {number} [opts.gasCeiling]     - Per-call gas ceiling for a cross-contract callee
+     *                                         (the caller-funded gasLimit reservation). Clamped to
+     *                                         the constructor ceiling; omitted for top-level runs.
+     * @param {number} [opts.callDepth]      - Cross-contract call depth (0 = user-submitted EXECUTE)
+     * @param {number} [opts.actionIndex]    - The executing EXECUTE's action_index; part of the
+     *                                         deterministic attestation request_id preimage
      * @returns {Promise<object>} Execution result
      */
     async execute(opts) {
@@ -639,7 +660,11 @@ class XChainVM {
         // worker. Read-only data MUST be plain snapshots here, not closures.
         if (this._executor) return this._executor.execute(opts);
 
-        const gasTracker        = new GasTracker(this.gasSchedule, this.gasCeiling);
+        // Per-call ceiling: a cross-contract callee runs against its caller-funded
+        // reservation. Every consensus-visible gasUsed clamp below derives from
+        // gasTracker.ceiling, so the clamp follows this resolution automatically.
+        const execCeiling       = effectiveCeiling(opts.gasCeiling, this.gasCeiling);
+        const gasTracker        = new GasTracker(this.gasSchedule, execCeiling);
         const stateManager      = new StateManager(opts.state || {}, this.limits);
         const emissionCollector = new EmissionCollector(this.limits.maxEmissions);
         const execContext       = { reverted: false };
@@ -674,6 +699,10 @@ class XChainVM {
                     contractAddress: opts.contractAddress,
                     contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
                     txHash:          opts.txHash || '',
+                    actionIndex:     opts.actionIndex != null ? Number(opts.actionIndex) : null,
+                    callDepth:       Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
+                    maxCallDepth:    this.limits.maxCallDepth,
+                    minCallGas:      this.limits.minCallGas,
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
                     balances:        opts.balances || {},
@@ -872,6 +901,7 @@ class XChainVM {
         g.setSync('__getInputParams',      bridge(gateway.getInputParams));
         g.setSync('__getInputParam',       bridge(gateway.getInputParam));
         g.setSync('__getInputParamCount',  bridge(gateway.getInputParamCount));
+        g.setSync('__getCallDepth',        bridge(gateway.getCallDepth));
 
         // Ledger queries (metered)
         g.setSync('__getBalance',   bridge(gateway.getBalance));
@@ -918,6 +948,7 @@ class XChainVM {
         g.setSync('__emit_link',      bridge(gateway.emit.link));
         g.setSync('__emit_broadcast', bridge(gateway.emit.broadcast));
         g.setSync('__emit_message',   bridge(gateway.emit.message));
+        g.setSync('__emit_execute',   bridge(gateway.emit.execute));
 
         // Math
         g.setSync('__math_add',      bridge(gateway.math.add));
@@ -972,8 +1003,11 @@ class XChainVM {
             // `ceiling` gas must never be billed beyond it — otherwise fee = gasUsed *
             // GAS_PRICE could exceed the caller's committed budget and drive balances
             // negative. The raw `used` stays in the (un-hashed) error message for debugging.
+            // Clamp target is the TRACKER's ceiling (= the per-call reservation for a
+            // cross-contract callee), never the constructor ceiling: a nested callee
+            // billed at 1M against a 50k reservation would diverge the refund math.
             return this._errorResult(gasTracker, emissionCollector,
-                'out_of_gas: used ' + error.used + ' of ' + error.ceiling, this.gasCeiling);
+                'out_of_gas: used ' + error.used + ' of ' + error.ceiling, gasTracker.ceiling);
         }
         // Detect typed errors that lost their class crossing the isolate boundary.
         // Only trust \x03-prefixed messages when the tracker/context confirms the classification,
@@ -990,7 +1024,7 @@ class XChainVM {
             }
             if (payload.startsWith('GAS:') && gasTracker.used > gasTracker.ceiling) {
                 return this._errorResult(gasTracker, emissionCollector,
-                    'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, this.gasCeiling);
+                    'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }
         }
         // ── Non-deterministic resource terminations ──────────────────────────
@@ -1007,19 +1041,19 @@ class XChainVM {
             console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +
                 (opts ? 'contract=' + opts.contractAddress + ' method=' + opts.method : ''));
             return this._errorResult(gasTracker, emissionCollector,
-                'timeout: wall-clock safety net triggered', this.gasCeiling);
+                'timeout: wall-clock safety net triggered', gasTracker.ceiling);
         }
         // Memory limit
         if (msg.includes('out of memory') || msg.includes('Array buffer allocation failed')) {
             return this._errorResult(gasTracker, emissionCollector,
-                'out_of_memory: isolate memory limit exceeded', this.gasCeiling);
+                'out_of_memory: isolate memory limit exceeded', gasTracker.ceiling);
         }
         // Native stack overflow (e.g. deep/infinite recursion). The V8 stack-depth
         // limit varies by architecture and V8 build, so gasUsed here is also
         // platform-dependent → clamp to the ceiling with a deterministic message.
         if (msg.includes('Maximum call stack size exceeded') || msg.includes('call stack')) {
             return this._errorResult(gasTracker, emissionCollector,
-                'out_of_stack: maximum call depth exceeded', this.gasCeiling);
+                'out_of_stack: maximum call depth exceeded', gasTracker.ceiling);
         }
         // Generic contract error — sanitize to prevent information leakage (RISK-15).
         // Strip stack traces, file paths, and internal details.
@@ -1085,6 +1119,10 @@ module.exports = XChainVM;
 // Expose the canonical code-size cap so the cross-service regression suite can
 // assert it has not drifted from the protocol constant.
 module.exports.MAX_CODE_SIZE = MAX_CODE_SIZE;
+// Cross-contract call protocol constants (canonical:
+// xchain-documentation/protocol/constants.js) — exposed for the same reason.
+module.exports.MAX_CALL_DEPTH = MAX_CALL_DEPTH;
+module.exports.MIN_CALL_GAS   = MIN_CALL_GAS;
 // Expose the pinned consensus runtime + checker so the indexer (and any
 // validator process bundling the VM) can gate the engine version it runs on.
 const consensusRuntime = require('./consensus-runtime.js');

@@ -22,7 +22,7 @@ describe('ActionValidator', function() {
         'SEND', 'DESTROY', 'ISSUE', 'MINT', 'ORDER',
         'DISPENSER', 'DIVIDEND', 'AIRDROP', 'CALLBACK',
         'FILE', 'LIST', 'COINPAY', 'SWEEP', 'LINK', 'BROADCAST', 'MESSAGE',
-        'ATTEST', 'SLASH'
+        'ATTEST', 'SLASH', 'EXECUTE'
     ];
 
     describe('allowed actions', function() {
@@ -41,11 +41,6 @@ describe('ActionValidator', function() {
 
         it('should reject DEPLOY action', function() {
             assert.throws(() => validator.validate({ action: 'DEPLOY', params: {} }),
-                /unknown emission action/);
-        });
-
-        it('should reject EXECUTE action', function() {
-            assert.throws(() => validator.validate({ action: 'EXECUTE', params: {} }),
                 /unknown emission action/);
         });
 

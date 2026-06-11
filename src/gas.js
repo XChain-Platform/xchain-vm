@@ -45,6 +45,20 @@ const CANONICAL_GAS_KEYS = Object.freeze([
     'VM_EMISSION'
 ]);
 
+// Resolve the gas ceiling for ONE execution. A cross-contract call runs the
+// callee with the caller-funded reservation (opts.gasCeiling = gasLimit) as its
+// ceiling; anything non-positive/non-integer/over the configured ceiling falls
+// back to the configured ceiling. Lives here so the in-process execute path
+// (index.js) and the subprocess host-termination clamp (process-executor.js)
+// resolve the SAME ceiling — if they drifted, a host-terminated nested call
+// would bill a different gasUsed than the in-isolate clamp → fee divergence → fork.
+function effectiveCeiling(requested, configCeiling) {
+    if (typeof requested === 'number' && Number.isInteger(requested) &&
+        requested > 0 && requested < configCeiling)
+        return requested;
+    return configCeiling;
+}
+
 class GasTracker {
     constructor(gasSchedule, gasCeiling) {
         // Validate schedule: all values must be non-negative integers
@@ -96,3 +110,4 @@ class GasTracker {
 
 module.exports = GasTracker;
 module.exports.CANONICAL_GAS_KEYS = CANONICAL_GAS_KEYS;
+module.exports.effectiveCeiling = effectiveCeiling;

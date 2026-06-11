@@ -21,7 +21,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **Sandboxed V8 isolates** — contracts run in isolated-vm with no access to the host process, filesystem, or network
 - **Deterministic execution** — all non-deterministic APIs (Date, Math.random, setTimeout, etc.) stripped; same input always produces same output
 - **AST-based gas metering** — acorn parses contract code and injects `__gas()` calls at control flow points; no V8 modifications required
-- **16 emittable actions** — contracts can emit SEND, DESTROY, ISSUE, MINT, ORDER, DISPENSER, DIVIDEND, AIRDROP, CALLBACK, FILE, LIST, COINPAY, SWEEP, LINK, BROADCAST, MESSAGE
+- **17 emittable actions** — contracts can emit SEND, DESTROY, ISSUE, MINT, ORDER, DISPENSER, DIVIDEND, AIRDROP, CALLBACK, FILE, LIST, COINPAY, SWEEP, LINK, BROADCAST, MESSAGE, and EXECUTE (cross-contract call: deferred, caller-funded gasLimit, max depth 4, no return value)
 - **External attestation** — `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
 - **Deterministic math** — `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point
 - **Contract state management** — key-value state with dirty tracking, key count limits, and value size limits
@@ -265,7 +265,7 @@ xchain-vm/
 │   ├── index.js          — XChainVM class (main entry point)
 │   ├── isolate.js        — V8 isolate management (create, compile, dispose)
 │   ├── gateway.js        — builds the xchain gateway object
-│   ├── gateway-emit.js   — emit API (16 action types)
+│   ├── gateway-emit.js   — emit API (17 action types, incl. cross-contract emit.execute)
 │   ├── gas.js            — gas tracking and ceiling enforcement
 │   ├── sandbox.js        — strips non-deterministic APIs
 │   ├── metering.js       — AST-based gas injection
