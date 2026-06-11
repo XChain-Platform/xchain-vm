@@ -29,6 +29,19 @@ const acorn = require('acorn');
 const walk  = require('acorn-walk');
 const { generate } = require('astring');
 
+// The contract language version — a FROZEN consensus choice, not an acorn
+// default. Every parse in the VM (metering transform, reserved-identifier
+// scan, deploy-time validation and the lint scans in syntax.js) pins to this
+// version. V8 on the pinned Node runtime accepts a superset of ES2020, so
+// everything acorn accepts here parses identically at execution time; the
+// only effect of the gap is that post-2020 syntax is rejected at DEPLOY with
+// a parse error (a DX limitation, never a consensus divergence). Bumping
+// this is a deliberate protocol migration: the metering transform must be
+// re-verified against every AST node type the new version introduces
+// (e.g. class static blocks), and contracts deployed before the bump must
+// keep validating — do not change it casually.
+const CONTRACT_ECMA_VERSION = 2020;
+
 // AST node for: __gas(1)
 function gasCallStatement() {
     return {
@@ -247,7 +260,7 @@ function transformAllocators(ast) {
  */
 function meterCode(source) {
     const ast = acorn.parse(source, {
-        ecmaVersion: 2020,
+        ecmaVersion: CONTRACT_ECMA_VERSION,
         sourceType: 'script',
         locations: true
     });
@@ -430,7 +443,7 @@ function meterCode(source) {
 function findReservedIdentifier(source) {
     try {
         const ast = acorn.parse(source, {
-            ecmaVersion: 2020,
+            ecmaVersion: CONTRACT_ECMA_VERSION,
             sourceType: 'script'
         });
         let found = null;
@@ -450,4 +463,4 @@ function findReservedIdentifier(source) {
 // Back-compat boolean form (the __gas-only check callers may still use).
 function hasGasIdentifier(source) { return findReservedIdentifier(source) !== null; }
 
-module.exports = { meterCode, hasGasIdentifier, findReservedIdentifier, RESERVED_IDENTIFIERS };
+module.exports = { meterCode, hasGasIdentifier, findReservedIdentifier, RESERVED_IDENTIFIERS, CONTRACT_ECMA_VERSION };

@@ -24,7 +24,7 @@
 const ivm   = require('isolated-vm');
 const acorn = require('acorn');
 const walk  = require('acorn-walk');
-const { meterCode, findReservedIdentifier } = require('./metering.js');
+const { meterCode, findReservedIdentifier, CONTRACT_ECMA_VERSION } = require('./metering.js');
 
 /**
  * Validate contract code syntax before deployment.
@@ -53,7 +53,7 @@ function validateSyntax(code) {
     try {
         meterCode(code);
     } catch (e) {
-        return { valid: false, error: 'unsupported syntax (ES2020 maximum): ' + e.message };
+        return { valid: false, error: 'unsupported syntax (ES' + CONTRACT_ECMA_VERSION + ' maximum): ' + e.message };
     }
 
     // 3. Reserved identifier check (__gas + the allocator metering helpers
@@ -110,7 +110,7 @@ function findBannedLiterals(code) {
     const hits = [];
     let ast;
     try {
-        ast = acorn.parse(code, { ecmaVersion: 2020, sourceType: 'script', locations: true });
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
     } catch (e) {
         return hits;
     }
@@ -143,7 +143,7 @@ function findBannedMathCalls(code) {
     let ast;
     try {
         ast = acorn.parse(code, {
-            ecmaVersion: 2020,
+            ecmaVersion: CONTRACT_ECMA_VERSION,
             sourceType: 'script',
             locations: true
         });
@@ -181,7 +181,7 @@ function checkFloatWarnings(code) {
     const warnings = [];
     try {
         const ast = acorn.parse(code, {
-            ecmaVersion: 2020,
+            ecmaVersion: CONTRACT_ECMA_VERSION,
             sourceType: 'script',
             locations: true
         });
