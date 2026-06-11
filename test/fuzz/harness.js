@@ -85,6 +85,7 @@ function createVM(overrides) {
         }
     }
     return new XChainVM({
+        execution: 'in-process',  // explicit: containment not needed in unit/fuzz harnesses
         gasSchedule: GAS_SCHEDULE,
         gasCeiling:  overrides?.gasCeiling || 1000000,
         limits

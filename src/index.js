@@ -561,6 +561,27 @@ class XChainVM {
         // Default is in-process so existing in-process callers (which pass closure
         // accessors that can't cross IPC) keep working unchanged; the indexer opts
         // into 'subprocess' explicitly.
+        //
+        // The mode string is validated against the two known values: with a bare
+        // `config.execution || 'in-process'` fallback, a typo ('subproces',
+        // 'sub-process', trailing space) would SILENTLY run in-process and drop
+        // host-crash containment — the exact failure the subprocess layer exists
+        // to prevent. Unknown values throw at construct time instead.
+        if (config.execution !== undefined &&
+            config.execution !== 'in-process' && config.execution !== 'subprocess') {
+            throw new Error("XChainVM: unknown execution mode '" + config.execution +
+                "' — use 'subprocess' (production) or 'in-process'");
+        }
+        if (config.execution === undefined && !XChainVM._warnedImplicitInProcess) {
+            // Loud once per process: an embedder that never chose a mode is
+            // running without SIGABRT containment, which is only safe for
+            // tests/tooling. Choosing 'in-process' explicitly acknowledges the
+            // trade-off and silences this.
+            XChainVM._warnedImplicitInProcess = true;
+            console.warn("XChainVM: no execution mode configured — defaulting to 'in-process', " +
+                "which has NO host-crash (SIGABRT) containment. Production embedders must pass " +
+                "execution: 'subprocess'; pass execution: 'in-process' to acknowledge and silence this.");
+        }
         this.execution = config.execution || 'in-process';
         this._executor = null;
         if (this.execution === 'subprocess') {

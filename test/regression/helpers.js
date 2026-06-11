@@ -69,6 +69,7 @@ const DEFAULT_LIMITS = {
  */
 function createVM(overrides) {
     return new XChainVM({
+        execution: 'in-process',  // explicit: containment not needed in unit/fuzz harnesses
         gasSchedule: overrides?.gasSchedule || GAS_SCHEDULE,
         gasCeiling:  overrides?.gasCeiling  || 1000000,
         limits: { ...DEFAULT_LIMITS, ...(overrides?.limits || {}) }

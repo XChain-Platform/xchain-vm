@@ -38,6 +38,7 @@ const GAS_SCHEDULE = {
 
 function createVM() {
     return new XChainVM({
+        execution: 'in-process',  // explicit: containment not needed in unit/fuzz harnesses
         gasSchedule: GAS_SCHEDULE,
         gasCeiling: 1000000,
         limits: {
