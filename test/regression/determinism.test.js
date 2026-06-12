@@ -26,7 +26,12 @@ try {
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
     VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000,
-    VM_EMISSION: 500
+    VM_EMISSION: 500,
+    // Cross-chain call buckets — MUST match the production per-chain configs
+    // (xchain-indexer/src/configs/{BTC,LTC,DOGE}.js). gateway-emit.js carries
+    // identical fallback defaults, but the keys are pinned here explicitly so
+    // the crossExecute baselines are computed against the production schedule.
+    VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
 };
 
 function createVM() {
@@ -147,17 +152,20 @@ async function runTwice(vm, opts) {
         assert.strictEqual(r1.emittedActions.length, 2);
     });
 
-    // Contract-targeted staking + external attestation host methods. These run
-    // on every chain in the indexer EXECUTE path, so a gas-charging,
-    // response-serialisation, or __gas-injection regression here must fail CI
-    // rather than silently diverge an on-chain block hash. Fixtures (code +
-    // injected accessors) are shared with determinism-baseline.test.js.
+    // Contract-targeted staking, external attestation, and cross-contract /
+    // cross-chain call host methods. These run on every chain in the indexer
+    // EXECUTE path, so a gas-charging, response-serialisation, or
+    // __gas-injection regression here must fail CI rather than silently
+    // diverge an on-chain block hash. Fixtures (code + injected accessors)
+    // are shared with determinism-baseline.test.js. Fixtures flagged
+    // expectSuccess: false pin a deterministic failure (e.g. the emit.execute
+    // depth-gate throw) — the run-twice equality assertion applies either way.
     CONTRACT_HOST_FIXTURES.forEach(function(f) {
         it(`should produce identical results for ${f.name}`, async function() {
             const opts = { ...baseOpts, code: f.code, ...(f.extra || {}) };
             const [r1, r2] = await runTwice(vm, opts);
             assert.strictEqual(hashResult(r1), hashResult(r2));
-            assert.strictEqual(r1.success, true, r1.error);
+            assert.strictEqual(r1.success, f.expectSuccess !== false, r1.error);
         });
     });
 

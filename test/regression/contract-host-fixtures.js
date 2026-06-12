@@ -13,13 +13,16 @@
 // contact legal@dankest.llc.
 
 // ---------------------------------------------------------------------------
-// Determinism fixtures for the contract-targeted staking + external
-// attestation VM host methods:
+// Determinism fixtures for the contract-targeted staking, external
+// attestation, and cross-contract/cross-chain call VM host methods:
 //
 //   xchain.contract.getStake / getTotalStaked / getStakers   (VM_STATE_READ)
 //   xchain.contract.slash                                     (VM_EMISSION)
 //   xchain.attestation.request                                (VM_ATTEST_REQUEST + VM_EMISSION)
 //   xchain.attestation.getResponse                            (VM_STATE_READ)
+//   xchain.emit.execute                                       (VM_EMISSION + gasLimit reservation)
+//   xchain.emit.crossExecute                                  (VM_EMISSION + VM_XCALL_REQUEST
+//                                                              + gasLimit + VM_XCALL_CALLBACK)
 //
 // Shared by BOTH determinism suites so each contract runs with byte-identical
 // code AND identical injected accessor data:
@@ -82,12 +85,45 @@ function makeAttestationData() {
     };
 }
 
-// Each fixture: { name, code, extra }.
+// Cross-contract call fixture builder. One fixture per allowed depth: the host
+// threads opts.callDepth, so a contract running at callDepth N queues a call
+// that will run at depth N+1. Depths 1–4 succeed (maxCallDepth default 4);
+// callDepth 4 must produce the deterministic depth-gate throw BEFORE any gas
+// is reserved. Each digest pins gasUsed (VM_EMISSION + the 5000 gasLimit
+// reservation, charged atomically against `ceiling - used`) and the queued
+// EXECUTE emission, so an order-of-operations or remaining-gas-check
+// regression in gateway-emit.js fails CI instead of forking gasUsed.
+// getCallDepth() is folded into the return value so the depth threading
+// itself is part of the pinned output.
+function makeEmitExecuteFixture(callDepth) {
+    const targetDepth = callDepth + 1;
+    const gated = targetDepth > 4;
+    return {
+        name: gated
+            ? `inline:emit-execute-depth${targetDepth}-throw`
+            : `inline:emit-execute-depth${targetDepth}`,
+        code: `module.exports = function(xchain) {
+            xchain.emit.execute({
+                contractIndex: 200,
+                method: 'onCall',
+                params: ['p1', 'p2'],
+                gasLimit: 5000
+            });
+            return { depth: xchain.getCallDepth(), queued: true };
+        };`,
+        extra: { state: {}, callDepth },
+        ...(gated ? { expectSuccess: false } : {})
+    };
+}
+
+// Each fixture: { name, code, extra, expectSuccess? }.
 //   name  — stable key in DETERMINISM_BASELINE.json; DO NOT rename without regen.
 //   code  — inline contract source (single exported function, dispatched as the
 //           default method exactly like the existing inline:* fixtures).
 //   extra — opts merged on top of the suite's baseOpts (accessor injection plus a
 //           clean empty state so nothing unrelated bleeds into the digest).
+//   expectSuccess — false for fixtures whose pinned output is a deterministic
+//           failure (e.g. the depth-gate throw); absent means success expected.
 //
 // attestation.request derives request_id from sha256(txHash:contractIndex:emissionIndex),
 // so txHash + contractIndex are pinned to fixed values to keep the digest stable.
@@ -132,6 +168,46 @@ const CONTRACT_HOST_FIXTURES = [
             return xchain.attestation.getResponse('abc123');
         };`,
         extra: { state: {}, attestationData: makeAttestationData() }
+    },
+    // emit.execute at depths 1–4 (callDepth 0–3) plus the depth-5 gate throw
+    // (callDepth 4).
+    makeEmitExecuteFixture(0),
+    makeEmitExecuteFixture(1),
+    makeEmitExecuteFixture(2),
+    makeEmitExecuteFixture(3),
+    makeEmitExecuteFixture(4),
+    {
+        // Cross-CHAIN call. Pins the 4-bucket charge (VM_EMISSION +
+        // VM_XCALL_REQUEST + gasLimit + VM_XCALL_CALLBACK — the suite's
+        // GAS_SCHEDULE must carry the two XCALL keys at production values) and
+        // the deterministic callId, which is returned so the digest covers the
+        // sha256(network:chain:txHash:actionIndex:contractIndex:emissionIndex:
+        // targetChain) preimage, including the emissionIndex derived from
+        // emissionCollector.actions.length at emit time. Every preimage input
+        // is pinned via `extra`; sourceChain comes from baseOpts'
+        // contractAddress ('C:BTC:100'), so LTC is a valid distinct target.
+        name: 'inline:emit-crossexecute',
+        code: `module.exports = function(xchain) {
+            var callId = xchain.emit.crossExecute({
+                targetChain: 'LTC',
+                contractIndex: 300,
+                method: 'onRemote',
+                params: ['x1', 'x2'],
+                gasLimit: 5000,
+                callbackMethod: 'onResult',
+                callbackParams: ['ctx'],
+                deadlineBlocks: 100
+            });
+            return { callId: callId, hops: xchain.getCrossHops() };
+        };`,
+        extra: {
+            state: {},
+            network: 'mainnet',
+            txHash: 'deadbeefcafe',
+            actionIndex: 3,
+            contractIndex: 100,
+            crossHops: 0
+        }
     }
 ];
 

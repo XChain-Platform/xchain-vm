@@ -8,6 +8,12 @@
   "inline:state-math-loop": "63e45241455c4c697694d04a4f8b2f2fe84abb281d2834323dd3935c570c4398",
   "inline:contract-stake-reads": "89ea9c6aacb889cd1a5e5ab3c52a63b53222a67f15d40929d3978d03285903fa",
   "inline:contract-slash": "86a20c5de3b8db672574d7dba890f991027b6868be7142413ae4ff746911ae9a",
-  "inline:attestation-request": "f39763d8debae8a530000332f3066d4395a50944529188aff6110072b2004aac",
-  "inline:attestation-getresponse": "257433b13fce66d93d23863de6516c0ba8f6fd90ea5b97986d4f412da4a7ca4d"
+  "inline:attestation-request": "805cc11fbad054da31f62dc26f9d73e25d0b5036148d2e0edbbb1de3c4a26ed4",
+  "inline:attestation-getresponse": "257433b13fce66d93d23863de6516c0ba8f6fd90ea5b97986d4f412da4a7ca4d",
+  "inline:emit-execute-depth1": "018944ebfe0c0399f0b67aa95a2bc0e6cbc44c42595b5455f6f84bba17b5f5f7",
+  "inline:emit-execute-depth2": "4d4e613d9f0f89dd6baac2f1475c3a38032c44d6119ec071637dcc6d5f9c1245",
+  "inline:emit-execute-depth3": "0ba92f9cd6b9b2a77b4a3e43113eacb4a940d59823e199b0b86f0d730515d508",
+  "inline:emit-execute-depth4": "83dd53dc3cbf887e564db9b82a01460db7af1f5d3cc96925615519b410386517",
+  "inline:emit-execute-depth5-throw": "12b59979d9aac54dc9a25fa3e0f0db557f6c659b59a48148b30240a0f3587720",
+  "inline:emit-crossexecute": "522bc69f5d2356f99e5ae71992bcef6ddc226e94a9e1decfc031dcdbc21e9ada"
 }

@@ -33,7 +33,12 @@ try {
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
     VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000,
-    VM_EMISSION: 500
+    VM_EMISSION: 500,
+    // Cross-chain call buckets — MUST match the production per-chain configs
+    // (xchain-indexer/src/configs/{BTC,LTC,DOGE}.js). gateway-emit.js carries
+    // identical fallback defaults, but the keys are pinned here explicitly so
+    // the crossExecute baselines are computed against the production schedule.
+    VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
 };
 
 function createVM() {
@@ -127,9 +132,10 @@ const CORPUS = [
         };`,
         state: {}
     },
-    // Contract-targeted staking + external attestation host methods. Shared with
-    // determinism.test.js via contract-host-fixtures.js so the run-twice suite and
-    // this pinned-baseline suite exercise byte-identical code + injected accessors.
+    // Contract-targeted staking, external attestation, and cross-contract /
+    // cross-chain call host methods. Shared with determinism.test.js via
+    // contract-host-fixtures.js so the run-twice suite and this pinned-baseline
+    // suite exercise byte-identical code + injected accessors.
     ...CONTRACT_HOST_FIXTURES
 ];
 
