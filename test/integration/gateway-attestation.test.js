@@ -120,6 +120,62 @@ function baseExecOpts(extra) {
             assert.strictEqual(emission.params.deadlineBlocks, 20);
             assert.strictEqual(typeof emission.params.requestId, 'string');
             assert.strictEqual(emission.params.requestId.length, 64);
+            // Feeless request → fee fields ride as empty strings (the indexer's
+            // buildActionParams emits them as trailing empties, which the wire
+            // serializer trims — byte-identical to the pre-fee format).
+            assert.strictEqual(emission.params.feeTick, '');
+            assert.strictEqual(emission.params.feeAmount, '');
+        });
+
+        it('carries feeTick/feeAmount into the emission when provided (E1 paid attestations)', async function () {
+            const result = await vm.execute(baseExecOpts({
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request(
+                        'http_get',
+                        'https://example.com/paid',
+                        'handleResponse',
+                        [],
+                        { redundancy: 1, deadlineBlocks: 10, feeTick: 'XCHAIN', feeAmount: '2.5' }
+                    );
+                };`
+            }));
+            assert.strictEqual(result.success, true, 'execution should succeed: ' + result.error);
+            let emission = result.emittedActions[0];
+            assert.strictEqual(emission.params.feeTick, 'XCHAIN');
+            assert.strictEqual(emission.params.feeAmount, '2.5');
+        });
+
+        it('rejects a feeAmount with more than 8 decimal places', async function () {
+            const result = await vm.execute(baseExecOpts({
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request('http_get', 'https://example.com/x', 'cb', [],
+                        { redundancy: 1, feeTick: 'XCHAIN', feeAmount: '1.123456789' });
+                };`
+            }));
+            assert.strictEqual(result.success, false);
+            assert.match(String(result.error), /feeAmount must be a non-negative decimal/);
+        });
+
+        it('rejects feeAmount > 0 without a feeTick', async function () {
+            const result = await vm.execute(baseExecOpts({
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request('http_get', 'https://example.com/x', 'cb', [],
+                        { redundancy: 1, feeAmount: '5' });
+                };`
+            }));
+            assert.strictEqual(result.success, false);
+            assert.match(String(result.error), /feeTick is required when feeAmount > 0/);
+        });
+
+        it('rejects a pipe character in feeTick (wire-format injection guard)', async function () {
+            const result = await vm.execute(baseExecOpts({
+                code: `module.exports = function(xchain) {
+                    return xchain.attestation.request('http_get', 'https://example.com/x', 'cb', [],
+                        { redundancy: 1, feeTick: 'XCH|AIN', feeAmount: '5' });
+                };`
+            }));
+            assert.strictEqual(result.success, false);
+            assert.match(String(result.error), /must not contain/);
         });
 
         it('produces distinct request_ids for two emissions in the same tx', async function () {

@@ -169,6 +169,19 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     throw new Error('attestation.request: redundancy must be 1, 3, or 5');
                 if (!Number.isInteger(deadlineBlocks) || deadlineBlocks < 1 || deadlineBlocks > 100)
                     throw new Error('attestation.request: deadlineBlocks must be an integer in [1, 100]');
+                // Optional request fee (E1 paid attestations). Pass-through as
+                // strings: the indexer enforces the consensus rules (XCHAIN-only
+                // tick in v1, amount format, fee-payer balance), keeping the VM
+                // agnostic to future tick loosening. Only basic shape checks here
+                // so a contract bug throws at call time, not at indexing time.
+                let feeTick   = opts.feeTick   !== undefined && opts.feeTick   !== null ? String(opts.feeTick).trim()   : '';
+                let feeAmount = opts.feeAmount !== undefined && opts.feeAmount !== null ? String(opts.feeAmount).trim() : '';
+                if (feeTick.indexOf('|') !== -1 || feeAmount.indexOf('|') !== -1)
+                    throw new Error('attestation.request: feeTick/feeAmount must not contain "|"');
+                if (feeAmount !== '' && !/^\d+(\.\d{1,8})?$/.test(feeAmount))
+                    throw new Error('attestation.request: feeAmount must be a non-negative decimal with at most 8 decimal places');
+                if (feeAmount !== '' && feeAmount !== '0' && feeTick === '')
+                    throw new Error('attestation.request: feeTick is required when feeAmount > 0');
                 // Per-provider deadline ceiling, injected by the host at execution
                 // setup (readOnlyData.providerDeadlines). The [1, 100] check above is
                 // a platform-wide safety net; this enforces the named provider's
@@ -207,7 +220,9 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     callbackMethod:  callbackMethod,
                     callbackParams:  callbackParamsJson,
                     redundancy:      redundancy,
-                    deadlineBlocks:  deadlineBlocks
+                    deadlineBlocks:  deadlineBlocks,
+                    feeTick:         feeTick,
+                    feeAmount:       feeAmount
                 });
 
                 return requestId;
