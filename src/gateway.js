@@ -57,6 +57,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
         // a run reached via emit.execute. Lets library contracts guard themselves
         // before emit.execute throws at the max-depth gate.
         getCallDepth:        () => Number.isInteger(readOnlyData.callDepth) ? readOnlyData.callDepth : 0,
+        getCrossHops:        () => Number.isInteger(readOnlyData.crossHops) ? readOnlyData.crossHops : 0,
 
         // Read-only ledger queries (100 gas each)
         getBalance: (address, tick) => {
@@ -108,7 +109,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             }
         },
 
-        // Cross-chain (Phase 4, metered)
+        // Cross-chain (metered)
         crossChain: {
             getAttestation: (chain, actionIndex) => {
                 gasTracker.charge(gasSchedule.VM_CROSSCHAIN_READ);
@@ -117,6 +118,15 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             isSettled: (chain, actionIndex) => {
                 gasTracker.charge(gasSchedule.VM_CROSSCHAIN_READ);
                 return readOnlyData.crossChainData?.isSettled(chain, actionIndex) || false;
+            },
+            // Outcome of a cross-chain call THIS chain originated:
+            // { status, payload } once terminal (visible the block after it
+            // resolved), null while in flight. The callback (emit.crossExecute's
+            // callbackMethod) is the primary delivery; this read backs
+            // idempotency checks and late consumers.
+            getCallResult: (callId) => {
+                gasTracker.charge(gasSchedule.VM_CROSSCHAIN_READ);
+                return readOnlyData.crossChainData?.getCallResult(callId) || null;
             }
         },
 
@@ -265,11 +275,21 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
         },
 
         // Action emission (metered, 500 gas each; emit.execute additionally
-        // reserves the callee's gasLimit — see gateway-emit.js)
+        // reserves the callee's gasLimit; emit.crossExecute pre-pays the
+        // request + remote ceiling + callback — see gateway-emit.js)
         emit: buildEmitAPI(gasTracker, emissionCollector, gasSchedule, {
             callDepth:    readOnlyData.callDepth,
             maxCallDepth: readOnlyData.maxCallDepth,
-            minCallGas:   readOnlyData.minCallGas
+            minCallGas:   readOnlyData.minCallGas,
+            // Cross-chain call context: hop budget + the call_id derivation
+            // inputs (network + source chain bound into the preimage so
+            // BTC-family chains sharing tx-hash space can never collide).
+            crossHops:       readOnlyData.crossHops,
+            network:         readOnlyData.network,
+            contractAddress: readOnlyData.contractAddress,
+            txHash:          readOnlyData.txHash,
+            actionIndex:     readOnlyData.actionIndex,
+            contractIndex:   readOnlyData.contractIndex
         }),
 
         // Deterministic math (wraps mathjs bignumber)

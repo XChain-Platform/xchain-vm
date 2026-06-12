@@ -135,6 +135,7 @@ const HARNESS_SOURCE = `
         getInputParam:       wrap(globalThis.__getInputParam),
         getInputParamCount:  wrap(globalThis.__getInputParamCount),
         getCallDepth:        wrap(globalThis.__getCallDepth),
+        getCrossHops:        wrap(globalThis.__getCrossHops),
 
         // Ledger queries (metered)
         getBalance:    wrap(globalThis.__getBalance),
@@ -158,7 +159,8 @@ const HARNESS_SOURCE = `
         // Cross-chain (metered)
         crossChain: Object.freeze({
             getAttestation: wrap(globalThis.__crossChain_getAttestation),
-            isSettled:      wrap(globalThis.__crossChain_isSettled)
+            isSettled:      wrap(globalThis.__crossChain_isSettled),
+            getCallResult:  wrap(globalThis.__crossChain_getCallResult)
         }),
 
         // External attestation framework (metered)
@@ -195,7 +197,8 @@ const HARNESS_SOURCE = `
             link:      wrap(globalThis.__emit_link),
             broadcast: wrap(globalThis.__emit_broadcast),
             message:   wrap(globalThis.__emit_message),
-            execute:   wrap(globalThis.__emit_execute)
+            execute:   wrap(globalThis.__emit_execute),
+            crossExecute: wrap(globalThis.__emit_crossExecute)
         }),
 
         // Math (wrapped from individual host-side References)
@@ -501,6 +504,19 @@ const CONTRACT_WRAPPER = `
     (new __Fn('module', 'exports', 'xchain', __contractCode))(module, exports, xchain);
     var contractExports = module.exports;
 
+    // Cross-chain call gate: an injected cross-chain execution may only invoke
+    // methods the contract explicitly opted in via an exported crossCallable
+    // array. This is the blast-radius bound on the federation's relay authority
+    // — a quorum-signed dispatch can only reach methods the target contract
+    // consciously exposed. The fixed marker string is matched by the indexer
+    // (xexec.js) to report status 'not_callable' back to the caller.
+    if (__isCrossCall) {
+        var __cc = (typeof contractExports === 'object' && contractExports !== null)
+            ? contractExports.crossCallable : null;
+        if (!Array.isArray(__cc) || __cc.indexOf(__methodName) === -1)
+            throw new Error('XCALL_NOT_CALLABLE: method "' + __methodName + '" is not in the crossCallable allowlist');
+    }
+
     // Invoke the method
     var __result;
     if (typeof contractExports === 'function') {
@@ -533,6 +549,16 @@ const MAX_CODE_SIZE = 65536;
 // bypass them. Exported below for the cross-service regression suite.
 const MAX_CALL_DEPTH = 4;
 const MIN_CALL_GAS   = 5000;
+
+// Cross-CHAIN call (XCALL) protocol constants. Canonical values:
+// xchain-documentation/protocol/constants.js; the indexer re-validates
+// host-side (execute.js processEmission + actions/xcall.js).
+const XCALL_MIN_GAS             = 5000;     // = MIN_CALL_GAS
+const XCALL_MAX_GAS             = 200000;   // target-side ceiling cap (the run is fee-less on the target chain)
+const XCALL_MAX_HOPS            = 2;        // user→remote = 1, remote→back = 2
+const XCALL_MIN_DEADLINE_BLOCKS = 10;
+const XCALL_MAX_DEADLINE_BLOCKS = 4000;
+const XCALL_MAX_RETURN_BYTES    = 1024;
 
 class XChainVM {
     /**
@@ -703,6 +729,10 @@ class XChainVM {
                     callDepth:       Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
                     maxCallDepth:    this.limits.maxCallDepth,
                     minCallGas:      this.limits.minCallGas,
+                    // Cross-chain call context: network + hop budget feed the
+                    // emit.crossExecute call_id derivation and hop gate.
+                    network:         opts.network || '',
+                    crossHops:       Number.isInteger(opts.crossHops) ? opts.crossHops : 0,
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
                     balances:        opts.balances || {},
@@ -764,6 +794,7 @@ class XChainVM {
             const escapedMethod = JSON.stringify(opts.method || 'default');
             const fullSource = 'let __contractCode = ' + escapedCode + ';\n' +
                                'let __methodName = ' + escapedMethod + ';\n' +
+                               'let __isCrossCall = ' + JSON.stringify(Boolean(opts.isCrossCall)) + ';\n' +
                                CONTRACT_WRAPPER;
 
             let script;
@@ -902,6 +933,7 @@ class XChainVM {
         g.setSync('__getInputParam',       bridge(gateway.getInputParam));
         g.setSync('__getInputParamCount',  bridge(gateway.getInputParamCount));
         g.setSync('__getCallDepth',        bridge(gateway.getCallDepth));
+        g.setSync('__getCrossHops',        bridge(gateway.getCrossHops));
 
         // Ledger queries (metered)
         g.setSync('__getBalance',   bridge(gateway.getBalance));
@@ -921,6 +953,7 @@ class XChainVM {
         // Cross-chain (metered)
         g.setSync('__crossChain_getAttestation', bridge(gateway.crossChain.getAttestation));
         g.setSync('__crossChain_isSettled',      bridge(gateway.crossChain.isSettled));
+        g.setSync('__crossChain_getCallResult',  bridge(gateway.crossChain.getCallResult));
 
         g.setSync('__attestation_request',     bridge(gateway.attestation.request));
         g.setSync('__attestation_getResponse', bridge(gateway.attestation.getResponse));
@@ -949,6 +982,7 @@ class XChainVM {
         g.setSync('__emit_broadcast', bridge(gateway.emit.broadcast));
         g.setSync('__emit_message',   bridge(gateway.emit.message));
         g.setSync('__emit_execute',   bridge(gateway.emit.execute));
+        g.setSync('__emit_crossExecute', bridge(gateway.emit.crossExecute));
 
         // Math
         g.setSync('__math_add',      bridge(gateway.math.add));
@@ -1123,6 +1157,13 @@ module.exports.MAX_CODE_SIZE = MAX_CODE_SIZE;
 // xchain-documentation/protocol/constants.js) — exposed for the same reason.
 module.exports.MAX_CALL_DEPTH = MAX_CALL_DEPTH;
 module.exports.MIN_CALL_GAS   = MIN_CALL_GAS;
+// Cross-CHAIN call (XCALL) protocol constants — same canonical source.
+module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
+module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
+module.exports.XCALL_MAX_HOPS            = XCALL_MAX_HOPS;
+module.exports.XCALL_MIN_DEADLINE_BLOCKS = XCALL_MIN_DEADLINE_BLOCKS;
+module.exports.XCALL_MAX_DEADLINE_BLOCKS = XCALL_MAX_DEADLINE_BLOCKS;
+module.exports.XCALL_MAX_RETURN_BYTES    = XCALL_MAX_RETURN_BYTES;
 // Expose the pinned consensus runtime + checker so the indexer (and any
 // validator process bundling the VM) can gate the engine version it runs on.
 const consensusRuntime = require('./consensus-runtime.js');

@@ -87,6 +87,7 @@ function buildCrossChainAccessor(snap) {
     if (isAccessor(snap, 'getAttestation')) return snap; // legacy passthrough
     const attestations = snap.attestations || {};
     const settled      = snap.settled || {};
+    const calls        = snap.calls || {};
     return {
         getAttestation: (chain, actionIndex) => {
             const k = String(chain) + ':' + String(actionIndex);
@@ -95,6 +96,12 @@ function buildCrossChainAccessor(snap) {
         isSettled: (chain, actionIndex) => {
             const k = String(chain) + ':' + String(actionIndex);
             return settled[k] === true;
+        },
+        // Terminal outcome of a cross-chain call this chain originated:
+        // { status, payload } or null while in flight (keys are call_ids).
+        getCallResult: (callId) => {
+            const r = calls[String(callId).toLowerCase()];
+            return r != null ? { status: String(r.status), payload: String(r.payload) } : null;
         }
     };
 }
