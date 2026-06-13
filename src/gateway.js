@@ -137,6 +137,11 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             // from sha256(tx_hash || contract_index || emission_index). The contract
             // proceeds synchronously; the response arrives later via the callback method.
             request: (providerId, requestPayload, callbackMethod, callbackParams, options) => {
+                // A controller guard runs synchronously inside a native action's
+                // settlement and must return an allow/deny decision now — it cannot
+                // wait blocks for an attestation response. Reject before charging.
+                if (readOnlyData.isGuard)
+                    throw new Error('attestation.request: not available to a controller guard');
                 gasTracker.charge(gasSchedule.VM_ATTEST_REQUEST);
                 gasTracker.charge(gasSchedule.VM_EMISSION);
                 if (typeof providerId !== 'string' || providerId.length === 0 || Buffer.byteLength(providerId, 'utf8') > 32)
@@ -304,7 +309,8 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             contractAddress: readOnlyData.contractAddress,
             txHash:          readOnlyData.txHash,
             actionIndex:     readOnlyData.actionIndex,
-            contractIndex:   readOnlyData.contractIndex
+            contractIndex:   readOnlyData.contractIndex,
+            isGuard:         readOnlyData.isGuard
         }),
 
         // Deterministic math (wraps mathjs bignumber)

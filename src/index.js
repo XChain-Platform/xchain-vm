@@ -733,6 +733,13 @@ class XChainVM {
                     // emit.crossExecute call_id derivation and hop gate.
                     network:         opts.network || '',
                     crossHops:       Number.isInteger(opts.crossHops) ? opts.crossHops : 0,
+                    // Controller-guard mode: when the indexer runs a token's bound
+                    // contract `guard` method before a guarded native action settles,
+                    // the asynchronous frameworks (attestation, cross-chain calls) are
+                    // disabled — their results arrive blocks later, after the guarded
+                    // action has already committed or reverted. Enforced at emit time
+                    // in gateway.js (attestation.request) + gateway-emit.js (crossExecute).
+                    isGuard:         Boolean(opts.isGuard),
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
                     balances:        opts.balances || {},

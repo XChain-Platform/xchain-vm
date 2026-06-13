@@ -76,6 +76,10 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     const maxCallDepth = Number.isInteger(ctx.maxCallDepth) ? ctx.maxCallDepth : 4;
     const minCallGas   = Number.isInteger(ctx.minCallGas)   ? ctx.minCallGas   : 5000;
     const crossHops    = Number.isInteger(ctx.crossHops)    ? ctx.crossHops    : 0;
+    // Controller-guard mode disables the asynchronous cross-chain call path: a
+    // guard must return its allow/deny decision synchronously, before the guarded
+    // native action settles (the XCALL result would land blocks later).
+    const isGuard      = Boolean(ctx.isGuard);
 
     return {
         // Cross-contract call (deferred). Queues an EXECUTE on another (or the
@@ -161,6 +165,8 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
         //
         // Returns the deterministic call_id.
         crossExecute: (params) => {
+            if (isGuard)
+                throw new Error('emit.crossExecute: not available to a controller guard');
             validateRequired(params, ['targetChain', 'contractIndex', 'method', 'gasLimit', 'callbackMethod']);
 
             // Hop gate first (deterministic throw before any gas moves): hops
