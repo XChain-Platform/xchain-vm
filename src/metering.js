@@ -68,6 +68,31 @@ function wrapWithGas(expr) {
     };
 }
 
+// AST node for a bare call statement:  __name()
+function callStatement(name) {
+    return {
+        type: 'ExpressionStatement',
+        expression: { type: 'CallExpression',
+            callee: { type: 'Identifier', name: name }, arguments: [], optional: false }
+    };
+}
+
+// Wrap a function node's (block) body with the deterministic call-depth guard:
+//     __depth_enter(); try { <original body> } finally { __depth_exit(); }
+// The enter hook throws (and poisons execution) when the fixed depth limit is
+// reached; the finally guarantees the counter is decremented on every normal or
+// exceptional return so sibling (non-nested) calls do not accumulate depth.
+function wrapDepthGuard(node) {
+    if (!node.body || node.body.type !== 'BlockStatement') return;
+    const tryStmt = {
+        type: 'TryStatement',
+        block: { type: 'BlockStatement', body: node.body.body },
+        handler: null,
+        finalizer: { type: 'BlockStatement', body: [callStatement('__depth_exit')] }
+    };
+    node.body.body = [callStatement('__depth_enter'), tryStmt];
+}
+
 // Count the number of directive prologue statements at the start of a body
 function directivePrologueLength(body) {
     let count = 0;
@@ -114,7 +139,13 @@ function binaryDepth(node) {
 // The pass below rewrites operators/syntax into calls to these; they must never
 // be wrapped as ordinary call sites, and contract source may not reference them.
 const ALLOC_HELPERS = ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread'];
-const RESERVED_IDENTIFIERS = ['__gas'].concat(ALLOC_HELPERS);
+// Deterministic call-depth metering helpers (src/index.js harness). Phase 4 below
+// wraps every contract function body in __depth_enter()/finally __depth_exit() so
+// intra-contract recursion is bounded by a fixed, platform-independent depth — not
+// by V8's architecture-dependent native stack limit. Reserved like __gas: a
+// contract may not define or reference them.
+const DEPTH_HELPERS = ['__depth_enter', '__depth_exit'];
+const RESERVED_IDENTIFIERS = ['__gas'].concat(ALLOC_HELPERS).concat(DEPTH_HELPERS);
 const HELPER_SET = new Set(ALLOC_HELPERS);
 
 // Small AST builders for the allocator rewrite.
@@ -427,6 +458,34 @@ function meterCode(source) {
                     }
                 }
             }
+        }
+    });
+
+    // Phase 4: Deterministic call-depth bounding.
+    // Wrap every contract function body as:
+    //     __depth_enter(); try { <body> } finally { __depth_exit(); }
+    // A native stack overflow (RangeError) fires at an architecture- and
+    // host-stack-dependent depth; a contract that CATCHES the RangeError can read
+    // that raw native depth and commit it into hashed state, so two validators on
+    // different CPUs (or at different host call depths) diverge → fork. The harness
+    // (src/index.js) enforces a fixed, platform-independent depth limit on these
+    // enter/exit hooks, throwing a deterministic out_of_stack fault that cannot be
+    // swallowed — so the maximum depth a contract can ever observe is identical on
+    // every node. Runs LAST, after all __gas() injection, so the synthetic
+    // try/finally is not itself gas-metered (depth bounding is gas-free, leaving the
+    // gas cost of existing contracts unchanged) and the depth hooks are exempt from
+    // the call-site wrapping above.
+    walk.simple(ast, {
+        FunctionDeclaration(node) { wrapDepthGuard(node); },
+        FunctionExpression(node)  { wrapDepthGuard(node); },
+        ArrowFunctionExpression(node) {
+            // Convert an expression-bodied arrow to a block returning the
+            // expression, so it can carry the enter/try/finally guard.
+            if (node.body.type !== 'BlockStatement') {
+                node.body = { type: 'BlockStatement',
+                    body: [{ type: 'ReturnStatement', argument: node.body }] };
+            }
+            wrapDepthGuard(node);
         }
     });
 

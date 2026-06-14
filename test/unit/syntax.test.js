@@ -49,6 +49,14 @@ try {
             }
         });
 
+        it('should reject the call-depth metering hooks as reserved', function() {
+            for (const id of ['__depth_enter', '__depth_exit']) {
+                const result = validateSyntax('var x = ' + id + ';');
+                assert.strictEqual(result.valid, false, id + ' should be reserved');
+                assert(result.error.includes(id), result.error);
+            }
+        });
+
         it('should accept ES2020 features', function() {
             const result = validateSyntax('var x = a?.b ?? "default";');
             assert.strictEqual(result.valid, true);

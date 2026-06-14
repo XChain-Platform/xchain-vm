@@ -70,9 +70,33 @@ const HARNESS_SOURCE = `
     // Use __defineProperty (saved by sandbox before stripping Object.defineProperty)
     // to make __gas non-writable/non-configurable so contracts cannot overwrite it.
     var __gasRef = globalThis.__gas;
+
+    // ----- Deterministic call-depth state -----
+    // Captured before the global-cleanup pass below strips __-prefixed injected
+    // names. __DEPTH_LIMIT is a fixed, platform-independent recursion bound chosen
+    // safely below the smallest native V8 stack limit across supported
+    // architectures, injected by the host (index.js). The counter + flag live in
+    // this closure, unreachable from contract code.
+    var __DEPTH_LIMIT  = globalThis.__DEPTH_LIMIT;
+    var __stackDepth   = 0;
+    var __stackPoison  = false;
+    // The deterministic stack fault. Its message embeds "call stack" so the host
+    // classifier (index.js _classifyError) maps it to the frozen out_of_stack
+    // status, exactly like a real native overflow.
+    var __stackError = function() { return new Error('maximum call stack depth exceeded'); };
+    // ----- end call-depth state -----
+
     // Forward the charge amount: 1 for the AST meter's __gas(1) (control flow),
     // or the allocation size for the bulk-allocation wrappers below.
-    var __gasFunc = function(n) { __gasRef.applySync(undefined, [(typeof n === 'number' && n > 1) ? n : 1]); };
+    // Also the choke point that makes the stack fault un-swallowable: once depth is
+    // poisoned, every metered point (the meter injects __gas(1) at the top of every
+    // catch block) re-throws, so a contract cannot catch the fault and resume to
+    // read a platform-dependent depth — mirroring how gas exhaustion cannot be
+    // caught and swallowed.
+    var __gasFunc = function(n) {
+        if (__stackPoison) throw __stackError();
+        __gasRef.applySync(undefined, [(typeof n === 'number' && n > 1) ? n : 1]);
+    };
     var __defProp = globalThis.__defineProperty;
     delete globalThis.__gas;
     __defProp(globalThis, '__gas', {
@@ -242,6 +266,34 @@ const HARNESS_SOURCE = `
             try { delete globalThis[names[i]]; } catch(e) {}
         }
     }
+
+    // ----- Deterministic call-depth metering -----
+    // The AST meter (metering.js Phase 4) wraps every contract function body as
+    //   __depth_enter(); try { <body> } finally { __depth_exit(); }
+    // so intra-contract recursion is bounded by a fixed, platform-independent depth
+    // rather than by V8's architecture-dependent native stack limit. Without this, a
+    // contract that catches the native RangeError observes the raw native depth and
+    // can commit it into hashed state — diverging validators on different CPUs (or at
+    // different host stack depths) → fork. Defined AFTER the cleanup pass so the hooks
+    // survive, and locked (like __gas) so contract code cannot overwrite them. When no
+    // positive limit was injected the guard is inert (no false trips) and behaviour
+    // falls back to the native overflow path.
+    __defProp(globalThis, '__depth_enter', {
+        value: function() {
+            if (__stackPoison) throw __stackError();
+            if (__DEPTH_LIMIT > 0 && __stackDepth >= __DEPTH_LIMIT) {
+                __stackPoison = true;
+                throw __stackError();
+            }
+            __stackDepth++;
+        },
+        writable: false, configurable: false, enumerable: false
+    });
+    __defProp(globalThis, '__depth_exit', {
+        value: function() { if (__stackDepth > 0) __stackDepth--; },
+        writable: false, configurable: false, enumerable: false
+    });
+    // ----- end call-depth metering -----
 
     // ----- Compute/iteration-size gas metering (G1) -----
     // F3 (above) bounded the ALLOCATION builtins; this bounds the COMPUTE/
@@ -568,6 +620,21 @@ const MAX_CODE_SIZE = 65536;
 const MAX_CALL_DEPTH = 4;
 const MIN_CALL_GAS   = 5000;
 
+// Deterministic intra-contract recursion bound. DISTINCT from MAX_CALL_DEPTH
+// (which bounds cross-contract emit.execute chains): this caps how deep a single
+// contract may recurse WITHIN one isolate before the metering-injected depth guard
+// throws a deterministic out_of_stack fault. The value is a fixed, conservative
+// constant chosen well below the smallest native V8 stack limit across every
+// supported architecture (linux/arm64 + linux/amd64) and across the host stack
+// remaining at runSync entry, so the guard always fires before V8's own
+// architecture-dependent RangeError. That makes the maximum recursion depth a
+// contract can observe identical on every validator — a contract that catches the
+// fault can no longer commit a platform-variable depth into hashed state. Purely an
+// in-isolate execution bound (the host never re-validates it), so it lives here
+// rather than in the cross-service protocol constants; all validators agree on it
+// via the pinned consensus runtime version.
+const MAX_STACK_DEPTH = 512;
+
 // Cross-CHAIN call (XCALL) protocol constants. Canonical values:
 // xchain-documentation/protocol/constants.js; the indexer re-validates
 // host-side (execute.js processEmission + actions/xcall.js).
@@ -601,6 +668,9 @@ class XChainVM {
         // caller's limits object predates them (additive, non-breaking).
         if (!Number.isInteger(this.limits.maxCallDepth)) this.limits.maxCallDepth = MAX_CALL_DEPTH;
         if (!Number.isInteger(this.limits.minCallGas))   this.limits.minCallGas   = MIN_CALL_GAS;
+        // Intra-contract recursion bound (see MAX_STACK_DEPTH). Default the constant
+        // when the caller's limits object predates it (additive, non-breaking).
+        if (!Number.isInteger(this.limits.maxStackDepth)) this.limits.maxStackDepth = MAX_STACK_DEPTH;
         this.isolateManager = new IsolateManager(this.limits);
         this.actionValidator = new ActionValidator();
 
@@ -793,6 +863,12 @@ class XChainVM {
                 }
             });
             context.global.setSync('__gas', gasRef);
+
+            // Inject the deterministic recursion bound. The harness captures this
+            // into a closure and enforces it on the metering-injected depth hooks,
+            // so a contract that catches a stack fault cannot observe a
+            // platform-dependent native depth (see MAX_STACK_DEPTH).
+            context.global.setSync('__DEPTH_LIMIT', this.limits.maxStackDepth);
 
             // Run harness script to assemble xchain object inside isolate
             const harnessScript = isolate.compileScriptSync(this._harnessSource);
@@ -1208,6 +1284,8 @@ module.exports.MAX_CODE_SIZE = MAX_CODE_SIZE;
 // xchain-documentation/protocol/constants.js) — exposed for the same reason.
 module.exports.MAX_CALL_DEPTH = MAX_CALL_DEPTH;
 module.exports.MIN_CALL_GAS   = MIN_CALL_GAS;
+// Intra-contract recursion bound (deterministic in-isolate stack-depth limit).
+module.exports.MAX_STACK_DEPTH = MAX_STACK_DEPTH;
 // Cross-CHAIN call (XCALL) protocol constants — same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
