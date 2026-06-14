@@ -491,7 +491,8 @@ const HARNESS_SOURCE = `
 /**
  * Contract wrapper script. Runs the contract code and invokes the
  * specified method (or the default export if it's a function).
- * Injected variables: __contractCode (string), __methodName (string)
+ * Injected variables: __contractCode (string), __methodName (string),
+ * __isCrossCall (bool), __readManifest (bool — Phase E manifest introspection)
  */
 const CONTRACT_WRAPPER = `
 (function() {
@@ -503,6 +504,23 @@ const CONTRACT_WRAPPER = `
     delete globalThis.__Function;
     (new __Fn('module', 'exports', 'xchain', __contractCode))(module, exports, xchain);
     var contractExports = module.exports;
+
+    // Permissions-manifest introspection (Phase E). When the host reads a
+    // contract's declared policy at deploy time it sets __readManifest, and we
+    // surface the exported permissions + maxTakeBps WITHOUT dispatching a method.
+    // Type tags are surfaced (not just values) so the indexer can fail-closed on a
+    // malformed manifest (e.g. permissions exported as a string, or a non-integer
+    // maxTakeBps) rather than silently treating it as absent. All validation +
+    // rejection lives host-side (actions/deploy.js); the VM only reports faithfully.
+    if (__readManifest) {
+        var __ce = (typeof contractExports === 'object' && contractExports !== null) ? contractExports : {};
+        return '\\x02' + JSON.stringify({
+            permissions:     Array.isArray(__ce.permissions) ? __ce.permissions : null,
+            permissionsType: (__ce.permissions === undefined) ? 'undefined' : (Array.isArray(__ce.permissions) ? 'array' : typeof __ce.permissions),
+            maxTakeBps:      (typeof __ce.maxTakeBps === 'number') ? __ce.maxTakeBps : null,
+            maxTakeBpsType:  (__ce.maxTakeBps === undefined) ? 'undefined' : typeof __ce.maxTakeBps
+        });
+    }
 
     // Cross-chain call gate: an injected cross-chain execution may only invoke
     // methods the contract explicitly opted in via an exported crossCallable
@@ -802,6 +820,7 @@ class XChainVM {
             const fullSource = 'let __contractCode = ' + escapedCode + ';\n' +
                                'let __methodName = ' + escapedMethod + ';\n' +
                                'let __isCrossCall = ' + JSON.stringify(Boolean(opts.isCrossCall)) + ';\n' +
+                               'let __readManifest = ' + JSON.stringify(Boolean(opts.readManifest)) + ';\n' +
                                CONTRACT_WRAPPER;
 
             let script;
@@ -1153,6 +1172,31 @@ class XChainVM {
      */
     checkFloatWarnings(code) {
         return checkFloatWarnings(code);
+    }
+
+    /**
+     * Read a contract's declared permissions manifest (Phase E) at deploy time.
+     * Instantiates the module top-level inside an isolate (gas-metered, no state,
+     * oracle, or balances) and surfaces its exported `permissions` + `maxTakeBps`
+     * WITHOUT dispatching a method — deterministic across validators because it
+     * depends only on the (immutable) contract code and the pinned runtime. Works
+     * for constructor-less contracts, which vm.execute() never runs otherwise.
+     *
+     * Returns the raw, typed manifest report; the indexer (actions/deploy.js) owns
+     * all validation + fail-closed rejection. On a module-level throw, success is
+     * false and the host treats the contract as declaring no manifest (today's
+     * behavior for a contract that only fails at first execute).
+     *
+     * @param {string} code
+     * @returns {Promise<{ success: boolean, manifest: object|null, error: string|null }>}
+     */
+    async readManifest(code) {
+        const result = await this.execute({ code, method: '__manifest__', readManifest: true });
+        if (!result.success)
+            return { success: false, manifest: null, error: result.error };
+        let manifest = null;
+        try { manifest = JSON.parse(result.returnValue); } catch (e) { manifest = null; }
+        return { success: true, manifest, error: null };
     }
 }
 
