@@ -185,12 +185,14 @@ function isStateGetCall(node) {
     return o.type === 'MemberExpression' && !o.computed && o.property && o.property.name === 'state'; // xchain.state.get(...)
 }
 
-// True if the callee is a member call to `<name>` (e.g. .require / .getInputParam),
-// in dotted form. Object identity is intentionally loose (xchain.require, this.require…).
-function isMemberCall(node, name) {
-    return node && node.type === 'CallExpression' && node.callee
-        && node.callee.type === 'MemberExpression' && !node.callee.computed
-        && node.callee.property && node.callee.property.name === name;
+// The simple callee name of a call: the identifier (foo(...)) or the dotted member
+// property (x.foo(...)). null for computed/complex callees.
+function calleeName(node) {
+    if (!node || node.type !== 'CallExpression' || !node.callee) return null;
+    const c = node.callee;
+    if (c.type === 'Identifier') return c.name;
+    if (c.type === 'MemberExpression' && !c.computed && c.property) return c.property.name;
+    return null;
 }
 
 // Locate the `module.exports = { ... }` object literal, returning { obj, methodNames }.
@@ -350,8 +352,13 @@ function analyzeContract(code) {
                 let readsInput = false, hasRequire = false;
                 walk.simple(v, {
                     CallExpression(c) {
-                        if (isMemberCall(c, 'getInputParam')) readsInput = true;
-                        if (isMemberCall(c, 'require')) hasRequire = true;
+                        const n = calleeName(c);
+                        if (n === 'getInputParam') readsInput = true;
+                        // Any require()/require*-named call counts as validation — this
+                        // covers xchain.require AND helper guards (requirePositive,
+                        // requireAddress, requireStatus, …) so delegating validation to
+                        // a helper is not flagged as missing.
+                        if (n && (n === 'require' || n.indexOf('require') === 0)) hasRequire = true;
                     }
                 });
                 if (readsInput && !hasRequire) {
