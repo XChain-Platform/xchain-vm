@@ -24,7 +24,7 @@ describe('GasTracker', function() {
         VM_ORACLE_READ:    100,
         VM_CROSSCHAIN_READ: 100,
         VM_ATTEST_REQUEST: 5000,
-        VM_EMISSION:       500
+        VM_EMISSION:       500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
     };
 
     it('should start with 0 gas used', function() {

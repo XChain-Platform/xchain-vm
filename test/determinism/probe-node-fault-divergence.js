@@ -53,7 +53,7 @@ const consensusStatus = (r) => (r && r.success ? 'valid' : vmFailureStatus(r && 
 
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200, VM_STATE_DELETE: 100,
-    VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000, VM_EMISSION: 500
+    VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000, VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
 };
 const LIMITS = { maxCpuTimeMs: 2000, maxMemory: 8, maxEmissions: 50, maxStateKeys: 10000, maxStateValueSize: 65536, maxCodeSize: 65536 };
 const CFG = { execution: 'subprocess', gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000, limits: LIMITS };

@@ -55,7 +55,7 @@ describe('Preflight: sandbox engine must load', function() {
             gasSchedule: {
                 VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
                 VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100,
-                VM_ATTEST_REQUEST: 5000, VM_EMISSION: 500,
+                VM_ATTEST_REQUEST: 5000, VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000,
             },
             gasCeiling: 1000000,
             limits: {

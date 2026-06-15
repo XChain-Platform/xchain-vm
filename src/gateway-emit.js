@@ -53,16 +53,10 @@ const XCALL_MIN_DEADLINE_BLOCKS = 10;
 const XCALL_MAX_DEADLINE_BLOCKS = 4000;
 const XCALL_DEFAULT_DEADLINE    = 400;
 
-// Fixed gas buckets pre-paid at emit time, resolvable from the schedule with
-// identical defaults (the per-chain configs in the indexer carry the same
-// values; the default is belt-and-suspenders so a schedule gap can never make
-// two operators charge differently).
-function xcallRequestGas(gasSchedule){
-    return Number.isInteger(gasSchedule.VM_XCALL_REQUEST) ? gasSchedule.VM_XCALL_REQUEST : 2000;
-}
-function xcallCallbackGas(gasSchedule){
-    return Number.isInteger(gasSchedule.VM_XCALL_CALLBACK) ? gasSchedule.VM_XCALL_CALLBACK : 20000;
-}
+// VM_XCALL_REQUEST / VM_XCALL_CALLBACK are charged directly from the schedule
+// (like VM_EMISSION). Both are CANONICAL_GAS_KEYS, so GasTracker construction
+// already rejects a schedule that omits them — no silent fallback default that
+// could diverge gasUsed (and fee) across the fleet on config drift.
 
 const ALLOWED_TARGET_CHAINS = ['BTC', 'LTC', 'DOGE'];
 
@@ -230,7 +224,7 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             if (!Number.isInteger(gasLimit) || gasLimit < XCALL_MIN_GAS || gasLimit > XCALL_MAX_GAS)
                 throw new Error('emit.crossExecute: gasLimit must be an integer in [' + XCALL_MIN_GAS + ', ' + XCALL_MAX_GAS + ']');
 
-            const totalCharge = gasSchedule.VM_EMISSION + xcallRequestGas(gasSchedule) + gasLimit + xcallCallbackGas(gasSchedule);
+            const totalCharge = gasSchedule.VM_EMISSION + gasSchedule.VM_XCALL_REQUEST + gasLimit + gasSchedule.VM_XCALL_CALLBACK;
             const remaining = gasTracker.ceiling - gasTracker.used;
             if (totalCharge > remaining)
                 throw new Error('emit.crossExecute: total charge ' + totalCharge + ' exceeds remaining gas ' + remaining);

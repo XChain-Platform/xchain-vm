@@ -42,7 +42,13 @@ const CANONICAL_GAS_KEYS = Object.freeze([
     'VM_ORACLE_READ',
     'VM_CROSSCHAIN_READ',
     'VM_ATTEST_REQUEST',
-    'VM_EMISSION'
+    'VM_EMISSION',
+    // XCALL buckets are charged unconditionally by emit.crossExecute
+    // (gateway-emit.js); listing them here makes a missing/mistyped schedule
+    // value fail loud at construction instead of silently charging a fallback
+    // default that diverges gasUsed (and therefore fee) across the fleet.
+    'VM_XCALL_REQUEST',
+    'VM_XCALL_CALLBACK'
 ]);
 
 // Resolve the gas ceiling for ONE execution. A cross-contract call runs the
