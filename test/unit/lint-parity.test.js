@@ -30,7 +30,7 @@ const fs     = require('fs');
 const path   = require('path');
 
 const { validateSyntax, checkFloatWarnings } = require('../../src/syntax.js');
-const { lintSource } = require('../../src/lint-core.js');
+const { lintSource, CONSENSUS_RULES } = require('../../src/lint-core.js');
 
 const VM_SRC_DIR     = path.join(__dirname, '..', '..', 'src');
 const SDK_VENDOR_DIR = path.join(__dirname, '..', '..', '..', 'xchain-sdk', 'src', 'contract');
@@ -90,6 +90,35 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                     fx.name + ' message drift:\n  deploy: ' + v.error + '\n  lint  : ' + l.errors[0].message);
             });
         }
+    });
+
+    describe('Move 2 rules NEVER change the deploy verdict (parity invariant)', function () {
+        // The critical guarantee: lint-core gained a new ERROR rule
+        // (crossCallable-not-array) and several warnings, but validateSyntax — the
+        // on-chain deploy gate — must block on CONSENSUS_RULES ONLY. A contract that
+        // only trips a Move-2 rule still deploys.
+        const CC_NOT_ARRAY = 'module.exports = { foo: function(x){ return 1; }, crossCallable: "oops" };';
+        const MOVE2_WARN   = 'function f(){ while(true){ break; } return new Array(5).fill(0); }';
+
+        it('crossCallable-not-array is a lint error but NOT deploy-blocking', function () {
+            const l = lintSource(CC_NOT_ARRAY);
+            assert.ok(l.errors.some(e => e.rule === 'crossCallable-not-array'), 'lint should flag it');
+            assert.ok(!CONSENSUS_RULES.has('crossCallable-not-array'), 'must not be a consensus rule');
+            assert.strictEqual(validateSyntax(CC_NOT_ARRAY).valid, true,
+                'deploy validator must still accept a contract with a malformed crossCallable');
+        });
+
+        it('Move-2 warnings do not block deployment', function () {
+            assert.ok(lintSource(MOVE2_WARN).warnings.length > 0, 'lint should warn');
+            assert.strictEqual(validateSyntax(MOVE2_WARN).valid, true);
+        });
+
+        it('every CONSENSUS_RULES member is an error-severity finding', function () {
+            // banned-math fixture trips a consensus rule; confirm severity tagging.
+            const e = lintSource('function f(){ return Math.sqrt(4); }').errors[0];
+            assert.strictEqual(e.severity, 'error');
+            assert.ok(CONSENSUS_RULES.has(e.rule));
+        });
     });
 
     describe('float warnings parity', function () {

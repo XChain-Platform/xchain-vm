@@ -31,8 +31,8 @@
 const fs   = require('fs');
 const path = require('path');
 
-const { validateSyntax, checkFloatWarnings } = require('../src/syntax.js');
-const { lintSource } = require('../src/lint-core.js');
+const { validateSyntax } = require('../src/syntax.js');
+const { lintSource, CONSENSUS_RULES } = require('../src/lint-core.js');
 
 function usage(msg) {
     if (msg) process.stderr.write('xchain-lint: ' + msg + '\n');
@@ -58,19 +58,20 @@ function lintFile(file) {
         return { file, ok: false, readError: e.message, errors: [], warnings: [] };
     }
 
-    // Authoritative verdict (includes the V8 step-1 compile).
+    // Authoritative deploy verdict (includes the V8 step-1 compile).
     const verdict = validateSyntax(code);
-    // Rich, multi-error/structured view (acorn-coverable rules + warnings).
+    // Full structured view: every acorn-coverable rule + Move-2 advisories.
     const lint = lintSource(code);
-    const warnings = checkFloatWarnings(code);
 
-    let errors = lint.errors;
-    // If the authoritative verdict failed but lint-core found nothing, the cause
-    // is the V8-only step-1 syntax check — surface its message.
-    if (!verdict.valid && errors.length === 0)
-        errors = [{ rule: 'syntax', message: verdict.error, line: null }];
+    const errors = lint.errors.slice();
+    // A V8-only step-1 failure (acorn parsed, but V8 rejected) won't appear in
+    // lint-core's errors — surface validateSyntax's message in that case.
+    if (!verdict.valid && !errors.some((e) => CONSENSUS_RULES.has(e.rule)))
+        errors.unshift({ rule: 'syntax', message: verdict.error, line: null, severity: 'error' });
 
-    return { file, ok: verdict.valid, errors, warnings };
+    // The CLI is the author-facing gate: any error-severity finding fails the
+    // file (exit 1), including the non-deploy-blocking crossCallable-not-array.
+    return { file, ok: errors.length === 0, errors, warnings: lint.warnings };
 }
 
 function main() {
@@ -111,7 +112,7 @@ function main() {
             for (const e of r.errors)
                 process.stderr.write('    error [' + e.rule + ']: ' + e.message + '\n');
             for (const w of r.warnings)
-                process.stderr.write('    ' + w + '\n');
+                process.stderr.write('    warning [' + w.rule + ']: ' + w.message + '\n');
         }
     }
 

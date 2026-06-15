@@ -23,7 +23,7 @@
 // @ts-nocheck
 
 const ivm = require('isolated-vm');
-const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals } = require('./lint-core.js');
+const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, CONSENSUS_RULES } = require('./lint-core.js');
 
 /**
  * Validate contract code syntax before deployment.
@@ -53,10 +53,12 @@ function validateSyntax(code) {
         try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
     }
 
-    // 2–5. Acorn-coverable rules (shared canonical source of truth).
-    const { errors } = lintSource(code);
-    if (errors.length > 0)
-        return { valid: false, error: errors[0].message };
+    // 2–5. Acorn-coverable rules (shared canonical source of truth). Block ONLY on
+    // consensus rules — lintSource also returns Move-2 advisory findings, which are
+    // author-facing signal and must never change the on-chain deploy verdict.
+    const blocking = lintSource(code).errors.filter((e) => CONSENSUS_RULES.has(e.rule));
+    if (blocking.length > 0)
+        return { valid: false, error: blocking[0].message };
 
     return { valid: true };
 }
