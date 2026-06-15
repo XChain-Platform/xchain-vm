@@ -4,6 +4,9 @@
   "version": "1.11.13",
   "license": "AGPL-3.0-or-later",
   "main": "src/index.js",
+  "bin": {
+    "xchain-lint": "bin/lint.js"
+  },
   "engines": {
     "comment": "Canonical runtime is Node 22 — matches the indexer's node:22-bookworm image and the V8 the validator fleet runs. isolated-vm's native binding is V8-ABI-specific: run `npm rebuild isolated-vm --build-from-source` after switching Node versions. See .nvmrc.",
     "node": ">=22.0.0"
@@ -34,6 +37,7 @@
   },
   "scripts": {
     "test": "mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js'",
+    "lint": "node bin/lint.js",
     "coverage": "c8 --reporter=text --reporter=html --include 'src/**/*.js' mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js' --exit",
     "ci": "mocha --timeout 60000 --exit 'test/preflight.test.js' 'test/unit/**/*.test.js' 'test/smoke/**/*.test.js' 'test/security/**/*.test.js' 'test/boundary/**/*.test.js' 'test/determinism/**/*.test.js' 'test/determinism/known-red/*.known-red.js' 'test/regression/p0-smoke.regression.test.js' 'test/regression/p1-security.regression.test.js' 'test/regression/determinism.test.js' 'test/regression/determinism-baseline.test.js'",
     "test:preflight": "mocha --timeout 30000 'test/preflight.test.js'",
