@@ -142,7 +142,50 @@ const HARNESS_SOURCE = `
     if (typeof __padEnd === 'function') __lockMethod(String.prototype, 'padEnd', function(len) {
         __allocGas(len); return __padEnd.apply(this, arguments);
     });
-    // ----- end F3 -----
+    // ----- Allocation-size gas metering for binary buffers (F3-binary) -----
+    // ArrayBuffer and the TypedArray constructors allocate a dense backing store
+    // proportional to the requested byte length the instant they run — but the F3
+    // wrappers above cover only the Array/String builtins. Left unmetered,
+    // new Uint8Array(1 << 20) in a loop costs ~3 gas/iteration yet marches the
+    // isolate toward its memoryLimit, where the backing-store allocation throws a
+    // CATCHABLE RangeError (Array buffer allocation failed). A contract can
+    // catch that and observe heap occupancy / GC timing — a value that depends on
+    // the failure point and, written into hashed state, diverges across validators
+    // (even identical builds). Charge the byte length up front (as F3 does for
+    // fill) so the deterministic gas ceiling binds before the memory limit is
+    // reachable. Proxy/Reflect are stripped by sandbox.js, so the F3 closure idiom
+    // is used: each global is replaced with a wrapper capturing the native.
+    var __setProto = Object.setPrototypeOf;
+    var __meterBinaryCtor = function(nm) {
+        var Orig = globalThis[nm];
+        if (typeof Orig !== 'function') return;
+        var isTyped = (typeof Orig.BYTES_PER_ELEMENT === 'number' && Orig.BYTES_PER_ELEMENT > 0);
+        var bpe = isTyped ? Orig.BYTES_PER_ELEMENT : 1;
+        var Wrapped = function(a) {
+            // A number arg is a fresh allocation of (count * bytesPerElement); an
+            // array-like / iterable-with-length copy source is the same size. A view
+            // over an existing ArrayBuffer (first arg is the buffer) makes no new
+            // backing store, so it is left uncharged.
+            if (typeof a === 'number') __allocGas(a * bpe);
+            else if (isTyped && a && typeof a.length === 'number') __allocGas(a.length * bpe);
+            return new Orig(...arguments);
+        };
+        // Preserve instanceof and the static surface (BYTES_PER_ELEMENT, from, of,
+        // ArrayBuffer.isView, …) by aliasing the prototype and inheriting statics.
+        Wrapped.prototype = Orig.prototype;
+        try { if (typeof __setProto === 'function') __setProto(Wrapped, Orig); } catch(e) {}
+        // Route species / (new X()).constructor back through the metered wrapper
+        // so the byte-count charge cannot be sidestepped via the instance. (Unlike
+        // Array/String, the TypedArray/ArrayBuffer prototype constructors are not
+        // neutered by sandbox.js, so this reassignment is the live reference.)
+        __lockMethod(Orig.prototype, 'constructor', Wrapped);
+        __lockMethod(globalThis, nm, Wrapped);
+    };
+    var __binCtors = ['ArrayBuffer', 'Uint8Array', 'Int8Array', 'Uint8ClampedArray',
+        'Uint16Array', 'Int16Array', 'Uint32Array', 'Int32Array',
+        'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array'];
+    for (var __bi = 0; __bi < __binCtors.length; __bi++) __meterBinaryCtor(__binCtors[__bi]);
+    // ----- end F3-binary -----
 
     // Clean up __defineProperty — no longer needed
     delete globalThis.__defineProperty;
