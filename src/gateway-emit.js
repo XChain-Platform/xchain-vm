@@ -242,13 +242,17 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             // collide or replay across chains/networks. The target chain is
             // bound so the same logical call to two chains never collides.
             // MUST byte-match the indexer's re-derivation in
-            // xchain-indexer/src/actions/xcall.js (_parseRequest).
+            // xchain-indexer/src/actions/xcall.js (_parseRequest). The emitting
+            // EXECUTE's action_index is deliberately NOT part of the preimage:
+            // (tx_hash, contract_index, emission_index) already uniquely identify
+            // this emission, and action_index shifts with the indexer's synthetic-
+            // action injection timing, which would make call_id non-deterministic
+            // across nodes after any one-block injection slip.
             const txHash        = ctx.txHash || '';
-            const actionIndex   = ctx.actionIndex != null ? Number(ctx.actionIndex) : '';
             const contractIndex = ctx.contractIndex != null ? Number(ctx.contractIndex) : '';
             const emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
             const preimage = String(ctx.network || '') + ':' + sourceChain + ':' +
-                             String(txHash) + ':' + String(actionIndex) + ':' +
+                             String(txHash) + ':' +
                              String(contractIndex) + ':' + emissionIndex + ':' + targetChain;
             const callId = crypto.createHash('sha256').update(preimage).digest('hex');
 

@@ -91,10 +91,12 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
     });
 
     describe('call_id derivation (consensus-critical)', function() {
-        it('byte-matches sha256(network:chain:txHash:actionIndex:contractIndex:emissionIndex:targetChain)', function() {
+        it('byte-matches sha256(network:chain:txHash:contractIndex:emissionIndex:targetChain)', function() {
             const { emit } = createEmitAPI();
             const callId = emit.crossExecute(GOOD);
-            const preimage = 'regtest:BTC:' + 'f'.repeat(64) + ':1234:42:0:DOGE';
+            // action_index is intentionally excluded — it depends on injection timing,
+            // not chain content, so binding it would make call_id non-deterministic.
+            const preimage = 'regtest:BTC:' + 'f'.repeat(64) + ':42:0:DOGE';
             assert.strictEqual(callId, crypto.createHash('sha256').update(preimage).digest('hex'));
         });
 
@@ -103,7 +105,7 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
             const id0 = emit.crossExecute(GOOD);
             const id1 = emit.crossExecute(Object.assign({}, GOOD, { targetChain: 'LTC' }));
             assert.notStrictEqual(id0, id1);
-            const pre1 = 'regtest:BTC:' + 'f'.repeat(64) + ':1234:42:1:LTC';
+            const pre1 = 'regtest:BTC:' + 'f'.repeat(64) + ':42:1:LTC';
             assert.strictEqual(id1, crypto.createHash('sha256').update(pre1).digest('hex'));
         });
 

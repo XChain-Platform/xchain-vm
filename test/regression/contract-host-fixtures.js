@@ -181,10 +181,11 @@ const CONTRACT_HOST_FIXTURES = [
         // VM_XCALL_REQUEST + gasLimit + VM_XCALL_CALLBACK — the suite's
         // GAS_SCHEDULE must carry the two XCALL keys at production values) and
         // the deterministic callId, which is returned so the digest covers the
-        // sha256(network:chain:txHash:actionIndex:contractIndex:emissionIndex:
-        // targetChain) preimage, including the emissionIndex derived from
-        // emissionCollector.actions.length at emit time. Every preimage input
-        // is pinned via `extra`; sourceChain comes from baseOpts'
+        // sha256(network:chain:txHash:contractIndex:emissionIndex:targetChain)
+        // preimage, including the emissionIndex derived from
+        // emissionCollector.actions.length at emit time. (action_index is
+        // intentionally NOT part of the preimage — it depends on injection timing.)
+        // Every preimage input is pinned via `extra`; sourceChain comes from baseOpts'
         // contractAddress ('C:BTC:100'), so LTC is a valid distinct target.
         name: 'inline:emit-crossexecute',
         code: `module.exports = function(xchain) {
