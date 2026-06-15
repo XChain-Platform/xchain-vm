@@ -163,6 +163,26 @@ const CONTRACT_HOST_FIXTURES = [
         extra: { state: {}, txHash: 'deadbeefcafe', contractIndex: 100 }
     },
     {
+        // Paid-attestation (E1) variant. Same call as inline:attestation-request
+        // but with non-empty feeTick/feeAmount in options, so the ATTEST emission
+        // carries the fee pass-through fields. Pins the non-zero-fee code path
+        // distinctly from the zero-fee one above — the VM only shape-checks the
+        // fee fields (the indexer enforces XCHAIN-only tick / amount / payer
+        // balance), so a regression in fee normalisation or emission shaping
+        // shifts THIS digest while leaving the zero-fee digest untouched.
+        name: 'inline:attestation-request-paid',
+        code: `module.exports = function(xchain) {
+            return xchain.attestation.request(
+                'http_get',
+                'https://example.com/data',
+                'onResult',
+                ['ctx'],
+                { redundancy: 1, deadlineBlocks: 10, feeTick: 'XCHAIN', feeAmount: '5.00000000' }
+            );
+        };`,
+        extra: { state: {}, txHash: 'deadbeefcafe', contractIndex: 100 }
+    },
+    {
         name: 'inline:attestation-getresponse',
         code: `module.exports = function(xchain) {
             return xchain.attestation.getResponse('abc123');
