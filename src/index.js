@@ -184,7 +184,21 @@ const HARNESS_SOURCE = `
     var __binCtors = ['ArrayBuffer', 'Uint8Array', 'Int8Array', 'Uint8ClampedArray',
         'Uint16Array', 'Int16Array', 'Uint32Array', 'Int32Array',
         'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array'];
-    for (var __bi = 0; __bi < __binCtors.length; __bi++) __meterBinaryCtor(__binCtors[__bi]);
+    // CONSENSUS GATE: this byte-length charge changes gasUsed (→ contract_hash →
+    // fee debit), so it must activate fleet-wide at a coordinated block-time
+    // flag-day, never the instant an individual node upgrades — otherwise a
+    // mixed-version fleet forks on the first binary-allocating execution. The
+    // host injects __blockTime (this execution's block time) and the flag-day
+    // constant before this harness runs. Below the flag day (or when no block
+    // time was supplied → __blockTime is 0) the constructors are left unmetered,
+    // exactly as pre-activation nodes leave them; at/after it every node charges
+    // the byte length identically. (Both injected names are __-prefixed and so
+    // are stripped by the cleanup pass below, unreachable from contract code.)
+    if (typeof __blockTime === 'number' &&
+        typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
+        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME) {
+        for (var __bi = 0; __bi < __binCtors.length; __bi++) __meterBinaryCtor(__binCtors[__bi]);
+    }
     // ----- end F3-binary -----
 
     // Clean up __defineProperty — no longer needed
@@ -688,6 +702,22 @@ const XCALL_MIN_DEADLINE_BLOCKS = 10;
 const XCALL_MAX_DEADLINE_BLOCKS = 4000;
 const XCALL_MAX_RETURN_BYTES    = 1024;
 
+// Coordinated activation (block time, unix seconds) for binary-allocation gas
+// metering (the F3-binary ArrayBuffer/TypedArray byte-length charge in the
+// harness below). That charge is a consensus-affecting gas-schedule change: a
+// node that applies it and a node that does not produce a different gasUsed for
+// the same execution, and gasUsed is hashed into the per-block contract
+// checkpoint and drives the fee debit — so applying it to ALL blocks (including
+// historical ones) forks any mixed-version fleet on the first binary-allocating
+// execution. Gating the metering on a fleet-wide flag-day makes every node flip
+// the rule at the same timestamp instead of whenever it happens to upgrade.
+// Below the flag day the constructors are UNMETERED (the pre-activation
+// behavior); at/after it the byte-length charge applies on every node alike.
+// Same coordinated timestamp as the indexer's other 2.0.0 flag-day activations
+// (protocol_changes.js). PLACEHOLDER — must be confirmed by the release team
+// before mainnet; a value that differs across the fleet is itself a fork.
+const BINARY_ALLOC_GATE_BLOCK_TIME = 1798761600;
+
 class XChainVM {
     /**
      * @param {object} config
@@ -912,6 +942,19 @@ class XChainVM {
             // so a contract that catches a stack fault cannot observe a
             // platform-dependent native depth (see MAX_STACK_DEPTH).
             context.global.setSync('__DEPTH_LIMIT', this.limits.maxStackDepth);
+
+            // Inject this execution's block time + the binary-alloc metering
+            // flag-day so the harness can gate the F3-binary byte-length charge on
+            // the coordinated activation (see BINARY_ALLOC_GATE_BLOCK_TIME). The
+            // block time is the same value the indexer threads through as
+            // blockContext.timestamp. Coerce to a finite number; a missing/garbage
+            // timestamp resolves to 0 → below the flag day → constructors left
+            // unmetered (pre-activation behavior), so an un-timestamped caller can
+            // never accidentally enable the new charge. Both names are stripped by
+            // the harness cleanup pass, so contract code never sees them.
+            const __blockTime = opts.blockContext && Number(opts.blockContext.timestamp);
+            context.global.setSync('__blockTime', Number.isFinite(__blockTime) ? __blockTime : 0);
+            context.global.setSync('__BINARY_ALLOC_GATE_BLOCK_TIME', BINARY_ALLOC_GATE_BLOCK_TIME);
 
             // Run harness script to assemble xchain object inside isolate
             const harnessScript = isolate.compileScriptSync(this._harnessSource);
@@ -1329,6 +1372,10 @@ module.exports.MAX_CALL_DEPTH = MAX_CALL_DEPTH;
 module.exports.MIN_CALL_GAS   = MIN_CALL_GAS;
 // Intra-contract recursion bound (deterministic in-isolate stack-depth limit).
 module.exports.MAX_STACK_DEPTH = MAX_STACK_DEPTH;
+// Coordinated flag-day (block time) that activates the F3-binary allocation gas
+// metering fleet-wide. Exposed so the consensus-params freeze guard can pin it —
+// the value is consensus-critical (a divergent flag day forks the fleet).
+module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // Cross-CHAIN call (XCALL) protocol constants — same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;

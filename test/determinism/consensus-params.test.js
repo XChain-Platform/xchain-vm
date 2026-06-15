@@ -48,6 +48,17 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.deepStrictEqual(vm.CONSENSUS_STATUS_TOKENS, cr.CONSENSUS_STATUS_TOKENS, 're-export must match');
     });
 
+    it('BINARY_ALLOC_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // The F3-binary ArrayBuffer/TypedArray byte-length gas charge activates
+        // fleet-wide at this block time. It is hashed (gasUsed → contract_hash) and
+        // drives the fee debit, so two nodes that disagree on the flag day diverge
+        // on the first binary-allocating execution after the earlier of the two.
+        // Pin it like any other consensus parameter; changing it is a coordinated
+        // release-team event, NOT a silent edit. Matches the indexer's other 2.0.0
+        // flag-day activations (protocol_changes.js: 1798761600).
+        assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1798761600);
+    });
+
     it('STATUS_ERROR_PREFIXES documents every raw prefix the VM can emit', function () {
         assert.deepStrictEqual(cr.STATUS_ERROR_PREFIXES,
             ['revert', 'out_of_gas', 'timeout', 'out_of_memory', 'out_of_stack', 'out_of_resource', 'error']);

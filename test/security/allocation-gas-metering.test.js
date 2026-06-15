@@ -99,7 +99,15 @@ const CEILING = 1000000;
     beforeEach(function () { vm = createVM(); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
-    const run = (code) => execute(vm, code, { method: 'default' });
+    // F3-binary metering is gated on a coordinated block-time flag-day
+    // (XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME): below it the ArrayBuffer/TypedArray
+    // constructors are intentionally unmetered (pre-activation behavior, so a
+    // mixed-version fleet cannot fork on a historical block). These tests assert
+    // the POST-activation charge, so they must run at/after the flag day. The
+    // pre/post split itself is locked by the binary-alloc-gate regression test.
+    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1798761600;
+    const ACTIVE_CONTEXT = { height: 100, timestamp: GATE, hash: 'abc123' };
+    const run = (code) => execute(vm, code, { method: 'default', blockContext: ACTIVE_CONTEXT });
 
     it('new Uint8Array(n) is charged by byte length → out_of_gas before V8 allocates (no stall)', async function () {
         const t0 = Date.now();
