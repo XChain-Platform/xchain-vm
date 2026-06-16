@@ -80,22 +80,28 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
         assert.strictEqual(o.stack, '', `stack must stay empty even after tamper attempt, got ${JSON.stringify(o.stack)}`);
     });
 
-    // Stack-OVERFLOW path. When recursion overflows the OS stack, V8 cannot run
-    // the isolate's prepareStackTrace hook and falls back to its default
-    // formatter; because every metered call crosses into the host via __gas/
-    // applySync, the overflow trace is captured host-side and (pre-fix) carried
-    // HOST FILESYSTEM PATHS into the contract's catch -> info-leak + per-validator
-    // nondeterminism -> fork. index.js fixes this by zeroing the HOST
-    // stackTraceLimit + prepareStackTrace for the duration of the contract run.
-    it('stack-overflow e.stack must not leak host filesystem paths', async function () {
+    // Stack-OVERFLOW path. Deep recursion used to surface as a contract-catchable
+    // RangeError whose stack text (captured host-side via the __gas/applySync
+    // boundary) carried HOST FILESYSTEM PATHS into the contract's catch -> info-leak
+    // + per-validator nondeterminism -> fork. The fix is now structural rather than
+    // cosmetic: the deterministic in-isolate depth bound (src/metering.js Phase 4 +
+    // src/index.js) throws an UNCATCHABLE out_of_stack fault at a fixed,
+    // platform-independent depth. The contract's own try/catch never runs, so there
+    // is no stack text for it to read or leak, and the fault label is byte-identical
+    // on every validator regardless of CPU/host call depth. Strictly stronger than
+    // the old "neuter the caught stack" guarantee.
+    it('stack-overflow faults deterministically and is uncatchable (no host-path leak)', async function () {
         const r = await ret(wrap(`function g(){ return 1 + g(); } try { g(); } catch (e) { return String(e.stack); }`));
-        assert.strictEqual(r.success, true, `expected success, got error=${r.error}`);
-        // The residual trace may contain deterministic isolate frames
-        // (<isolated-vm>/[eval]) but MUST NOT contain host filesystem paths or
-        // host module references — those vary per validator deployment.
-        const s = r.returnValue || '';
-        assert(!/\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/-]+\.js|node:internal|index\.js:|harness\.js:|cjs\/loader/.test(s),
-            `stack-overflow e.stack leaks host paths: ${s}`);
+        // The contract cannot swallow the overflow: execution faults rather than
+        // reaching the catch and returning the (host-dependent) stack.
+        assert.strictEqual(r.success, false,
+            `overflow must fault uncatchably, not return; got returnValue=${r.returnValue}`);
+        // Frozen, deterministic fault label — no host filesystem paths, no host
+        // module references, no per-validator-variable frame/offset data.
+        assert.strictEqual(r.error, 'out_of_stack: maximum call depth exceeded',
+            `expected the frozen out_of_stack fault, got ${r.error}`);
+        assert(!/\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/-]+\.js|node:internal|index\.js:|harness\.js:|cjs\/loader/.test(r.error || ''),
+            `out_of_stack fault leaks host paths: ${r.error}`);
     });
 
     // DOCUMENTED RESIDUAL — not in-VM fixable, mitigated operationally.
