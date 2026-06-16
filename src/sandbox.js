@@ -7,7 +7,7 @@
  *
  * This file is part of XChain Platform. Licensed under the GNU Affero
  * General Public License v3.0 or later; see LICENSE.md. A commercial
- * license (without AGPL source-disclosure terms) is available —
+ * license (without AGPL source-disclosure terms) is available -
  * contact legal@dankest.llc.
  *
  **********************************************************************
@@ -34,7 +34,16 @@ const STRIP_SCRIPT = `
         'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
         'fetch', 'XMLHttpRequest', 'WebSocket',
         'SharedArrayBuffer', 'Atomics',
-        'queueMicrotask',
+        // queueMicrotask + Promise are removed together: contracts run
+        // SYNCHRONOUSLY under the CONTRACT_WRAPPER (runSync), so any microtask
+        // a contract schedules (.then continuation, post-await write) drains on
+        // isolated-vm-version-dependent timing that is outside the consensus
+        // pin, forking validators on success-vs-timeout or post-await state.
+        // async/await/Promise are also rejected at deploy time (lint-core
+        // findBannedAsync); stripping the Promise global is defense in depth.
+        // The host still derives AsyncFunction below from async-function
+        // syntax, which does not depend on the Promise global binding.
+        'queueMicrotask', 'Promise',
         // BigInt arithmetic (** / *) is a native operation whose cost is super-linear
         // in operand size but is invisible to the AST gas meter -- e.g. 2n ** 5000000n
         // costs ~2 gas yet burns heavy CPU under the memory limit. Removed to close the
@@ -122,6 +131,10 @@ const STRIP_SCRIPT = `
     //   - String.prototype.localeCompare       (ICU collation order/sign)
     //   - String.prototype.toLocaleLowerCase/UpperCase (locale case mapping)
     //   - Number/Array/Object.prototype.toLocaleString (locale separators)
+    // Note: String.prototype.toLowerCase/toUpperCase are NOT neutered here — they are
+    // non-locale methods whose Unicode case-folding output is pinned by the
+    // 'unicode: 17.0' setting in consensus-runtime.js. This is analogous to the
+    // e.message residual: covered by the runtime pin, not by prototype deletion.
     (function() {
         var locale = [
             [String.prototype, 'normalize'],

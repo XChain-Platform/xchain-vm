@@ -7,7 +7,7 @@
  *
  * This file is part of XChain Platform. Licensed under the GNU Affero
  * General Public License v3.0 or later; see LICENSE.md. A commercial
- * license (without AGPL source-disclosure terms) is available —
+ * license (without AGPL source-disclosure terms) is available -
  * contact legal@dankest.llc.
  *
  **********************************************************************
@@ -109,8 +109,57 @@ function findBannedLiterals(code) {
 }
 
 /**
- * Scan contract code for non-integer (decimal) number literals — a non-blocking
- * warning that native float arithmetic is being used. Returns structured rules;
+ * Scan contract code for the async surface (async functions, await expressions,
+ * and Promise references). The CONTRACT_WRAPPER invokes exports SYNCHRONOUSLY:
+ * an `async` export returns a pending Promise (JSON.stringify(result) yields
+ * "{}"), and whether its post-`await` state writes land depends on isolated-vm's
+ * microtask-drain timing inside runSync, a property of the package version that
+ * is NOT part of the consensus-runtime pin. A wall-clock interrupt landing
+ * mid-drain turns a success on one validator into a timeout on another. async/
+ * await is ES2017, so it parses clean under the ES2020 deploy pin and meters
+ * cleanly; reject it at the syntax layer like BigInt/RegExp literals (the
+ * sandbox also strips the Promise global as defense in depth).
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{kind: string, line: (number|string)}>}
+ */
+function findBannedAsync(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
+    } catch (e) {
+        return hits;
+    }
+    const markAsync = (node) => {
+        if (node.async) hits.push({ kind: 'async', line: node.loc ? node.loc.start.line : '?' });
+    };
+    walk.ancestor(ast, {
+        FunctionDeclaration: markAsync,
+        FunctionExpression: markAsync,
+        ArrowFunctionExpression: markAsync,
+        AwaitExpression(node) {
+            hits.push({ kind: 'await', line: node.loc ? node.loc.start.line : '?' });
+        },
+        Identifier(node, state, ancestors) {
+            if (node.name !== 'Promise') return;
+            // Only the GLOBAL Promise is banned. Skip the property position of a
+            // member access (obj.Promise) and a non-computed object-literal key
+            // ({ Promise: ... }): those never resolve to the global binding.
+            const parent = ancestors.length >= 2 ? ancestors[ancestors.length - 2] : null;
+            if (parent) {
+                if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
+                if (parent.type === 'Property' && parent.key === node && !parent.computed) return;
+            }
+            hits.push({ kind: 'promise', line: node.loc ? node.loc.start.line : '?' });
+        }
+    });
+    return hits;
+}
+
+/**
+ * Scan contract code for non-integer (decimal) number literals (a non-blocking
+ * warning that native float arithmetic is being used). Returns structured rules;
  * checkFloatWarnings flattens these to their message strings.
  *
  * @param {string} code - Contract source code
@@ -161,7 +210,8 @@ const CONSENSUS_RULES = new Set([
     'unsupported-syntax',
     'reserved-identifier',
     'banned-math',
-    'banned-literal'
+    'banned-literal',
+    'banned-async'
 ]);
 
 const TYPED_ARRAY_CTORS = new Set([
@@ -456,6 +506,27 @@ function lintSource(code) {
         });
     }
 
+    // 6. Banned async surface (async functions, await, Promise). The
+    //    CONTRACT_WRAPPER invokes exports synchronously, so a pending Promise
+    //    returned by an async export resolves (or not) per isolated-vm's
+    //    version-dependent microtask-drain timing, which is outside the
+    //    consensus-runtime pin: two validators can diverge (success vs timeout,
+    //    or differing post-await state). Rejected at deploy like BigInt/RegExp.
+    const asyncs = findBannedAsync(code);
+    for (const hit of asyncs) {
+        const advice = hit.kind === 'promise'
+            ? 'Promise schedules microtasks whose drain timing is isolated-vm version-dependent and unpinned'
+            : hit.kind === 'await'
+                ? 'await resumes after the synchronous contract invocation returns; post-await state writes are nondeterministic across validators'
+                : 'async functions return a pending Promise the synchronous CONTRACT_WRAPPER cannot await; their post-await effects are nondeterministic across validators';
+        errors.push({
+            rule: 'banned-async',
+            message: 'banned async surface: ' + hit.kind + ' at line ' + hit.line + ' (' + advice + ')',
+            line: typeof hit.line === 'number' ? hit.line : null,
+            severity: 'error'
+        });
+    }
+
     const warnings = findFloatWarnings(code);
 
     // Move 2: logic-level advisories (crossCallable integrity, gas/footgun heuristics).
@@ -474,6 +545,7 @@ module.exports = {
     analyzeContract,
     findBannedMathCalls,
     findBannedLiterals,
+    findBannedAsync,
     findFloatWarnings,
     CONSENSUS_RULES,
     CONTRACT_ECMA_VERSION

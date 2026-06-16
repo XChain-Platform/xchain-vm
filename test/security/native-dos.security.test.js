@@ -7,7 +7,7 @@
  *
  * This file is part of XChain Platform. Licensed under the GNU Affero
  * General Public License v3.0 or later; see LICENSE.md. A commercial
- * license (without AGPL source-disclosure terms) is available —
+ * license (without AGPL source-disclosure terms) is available -
  * contact legal@dankest.llc.
  *
  **********************************************************************
@@ -110,6 +110,55 @@ describe('Native-op DoS: banned literals (deploy-time)', function () {
 
     it('does not false-positive on the string "10n" or division', function () {
         assert.strictEqual(vm.validateSyntax(fn("return '10n' + (10 / 2);")).valid, true);
+    });
+});
+
+describe('Async surface banned (deploy-time): async/await/Promise', function () {
+    let vm;
+    before(function () { if (!XChainVM) this.skip(); vm = createVM(); });
+
+    it('rejects an async function export', function () {
+        const r = vm.validateSyntax('module.exports = { m: async function(x){ return 1; } };');
+        assert.strictEqual(r.valid, false);
+        assert.match(r.error, /async/i);
+    });
+
+    it('rejects an async arrow export', function () {
+        const r = vm.validateSyntax('module.exports = { m: async (x) => { return 1; } };');
+        assert.strictEqual(r.valid, false);
+        assert.match(r.error, /async/i);
+    });
+
+    it('rejects an await expression', function () {
+        const r = vm.validateSyntax('module.exports = { m: async function(){ await 0; return 1; } };');
+        assert.strictEqual(r.valid, false);
+        assert.match(r.error, /async|await/i);
+    });
+
+    it('rejects a bare Promise reference', function () {
+        const r = vm.validateSyntax(fn('return Promise.resolve(1);'));
+        assert.strictEqual(r.valid, false);
+        assert.match(r.error, /promise/i);
+    });
+
+    it('rejects a new Promise(...) construction', function () {
+        const r = vm.validateSyntax(fn('return new Promise(function(res){ res(1); });'));
+        assert.strictEqual(r.valid, false);
+        assert.match(r.error, /promise/i);
+    });
+
+    it('does not false-positive on a property or key named Promise', function () {
+        assert.strictEqual(vm.validateSyntax(fn("var o = { Promise: 1 }; return o.Promise;")).valid, true);
+    });
+
+    it('does not false-positive on the string "Promise" or "async"', function () {
+        assert.strictEqual(vm.validateSyntax(fn("return 'async' + 'Promise';")).valid, true);
+    });
+
+    it('Promise is undefined inside the sandbox at runtime', async function () {
+        const r = await execute(vm, fn('return typeof Promise;'));
+        assert.strictEqual(r.success, true);
+        assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
     });
 });
 
