@@ -279,10 +279,12 @@ describe('[P2] Functional Regression', function() {
     // ================================================================
     describe('ActionValidator', function() {
 
+        // Mirrors validator.js#ALLOWED_ACTIONS (16 base + 4 consensus emission actions).
         const ALLOWED = [
             'SEND', 'DESTROY', 'ISSUE', 'MINT', 'ORDER', 'DISPENSER',
             'DIVIDEND', 'AIRDROP', 'CALLBACK', 'FILE', 'LIST', 'COINPAY',
-            'SWEEP', 'LINK', 'BROADCAST', 'MESSAGE'
+            'SWEEP', 'LINK', 'BROADCAST', 'MESSAGE',
+            'ATTEST', 'SLASH', 'EXECUTE', 'XCALL'
         ];
 
         let validator;
@@ -297,7 +299,6 @@ describe('[P2] Functional Regression', function() {
         it('should reject unknown actions', function() {
             assert.throws(() => validator.validate({ action: 'TRANSFER', params: {} }), /unknown/);
             assert.throws(() => validator.validate({ action: 'DEPLOY', params: {} }), /unknown/);
-            assert.throws(() => validator.validate({ action: 'EXECUTE', params: {} }), /unknown/);
             assert.throws(() => validator.validate({ action: 'send', params: {} }), /unknown/);
         });
 
