@@ -75,6 +75,10 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     // nested runs of the same contract in one tx without binding the injection-
     // timing-dependent action_index. MUST byte-match the indexer (xcall EMITTER_PATH).
     const callPath     = typeof ctx.callPath === 'string'   ? ctx.callPath     : '';
+    // Per-root discriminator (deterministic root on-chain action_index), pinned at the root
+    // and threaded unchanged. Bound into the call_id preimage alongside callPath so two
+    // forest roots under one tx_hash cannot collide. MUST byte-match the indexer (xcall.js).
+    const rootActionIndex = ctx.rootActionIndex != null ? Number(ctx.rootActionIndex) : '';
     // Controller-guard mode disables the asynchronous cross-chain call path: a
     // guard must return its allow/deny decision synchronously, before the guarded
     // native action settles (the XCALL result would land blocks later).
@@ -253,7 +257,7 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             const contractIndex = ctx.contractIndex != null ? Number(ctx.contractIndex) : '';
             const emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
             const preimage = String(ctx.network || '') + ':' + sourceChain + ':' +
-                             String(txHash) + ':' +
+                             String(txHash) + ':' + String(rootActionIndex) + ':' +
                              String(contractIndex) + ':' + callPath + ':' + emissionIndex + ':' + targetChain;
             const callId = crypto.createHash('sha256').update(preimage).digest('hex');
 

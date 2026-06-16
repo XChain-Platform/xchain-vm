@@ -840,6 +840,13 @@ class XChainVM {
      * @param {number} [opts.callDepth]      - Cross-contract call depth (0 = user-submitted EXECUTE)
      * @param {number} [opts.actionIndex]    - The executing EXECUTE's action_index; part of the
      *                                         deterministic attestation request_id preimage
+     * @param {number} [opts.rootActionIndex] - The deterministic on-chain action_index of the ROOT
+     *                                         action that seeded this VM subtree (a top-level EXECUTE,
+     *                                         a controller guard's host action, or a DEPLOY). Pinned at
+     *                                         the root and threaded unchanged through nested executions;
+     *                                         bound into the request_id/call_id preimages as the
+     *                                         per-root discriminator so two forest roots under one
+     *                                         tx_hash (callPath '' both) cannot collide.
      * @returns {Promise<object>} Execution result
      */
     async execute(opts) {
@@ -887,6 +894,12 @@ class XChainVM {
                     contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
                     txHash:          opts.txHash || '',
                     actionIndex:     opts.actionIndex != null ? Number(opts.actionIndex) : null,
+                    // Per-root discriminator: the deterministic on-chain action_index of the root
+                    // that seeded this subtree, threaded unchanged through nested executions. Bound
+                    // into the request_id/call_id preimages alongside callPath so two VM-executing
+                    // roots under one tx_hash (each callPath '') cannot derive the same id. MUST
+                    // byte-match the indexer's ROOT_ACTION_INDEX (execute.processEmission).
+                    rootActionIndex: opts.rootActionIndex != null ? Number(opts.rootActionIndex) : null,
                     // Deterministic call-path: the '>'-joined per-execution emission
                     // positions from the root on-chain action down to THIS execution
                     // (root = ''). Replaces the injection-timing-dependent action_index

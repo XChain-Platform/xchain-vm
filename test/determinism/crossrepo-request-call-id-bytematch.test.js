@@ -38,15 +38,16 @@ const SCHEDULE = {
 // ── Indexer-side preimage formulas — MUST byte-match, verbatim, the strings in:
 //      xchain-indexer/src/actions/attest.js  (request_id)
 //      xchain-indexer/src/actions/xcall.js   (call_id)
-// EMITTER_PATH = the emitter execution's callPath; EMITTER_POSITION = emissionIndex.
-const indexerRequestId = (txHash, emitterPath, contractIndex, position) =>
+// EMITTER_PATH = the emitter execution's callPath; EMITTER_POSITION = emissionIndex;
+// ROOT_ACTION_INDEX = the per-root discriminator (deterministic root on-chain action_index).
+const indexerRequestId = (txHash, rootActionIndex, emitterPath, contractIndex, position) =>
     crypto.createHash('sha256')
-        .update(String(txHash) + ':' + String(emitterPath) + ':' + String(contractIndex) + ':' + String(position))
+        .update(String(txHash) + ':' + String(rootActionIndex) + ':' + String(emitterPath) + ':' + String(contractIndex) + ':' + String(position))
         .digest('hex');
 
-const indexerCallId = (network, coin, txHash, contractIndex, emitterPath, position, targetChain) =>
+const indexerCallId = (network, coin, txHash, rootActionIndex, contractIndex, emitterPath, position, targetChain) =>
     crypto.createHash('sha256')
-        .update(String(network) + ':' + String(coin) + ':' + String(txHash) + ':' +
+        .update(String(network) + ':' + String(coin) + ':' + String(txHash) + ':' + String(rootActionIndex) + ':' +
                 String(contractIndex) + ':' + String(emitterPath) + ':' + String(position) + ':' +
                 String(targetChain))
         .digest('hex');
@@ -55,21 +56,21 @@ const indexerCallId = (network, coin, txHash, contractIndex, emitterPath, positi
 function mkGas() { return { charges: [], charge(n){ this.charges.push(n); } }; }
 function mkState() { const m = new Map(); return { get:k=>m.get(k), has:k=>m.has(k), set:(k,v)=>m.set(k,v), delete:k=>m.delete(k) }; }
 
-function vmRequestId({ txHash, callPath, contractIndex }) {
+function vmRequestId({ txHash, rootActionIndex, callPath, contractIndex }) {
     const collector = new EmissionCollector(50);
     const ro = {
-        contractIndex, txHash, callPath,
+        contractIndex, txHash, rootActionIndex, callPath,
         providerDeadlines: { http_get: 100 }
     };
     const gw = buildGateway(mkGas(), mkState(), collector, ro, SCHEDULE, { reverted: false });
     return gw.attestation.request('http_get', 'https://example.com', 'cb', [], { redundancy: 1, deadlineBlocks: 10 });
 }
 
-function vmCallId({ network, txHash, callPath, contractIndex, targetChain }) {
+function vmCallId({ network, txHash, rootActionIndex, callPath, contractIndex, targetChain }) {
     const collector = new EmissionCollector(50);
     const emit = buildEmitAPI(new GasTracker(SCHEDULE, 1000000), collector, SCHEDULE, {
         callDepth: 0, maxCallDepth: 4, minCallGas: 5000, crossHops: 0,
-        network, txHash, callPath, contractIndex,
+        network, txHash, rootActionIndex, callPath, contractIndex,
         // sourceChain in the call_id preimage is parsed from contractAddress (C:<COIN>:<idx>).
         contractAddress: 'C:' + 'BTC' + ':' + contractIndex
     });
@@ -82,25 +83,34 @@ function vmCallId({ network, txHash, callPath, contractIndex, targetChain }) {
 describe('cross-repo request_id / call_id byte-match (consensus-critical) @regression', function () {
 
     const CASES = [
-        { name: 'root execution (empty call-path)', callPath: '' },
-        { name: 'first-level nested emission',      callPath: '0' },
-        { name: 'deep call-path',                   callPath: '1>0>3' }
+        { name: 'root execution (empty call-path)', callPath: '',      rootActionIndex: 100 },
+        { name: 'first-level nested emission',      callPath: '0',     rootActionIndex: 100 },
+        { name: 'deep call-path',                   callPath: '1>0>3', rootActionIndex: 250 }
     ];
 
     describe('ATTEST request_id', function () {
         for (const c of CASES) {
             it('VM matches the indexer formula — ' + c.name, function () {
                 const txHash = 'abc123', contractIndex = 7;
-                const vm = vmRequestId({ txHash, callPath: c.callPath, contractIndex });
-                const idx = indexerRequestId(txHash, c.callPath, contractIndex, 0);
+                const vm = vmRequestId({ txHash, rootActionIndex: c.rootActionIndex, callPath: c.callPath, contractIndex });
+                const idx = indexerRequestId(txHash, c.rootActionIndex, c.callPath, contractIndex, 0);
                 assert.strictEqual(vm, idx, 'VM and indexer request_id diverged for ' + c.name);
             });
         }
 
         it('two nested runs of the same contract derive DISTINCT request_ids (no collision)', function () {
-            const a = vmRequestId({ txHash: 'abc123', callPath: '0', contractIndex: 7 });
-            const b = vmRequestId({ txHash: 'abc123', callPath: '1', contractIndex: 7 });
+            const a = vmRequestId({ txHash: 'abc123', rootActionIndex: 100, callPath: '0', contractIndex: 7 });
+            const b = vmRequestId({ txHash: 'abc123', rootActionIndex: 100, callPath: '1', contractIndex: 7 });
             assert.notStrictEqual(a, b);
+        });
+
+        // #4244: two FOREST ROOTS under one tx (a top-level EXECUTE and a controller guard) each
+        // seed callPath '' and may target the same contract — only the root discriminator
+        // distinguishes them. Without it both derive the identical request_id.
+        it('two forest roots under one tx (same call-path, differing root) derive DISTINCT request_ids (#4244)', function () {
+            const a = vmRequestId({ txHash: 'abc123', rootActionIndex: 100, callPath: '', contractIndex: 7 });
+            const b = vmRequestId({ txHash: 'abc123', rootActionIndex: 101, callPath: '', contractIndex: 7 });
+            assert.notStrictEqual(a, b, 'top-level EXECUTE vs controller guard under one tx must not collide');
         });
     });
 
@@ -109,19 +119,27 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
             it('VM matches the indexer formula — ' + c.name, function () {
                 const network = 'regtest', coin = 'BTC', txHash = 'f'.repeat(64);
                 const contractIndex = 42, targetChain = 'DOGE';
-                const vm = vmCallId({ network, txHash, callPath: c.callPath, contractIndex, targetChain });
+                const vm = vmCallId({ network, txHash, rootActionIndex: c.rootActionIndex, callPath: c.callPath, contractIndex, targetChain });
                 // sourceChain in the VM preimage is the COIN the emit API is bound to;
                 // gateway-emit derives it from contractAddress/config — here it equals coin.
-                const idx = indexerCallId(network, coin, txHash, contractIndex, c.callPath, 0, targetChain);
+                const idx = indexerCallId(network, coin, txHash, c.rootActionIndex, contractIndex, c.callPath, 0, targetChain);
                 assert.strictEqual(vm, idx, 'VM and indexer call_id diverged for ' + c.name);
             });
         }
 
         it('two nested runs of the same contract derive DISTINCT call_ids (d631c28 regression)', function () {
-            const base = { network: 'regtest', txHash: 'f'.repeat(64), contractIndex: 42, targetChain: 'DOGE' };
+            const base = { network: 'regtest', txHash: 'f'.repeat(64), contractIndex: 42, targetChain: 'DOGE', rootActionIndex: 100 };
             const a = vmCallId(Object.assign({}, base, { callPath: '0' }));
             const b = vmCallId(Object.assign({}, base, { callPath: '1' }));
             assert.notStrictEqual(a, b, 'same-contract nested runs must not collide');
+        });
+
+        // #4244 twin: two forest roots under one tx, same call-path, differing only by root.
+        it('two forest roots under one tx (same call-path, differing root) derive DISTINCT call_ids (#4244)', function () {
+            const base = { network: 'regtest', txHash: 'f'.repeat(64), contractIndex: 42, targetChain: 'DOGE', callPath: '' };
+            const a = vmCallId(Object.assign({}, base, { rootActionIndex: 100 }));
+            const b = vmCallId(Object.assign({}, base, { rootActionIndex: 101 }));
+            assert.notStrictEqual(a, b, 'two forest roots must not collide on call_id');
         });
     });
 });
