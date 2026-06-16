@@ -887,6 +887,13 @@ class XChainVM {
                     contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
                     txHash:          opts.txHash || '',
                     actionIndex:     opts.actionIndex != null ? Number(opts.actionIndex) : null,
+                    // Deterministic call-path: the '>'-joined per-execution emission
+                    // positions from the root on-chain action down to THIS execution
+                    // (root = ''). Replaces the injection-timing-dependent action_index
+                    // in the attestation request_id + cross-chain call_id preimages so
+                    // they stay byte-stable across nodes and reorgs. MUST byte-match the
+                    // indexer's EMITTER_PATH (xchain-indexer execute.processEmission).
+                    callPath:        typeof opts.callPath === 'string' ? opts.callPath : '',
                     callDepth:       Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
                     maxCallDepth:    this.limits.maxCallDepth,
                     minCallGas:      this.limits.minCallGas,

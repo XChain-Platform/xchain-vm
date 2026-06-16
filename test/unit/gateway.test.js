@@ -238,12 +238,15 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(id, crypto.createHash('sha256').update(':' + ':' + ':' + '0').digest('hex'));
         });
 
-        it('includes the executing action_index in the preimage (nested-run disambiguation)', function () {
+        it('includes the executing call-path in the preimage (nested-run disambiguation)', function () {
             // Cross-contract calls can run the SAME contract twice in the SAME tx —
-            // the EXECUTE's own action_index is what keeps their request_ids distinct.
-            const { gw } = build({ actionIndex: 55 });
+            // the execution's deterministic call-path is what keeps their request_ids
+            // distinct (and, unlike the old action_index, it does not shift with the
+            // indexer's synthetic-action injection timing). MUST byte-match the indexer
+            // EMITTER_PATH (xchain-indexer attest.js).
+            const { gw } = build({ callPath: '2>0' });
             const id = gw.attestation.request('llm', 'p', 'cb', []);
-            assert.strictEqual(id, crypto.createHash('sha256').update('abc123:55:7:0').digest('hex'));
+            assert.strictEqual(id, crypto.createHash('sha256').update('abc123:2>0:7:0').digest('hex'));
         });
 
         const bad = [

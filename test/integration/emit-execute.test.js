@@ -149,19 +149,22 @@ const BASE = {
         assert.ok(/exceeds remaining gas/.test(result.error), 'got: ' + result.error);
     });
 
-    it('attestation request_id should differ across actionIndex (nested-run disambiguation)', async function() {
+    it('attestation request_id should differ across callPath (nested-run disambiguation)', async function() {
         const code = `module.exports = function(xchain) {
             return xchain.attestation.request('http_get', 'https://example.com', 'cb', []);
         };`;
-        const optsA = Object.assign({}, BASE, { code, txHash: 'deadbeef', actionIndex: 1001,
+        // Two runs of the same contract in the same tx are distinguished by the
+        // execution's call-path (set by the indexer per execution), NOT action_index
+        // (which is injection-timing-dependent and non-deterministic across nodes).
+        const optsA = Object.assign({}, BASE, { code, txHash: 'deadbeef', callPath: '0',
             providerDeadlines: { http_get: 100 } });
-        const optsB = Object.assign({}, BASE, { code, txHash: 'deadbeef', actionIndex: 1002,
+        const optsB = Object.assign({}, BASE, { code, txHash: 'deadbeef', callPath: '1',
             providerDeadlines: { http_get: 100 } });
         const a = await vm.execute(optsA);
         const b = await vm.execute(optsB);
         assert.strictEqual(a.success, true);
         assert.strictEqual(b.success, true);
         assert.notStrictEqual(JSON.parse(a.returnValue), JSON.parse(b.returnValue),
-            'same contract + tx at different action indexes must derive different request_ids');
+            'same contract + tx at different call-paths must derive different request_ids');
     });
 });

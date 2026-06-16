@@ -70,6 +70,11 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     const maxCallDepth = Number.isInteger(ctx.maxCallDepth) ? ctx.maxCallDepth : 4;
     const minCallGas   = Number.isInteger(ctx.minCallGas)   ? ctx.minCallGas   : 5000;
     const crossHops    = Number.isInteger(ctx.crossHops)    ? ctx.crossHops    : 0;
+    // Deterministic call-path ('>'-joined per-execution emission positions from the
+    // root on-chain action down to this execution; root = ''). Disambiguates two
+    // nested runs of the same contract in one tx without binding the injection-
+    // timing-dependent action_index. MUST byte-match the indexer (xcall EMITTER_PATH).
+    const callPath     = typeof ctx.callPath === 'string'   ? ctx.callPath     : '';
     // Controller-guard mode disables the asynchronous cross-chain call path: a
     // guard must return its allow/deny decision synchronously, before the guarded
     // native action settles (the XCALL result would land blocks later).
@@ -236,18 +241,20 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             // collide or replay across chains/networks. The target chain is
             // bound so the same logical call to two chains never collides.
             // MUST byte-match the indexer's re-derivation in
-            // xchain-indexer/src/actions/xcall.js (_parseRequest). The emitting
-            // EXECUTE's action_index is deliberately NOT part of the preimage:
-            // (tx_hash, contract_index, emission_index) already uniquely identify
-            // this emission, and action_index shifts with the indexer's synthetic-
-            // action injection timing, which would make call_id non-deterministic
-            // across nodes after any one-block injection slip.
+            // xchain-indexer/src/actions/xcall.js (_parseRequest, EMITTER_PATH).
+            // The emitting EXECUTE's action_index is deliberately NOT in the preimage:
+            // it shifts with the indexer's synthetic-action injection timing, so it is
+            // non-deterministic across nodes / reorgs. The call-path replaces it as the
+            // disambiguator — (tx_hash, contract_index, emission_index) alone are NOT
+            // unique because emission_index is per-execution, so two nested runs of the
+            // SAME contract each emitting their first call would collide; the call-path
+            // uniquely names this execution in the call tree and is content-derived.
             const txHash        = ctx.txHash || '';
             const contractIndex = ctx.contractIndex != null ? Number(ctx.contractIndex) : '';
             const emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
             const preimage = String(ctx.network || '') + ':' + sourceChain + ':' +
                              String(txHash) + ':' +
-                             String(contractIndex) + ':' + emissionIndex + ':' + targetChain;
+                             String(contractIndex) + ':' + callPath + ':' + emissionIndex + ':' + targetChain;
             const callId = crypto.createHash('sha256').update(preimage).digest('hex');
 
             gasTracker.charge(totalCharge);

@@ -204,18 +204,22 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
 
                 // Derive deterministic request_id BEFORE pushing the emission so it
                 // reflects the current emission index, not the post-push index.
-                // The executing EXECUTE's own action_index is part of the preimage:
-                // without it, two nested emit.execute runs of the SAME contract in
-                // the SAME tx (same tx_hash, same contract_index, same emission
-                // index 0) would derive IDENTICAL request_ids. The action_index is
-                // unique per execution row, so it disambiguates every run in a call
-                // tree. MUST byte-match the indexer's re-derivation in
-                // xchain-indexer/src/actions/attest.js (_parseRequest).
+                // The call-path is part of the preimage: without it, two nested
+                // emit.execute runs of the SAME contract in the SAME tx (same tx_hash,
+                // same contract_index, same emission index 0) would derive IDENTICAL
+                // request_ids. The call-path (the '>'-joined per-execution emission
+                // positions from the root on-chain action down to this execution;
+                // root = '') uniquely names this execution in the call tree, so it
+                // disambiguates every run — and unlike the old action_index it is
+                // content-derived, so it stays byte-stable across nodes and reorgs
+                // (action_index advanced with injection timing and forked the PBFT).
+                // MUST byte-match the indexer's re-derivation in
+                // xchain-indexer/src/actions/attest.js (_parseRequest, EMITTER_PATH).
                 let txHash        = readOnlyData.txHash || '';
-                let actionIndex   = readOnlyData.actionIndex != null ? Number(readOnlyData.actionIndex) : '';
+                let callPath      = typeof readOnlyData.callPath === 'string' ? readOnlyData.callPath : '';
                 let contractIndex = readOnlyData.contractIndex != null ? Number(readOnlyData.contractIndex) : '';
                 let emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
-                let preimage = String(txHash) + ':' + String(actionIndex) + ':' + String(contractIndex) + ':' + emissionIndex;
+                let preimage = String(txHash) + ':' + callPath + ':' + String(contractIndex) + ':' + emissionIndex;
                 let requestId = crypto.createHash('sha256').update(preimage).digest('hex');
 
                 emissionCollector.add('ATTEST', {
@@ -309,6 +313,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             contractAddress: readOnlyData.contractAddress,
             txHash:          readOnlyData.txHash,
             actionIndex:     readOnlyData.actionIndex,
+            callPath:        readOnlyData.callPath,
             contractIndex:   readOnlyData.contractIndex,
             isGuard:         readOnlyData.isGuard
         }),

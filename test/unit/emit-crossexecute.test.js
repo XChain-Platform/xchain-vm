@@ -31,7 +31,7 @@ const CTX = {
     network: 'regtest',
     contractAddress: 'C:BTC:42',
     txHash: 'f'.repeat(64),
-    actionIndex: 1234,
+    callPath: '',          // root on-chain execution (no nested ancestry)
     contractIndex: 42
 };
 
@@ -91,12 +91,14 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
     });
 
     describe('call_id derivation (consensus-critical)', function() {
-        it('byte-matches sha256(network:chain:txHash:contractIndex:emissionIndex:targetChain)', function() {
+        it('byte-matches sha256(network:chain:txHash:contractIndex:callPath:emissionIndex:targetChain)', function() {
             const { emit } = createEmitAPI();
             const callId = emit.crossExecute(GOOD);
-            // action_index is intentionally excluded — it depends on injection timing,
-            // not chain content, so binding it would make call_id non-deterministic.
-            const preimage = 'regtest:BTC:' + 'f'.repeat(64) + ':42:0:DOGE';
+            // The call-path replaces action_index: action_index depended on injection
+            // timing (non-deterministic across nodes), while the call-path is content-
+            // derived AND disambiguates two nested runs of the same contract. Root
+            // execution → empty path segment.
+            const preimage = 'regtest:BTC:' + 'f'.repeat(64) + ':42::0:DOGE';
             assert.strictEqual(callId, crypto.createHash('sha256').update(preimage).digest('hex'));
         });
 
@@ -105,8 +107,20 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
             const id0 = emit.crossExecute(GOOD);
             const id1 = emit.crossExecute(Object.assign({}, GOOD, { targetChain: 'LTC' }));
             assert.notStrictEqual(id0, id1);
-            const pre1 = 'regtest:BTC:' + 'f'.repeat(64) + ':42:1:LTC';
+            const pre1 = 'regtest:BTC:' + 'f'.repeat(64) + ':42::1:LTC';
             assert.strictEqual(id1, crypto.createHash('sha256').update(pre1).digest('hex'));
+        });
+
+        it('binds the call-path: two nested runs of the same contract derive distinct ids', function() {
+            // The d631c28 collision regression: emissionIndex is per-execution, so two
+            // runs of the same contract each emitting their FIRST cross-call both see
+            // emissionIndex 0 — only the call-path (set by the indexer per execution)
+            // keeps their call_ids distinct. Same everything except callPath here.
+            const a = createEmitAPI({ callPath: '0' }).emit.crossExecute(GOOD);
+            const b = createEmitAPI({ callPath: '1' }).emit.crossExecute(GOOD);
+            assert.notStrictEqual(a, b);
+            const preA = 'regtest:BTC:' + 'f'.repeat(64) + ':42:0:0:DOGE';
+            assert.strictEqual(a, crypto.createHash('sha256').update(preA).digest('hex'));
         });
 
         it('binds the target chain: identical calls to two chains never collide', function() {

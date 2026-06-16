@@ -13,7 +13,8 @@
  **********************************************************************
  * Red-team: attestation request_id + math-API determinism.
  *
- * (1) request_id = sha256(txHash : contractIndex : emissionIndex). Probe:
+ * (1) request_id = sha256(txHash : callPath : contractIndex : emissionIndex), where
+ *     callPath is the execution's deterministic call-path (root = ''). Probe:
  *     - same inputs -> same id (cross-run determinism; fork-relevant)
  *     - N requests in one execution -> N DISTINCT ids (no intra-tx collision)
  *     - the delimiter cannot be gamed into a collision between
