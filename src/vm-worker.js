@@ -7,7 +7,7 @@
  *
  * This file is part of XChain Platform. Licensed under the GNU Affero
  * General Public License v3.0 or later; see LICENSE.md. A commercial
- * license (without AGPL source-disclosure terms) is available —
+ * license (without AGPL source-disclosure terms) is available -
  * contact legal@dankest.llc.
  *
  **********************************************************************
@@ -66,14 +66,19 @@ process.on('message', (msg) => {
             try {
                 result = await vm.execute(msg.opts);
             } catch (e) {
-                // vm.execute() should never throw; if it does, surface a clean
-                // failure rather than crashing the worker.
-                result = {
-                    success: false,
-                    error: 'error: worker execute threw: ' + (e && e.message ? e.message : 'unknown'),
-                    gasUsed: 0, returnValue: null,
-                    stateChanges: [], stateDeletes: [], emittedActions: [], logs: []
-                };
+                // vm.execute() throwing is a HOST fault, not a contract outcome:
+                // the throwing window is host-side construction (new GasTracker /
+                // new StateManager) that runs BEFORE execute()'s own try block, and
+                // a contract cannot make those throw. Fabricating a consensus result
+                // here was a fork hazard: gasUsed:0 zeroes the fee, the 'error:'
+                // prefix maps to the frozen failed status, and the raw host
+                // exception text leaked cross-chain via VM_ERROR_MESSAGE. Instead
+                // die, so the parent's deterministic host-termination machinery
+                // (process-executor _onExit, hostTerminatedResult) clamps this
+                // request to its caller-funded ceiling, identically on every
+                // validator, exactly as an in-isolate resource failure would.
+                process.exit(1);
+                return;
             }
             send({ type: 'result', id: msg.id, result });
         });
