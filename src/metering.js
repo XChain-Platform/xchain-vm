@@ -435,7 +435,8 @@ function meterCode(source) {
         CallExpression(node, ancestors) {
             if (processed.has(node)) return;
             // Don't inject into our own __gas call or the allocator metering helpers
-            // (__concat/__tmpl/__arrspread/__objspread), which already charge by size.
+            // (__concat/__setconcat/__tmpl/__tmpltag/__tmpltagm/__arrspread/__objspread),
+            // which already charge by size.
             if (node.callee.type === 'Identifier' &&
                 (node.callee.name === '__gas' || HELPER_SET.has(node.callee.name))) return;
             // Don't inject into member calls on __gas (shouldn't exist, but defensive)

@@ -7,11 +7,11 @@
  *
  * This file is part of XChain Platform. Licensed under the GNU Affero
  * General Public License v3.0 or later; see LICENSE.md. A commercial
- * license (without AGPL source-disclosure terms) is available —
+ * license (without AGPL source-disclosure terms) is available -
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Gateway Builder
+ * XChain VM Gateway Builder
  *
  * Builds the xchain gateway object that contracts interact with.
  * Every state/ledger/emission method is gas-metered.
@@ -134,11 +134,11 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
         // Spec: claude/reports/specs/2026-05-24_external-attestation-framework.md
         attestation: {
             // Emit an attestation request. Returns a deterministic request_id derived
-            // from sha256(tx_hash || contract_index || emission_index). The contract
+            // from sha256("<tx_hash>:<rootActionIndex>:<callPath>:<contractIndex>:<emissionIndex>") (colon-delimited). The contract
             // proceeds synchronously; the response arrives later via the callback method.
             request: (providerId, requestPayload, callbackMethod, callbackParams, options) => {
                 // A controller guard runs synchronously inside a native action's
-                // settlement and must return an allow/deny decision now — it cannot
+                // settlement and must return an allow/deny decision now; it cannot
                 // wait blocks for an attestation response. Reject before charging.
                 if (readOnlyData.isGuard)
                     throw new Error('attestation.request: not available to a controller guard');
@@ -210,15 +210,15 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // request_ids. The call-path (the '>'-joined per-execution emission
                 // positions from the root on-chain action down to this execution;
                 // root = '') uniquely names this execution in the call tree, so it
-                // disambiguates every run — and unlike the old action_index it is
+                // disambiguates every run, and unlike the old action_index it is
                 // content-derived, so it stays byte-stable across nodes and reorgs
                 // (action_index advanced with injection timing and forked the PBFT).
                 // MUST byte-match the indexer's re-derivation in
                 // xchain-indexer/src/actions/attest.js (_parseRequest, EMITTER_PATH).
                 let txHash          = readOnlyData.txHash || '';
                 // Per-root discriminator (deterministic root on-chain action_index). Without it,
-                // two forest roots under one tx_hash — e.g. a top-level EXECUTE and a controlled-
-                // token guard, both seeding callPath '' — derive the SAME request_id. Pinned at the
+                // two forest roots under one tx_hash (e.g. a top-level EXECUTE and a controlled-
+                // token guard, both seeding callPath '') derive the SAME request_id. Pinned at the
                 // root, threaded unchanged. MUST byte-match the indexer (attest.js ROOT_ACTION_INDEX).
                 let rootActionIndex = readOnlyData.rootActionIndex != null ? Number(readOnlyData.rootActionIndex) : '';
                 let callPath        = typeof readOnlyData.callPath === 'string' ? readOnlyData.callPath : '';
@@ -251,9 +251,9 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             }
         },
 
-        // Contract-targeted staking — readable + slashable from inside the contract being staked TO.
+        // Contract-targeted staking: readable + slashable from inside the contract being staked TO.
         // The contractStakeData accessor is pre-loaded by execute.js for ONLY the currently-executing
-        // contract's stakes — a contract cannot read/slash stakes targeting another contract.
+        // contract's stakes; a contract cannot read/slash stakes targeting another contract.
         contract: {
             // Returns the SUM of active stake amounts for (pubkey, token) on THIS contract.
             // Returns '0' if no active stake (also during pre-activation grace).
@@ -283,7 +283,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             // (from readOnlyData) for defense-in-depth verification in the indexer handler.
             //
             // Slashed tokens are routed to the contract's slash_destination (locked at DEPLOY
-            // time — see deploy.js). Reaches both active stakes AND cooldown-queued balances
+            // time, see deploy.js). Reaches both active stakes AND cooldown-queued balances
             // per the plan; over-slash is silently capped at available balance.
             slash: (pubkey, token, amount) => {
                 gasTracker.charge(gasSchedule.VM_EMISSION);
@@ -305,7 +305,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
 
         // Action emission (metered, 500 gas each; emit.execute additionally
         // reserves the callee's gasLimit; emit.crossExecute pre-pays the
-        // request + remote ceiling + callback — see gateway-emit.js)
+        // request + remote ceiling + callback, see gateway-emit.js)
         emit: buildEmitAPI(gasTracker, emissionCollector, gasSchedule, {
             callDepth:    readOnlyData.callDepth,
             maxCallDepth: readOnlyData.maxCallDepth,
@@ -329,7 +329,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
 
         // Control flow (gas-free)
         // Store the revert reason in execContext so the error classifier can
-        // verify it matches — prevents spoofing via caught reverts (RISK-04).
+        // verify it matches, prevents spoofing via caught reverts (RISK-04).
         revert: (reason) => {
             const r = reason || 'reverted';
             if (execContext) {
