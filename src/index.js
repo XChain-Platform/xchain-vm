@@ -718,6 +718,40 @@ const XCALL_MAX_RETURN_BYTES    = 1024;
 // before mainnet; a value that differs across the fleet is itself a fork.
 const BINARY_ALLOC_GATE_BLOCK_TIME = 1798761600;
 
+// Coordinated activation (block time, unix seconds) for the async/Promise
+// contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
+// `Promise` (sandbox.js) and the deploy validator rejects async/await/Promise
+// (lint-core CONSENSUS_RULES 'banned-async'). Both are consensus-affecting — a
+// node that strips Promise / rejects an async DEPLOY and a node that does not
+// produce a different gasUsed/status (→ contract_hash → fee debit, and a
+// different deploy verdict), so a mixed-version fleet forks on the first
+// Promise-referencing execution / async DEPLOY. Gating on a fleet-wide flag-day
+// makes every node flip together, and a from-genesis replay reproduces the
+// historical accept-below/reject-above verdict at every height.
+//
+// Network-aware, mirroring the indexer's VM_BANNED_ASYNC / DEPLOY_BASE64_CODE
+// protocol_changes activations: mainnet defers to the coordinated flag-day;
+// testnet/regtest activate at genesis (the pre-launch nets have no pre-activation
+// history to preserve and the e2e/regtest stack already ran with the rule live,
+// so keeping it on from block 0 preserves their current behaviour). An unknown /
+// empty network is treated like mainnet (conservative: requires the flag-day).
+// Same coordinated timestamp value as the indexer's other 2.0.0 flag-days and
+// BINARY_ALLOC_GATE_BLOCK_TIME (protocol_changes.js: 1798761600). PLACEHOLDER:
+// must be confirmed by the release team before mainnet; a value that differs
+// across the fleet is itself a fork.
+const ASYNC_SURFACE_GATE_BLOCK_TIME = 1798761600;
+
+// Resolve whether the async/Promise surface change is active for a given network
+// at a given block time. Used to gate the execution-side Promise strip; the
+// deploy-side banned-async rule is gated identically by the indexer via
+// protocol_changes.isEnabled('VM_BANNED_ASYNC').
+function isAsyncSurfaceActive(network, blockTime) {
+    // testnet/regtest: active from genesis (flag day 0).
+    if (network === 'testnet' || network === 'regtest') return true;
+    // mainnet + unknown/empty: active at/after the coordinated flag-day.
+    return Number.isFinite(blockTime) && blockTime >= ASYNC_SURFACE_GATE_BLOCK_TIME;
+}
+
 class XChainVM {
     /**
      * @param {object} config
@@ -877,8 +911,16 @@ class XChainVM {
             isolate = env.isolate;
             const context = env.context;
 
-            // Strip non-deterministic globals
-            stripGlobals(isolate, context);
+            // Strip non-deterministic globals. The Promise strip is consensus-gated
+            // on the async-surface flag-day (network-aware, mirroring the indexer's
+            // VM_BANNED_ASYNC activation): below it Promise is left in place so a
+            // from-genesis replay reproduces the historical pre-flag-day execution.
+            // The block time is the same value the indexer threads as
+            // blockContext.timestamp; a missing/garbage timestamp resolves to NaN →
+            // pre-activation (Promise left in place) for any non-pre-launch network.
+            const __asyncBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
+            const stripPromise = isAsyncSurfaceActive(opts.network, __asyncBlockTime);
+            stripGlobals(isolate, context, { stripPromise });
 
             // Resolve read-only data into synchronous accessor objects. Accepts
             // either plain serializable snapshots (the canonical form, required by
@@ -1341,10 +1383,16 @@ class XChainVM {
     /**
      * Validate contract code syntax before deployment.
      * @param {string} code
+     * @param {object} [opts]
+     * @param {boolean} [opts.enforceBannedAsync=true] - block async/await/Promise
+     *        (CONSENSUS_RULES 'banned-async'). CONSENSUS-GATED on the indexer:
+     *        deploy.js passes the resolved VM_BANNED_ASYNC activation so a
+     *        from-genesis replay reproduces the historical accept-below verdict.
+     *        Defaults to true for author-facing callers (SDK linter, unit tests).
      * @returns {{ valid: boolean, error?: string }}
      */
-    validateSyntax(code) {
-        return validateSyntax(code);
+    validateSyntax(code, opts) {
+        return validateSyntax(code, opts);
     }
 
     /**
@@ -1396,6 +1444,10 @@ module.exports.MAX_STACK_DEPTH = MAX_STACK_DEPTH;
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it —
 // the value is consensus-critical (a divergent flag day forks the fleet).
 module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
+// Coordinated flag-day (block time) that activates the async/Promise contract
+// surface change (Promise strip + banned-async deploy rejection) fleet-wide.
+// Exposed so the consensus-params freeze guard can pin it; consensus-critical.
+module.exports.ASYNC_SURFACE_GATE_BLOCK_TIME = ASYNC_SURFACE_GATE_BLOCK_TIME;
 // Cross-CHAIN call (XCALL) protocol constants — same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
@@ -1416,3 +1468,9 @@ module.exports.describeRuntimeMismatch = consensusRuntime.describeMismatch;
 // subprocess executor) is recognisable by callers — they must HALT, not commit
 // a fabricated result that would fork the chain.
 module.exports.HostFaultError = require('./errors.js').HostFaultError;
+// Expose the FROZEN deploy/execution contract surface so the consensus-params
+// freeze guards (VM determinism suite + indexer cross-repo coupling test) can
+// digest it: the sandbox strip set and the deploy validator's CONSENSUS_RULES.
+// Any change to either must bump CONSENSUS_VERSION + re-golden in lockstep.
+module.exports.STRIPPED_GLOBAL_NAMES = require('./sandbox.js').STRIPPED_GLOBAL_NAMES;
+module.exports.CONSENSUS_RULES = require('./lint-core.js').CONSENSUS_RULES;

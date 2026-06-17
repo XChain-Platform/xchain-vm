@@ -28,7 +28,7 @@ describe('Consensus runtime pin', function () {
             assert.ok(Object.isFrozen(CONSENSUS_STATUS_TOKENS));
             assert.ok(Object.isFrozen(STATUS_ERROR_PREFIXES));
             assert.deepStrictEqual(CONSENSUS_STATUS_TOKENS, ['reverted', 'out_of_resource', 'failed']);
-            assert.strictEqual(CONSENSUS_VERSION, '1');
+            assert.strictEqual(CONSENSUS_VERSION, '2');
             assert.strictEqual(REFERENCE_NODE, 'v22.22.3');
         });
     });

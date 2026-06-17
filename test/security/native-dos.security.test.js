@@ -67,7 +67,11 @@ function execute(vm, code, opts) {
         code, state: opts?.state || {}, method: opts?.method || 'default',
         params: opts?.params || [], caller: 'test_addr', contractAddress: 'C:BTC:1',
         contractIndex: 1, txHash: '00'.repeat(32),
-        blockContext: { height: 100, timestamp: 1700000000, hash: 'abc123' },
+        // network + blockContext drive the async-surface flag-day gate (Promise
+        // strip). Default to regtest, where the rule is active from genesis, so the
+        // sandbox-hardening assertions below see the post-activation behaviour.
+        network: opts?.network || 'regtest',
+        blockContext: opts?.blockContext || { height: 100, timestamp: 1700000000, hash: 'abc123' },
         balances: {}, tokenInfo: {}
     });
 }
@@ -159,6 +163,19 @@ describe('Async surface banned (deploy-time): async/await/Promise', function () 
         const r = await execute(vm, fn('return typeof Promise;'));
         assert.strictEqual(r.success, true);
         assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
+    });
+
+    it('Promise is PRESENT below the async-surface flag-day on mainnet (replay parity)', async function () {
+        // The Promise strip is consensus-gated on a block-time flag-day. A mainnet
+        // execution below the flag day must leave the Promise global in place so a
+        // from-genesis replay reproduces the historical pre-activation result; the
+        // strip only engages at/after the coordinated activation.
+        const r = await execute(vm, fn('return typeof Promise;'), {
+            network: 'mainnet',
+            blockContext: { height: 1, timestamp: 1700000000, hash: 'abc123' }
+        });
+        assert.strictEqual(r.success, true);
+        assert.strictEqual(JSON.parse(r.returnValue), 'function');
     });
 });
 
