@@ -11,14 +11,14 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Emit API
+ * XChain VM: Emit API
  *
  * Each emit method validates basic parameter shape, charges gas,
  * and queues the action. Full validation happens in the indexer.
  ********************************************************************/
 // @ts-nocheck
 
-// 
+//
 
 
 function validateRequired(params, fields) {
@@ -43,7 +43,7 @@ function validateTypes(params, typeSpec) {
 
 const crypto = require('crypto');
 
-// Cross-CHAIN call (XCALL) protocol constants — canonical:
+// Cross-CHAIN call (XCALL) protocol constants. Canonical source:
 // xchain-documentation/protocol/constants.js; mirrored in src/index.js exports
 // and re-validated host-side by the indexer.
 const XCALL_MIN_GAS             = 5000;
@@ -55,7 +55,7 @@ const XCALL_DEFAULT_DEADLINE    = 400;
 
 // VM_XCALL_REQUEST / VM_XCALL_CALLBACK are charged directly from the schedule
 // (like VM_EMISSION). Both are CANONICAL_GAS_KEYS, so GasTracker construction
-// already rejects a schedule that omits them — no silent fallback default that
+// already rejects a schedule that omits them. No silent fallback default that
 // could diverge gasUsed (and fee) across the fleet on config drift.
 
 const ALLOWED_TARGET_CHAINS = ['BTC', 'LTC', 'DOGE'];
@@ -87,11 +87,11 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     return {
         // Cross-contract call (deferred). Queues an EXECUTE on another (or the
         // same) contract, run by the indexer AFTER this method completes, inside
-        // the same atomicity scope. No return value — a callee that must respond
+        // the same atomicity scope. No return value; a callee that must respond
         // calls back via its own emit.execute (callback pattern).
         //
-        // Gas: charges VM_EMISSION + gasLimit NOW, out of THIS run's budget —
-        // the reservation is what the callee runs against (its gas ceiling), so
+        // Gas: charges VM_EMISSION + gasLimit NOW, out of THIS run's budget.
+        // The reservation is what the callee runs against (its gas ceiling), so
         // total work per top-level EXECUTE can never exceed the caller's own
         // ceiling regardless of call-tree shape. Unused reservation is refunded
         // at the top-level fee settlement (indexer-side).
@@ -153,8 +153,8 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
 
         // Cross-CHAIN contract call (deferred, slow). Queues an XCALL request
         // that the validator federation relays to the target chain after this
-        // chain's confirmation depth (minutes-to-tens-of-minutes — design
-        // async). The outcome ALWAYS arrives via callbackMethod(call_id,
+        // chain's confirmation depth (design async; typically minutes to tens of
+        // minutes). The outcome ALWAYS arrives via callbackMethod(call_id,
         // target_chain, status, return_payload, ...callbackParams); if no
         // result lands before deadlineBlocks, a deterministic 'expired'
         // callback fires instead. The target method must be in the target
@@ -173,9 +173,9 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             validateRequired(params, ['targetChain', 'contractIndex', 'method', 'gasLimit', 'callbackMethod']);
 
             // Hop gate first (deterministic throw before any gas moves): hops
-            // are HOST-threaded context — user-originated runs are 0, a
+            // are HOST-threaded context. User-originated runs are 0; a
             // cross-chain-injected execution or result callback carries its
-            // call's count — so two contracts cannot ping-pong forever.
+            // call's count. This prevents two contracts from ping-ponging forever.
             if (crossHops + 1 > XCALL_MAX_HOPS)
                 throw new Error('emit.crossExecute: max cross-chain hops ' + XCALL_MAX_HOPS + ' reached');
 
@@ -241,7 +241,7 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             // Deterministic call_id, derived BEFORE pushing the emission so it
             // reflects the current emission index. Network + source chain are
             // bound into the preimage (unlike the attestation request_id)
-            // because BTC-family chains share tx-hash space — a call must never
+            // because BTC-family chains share tx-hash space; a call must never
             // collide or replay across chains/networks. The target chain is
             // bound so the same logical call to two chains never collides.
             // MUST byte-match the indexer's re-derivation in
@@ -249,9 +249,9 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             // The emitting EXECUTE's action_index is deliberately NOT in the preimage:
             // it shifts with the indexer's synthetic-action injection timing, so it is
             // non-deterministic across nodes / reorgs. The call-path replaces it as the
-            // disambiguator — (tx_hash, contract_index, emission_index) alone are NOT
-            // unique because emission_index is per-execution, so two nested runs of the
-            // SAME contract each emitting their first call would collide; the call-path
+            // disambiguator. (tx_hash, contract_index, emission_index) alone are NOT
+            // unique because emission_index is per-execution; two nested runs of the
+            // SAME contract each emitting their first call would collide. The call-path
             // uniquely names this execution in the call tree and is content-derived.
             const txHash        = ctx.txHash || '';
             const contractIndex = ctx.contractIndex != null ? Number(ctx.contractIndex) : '';
@@ -272,7 +272,7 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
                 callbackMethod: callbackMethod,
                 callbackParams: cbParams.map(String),
                 deadlineBlocks: deadlineBlocks
-                // crossHops is HOST-derived in the indexer (processEmission) —
+                // crossHops is HOST-derived in the indexer (processEmission);
                 // deliberately NOT taken from the VM.
             });
             return callId;
@@ -371,4 +371,47 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     };
 }
 
-module.exports = { buildEmitAPI };
+// Checked-in golden vectors for the ATTEST request_id and XCALL call_id preimage
+// formulas. These are a fixed (input tuple -> expected hex) pair that the VM
+// cross-repo byte-match test AND the indexer attest.test.js/xcall.test.js can
+// both assert against independently. If either side's preimage drifts, the
+// affected suite fails even when the two inline lambda copies happen to match each
+// other (i.e. both were edited in lockstep, masking the fork).
+//
+// The tuples are deliberately minimal: enough fields to exercise every component
+// of each preimage, with values that are easy to verify by hand.
+//
+// ATTEST request_id preimage: TX_HASH:ROOT_ACTION_INDEX:EMITTER_PATH:CONTRACT_INDEX:EMITTER_POSITION
+// XCALL call_id preimage:     NETWORK:COIN:TX_HASH:ROOT_ACTION_INDEX:CONTRACT_INDEX:EMITTER_PATH:EMITTER_POSITION:TARGET_CHAIN
+//
+// Do NOT change these values without regenerating and committing both the VM
+// crossrepo test assertions and the corresponding indexer test assertions.
+const GOLDEN_VECTORS = {
+    requestId: {
+        input: {
+            txHash:          'abc123',
+            rootActionIndex: 100,
+            emitterPath:     '',
+            contractIndex:   7,
+            emitterPosition: 0
+        },
+        // sha256('abc123:100::7:0')
+        expected: 'b770a548716259f767c3eb6e9e1e5eb0e3878c9ec3d6bbd68a7e1ab8221fffb7'
+    },
+    callId: {
+        input: {
+            network:         'regtest',
+            coin:            'BTC',
+            txHash:          'f'.repeat(64),
+            rootActionIndex: 100,
+            contractIndex:   42,
+            emitterPath:     '',
+            emitterPosition: 0,
+            targetChain:     'DOGE'
+        },
+        // sha256('regtest:BTC:<64 f chars>:100:42::0:DOGE')
+        expected: 'bca0e6ab4e60a2ec7ea96ab4935c0a4db936be5ce9d8cab0d899b4144a7ae480'
+    }
+};
+
+module.exports = { buildEmitAPI, GOLDEN_VECTORS };

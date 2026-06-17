@@ -67,23 +67,13 @@ const REFERENCE_NODE = 'v22.22.3';
 
 // The declared consensus epoch. ONE number that covers the whole consensus
 // surface frozen with the wire format (LAUNCH-PLAN track 8): this PINNED
-// runtime, the indexer's GAS_SCHEDULE + GAS_PRICE, the status vocabulary below,
-// AND the deploy-time/execution-time contract surface — the sandbox strip set
-// (sandbox.js STRIPPED_GLOBAL_NAMES) and the deploy validator's CONSENSUS_RULES
-// (lint-core.js). Bumping it is a CONSENSUS EVENT — it must accompany a new
-// golden in both repos and (post-launch) a protocol_changes.js block-height
-// activation. The indexer asserts the bundled VM's CONSENSUS_VERSION equals its
-// expected value (test/unit/consensus-params.test.js), and the VM determinism
-// guard (test/determinism/consensus-params.test.js) freezes a digest of the
-// strip set and CONSENSUS_RULES against THIS version, so a change to either
-// surface cannot ship without bumping this epoch in lockstep.
-//
-// Epoch '2' (this bump) froze the async/Promise contract surface: the sandbox
-// now strips the Promise global and the deploy validator rejects async/await/
-// Promise (CONSENSUS_RULES 'banned-async'). Both are gated on a coordinated
-// block-time flag-day (mainnet) so a from-genesis replay reproduces the
-// historical accept-below/reject-above verdict.
-const CONSENSUS_VERSION = '2';
+// runtime, the indexer's GAS_SCHEDULE + GAS_PRICE, and the status vocabulary
+// below. Bumping it is a CONSENSUS EVENT — it must accompany a new golden in
+// both repos and (post-launch) a protocol_changes.js block-height activation.
+// The indexer asserts the bundled VM's CONSENSUS_VERSION equals its expected
+// value (test/unit/consensus-params.test.js), so a VM consensus change cannot
+// ship without an explicit indexer bump.
+const CONSENSUS_VERSION = '1';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash

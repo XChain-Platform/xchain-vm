@@ -1,5 +1,5 @@
 // @ts-nocheck
-// 
+//
 'use strict';
 
 // Copyright © 2025–2026 Dankest, LLC
@@ -9,7 +9,7 @@
 //
 // This file is part of XChain Platform. Licensed under the GNU Affero
 // General Public License v3.0 or later; see LICENSE.md. A commercial
-// license (without AGPL source-disclosure terms) is available —
+// license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 
 // ---------------------------------------------------------------------------
@@ -30,14 +30,14 @@
 //   - determinism-baseline.test.js pins a committed SHA-256 digest
 // A digest pinned in the baseline therefore means exactly the same thing the
 // run-twice suite asserts. Keeping the inputs in one place is what makes that
-// equivalence hold — duplicating the code/accessors across both files would let
+// equivalence hold. Duplicating the code/accessors across both files would let
 // them silently drift.
 //
 // The accessor objects below are pure, deterministic stand-ins for the indexer's
 // real providers (xchain-indexer/src/db.js getContractStakeData() and the
 // attestation-response store). They return the same shapes the production
 // accessors return, so a change in gas charging, response serialisation, or
-// __gas injection around these call sites shifts the digest and fails CI —
+// __gas injection around these call sites shifts the digest and fails CI
 // instead of surfacing only as an on-chain block-hash divergence.
 // ---------------------------------------------------------------------------
 
@@ -70,8 +70,8 @@ function makeContractStakeData() {
 }
 
 // Deterministic attestation-response accessor. Returns a fixed, fully-serialised
-// response for one known request_id and null otherwise — the same { status,
-// payload, providerId, blockIndex, validatorCount } shape the host stores.
+// response for one known request_id and null otherwise. The shape is
+// { status, payload, providerId, blockIndex, validatorCount } matching what the host stores.
 function makeAttestationData() {
     const stored = {
         status:         'ok',
@@ -117,15 +117,16 @@ function makeEmitExecuteFixture(callDepth) {
 }
 
 // Each fixture: { name, code, extra, expectSuccess? }.
-//   name  — stable key in DETERMINISM_BASELINE.json; DO NOT rename without regen.
-//   code  — inline contract source (single exported function, dispatched as the
-//           default method exactly like the existing inline:* fixtures).
-//   extra — opts merged on top of the suite's baseOpts (accessor injection plus a
-//           clean empty state so nothing unrelated bleeds into the digest).
-//   expectSuccess — false for fixtures whose pinned output is a deterministic
-//           failure (e.g. the depth-gate throw); absent means success expected.
+//   name: stable key in DETERMINISM_BASELINE.json; DO NOT rename without regen.
+//   code: inline contract source (single exported function, dispatched as the
+//         default method exactly like the existing inline:* fixtures).
+//   extra: opts merged on top of the suite's baseOpts (accessor injection plus a
+//          clean empty state so nothing unrelated bleeds into the digest).
+//   expectSuccess: false for fixtures whose pinned output is a deterministic
+//          failure (e.g. the depth-gate throw); absent means success expected.
 //
-// attestation.request derives request_id from sha256(txHash:contractIndex:emissionIndex),
+// attestation.request derives request_id from
+// sha256(TX_HASH:ROOT_ACTION_INDEX:EMITTER_PATH:CONTRACT_INDEX:EMITTER_POSITION),
 // so txHash + contractIndex are pinned to fixed values to keep the digest stable.
 // providerDeadlines is intentionally omitted so only the platform-wide [1,100]
 // deadline check applies (the per-provider window lives in the indexer).
@@ -166,8 +167,8 @@ const CONTRACT_HOST_FIXTURES = [
         // Paid-attestation (E1) variant. Same call as inline:attestation-request
         // but with non-empty feeTick/feeAmount in options, so the ATTEST emission
         // carries the fee pass-through fields. Pins the non-zero-fee code path
-        // distinctly from the zero-fee one above — the VM only shape-checks the
-        // fee fields (the indexer enforces XCHAIN-only tick / amount / payer
+        // separately from the zero-fee one above (the VM only shape-checks the
+        // fee fields; the indexer enforces XCHAIN-only tick / amount / payer
         // balance), so a regression in fee normalisation or emission shaping
         // shifts THIS digest while leaving the zero-fee digest untouched.
         name: 'inline:attestation-request-paid',
@@ -198,13 +199,13 @@ const CONTRACT_HOST_FIXTURES = [
     makeEmitExecuteFixture(4),
     {
         // Cross-CHAIN call. Pins the 4-bucket charge (VM_EMISSION +
-        // VM_XCALL_REQUEST + gasLimit + VM_XCALL_CALLBACK — the suite's
+        // VM_XCALL_REQUEST + gasLimit + VM_XCALL_CALLBACK; the suite's
         // GAS_SCHEDULE must carry the two XCALL keys at production values) and
         // the deterministic callId, which is returned so the digest covers the
         // sha256(network:chain:txHash:contractIndex:emissionIndex:targetChain)
         // preimage, including the emissionIndex derived from
-        // emissionCollector.actions.length at emit time. (action_index is
-        // intentionally NOT part of the preimage — it depends on injection timing.)
+        // emissionCollector.actions.length at emit time. action_index is
+        // intentionally NOT part of the preimage because it depends on injection timing.
         // Every preimage input is pinned via `extra`; sourceChain comes from baseOpts'
         // contractAddress ('C:BTC:100'), so LTC is a valid distinct target.
         name: 'inline:emit-crossexecute',

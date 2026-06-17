@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Main Entry Point
+ * XChain VM: Main Entry Point
  *
  * The XChainVM class is the public API for the VM runtime.
  * It creates V8 isolates, injects the gateway, meters code,
@@ -91,7 +91,7 @@ const HARNESS_SOURCE = `
     // Also the choke point that makes the stack fault un-swallowable: once depth is
     // poisoned, every metered point (the meter injects __gas(1) at the top of every
     // catch block) re-throws, so a contract cannot catch the fault and resume to
-    // read a platform-dependent depth — mirroring how gas exhaustion cannot be
+    // read a platform-dependent depth, mirroring how gas exhaustion cannot be
     // caught and swallowed.
     var __gasFunc = function(n) {
         if (__stackPoison) throw __stackError();
@@ -108,13 +108,13 @@ const HARNESS_SOURCE = `
 
     // ----- Allocation-size gas metering (F3) -----
     // Charge gas proportional to the number of elements/chars a bulk-allocation
-    // builtin will materialize, BEFORE delegating to the native — so a hostile
+    // builtin will materialize, BEFORE delegating to the native, so a hostile
     // allocation (new Array(1e8).fill('x'), 'x'.repeat(1e9), Array.from({length:1e8}))
     // trips the deterministic gas ceiling instead of reaching V8's allocator (which
     // would burn ~28s to the wall-clock timeout, or abort the worker). Installed at
     // the PROTOTYPE level so it is aliasing-proof: var f=[].fill; f.call(arr,x) gets
     // the metered wrapper, and the native (captured in a closure) is unreachable.
-    // Defense-in-depth — the out-of-process executor remains the load-bearing
+    // Defense-in-depth: the out-of-process executor remains the load-bearing
     // containment for paths that cannot be wrapped (spread, infinite-generator).
     var __lockMethod = function(obj, name, fn) {
         try { __defProp(obj, name, { value: fn, writable: false, configurable: false, enumerable: false }); } catch(e) {}
@@ -144,12 +144,12 @@ const HARNESS_SOURCE = `
     });
     // ----- Allocation-size gas metering for binary buffers (F3-binary) -----
     // ArrayBuffer and the TypedArray constructors allocate a dense backing store
-    // proportional to the requested byte length the instant they run — but the F3
+    // proportional to the requested byte length the instant they run, but the F3
     // wrappers above cover only the Array/String builtins. Left unmetered,
     // new Uint8Array(1 << 20) in a loop costs ~3 gas/iteration yet marches the
     // isolate toward its memoryLimit, where the backing-store allocation throws a
     // CATCHABLE RangeError (Array buffer allocation failed). A contract can
-    // catch that and observe heap occupancy / GC timing — a value that depends on
+    // catch that and observe heap occupancy / GC timing (a value that depends on
     // the failure point and, written into hashed state, diverges across validators
     // (even identical builds). Charge the byte length up front (as F3 does for
     // fill) so the deterministic gas ceiling binds before the memory limit is
@@ -183,10 +183,10 @@ const HARNESS_SOURCE = `
     };
     var __binCtors = ['ArrayBuffer', 'Uint8Array', 'Int8Array', 'Uint8ClampedArray',
         'Uint16Array', 'Int16Array', 'Uint32Array', 'Int32Array',
-        'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array'];
+        'Float16Array', 'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array'];
     // CONSENSUS GATE: this byte-length charge changes gasUsed (→ contract_hash →
     // fee debit), so it must activate fleet-wide at a coordinated block-time
-    // flag-day, never the instant an individual node upgrades — otherwise a
+    // flag-day, never the instant an individual node upgrades, otherwise a
     // mixed-version fleet forks on the first binary-allocating execution. The
     // host injects __blockTime (this execution's block time) and the flag-day
     // constant before this harness runs. Below the flag day (or when no block
@@ -201,7 +201,7 @@ const HARNESS_SOURCE = `
     }
     // ----- end F3-binary -----
 
-    // Clean up __defineProperty — no longer needed
+    // Clean up __defineProperty (no longer needed)
     delete globalThis.__defineProperty;
 
     // Build the xchain object from injected references
@@ -251,7 +251,7 @@ const HARNESS_SOURCE = `
         }),
 
         // Contract-targeted staking (metered)
-        // Scoped to the currently-executing contract — read-only access to its own
+        // Scoped to the currently-executing contract: read-only access to its own
         // stake table + a slash() primitive routing to the contract's locked destination.
         contract: Object.freeze({
             getStake:       wrap(globalThis.__contract_getStake),
@@ -330,7 +330,7 @@ const HARNESS_SOURCE = `
     // so intra-contract recursion is bounded by a fixed, platform-independent depth
     // rather than by V8's architecture-dependent native stack limit. Without this, a
     // contract that catches the native RangeError observes the raw native depth and
-    // can commit it into hashed state — diverging validators on different CPUs (or at
+    // can commit it into hashed state, diverging validators on different CPUs (or at
     // different host stack depths) → fork. Defined AFTER the cleanup pass so the hooks
     // survive, and locked (like __gas) so contract code cannot overwrite them. When no
     // positive limit was injected the guard is inert (no false trips) and behaviour
@@ -357,11 +357,11 @@ const HARNESS_SOURCE = `
     // ITERATION builtins that scan / order / serialize a whole collection in
     // native code for a single call site. Pre-fix, a.indexOf(x) / s.split(',') /
     // JSON.stringify(a) over a large working set cost ~1 gas while doing O(n)
-    // native work (~66,000 element-touches per gas measured) — a cheap-gas /
+    // native work (~66,000 element-touches per gas measured), a cheap-gas /
     // expensive-CPU throughput attack: a one-fee tx grinds every validator to
     // the wall-clock backstop. We charge gas proportional to the collection
-    // length BEFORE delegating, so the deterministic gas ceiling — not the
-    // wall-clock net — is the binding constraint. Installed AFTER the reference
+    // length BEFORE delegating, so the deterministic gas ceiling, not the
+    // wall-clock net, is the binding constraint. Installed AFTER the reference
     // cleanup above so harness init (which uses indexOf) is not itself charged.
     //
     // Methods that take a per-element JS CALLBACK (map/filter/reduce/forEach/
@@ -369,8 +369,8 @@ const HARNESS_SOURCE = `
     // body and are intentionally NOT wrapped. The + string-concat operator is
     // not a method and cannot be wrapped here; an oversized + build is bounded
     // by the isolate memory ceiling / V8 max-string-length (deterministic
-    // out_of_resource post-F1), and its only amplification path — feeding the
-    // result to an O(n) consumer — is closed by the wrappers below.
+    // out_of_resource post-F1), and its only amplification path (feeding the
+    // result to an O(n) consumer) is closed by the wrappers below.
     var __meterLen = function(obj, name) {
         var orig = obj[name];
         if (typeof orig !== 'function') return;
@@ -379,22 +379,22 @@ const HARNESS_SOURCE = `
             return orig.apply(this, arguments);
         });
     };
-    // Array — native scan / order / copy / mutate without a per-element callback.
-    // (fill is owned by F3; map/filter/etc. are callback-metered — both excluded.)
+    // Array: native scan / order / copy / mutate without a per-element callback.
+    // (fill is owned by F3; map/filter/etc. are callback-metered, both excluded.)
     // Includes the O(n) mutators (splice/unshift/shift shift every element) and
     // the ES2023 copying methods (toSorted/toReversed/toSpliced/with allocate a
     // full copy). __meterLen no-ops for any absent on the host V8.
     ['indexOf', 'lastIndexOf', 'includes', 'join', 'reverse', 'sort',
      'flat', 'slice', 'copyWithin', 'splice', 'unshift', 'shift',
      'toSorted', 'toReversed', 'toSpliced', 'with'].forEach(function(m) { __meterLen(Array.prototype, m); });
-    // String — native scan / copy (regex literals are banned at deploy time; the
+    // String: native scan / copy (regex literals are banned at deploy time; the
     // locale-sensitive case methods are neutered in sandbox.js). repeat/padStart/
     // padEnd are owned by F3.
     ['indexOf', 'lastIndexOf', 'includes', 'startsWith', 'endsWith', 'slice',
      'substring', 'substr', 'split', 'replace', 'replaceAll', 'trim',
      'trimStart', 'trimEnd', 'toLowerCase', 'toUpperCase'].forEach(function(m) { __meterLen(String.prototype, m); });
 
-    // Variadic concat — charge the receiver length plus each argument's length.
+    // Variadic concat: charge the receiver length plus each argument's length.
     var __aconcat = Array.prototype.concat;
     if (typeof __aconcat === 'function') __lockMethod(Array.prototype, 'concat', function() {
         var n = (this == null ? 0 : this.length);
@@ -414,12 +414,12 @@ const HARNESS_SOURCE = `
         __allocGas(n); return __sconcat.apply(this, arguments);
     });
 
-    // JSON — parse cost scales with the input string; stringify with the output.
+    // JSON: parse cost scales with the input string; stringify with the output.
     // parse is charged BEFORE (input length is known); stringify is charged AFTER
     // (the only cheap size signal is the result), which still bounds a loop after
     // one pass and bounds a single pass by the gas already paid to allocate the
     // structure. Charging stringify also covers the host-call arg marshaling and
-    // return-value serialization — deterministic, and bounded by the 64 KB state
+    // return-value serialization, deterministic, and bounded by the 64 KB state
     // and return-value caps.
     if (typeof JSON !== 'undefined') {
         var __jstr = JSON.stringify;
@@ -437,7 +437,7 @@ const HARNESS_SOURCE = `
 
     // Object statics that enumerate every own property in native code without a
     // callback. The property count is not cheaply known before enumerating, so
-    // (like JSON.stringify) charge AFTER by the result size — which still bounds
+    // (like JSON.stringify) charge AFTER by the result size, which still bounds
     // a reuse loop after one pass and bounds a single pass by the gas already
     // paid to build the object. Uses captured natives so the size probe does not
     // re-enter a wrapper. (Object.create with descriptors is already blocked in
@@ -465,7 +465,7 @@ const HARNESS_SOURCE = `
     // to their inputs but are invisible to the AST gas meter and cannot be wrapped
     // at the prototype level. The metering pass (metering.js) rewrites them into
     // calls to the helpers below. Each charges gas for the bytes/elements grown
-    // BEYOND the largest operand (so doubling — s = s + s — costs O(n) gas total,
+    // BEYOND the largest operand (so doubling, s = s + s, costs O(n) gas total,
     // while incremental append, already loop-metered, is not over-charged), above
     // a threshold so numeric + and small literals cost nothing. Installed as locked
     // globals (like __gas) AFTER the reference cleanup so transformed contract code
@@ -509,10 +509,10 @@ const HARNESS_SOURCE = `
     //                  obj.m-backtick...->  __tmpltagm(obj, key, cooked, raw, [...])  (this=obj)
     // Rebuilds the frozen strings template object (cooked array + frozen .raw, as
     // the language produces), charges by string-growth of the parts (string-typed
-    // only — never coerces, so we don't fire a toString the tag itself wouldn't),
+    // only, never coerces, so we do not fire a toString the tag itself would not),
     // then invokes the tag with the correct receiver. The fn lookup (obj[key]) is
     // resolved here, after the substitutions were evaluated when this call's
-    // argument list was built — a benign reorder vs the spec (fn-ref before
+    // argument list was built, a benign reorder vs the spec (fn-ref before
     // substitutions) that is identical on every node. The strings object is rebuilt
     // per evaluation rather than cached per call-site; also deterministic.
     var __tagInvoke = function(thisArg, fn, cooked, raw, exprs) {
@@ -601,7 +601,7 @@ const HARNESS_SOURCE = `
  * Contract wrapper script. Runs the contract code and invokes the
  * specified method (or the default export if it's a function).
  * Injected variables: __contractCode (string), __methodName (string),
- * __isCrossCall (bool), __readManifest (bool — Phase E manifest introspection)
+ * __isCrossCall (bool), __readManifest (bool, Phase E manifest introspection)
  */
 const CONTRACT_WRAPPER = `
 (function() {
@@ -634,7 +634,7 @@ const CONTRACT_WRAPPER = `
     // Cross-chain call gate: an injected cross-chain execution may only invoke
     // methods the contract explicitly opted in via an exported crossCallable
     // array. This is the blast-radius bound on the federation's relay authority
-    // — a quorum-signed dispatch can only reach methods the target contract
+    // a quorum-signed dispatch can only reach methods the target contract
     // consciously exposed. The fixed marker string is matched by the indexer
     // (xexec.js) to report status 'not_callable' back to the caller.
     if (__isCrossCall) {
@@ -685,7 +685,7 @@ const MIN_CALL_GAS   = 5000;
 // supported architecture (linux/arm64 + linux/amd64) and across the host stack
 // remaining at runSync entry, so the guard always fires before V8's own
 // architecture-dependent RangeError. That makes the maximum recursion depth a
-// contract can observe identical on every validator — a contract that catches the
+// contract can observe identical on every validator. A contract that catches the
 // fault can no longer commit a platform-variable depth into hashed state. Purely an
 // in-isolate execution bound (the host never re-validates it), so it lives here
 // rather than in the cross-service protocol constants; all validators agree on it
@@ -707,14 +707,14 @@ const XCALL_MAX_RETURN_BYTES    = 1024;
 // harness below). That charge is a consensus-affecting gas-schedule change: a
 // node that applies it and a node that does not produce a different gasUsed for
 // the same execution, and gasUsed is hashed into the per-block contract
-// checkpoint and drives the fee debit — so applying it to ALL blocks (including
+// checkpoint and drives the fee debit, so applying it to ALL blocks (including
 // historical ones) forks any mixed-version fleet on the first binary-allocating
 // execution. Gating the metering on a fleet-wide flag-day makes every node flip
 // the rule at the same timestamp instead of whenever it happens to upgrade.
 // Below the flag day the constructors are UNMETERED (the pre-activation
 // behavior); at/after it the byte-length charge applies on every node alike.
 // Same coordinated timestamp as the indexer's other 2.0.0 flag-day activations
-// (protocol_changes.js). PLACEHOLDER — must be confirmed by the release team
+// (protocol_changes.js). PLACEHOLDER: must be confirmed by the release team
 // before mainnet; a value that differs across the fleet is itself a fork.
 const BINARY_ALLOC_GATE_BLOCK_TIME = 1798761600;
 
@@ -791,7 +791,7 @@ class XChainVM {
         //   'in-process' (default): run the isolate in THIS process. Fast; used
         //       by the whole test/bench suite and by syntax validation.
         //   'subprocess': run every execution in a forked child via ProcessExecutor,
-        //       so a contract that aborts V8 (process-wide SIGABRT — e.g. a bulk
+        //       so a contract that aborts V8 (process-wide SIGABRT, e.g. a bulk
         //       allocation that bypasses the isolate memory limit) crashes only the
         //       child, never the host. PRODUCTION (the indexer) MUST use this.
         // Default is in-process so existing in-process callers (which pass closure
@@ -801,12 +801,12 @@ class XChainVM {
         // The mode string is validated against the two known values: with a bare
         // `config.execution || 'in-process'` fallback, a typo ('subproces',
         // 'sub-process', trailing space) would SILENTLY run in-process and drop
-        // host-crash containment — the exact failure the subprocess layer exists
+        // host-crash containment (the exact failure the subprocess layer exists
         // to prevent. Unknown values throw at construct time instead.
         if (config.execution !== undefined &&
             config.execution !== 'in-process' && config.execution !== 'subprocess') {
             throw new Error("XChainVM: unknown execution mode '" + config.execution +
-                "' — use 'subprocess' (production) or 'in-process'");
+                "' use 'subprocess' (production) or 'in-process'");
         }
         if (config.execution === undefined && !XChainVM._warnedImplicitInProcess) {
             // Loud once per process: an embedder that never chose a mode is
@@ -814,7 +814,7 @@ class XChainVM {
             // tests/tooling. Choosing 'in-process' explicitly acknowledges the
             // trade-off and silences this.
             XChainVM._warnedImplicitInProcess = true;
-            console.warn("XChainVM: no execution mode configured — defaulting to 'in-process', " +
+            console.warn("XChainVM: no execution mode configured, defaulting to 'in-process', " +
                 "which has NO host-crash (SIGABRT) containment. Production embedders must pass " +
                 "execution: 'subprocess'; pass execution: 'in-process' to acknowledge and silence this.");
         }
@@ -874,13 +874,14 @@ class XChainVM {
      * @param {number} [opts.callDepth]      - Cross-contract call depth (0 = user-submitted EXECUTE)
      * @param {number} [opts.actionIndex]    - The executing EXECUTE's action_index; part of the
      *                                         deterministic attestation request_id preimage
-     * @param {number} [opts.rootActionIndex] - The deterministic on-chain action_index of the ROOT
-     *                                         action that seeded this VM subtree (a top-level EXECUTE,
-     *                                         a controller guard's host action, or a DEPLOY). Pinned at
-     *                                         the root and threaded unchanged through nested executions;
-     *                                         bound into the request_id/call_id preimages as the
-     *                                         per-root discriminator so two forest roots under one
-     *                                         tx_hash (callPath '' both) cannot collide.
+     * @param {number} [opts.rootActionIndex] - The root action's on-chain output index (TX_VOUT),
+     *                                         a reorg-stable value pinned at the root action and
+     *                                         threaded unchanged through nested executions. Bound
+     *                                         into the request_id/call_id preimages as the per-root
+     *                                         discriminator so two forest roots under one tx_hash
+     *                                         (callPath '' both) cannot collide. NOTE: despite the
+     *                                         field name, the value carried is TX_VOUT, not
+     *                                         action_index (which is reorg-unstable).
      * @returns {Promise<object>} Execution result
      */
     async execute(opts) {
@@ -936,11 +937,13 @@ class XChainVM {
                     contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
                     txHash:          opts.txHash || '',
                     actionIndex:     opts.actionIndex != null ? Number(opts.actionIndex) : null,
-                    // Per-root discriminator: the deterministic on-chain action_index of the root
-                    // that seeded this subtree, threaded unchanged through nested executions. Bound
-                    // into the request_id/call_id preimages alongside callPath so two VM-executing
-                    // roots under one tx_hash (each callPath '') cannot derive the same id. MUST
-                    // byte-match the indexer's ROOT_ACTION_INDEX (execute.processEmission).
+                    // Per-root discriminator: the root action's TX_VOUT (reorg-stable on-chain
+                    // output index), threaded unchanged through nested executions. Bound into the
+                    // request_id/call_id preimages alongside callPath so two VM-executing roots
+                    // under one tx_hash (each callPath '') cannot derive the same id. The field
+                    // is named rootActionIndex for historical reasons; the value is TX_VOUT, not
+                    // action_index. MUST byte-match the indexer's ROOT_ACTION_INDEX field, which
+                    // is also populated from TX_VOUT (execute.processEmission).
                     rootActionIndex: opts.rootActionIndex != null ? Number(opts.rootActionIndex) : null,
                     // Deterministic call-path: the '>'-joined per-execution emission
                     // positions from the root on-chain action down to THIS execution
@@ -959,7 +962,7 @@ class XChainVM {
                     // Controller-guard mode: when the indexer runs a token's bound
                     // contract `guard` method before a guarded native action settles,
                     // the asynchronous frameworks (attestation, cross-chain calls) are
-                    // disabled — their results arrive blocks later, after the guarded
+                    // disabled: their results arrive blocks later, after the guarded
                     // action has already committed or reverted. Enforced at emit time
                     // in gateway.js (attestation.request) + gateway-emit.js (crossExecute).
                     isGuard:         Boolean(opts.isGuard),
@@ -1271,7 +1274,7 @@ class XChainVM {
      *
      * The error STRING prefixes emitted here (revert/out_of_gas/timeout/
      * out_of_memory/out_of_stack/error; out_of_resource from process-executor)
-     * are the frozen STATUS_ERROR_PREFIXES in consensus-runtime.js — the indexer
+     * are the frozen STATUS_ERROR_PREFIXES in consensus-runtime.js. The indexer
      * collapses them into CONSENSUS_STATUS_TOKENS (utility.vmFailureStatus).
      * Changing a prefix is a consensus change; guarded by the consensus-params
      * tests in both repos.
@@ -1284,7 +1287,7 @@ class XChainVM {
             // Clamp the consensus-visible gasUsed to the ceiling. A single charge can
             // overshoot the ceiling by a lot (the allocation wrappers charge the full
             // requested size, e.g. 1e8 for Array(1e8).fill), but a contract allotted
-            // `ceiling` gas must never be billed beyond it — otherwise fee = gasUsed *
+            // `ceiling` gas must never be billed beyond it, otherwise fee = gasUsed *
             // GAS_PRICE could exceed the caller's committed budget and drive balances
             // negative. The raw `used` stays in the (un-hashed) error message for debugging.
             // Clamp target is the TRACKER's ceiling (= the per-call reservation for a
@@ -1321,7 +1324,7 @@ class XChainVM {
         // consumed the maximum allowed resources, and the ceiling is identical on
         // every node. This is the deterministic, fork-safe charge.
         if (msg.includes('Script execution timed out') || msg.includes('disposed')) {
-            // Wall-clock timeout — this is a consensus risk. Log at ERROR level.
+            // Wall-clock timeout (consensus risk). Log at ERROR level.
             console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +
                 (opts ? 'contract=' + opts.contractAddress + ' method=' + opts.method : ''));
             return this._errorResult(gasTracker, emissionCollector,
@@ -1339,7 +1342,7 @@ class XChainVM {
             return this._errorResult(gasTracker, emissionCollector,
                 'out_of_stack: maximum call depth exceeded', gasTracker.ceiling);
         }
-        // Generic contract error — sanitize to prevent information leakage (RISK-15).
+        // Generic contract error: sanitize to prevent information leakage (RISK-15).
         // Strip stack traces, file paths, and internal details.
         return this._errorResult(gasTracker, emissionCollector, 'error: ' + this._sanitizeError(msg));
     }
@@ -1368,7 +1371,7 @@ class XChainVM {
             error:          errorMsg,
             // gasOverride bounds the consensus-visible gasUsed to the gas ceiling:
             // for non-deterministic resource terminations (timeout / out_of_memory /
-            // out_of_stack) so gasUsed — and therefore the fee — is identical on every
+            // out_of_stack) so gasUsed, and therefore the fee, is identical on every
             // validator, and for out_of_gas so a single over-ceiling charge (the
             // allocation wrappers) can never bill the caller beyond their committed budget.
             gasUsed:        (gasOverride != null) ? gasOverride : gasTracker.getUsed(),
@@ -1408,7 +1411,7 @@ class XChainVM {
      * Read a contract's declared permissions manifest (Phase E) at deploy time.
      * Instantiates the module top-level inside an isolate (gas-metered, no state,
      * oracle, or balances) and surfaces its exported `permissions` + `maxTakeBps`
-     * WITHOUT dispatching a method — deterministic across validators because it
+     * WITHOUT dispatching a method, deterministic across validators because it
      * depends only on the (immutable) contract code and the pinned runtime. Works
      * for constructor-less contracts, which vm.execute() never runs otherwise.
      *
@@ -1435,20 +1438,20 @@ module.exports = XChainVM;
 // assert it has not drifted from the protocol constant.
 module.exports.MAX_CODE_SIZE = MAX_CODE_SIZE;
 // Cross-contract call protocol constants (canonical:
-// xchain-documentation/protocol/constants.js) — exposed for the same reason.
+// xchain-documentation/protocol/constants.js) for the same reason.
 module.exports.MAX_CALL_DEPTH = MAX_CALL_DEPTH;
 module.exports.MIN_CALL_GAS   = MIN_CALL_GAS;
 // Intra-contract recursion bound (deterministic in-isolate stack-depth limit).
 module.exports.MAX_STACK_DEPTH = MAX_STACK_DEPTH;
 // Coordinated flag-day (block time) that activates the F3-binary allocation gas
-// metering fleet-wide. Exposed so the consensus-params freeze guard can pin it —
+// metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).
 module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // Coordinated flag-day (block time) that activates the async/Promise contract
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.ASYNC_SURFACE_GATE_BLOCK_TIME = ASYNC_SURFACE_GATE_BLOCK_TIME;
-// Cross-CHAIN call (XCALL) protocol constants — same canonical source.
+// Cross-CHAIN call (XCALL) protocol constants, same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
 module.exports.XCALL_MAX_HOPS            = XCALL_MAX_HOPS;
@@ -1465,7 +1468,7 @@ module.exports.STATUS_ERROR_PREFIXES = consensusRuntime.STATUS_ERROR_PREFIXES;
 module.exports.checkConsensusRuntime = consensusRuntime.checkConsensusRuntime;
 module.exports.describeRuntimeMismatch = consensusRuntime.describeMismatch;
 // Expose HostFaultError so a host that cannot run contracts (permanently broken
-// subprocess executor) is recognisable by callers — they must HALT, not commit
+// subprocess executor) is recognisable by callers. They must HALT, not commit
 // a fabricated result that would fork the chain.
 module.exports.HostFaultError = require('./errors.js').HostFaultError;
 // Expose the FROZEN deploy/execution contract surface so the consensus-params

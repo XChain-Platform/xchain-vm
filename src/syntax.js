@@ -39,19 +39,9 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  * deploy-path verdict (and its on-chain execution record) is unchanged.
  *
  * @param {string} code - Contract source code
- * @param {object} [opts]
- * @param {boolean} [opts.enforceBannedAsync=true] - whether the 'banned-async'
- *        rule (async/await/Promise) is deploy-blocking. CONSENSUS-GATED: the
- *        indexer passes the resolved VM_BANNED_ASYNC flag-day activation
- *        (deploy.js) so that BELOW the flag day an async/Promise DEPLOY resolves
- *        exactly as it did pre-activation (accepted), and a from-genesis replay
- *        reproduces the historical verdict. Defaults to true so author-facing
- *        callers (the SDK/CLI linter, unit tests) always see the rule.
  * @returns {{ valid: boolean, error?: string }}
  */
-function validateSyntax(code, opts) {
-    const enforceBannedAsync = !opts || opts.enforceBannedAsync !== false;
-
+function validateSyntax(code) {
     // 1. V8 syntax check (the only step that requires isolated-vm)
     let testIsolate;
     try {
@@ -65,14 +55,8 @@ function validateSyntax(code, opts) {
 
     // 2–5. Acorn-coverable rules (shared canonical source of truth). Block ONLY on
     // consensus rules — lintSource also returns Move-2 advisory findings, which are
-    // author-facing signal and must never change the on-chain deploy verdict. When
-    // the banned-async flag-day is not yet active for this deploy, drop that rule
-    // from the blocking set (pre-activation parity); all other consensus rules and
-    // the byte-identical error ordering are unchanged.
-    const blocking = lintSource(code).errors.filter((e) => {
-        if (e.rule === 'banned-async' && !enforceBannedAsync) return false;
-        return CONSENSUS_RULES.has(e.rule);
-    });
+    // author-facing signal and must never change the on-chain deploy verdict.
+    const blocking = lintSource(code).errors.filter((e) => CONSENSUS_RULES.has(e.rule));
     if (blocking.length > 0)
         return { valid: false, error: blocking[0].message };
 

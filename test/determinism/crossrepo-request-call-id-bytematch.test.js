@@ -15,17 +15,17 @@
 // The ATTEST request_id and XCALL call_id are derived in the VM (gateway.js /
 // gateway-emit.js) and RE-derived in the indexer (xchain-indexer attest.js /
 // xcall.js). If the two preimages ever drift by a single byte, every legitimate
-// emission is rejected by the re-derivation → the fleet forks. The VM-side suites
+// emission is rejected by the re-derivation and the fleet forks. The VM-side suites
 // pin the VM output; the indexer-side suites pin the handler. THIS test pins the
 // two against each other: it drives the REAL VM derivation and compares it to the
-// indexer's exact preimage formula (copied verbatim below — keep in lockstep).
+// indexer's exact preimage formula (copied verbatim below; keep in lockstep).
 //
-// Runs on Node 24 (no isolated-vm — pure gateway builders).
+// Runs on Node 24 (no isolated-vm; pure gateway builders).
 
 const assert = require('assert');
 const crypto = require('crypto');
 const { buildGateway } = require('../../src/gateway.js');
-const { buildEmitAPI } = require('../../src/gateway-emit.js');
+const { buildEmitAPI, GOLDEN_VECTORS } = require('../../src/gateway-emit.js');
 const GasTracker = require('../../src/gas.js');
 const EmissionCollector = require('../../src/collector.js');
 
@@ -35,7 +35,7 @@ const SCHEDULE = {
     VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
 };
 
-// ── Indexer-side preimage formulas — MUST byte-match, verbatim, the strings in:
+// Indexer-side preimage formulas. MUST byte-match, verbatim, the strings in:
 //      xchain-indexer/src/actions/attest.js  (request_id)
 //      xchain-indexer/src/actions/xcall.js   (call_id)
 // EMITTER_PATH = the emitter execution's callPath; EMITTER_POSITION = emissionIndex;
@@ -52,7 +52,7 @@ const indexerCallId = (network, coin, txHash, rootActionIndex, contractIndex, em
                 String(targetChain))
         .digest('hex');
 
-// ── VM-side drivers (real gateway code) ─────────────────────────────────────
+// VM-side drivers (real gateway code)
 function mkGas() { return { charges: [], charge(n){ this.charges.push(n); } }; }
 function mkState() { const m = new Map(); return { get:k=>m.get(k), has:k=>m.has(k), set:(k,v)=>m.set(k,v), delete:k=>m.delete(k) }; }
 
@@ -90,7 +90,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
 
     describe('ATTEST request_id', function () {
         for (const c of CASES) {
-            it('VM matches the indexer formula — ' + c.name, function () {
+            it('VM matches the indexer formula (' + c.name + ')', function () {
                 const txHash = 'abc123', contractIndex = 7;
                 const vm = vmRequestId({ txHash, rootActionIndex: c.rootActionIndex, callPath: c.callPath, contractIndex });
                 const idx = indexerRequestId(txHash, c.rootActionIndex, c.callPath, contractIndex, 0);
@@ -104,24 +104,45 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
             assert.notStrictEqual(a, b);
         });
 
-        // #4244: two FOREST ROOTS under one tx (a top-level EXECUTE and a controller guard) each
-        // seed callPath '' and may target the same contract — only the root discriminator
+        // #4244: two forest roots under one tx (a top-level EXECUTE and a controller guard) each
+        // seed callPath '' and may target the same contract; only the root discriminator
         // distinguishes them. Without it both derive the identical request_id.
         it('two forest roots under one tx (same call-path, differing root) derive DISTINCT request_ids (#4244)', function () {
             const a = vmRequestId({ txHash: 'abc123', rootActionIndex: 100, callPath: '', contractIndex: 7 });
             const b = vmRequestId({ txHash: 'abc123', rootActionIndex: 101, callPath: '', contractIndex: 7 });
             assert.notStrictEqual(a, b, 'top-level EXECUTE vs controller guard under one tx must not collide');
         });
+
+        // Golden-vector assertion: pins the exact preimage formula against a checked-in
+        // expected hex so a lockstep edit to both inline lambdas (masking the fork) still
+        // fails. The same vector is asserted in xchain-indexer attest.test.js.
+        it('golden vector: VM derivation matches checked-in expected hex', function () {
+            const v = GOLDEN_VECTORS.requestId;
+            const i = v.input;
+            const got = vmRequestId({
+                txHash:          i.txHash,
+                rootActionIndex: i.rootActionIndex,
+                callPath:        i.emitterPath,
+                contractIndex:   i.contractIndex
+            });
+            assert.strictEqual(got, v.expected,
+                'request_id golden vector mismatch: preimage formula changed without updating GOLDEN_VECTORS');
+            // Also verify the inline indexer lambda produces the same expected value,
+            // so a drift in the lambda is caught here rather than masked.
+            const idx = indexerRequestId(i.txHash, i.rootActionIndex, i.emitterPath, i.contractIndex, i.emitterPosition);
+            assert.strictEqual(idx, v.expected,
+                'indexer inline lambda diverged from GOLDEN_VECTORS.requestId.expected');
+        });
     });
 
     describe('XCALL call_id', function () {
         for (const c of CASES) {
-            it('VM matches the indexer formula — ' + c.name, function () {
+            it('VM matches the indexer formula (' + c.name + ')', function () {
                 const network = 'regtest', coin = 'BTC', txHash = 'f'.repeat(64);
                 const contractIndex = 42, targetChain = 'DOGE';
                 const vm = vmCallId({ network, txHash, rootActionIndex: c.rootActionIndex, callPath: c.callPath, contractIndex, targetChain });
                 // sourceChain in the VM preimage is the COIN the emit API is bound to;
-                // gateway-emit derives it from contractAddress/config — here it equals coin.
+                // gateway-emit derives it from contractAddress/config; here it equals coin.
                 const idx = indexerCallId(network, coin, txHash, c.rootActionIndex, contractIndex, c.callPath, 0, targetChain);
                 assert.strictEqual(vm, idx, 'VM and indexer call_id diverged for ' + c.name);
             });
@@ -140,6 +161,28 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
             const a = vmCallId(Object.assign({}, base, { rootActionIndex: 100 }));
             const b = vmCallId(Object.assign({}, base, { rootActionIndex: 101 }));
             assert.notStrictEqual(a, b, 'two forest roots must not collide on call_id');
+        });
+
+        // Golden-vector assertion: pins the exact preimage formula against a checked-in
+        // expected hex so a lockstep edit to both inline lambdas (masking the fork) still
+        // fails. The same vector is asserted in xchain-indexer xcall.test.js.
+        it('golden vector: VM derivation matches checked-in expected hex', function () {
+            const v = GOLDEN_VECTORS.callId;
+            const i = v.input;
+            const got = vmCallId({
+                network:         i.network,
+                txHash:          i.txHash,
+                rootActionIndex: i.rootActionIndex,
+                callPath:        i.emitterPath,
+                contractIndex:   i.contractIndex,
+                targetChain:     i.targetChain
+            });
+            assert.strictEqual(got, v.expected,
+                'call_id golden vector mismatch: preimage formula changed without updating GOLDEN_VECTORS');
+            // Also verify the inline indexer lambda produces the same expected value.
+            const idx = indexerCallId(i.network, i.coin, i.txHash, i.rootActionIndex, i.contractIndex, i.emitterPath, i.emitterPosition, i.targetChain);
+            assert.strictEqual(idx, v.expected,
+                'indexer inline lambda diverged from GOLDEN_VECTORS.callId.expected');
         });
     });
 });
