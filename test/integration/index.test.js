@@ -16,7 +16,7 @@ let XChainVM, vmWorking = false;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping index tests — isolated-vm not available:', e);
+    console.log('Skipping index tests: isolated-vm not available:', e);
 }
 
 const GAS_SCHEDULE = {
@@ -54,7 +54,7 @@ if (XChainVM) {
         // The before() hook below will do the actual async check.
         vmWorking = true;
     } catch (e) {
-        console.log('Skipping index tests — VM probe failed:', e);
+        console.log('Skipping index tests: VM probe failed:', e);
     }
 }
 
@@ -88,7 +88,7 @@ function execute(vm, code, opts) {
             blockContext: { height: 1, timestamp: 0, hash: '0' }
         });
         if (!probe.success) {
-            console.log('Skipping XChainVM tests — VM execution not functional: ' + probe.error);
+            console.log('Skipping XChainVM tests: VM execution not functional: ' + probe.error);
             this.skip();
         }
     });
@@ -504,7 +504,7 @@ function execute(vm, code, opts) {
             vm.beginBlock();
             await execute(vm, code, { contractIndex: 1 });
             vm.endBlock();
-            // After endBlock, cache is null — next execute should still work
+            // After endBlock, cache is null; next execute should still work
             const result = await execute(vm, code);
             assert.strictEqual(result.success, true);
         });

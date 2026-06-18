@@ -56,7 +56,7 @@ async function runOne(vm, sc) {
 
 async function runAll() {
     if (!XChainVM) {
-        const err = new Error('isolated-vm not available — cannot run determinism corpus');
+        const err = new Error('isolated-vm not available; cannot run determinism corpus');
         err.code = 'NO_ISOLATED_VM';
         throw err;
     }

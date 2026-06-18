@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — Contract Function Arguments
+ * Fuzz Tests: Contract Function Arguments
  *
  * Tests that any params array passed to vm.execute() produces a
  * well-shaped result and never crashes the VM.

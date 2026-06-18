@@ -20,11 +20,11 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping determinism-baseline tests — isolated-vm not available:', e);
+    console.log('Skipping determinism-baseline tests (isolated-vm not available):', e);
 }
 
 // ---------------------------------------------------------------------------
-// VM construction + result normalization — kept byte-identical to
+// VM construction + result normalization: kept byte-identical to
 // determinism.test.js so a digest pinned here means the same thing there.
 // (determinism.test.js proves same-process run-twice-equal; THIS file pins a
 //  committed baseline so a *semantic* change is caught even when it's still
@@ -34,7 +34,7 @@ const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
     VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000,
     VM_EMISSION: 500,
-    // Cross-chain call buckets — MUST match the production per-chain configs
+    // Cross-chain call buckets: MUST match the production per-chain configs
     // (xchain-indexer/src/configs/{BTC,LTC,DOGE}.js). gateway-emit.js carries
     // identical fallback defaults, but the keys are pinned here explicitly so
     // the crossExecute baselines are computed against the production schedule.
@@ -91,7 +91,7 @@ const baseOpts = {
 
 // ---------------------------------------------------------------------------
 // Fixed contract corpus. `name` is the stable key in DETERMINISM_BASELINE.json
-// — DO NOT rename without regenerating. File contracts live in test/contracts/;
+// DO NOT rename without regenerating. File contracts live in test/contracts/;
 // inline cases mirror the proven-good inline contracts in determinism.test.js.
 // ---------------------------------------------------------------------------
 const CORPUS = [
@@ -158,7 +158,7 @@ function optsFor(c) {
     };
 }
 
-(XChainVM ? describe : describe.skip)('Determinism — committed baseline', function() {
+(XChainVM ? describe : describe.skip)('Determinism: committed baseline', function() {
 
     let vm;
     const actual = {};
@@ -185,7 +185,7 @@ function optsFor(c) {
         it(`pins digest: ${c.name}`, function() {
             assert.ok(
                 baseline[c.name],
-                `no baseline digest for "${c.name}" — regenerate with REGEN_DETERMINISM_BASELINE=1`
+                `no baseline digest for "${c.name}"; regenerate with REGEN_DETERMINISM_BASELINE=1`
             );
             assert.strictEqual(
                 actual[c.name],

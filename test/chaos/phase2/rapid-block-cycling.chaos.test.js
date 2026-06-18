@@ -126,7 +126,7 @@ const { checkResultShape } = require('../../fuzz/invariants');
         this.timeout(10000);
         const vm = createVM();
 
-        // Execute without calling beginBlock — _blockCache is null
+        // Execute without calling beginBlock (_blockCache is null)
         const code = `module.exports = function(xchain) { return 'no_cache'; };`;
         const result = await execute(vm, code);
 
@@ -164,7 +164,7 @@ const { checkResultShape } = require('../../fuzz/invariants');
 
         vm.beginBlock();
         vm.endBlock();
-        // Second endBlock — sets null to null, should be harmless
+        // Second endBlock sets null to null, should be harmless
         vm.endBlock();
 
         assert.strictEqual(vm._blockCache, null);

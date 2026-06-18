@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Acceptance test (was KNOWN-RED) — contract-visible Error.stack must be
+ * Acceptance test (was KNOWN-RED): contract-visible Error.stack must be
  * neutered (consensus determinism + info leak).
  *
  * A contract can catch its own errors and return/store e.stack, which lands
@@ -46,7 +46,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
 
     // Normal (non-overflow) throws: prepareStackTrace + stackTraceLimit=0 apply,
     // so e.stack is the empty string. (The stack-OVERFLOW path is a separate,
-    // deeper exposure — see the it.skip residuals below — because V8 cannot run
+    // deeper exposure (see the it.skip residuals below) because V8 cannot run
     // the JS prepareStackTrace hook when the stack is exhausted.)
     const VECTORS = [
         { id: 'TypeError (call undefined)', code: wrap(`try { var f; f(); } catch (e) { return String(e.stack); }`) },
@@ -96,7 +96,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
         // reaching the catch and returning the (host-dependent) stack.
         assert.strictEqual(r.success, false,
             `overflow must fault uncatchably, not return; got returnValue=${r.returnValue}`);
-        // Frozen, deterministic fault label — no host filesystem paths, no host
+        // Frozen, deterministic fault label: no host filesystem paths, no host
         // module references, no per-validator-variable frame/offset data.
         assert.strictEqual(r.error, 'out_of_stack: maximum call depth exceeded',
             `expected the frozen out_of_stack fault, got ${r.error}`);
@@ -104,7 +104,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
             `out_of_stack fault leaks host paths: ${r.error}`);
     });
 
-    // DOCUMENTED RESIDUAL — not in-VM fixable, mitigated operationally.
+    // DOCUMENTED RESIDUAL: not in-VM fixable, mitigated operationally.
     // Native throws set e.message as a V8 own property; it cannot be intercepted
     // by overriding the Error constructor. e.message / e.toString() text is
     // therefore still contract-observable and has changed across V8 versions
@@ -114,5 +114,5 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
     // parameter: pin the exact V8/ICU build fleet-wide and enforce it with the
     // cross-version determinism manifest gate. Contracts must not branch on or
     // persist raw error text (SDK/docs guidance). Tracked, intentionally pending.
-    it.skip('RESIDUAL: e.message text is V8-version-dependent — mitigate by pinning exact V8 (consensus param), not in-VM', function () {});
+    it.skip('RESIDUAL: e.message text is V8-version-dependent; mitigate by pinning exact V8 (consensus param), not in-VM', function () {});
 });

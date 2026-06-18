@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Generators — Emission Actions
+ * Fuzz Generators: Emission Actions
  *
  * Generates contracts that call xchain.emit.* with valid, malformed,
  * and adversarial parameters.
@@ -75,7 +75,7 @@ const validEmitContractArb = fc.constantFrom(...EMIT_METHODS).map(method =>
     buildEmitContract(method.name, buildValidParams(method))
 );
 
-// Malformed emit contracts — missing required fields
+// Malformed emit contracts (missing required fields)
 const missingFieldEmitArb = fc.constantFrom(
     ...EMIT_METHODS.filter(m => m.required.length > 0).map(method => {
         const params = buildValidParams(method);

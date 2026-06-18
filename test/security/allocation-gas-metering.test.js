@@ -15,11 +15,11 @@
  *
  * The AST meter charges a flat __gas(1) per call, so a bulk-allocation builtin
  * (new Array(1e8).fill, 'x'.repeat(1e9), Array.from({length:1e8})) cost ~2 gas
- * while V8 materialized hundreds of MB — on x86 the worker then churned ~28s to
+ * while V8 materialized hundreds of MB. On x86 the worker then churned ~28s to
  * the wall-clock timeout (a cheap liveness-degradation; the backstop that fired
  * was arch/timing-dependent). The harness now wraps these builtins at the
  * PROTOTYPE level to charge __gas(size) BEFORE delegating, so the deterministic
- * gas ceiling rejects the allocation first. Defense-in-depth — the out-of-process
+ * gas ceiling rejects the allocation first. Defense-in-depth: the out-of-process
  * executor remains the load-bearing containment for paths that can't be wrapped.
  ********************************************************************/
 // @ts-nocheck
@@ -44,7 +44,7 @@ const CEILING = 1000000;
         assert.strictEqual(r.success, false);
         assert.match(r.error, /^out_of_gas:/, 'must be gas-bounded, got: ' + r.error);
         assert.strictEqual(r.gasUsed, CEILING, 'gasUsed must clamp to the ceiling (fee-bounded, hashed)');
-        assert.ok(Date.now() - t0 < 2000, 'must fail fast — the allocation never reaches V8 (got ' + (Date.now() - t0) + 'ms)');
+        assert.ok(Date.now() - t0 < 2000, 'must fail fast; the allocation never reaches V8 (got ' + (Date.now() - t0) + 'ms)');
     });
 
     it('String.repeat is charged by count*length', async function () {
@@ -80,7 +80,7 @@ const CEILING = 1000000;
 });
 
 // ===========================================================================
-// Allocation-size gas metering — binary buffers (F3-binary)
+// Allocation-size gas metering: binary buffers (F3-binary)
 //
 // ArrayBuffer + TypedArray constructors allocate a dense backing store at
 // [[Construct]] time. Unmetered, new Uint8Array(1<<20) costs ~3 gas while
@@ -92,7 +92,7 @@ const CEILING = 1000000;
 // out_of_gas rather than a catchable allocation error.
 // ===========================================================================
 
-(XChainVM ? describe : describe.skip)('allocation-size gas metering — binary buffers (F3-binary)', function () {
+(XChainVM ? describe : describe.skip)('allocation-size gas metering: binary buffers (F3-binary)', function () {
     this.timeout(30000);
 
     let vm;
@@ -115,7 +115,7 @@ const CEILING = 1000000;
         assert.strictEqual(r.success, false);
         assert.match(r.error, /^out_of_gas:/, 'must be gas-bounded, got: ' + r.error);
         assert.strictEqual(r.gasUsed, CEILING, 'gasUsed must clamp to the ceiling (fee-bounded, hashed)');
-        assert.ok(Date.now() - t0 < 2000, 'must fail fast — the allocation never reaches V8 (got ' + (Date.now() - t0) + 'ms)');
+        assert.ok(Date.now() - t0 < 2000, 'must fail fast; the allocation never reaches V8 (got ' + (Date.now() - t0) + 'ms)');
     });
 
     it('the caught-allocation determinism attack is an uncatchable out_of_gas, not a catchable RangeError', async function () {
@@ -123,7 +123,7 @@ const CEILING = 1000000;
         // try/catch hoping to swallow the memory-limit error and read a
         // GC-timing-dependent count. The byte-length charge means the FIRST
         // 1-MiB allocation already exceeds the ceiling, and gas exhaustion (unlike
-        // the RangeError) cannot be caught — so no nondeterministic value is ever
+        // the RangeError) cannot be caught, so no nondeterministic value is ever
         // observable, and the result is identical on every validator.
         const r = await run(`module.exports = function(){
             var n = 0;

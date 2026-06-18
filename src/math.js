@@ -11,10 +11,10 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Deterministic Math
+ * XChain VM: Deterministic Math
  *
  * Wraps mathjs bignumber for contract use. All inputs and outputs
- * are strings — no floating-point anywhere.
+ * are strings (no floating-point anywhere).
  ********************************************************************/
 // @ts-nocheck
 
@@ -39,7 +39,7 @@ function toFixed(val) {
 // (sqrt, pow, log, ...) can legitimately produce complex values (sqrt of a
 // negative, fractional pow of a negative) or non-finite values (log of zero).
 // Returning a "1+2i" or "Infinity" string from a numeric contract API is a
-// footgun, so we reject those here — safeMath() turns the throw into a clean
+// footgun, so we reject those here. safeMath() turns the throw into a clean
 // ContractRevertError.
 function toRealFixed(val) {
     if (mathjs.isComplex(val))
@@ -58,7 +58,7 @@ function validateInput(val) {
     return s;
 }
 
-// Safely divide — mathjs returns Infinity for div by zero instead of throwing
+// Safely divide (mathjs returns Infinity for div by zero instead of throwing)
 function safeDivide(a, b) {
     const bb = bignumber(validateInput(b));
     if (bb.isZero()) throw new Error('Division by zero');
@@ -98,7 +98,7 @@ function buildMathAPI() {
         abs:      safeMath((a)    => toFixed(bignumber(validateInput(a)).abs())),
         isZero:   safeMath((a)    => bignumber(validateInput(a)).isZero()),
 
-        // Transcendental functions — deterministic, architecture-independent
+        // Transcendental functions: deterministic, architecture-independent
         // replacements for the IEEE 754 Math.sqrt/pow/log/... that are no longer
         // exposed in the sandbox. mathjs bignumber is pure-software arithmetic,
         // so these produce bit-identical results on every CPU architecture.

@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Gas Tracking
+ * XChain VM: Gas Tracking
  *
  * Tracks gas consumption during contract execution.
  * Throws GasExhaustedError when the ceiling is exceeded.
@@ -24,7 +24,7 @@ const { GasExhaustedError } = require('./errors.js');
 // a missing key resolves to `undefined` the first time that operation is metered,
 // which charge() then rejects deep inside execution. Validating membership up
 // front turns that latent, execution-time failure into a deterministic
-// construction-time error — so two operators whose schedules disagree on any of
+// construction-time error. Two operators whose schedules disagree on any of
 // these keys fail loudly at startup instead of silently reaching divergent
 // contract outcomes on the same block.
 //
@@ -56,7 +56,7 @@ const CANONICAL_GAS_KEYS = Object.freeze([
 // ceiling; anything non-positive/non-integer/over the configured ceiling falls
 // back to the configured ceiling. Lives here so the in-process execute path
 // (index.js) and the subprocess host-termination clamp (process-executor.js)
-// resolve the SAME ceiling — if they drifted, a host-terminated nested call
+// resolve the SAME ceiling. If they drifted, a host-terminated nested call
 // would bill a different gasUsed than the in-isolate clamp → fee divergence → fork.
 function effectiveCeiling(requested, configCeiling) {
     if (typeof requested === 'number' && Number.isInteger(requested) &&
@@ -72,7 +72,7 @@ class GasTracker {
             const val = gasSchedule[key];
             // `typeof val !== 'number'` is redundant defense: Number.isInteger
             // never coerces, so !Number.isInteger(val) already rejects every
-            // non-number. Kept for clarity/intent. Equivalent mutant — proven
+            // non-number. Kept for clarity/intent. Equivalent mutant, proven
             // exhaustively, see test/unit/gas.test.js boundary tests.
             // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
             if (typeof val !== 'number' || !Number.isInteger(val) || val < 0)

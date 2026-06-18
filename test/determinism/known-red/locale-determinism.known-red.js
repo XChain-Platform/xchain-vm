@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * KNOWN-RED acceptance test — locale/unicode-sensitive prototype methods
+ * KNOWN-RED acceptance test: locale/unicode-sensitive prototype methods
  * are reachable inside the sandbox (suspected consensus-fork surface).
  *
  * sandbox.js strips the locale GLOBALS (Intl/Temporal/performance/

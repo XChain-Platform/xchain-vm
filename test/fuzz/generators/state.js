@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Generators — State Operations
+ * Fuzz Generators: State Operations
  *
  * Generates adversarial keys, values, initial state, and contracts
  * that exercise state CRUD in adversarial ways.

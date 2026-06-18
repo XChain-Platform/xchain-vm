@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Error Types
+ * XChain VM: Error Types
  ********************************************************************/
 
 class ContractRevertError extends Error {
@@ -30,7 +30,7 @@ class GasExhaustedError extends Error {
     }
 }
 
-// A LOCAL host fault — the out-of-process executor cannot run a contract on
+// A LOCAL host fault. The out-of-process executor cannot run a contract on
 // THIS machine at all (the worker process can never start: fork EAGAIN,
 // isolated-vm load failure, etc.). This is NOT a contract outcome: it is not a
 // deterministic property of the contract (a contract cannot make fork() fail),

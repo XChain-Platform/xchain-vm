@@ -32,10 +32,10 @@
  *
  * The cross-arch x86 run surfaced this (qemu is ~10–20× slower, so the net
  * wins there). This probe reproduces it NATIVELY and deterministically by
- * varying only the wall-clock budget `maxCpuTimeMs` — a faithful, controlled
+ * varying only the wall-clock budget `maxCpuTimeMs`, a faithful, controlled
  * proxy for host speed: a host N× slower trips a 5000 ms net at the same
  * gasUsed that a fast host trips a 5000/N ms net at. gasUsed is identical
- * (clamped to the ceiling) in BOTH outcomes, so the FEE is fork-safe — only
+ * (clamped to the ceiling) in BOTH outcomes, so the FEE is fork-safe; only
  * the hashed STATUS token diverges.
  *
  *   node test/determinism/probe-gas-vs-wallclock-race.js
@@ -46,7 +46,7 @@ const fs = require('fs');
 const path = require('path');
 const { createVM, execute } = require('../fuzz/harness');
 
-// Mirror of xchain-indexer/src/utility.js `vmFailureStatus` — the consensus
+// Mirror of xchain-indexer/src/utility.js `vmFailureStatus`: the consensus
 // status mapping. Kept in sync with that source: the whole resource-exhaustion
 // family (out_of_gas included) collapses to one token, which is the fix this
 // probe verifies.
@@ -68,7 +68,7 @@ async function run(maxCpuTimeMs) {
 }
 
 async function main() {
-    process.stdout.write(`out_of_gas vs out_of_resource — host-timing race probe\n${'='.repeat(78)}\n`);
+    process.stdout.write(`out_of_gas vs out_of_resource: host-timing race probe\n${'='.repeat(78)}\n`);
     // Generous budget: a fast validator. Gas ceiling wins the race.
     const fast = await run(5000);
     // Tight budget: a proportionally slower validator. Wall-clock net wins.

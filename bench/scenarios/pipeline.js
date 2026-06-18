@@ -18,7 +18,7 @@
  *
  * Measures each stage of the VM execution pipeline:
  *   1. Full execute() end-to-end (cache miss)
- *   2. Full execute() end-to-end (cache hit — within a block)
+ *   2. Full execute() end-to-end (cache hit, within a block)
  *   3. Metering (AST parse + injection + codegen)
  *   4. Sandbox + gateway overhead (estimated from trivial vs no-op delta)
  *
@@ -70,7 +70,7 @@ async function benchmarkExecuteCacheMiss() {
         const ctx  = createContext();
 
         const timings = await measure(async () => {
-            // No beginBlock — every call is a cache miss
+            // No beginBlock: every call is a cache miss
             const result = await vm.execute({ code, ...ctx });
             if (!result.success && !result.error.startsWith('out_of_gas')) {
                 throw new Error('Unexpected failure: ' + result.error);
@@ -127,7 +127,7 @@ async function benchmarkStressContracts() {
         rows.push({ label: 'stress/' + sc.name, stats: collectStats(timings) });
     }
 
-    // Gas burner — expect it to hit gas ceiling; measure time-to-terminate
+    // Gas burner: expect it to hit gas ceiling; measure time-to-terminate
     const burnerVM   = createVM({ gasCeiling: 100000 });
     const burnerCode = loadContract('stress/gas_burner.js');
     const burnerCtx  = createContext();
@@ -153,8 +153,8 @@ async function main() {
     const stressRows    = await benchmarkStressContracts();
 
     printTable('Metering (AST parse + inject + codegen)', meteringRows);
-    printTable('Execute — Cache Miss (cold)', coldRows);
-    printTable('Execute — Cache Hit (warm)', warmRows);
+    printTable('Execute: Cache Miss (cold)', coldRows);
+    printTable('Execute: Cache Hit (warm)', warmRows);
     printTable('Stress Contracts', stressRows);
 
     // Cache speedup summary

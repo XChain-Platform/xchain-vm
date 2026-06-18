@@ -247,9 +247,9 @@ function guardDeletion(source, filename) {
 // Removes Object.freeze() and Object.defineProperty() calls that establish
 // immutability and non-configurability constraints in the VM sandbox.
 // Targets:
-//   sandbox.js: Object.freeze(SafeMath) — prevents Math.random restoration
-//   sandbox.js: Object.defineProperty(..., 'constructor', ...) — prevents escape
-//   index.js HARNESS_SOURCE: Object.defineProperty(globalThis, '__gas', ...) — prevents override
+//   sandbox.js: Object.freeze(SafeMath) (prevents Math.random restoration)
+//   sandbox.js: Object.defineProperty(..., 'constructor', ...) (prevents escape)
+//   index.js HARNESS_SOURCE: Object.defineProperty(globalThis, '__gas', ...) (prevents override)
 //
 // Object.freeze(x) → replaced with just x (unwrap)
 // Object.defineProperty(a,b,c) → replaced with undefined (no-op)

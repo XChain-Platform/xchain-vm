@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 
-// All known sandbox escape attempts — every one must fail
+// All known sandbox escape attempts: every one must fail
 module.exports = function(xchain) {
     var results = [];
 

@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * MockIndexer — Processes emitted VM actions against the MockLedger
+ * MockIndexer: processes emitted VM actions against the MockLedger
  *
  * Translates SEND, DESTROY, MINT, and other emitted actions into
  * ledger state changes, simulating what the real xchain-indexer does.
@@ -76,7 +76,7 @@ class MockIndexer {
     }
 
     _processIssue(params) {
-        // Token issuance — just record it exists
+        // Token issuance: just record it exists
         // Real indexer would create token record
     }
 
@@ -92,7 +92,7 @@ class MockIndexer {
             this.ledger.debitBalance(caller, this.ledger.gasToken, fee);
             this.ledger.creditBalance(this.ledger.gasAddress, this.ledger.gasToken, fee);
         } catch (e) {
-            // Caller can't afford fee — in real indexer this would reject the tx
+            // Caller can't afford fee; in the real indexer this would reject the tx
             // For E2E testing we allow it to proceed with a warning
         }
     }

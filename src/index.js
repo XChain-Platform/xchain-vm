@@ -721,7 +721,7 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1798761600;
 // Coordinated activation (block time, unix seconds) for the async/Promise
 // contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
 // `Promise` (sandbox.js) and the deploy validator rejects async/await/Promise
-// (lint-core CONSENSUS_RULES 'banned-async'). Both are consensus-affecting — a
+// (lint-core CONSENSUS_RULES 'banned-async'). Both are consensus-affecting: a
 // node that strips Promise / rejects an async DEPLOY and a node that does not
 // produce a different gasUsed/status (→ contract_hash → fee debit, and a
 // different deploy verdict), so a mixed-version fleet forks on the first

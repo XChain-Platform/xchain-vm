@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Preflight
+ * XChain VM: Preflight
  *
  * The rest of the suite guards isolate-dependent tests behind
  * `(XChainVM ? describe : describe.skip)` so a single focused run
@@ -41,7 +41,7 @@ const assert = require('assert');
 
 describe('Preflight: sandbox engine must load', function() {
     it('loads the XChainVM engine (isolated-vm native binding)', function() {
-        // No try/catch on purpose — a load failure MUST fail the suite,
+        // No try/catch on purpose: a load failure MUST fail the suite,
         // never skip it.
         const XChainVM = require('../src/index.js');
         assert.strictEqual(typeof XChainVM, 'function',

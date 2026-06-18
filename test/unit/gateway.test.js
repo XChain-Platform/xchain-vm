@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// Unit tests for src/gateway.js — the host-function surface every contract
+// Unit tests for src/gateway.js (the host-function surface every contract
 // interacts with (read-only context, ledger queries, state, oracle, cross-chain,
 // external attestation, contract-targeted staking, control flow, logging).
 // Exercised directly here (no isolate) so each branch + gas charge is covered.
@@ -26,7 +26,7 @@ const SCHEDULE = {
     VM_ATTEST_REQUEST: 5000, VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
 };
 
-// Recording fakes — let each test assert exact gas charges and captured emissions
+// Recording fakes: let each test assert exact gas charges and captured emissions
 // without depending on GasTracker/EmissionCollector internals.
 function mkGas() {
     return { charges: [], charge(n) { this.charges.push(n); }, total() { return this.charges.reduce((a, b) => a + b, 0); } };
@@ -239,7 +239,7 @@ describe('Gateway (host-function surface)', function () {
         });
 
         it('includes the executing call-path in the preimage (nested-run disambiguation)', function () {
-            // Cross-contract calls can run the SAME contract twice in the SAME tx —
+            // Cross-contract calls can run the SAME contract twice in the SAME tx;
             // the execution's deterministic call-path is what keeps their request_ids
             // distinct (and, unlike the old action_index, it does not shift with the
             // indexer's synthetic-action injection timing). MUST byte-match the indexer

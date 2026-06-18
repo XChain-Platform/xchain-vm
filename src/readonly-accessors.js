@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Read-only data accessors
+ * XChain VM: Read-only data accessors
  *
  * The gateway (src/gateway.js) calls oracle / crossChain / attestation /
  * contract-stake accessors SYNCHRONOUSLY through the isolate's applySync
@@ -22,7 +22,7 @@
  * This module standardizes the contract: the host passes a plain,
  * SERIALIZABLE snapshot, and these builders turn it into the synchronous
  * accessor object the gateway expects. `resolveAccessors()` is
- * backward-compatible — if a field is already an accessor object (has the
+ * backward-compatible: if a field is already an accessor object (has the
  * expected methods), it is passed through unchanged, so existing in-process
  * callers/tests keep working without migration.
  *

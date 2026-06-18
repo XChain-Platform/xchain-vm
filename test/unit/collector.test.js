@@ -39,7 +39,7 @@ describe('EmissionCollector', function() {
     });
 
     // RISK-10 prototype-pollution guard: `if (key === '__proto__' || key ===
-    // 'constructor') continue;`. The realistic vector is JSON-sourced params —
+    // 'constructor') continue;`. The realistic vector is JSON-sourced params:
     // a contract emits JSON, and JSON.parse creates REAL own-enumerable
     // __proto__ / constructor keys (an object literal would not). Both keys must
     // be dropped from the copied params; the benign key survives. Pins both arms

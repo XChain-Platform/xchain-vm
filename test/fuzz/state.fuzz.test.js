@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — State Operations
+ * Fuzz Tests: State Operations
  *
  * Tests that adversarial keys, values, and state operation sequences
  * never corrupt state, crash the VM, or pollute prototypes.
@@ -153,7 +153,7 @@ const {
                 // like "__proto__" become genuine own properties. A plain {}
                 // would route state["__proto__"] = "str" through the __proto__
                 // setter (a no-op for non-object values), silently dropping the
-                // key before it ever reaches the VM — a false failure that masks
+                // key before it ever reaches the VM, a false failure that masks
                 // what we actually want to test: round-trip fidelity for every key.
                 const state = Object.create(null);
                 state[key] = value;

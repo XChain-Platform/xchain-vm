@@ -18,7 +18,7 @@ try {
     validateSyntax = syntax.validateSyntax;
     checkFloatWarnings = syntax.checkFloatWarnings;
 } catch (e) {
-    console.log('Skipping syntax tests — isolated-vm not available:', e);
+    console.log('Skipping syntax tests (isolated-vm not available):', e);
 }
 
 (validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
@@ -272,7 +272,7 @@ try {
             // Since we can't always guarantee what the acorn version supports,
             // we exercise the path indirectly: if the metering pass throws, the error
             // message should include 'unsupported syntax'.
-            // This is a best-effort test — if the acorn version is recent enough
+            // This is a best-effort test; if the acorn version is recent enough
             // to accept newer syntax, this test acts as a documentation probe.
             const result = validateSyntax('class C { static { let x = 1; } }');
             // Either the syntax is accepted (valid) or rejected with 'unsupported syntax'

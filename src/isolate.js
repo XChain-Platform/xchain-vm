@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Isolate Manager
+ * XChain VM: Isolate Manager
  *
  * Manages V8 isolate creation, compilation, and disposal via
  * isolated-vm. All operations use synchronous APIs to prevent
@@ -79,7 +79,7 @@ class IsolateManager {
             if (isolate && !isolate.isDisposed)
                 isolate.dispose();
         } catch (e) {
-            // Already disposed or other cleanup error — ignore
+            // Already disposed or other cleanup error; ignore
         }
     }
 }

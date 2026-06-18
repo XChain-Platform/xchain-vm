@@ -118,7 +118,7 @@ describe('StateManager', function() {
         sm.delete('existing');
 
         const { changes, deletes } = sm.getChanges();
-        // 'existing' was set then deleted — dirty map has null for it
+        // 'existing' was set then deleted; dirty map has null for it
         assert.deepStrictEqual(deletes, ['existing']);
         assert.deepStrictEqual(changes, [{ key: 'added', value: 'value' }]);
     });
@@ -253,7 +253,7 @@ describe('StateManager', function() {
     it('should use default 1024-byte key limit when maxStateKeySize not set', function() {
         const sm = new StateManager({}, LIMITS); // LIMITS has no maxStateKeySize
         assert.throws(() => sm.set('a'.repeat(1025), 'value'), /key exceeds max size/);
-        sm.set('a'.repeat(1024), 'value'); // at the limit — should pass
+        sm.set('a'.repeat(1024), 'value'); // at the limit, should pass
     });
 
     it('should reject non-JSON-serializable values (function)', function() {
@@ -262,7 +262,7 @@ describe('StateManager', function() {
     });
 
     it('should reject non-JSON-serializable values (undefined via JSON.stringify)', function() {
-        // JSON.stringify wraps the value — a plain undefined arg produces ""undefined""
+        // JSON.stringify wraps the value. A plain undefined arg produces ""undefined""
         // but JSON.stringify(undefined) itself returns undefined (not a string).
         // We need a value that makes JSON.stringify(value) === undefined.
         // Functions are the canonical way; verify the error message.

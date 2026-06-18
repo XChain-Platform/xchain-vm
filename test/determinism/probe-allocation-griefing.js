@@ -15,8 +15,8 @@
  *
  * AST gas metering charges per __gas() injection point (function entry,
  * loop body, call site, conditional, deep binary expr). A SINGLE builtin
- * call that allocates or computes a huge amount — 'x'.repeat(2e9),
- * Array(n).fill(), padStart(1e9), deep recursion — passes ONE call site
+ * call that allocates or computes a huge amount ('x'.repeat(2e9),
+ * Array(n).fill(), padStart(1e9), deep recursion) passes ONE call site
  * (~1 gas) yet consumes unbounded host memory / CPU. The only backstops
  * are the memory ceiling and the WALL-CLOCK timeout, both of which can
  * fire at machine-/GC-/stack-depth-dependent points.
@@ -24,7 +24,7 @@
  * For each vector this probe runs N times and reports whether the
  * (error-class, gasUsed) outcome is DETERMINISTIC. Any vector that
  * resolves via a nondeterministic ceiling is a consensus-split candidate
- * (gasUsed feeds fee math — see report), not merely a DoS.
+ * (gasUsed feeds fee math; see report), not merely a DoS.
  *
  *   node test/determinism/probe-allocation-griefing.js [runs=8]
  ********************************************************************/
@@ -85,7 +85,7 @@ async function main() {
         process.exit(r.success ? 99 : 0);
     }
 
-    process.stdout.write(`Allocation-griefing red-team probe — ${RUNS} runs/vector\n${'='.repeat(74)}\n`);
+    process.stdout.write(`Allocation-griefing red-team probe: ${RUNS} runs/vector\n${'='.repeat(74)}\n`);
     const findings = [];
     for (const v of VECTORS) {
         const outcomes = await probe(v);

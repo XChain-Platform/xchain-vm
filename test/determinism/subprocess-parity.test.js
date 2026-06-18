@@ -16,9 +16,9 @@
  * Production (the indexer) runs the VM in `execution: 'subprocess'` mode so
  * a contract that aborts V8 crashes only the worker, not the host. This guard
  * proves two things the chain depends on:
- *   1. PARITY  — subprocess execution reproduces the EXACT golden-manifest
+ *   1. PARITY: subprocess execution reproduces the EXACT golden-manifest
  *      hashes (byte-identical to in-process; no behavior drift from IPC).
- *   2. CONTAINMENT — the Array(1e8).fill host-abort bug (was Finding A,
+ *   2. CONTAINMENT: the Array(1e8).fill host-abort bug (was Finding A,
  *      2026-06-06) is contained: it returns a deterministic resource failure
  *      (gasUsed = ceiling) and the executor keeps serving.
  ********************************************************************/
@@ -48,7 +48,7 @@ function makeSubprocessVM() {
     before(function () { vm = makeSubprocessVM(); vm.beginBlock(); });
     after(async function () { if (vm) { await vm.shutdown(); vm = null; } });
 
-    // Scenarios whose read-only data is plain (no closure accessors) — these
+    // Scenarios whose read-only data is plain (no closure accessors); these
     // serialize across IPC. The oracle-with-price path is covered separately
     // by the executor snapshot test.
     const parityScenarios = SCENARIOS.filter(s =>
@@ -64,7 +64,7 @@ function makeSubprocessVM() {
             assert.ok(golden, `manifest missing ${sc.id}`);
             assert.strictEqual(hashResult(r), golden.hash,
                 `subprocess result for "${sc.id}" diverged from the golden manifest ` +
-                `(gasUsed=${r.gasUsed}, error=${JSON.stringify(r.error)}) — IPC introduced drift.`);
+                `(gasUsed=${r.gasUsed}, error=${JSON.stringify(r.error)}): IPC introduced drift.`);
         });
     }
 

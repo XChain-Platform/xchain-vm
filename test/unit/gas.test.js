@@ -42,7 +42,7 @@ describe('GasTracker', function() {
 
     it('should allow charge exactly at ceiling', function() {
         const tracker = new GasTracker(SCHEDULE, 100);
-        // Should not throw — used == ceiling is OK
+        // Should not throw: used == ceiling is OK
         tracker.charge(100);
         assert.strictEqual(tracker.getUsed(), 100);
     });
@@ -116,7 +116,7 @@ describe('GasTracker', function() {
 
     // The charge() guard is `typeof amount !== 'number' || !Number.isFinite(amount)
     // || amount < 0`. A NaN slips past the type and sign checks (typeof NaN ===
-    // 'number', NaN < 0 is false) — only the !Number.isFinite arm rejects it.
+    // 'number', NaN < 0 is false), so only the !Number.isFinite arm rejects it.
     // Without this, a missing GAS_SCHEDULE key (→ undefined → NaN) would silently
     // disable the ceiling for the rest of execution: a non-deterministic gasUsed
     // → fork. Pins the !Number.isFinite arm (kills the `||`→`&&` mutant on line 72).

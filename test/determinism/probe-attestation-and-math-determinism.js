@@ -111,7 +111,7 @@ async function main() {
     process.stdout.write(`\n${'='.repeat(74)}\n`);
     process.stdout.write(findings
         ? `FINDINGS: ${findings} ***\n`
-        : 'No findings — request_id and math are deterministic and collision-free.\n');
+        : 'No findings: request_id and math are deterministic and collision-free.\n');
 }
 
 main().then(() => process.exit(0)).catch(e => {

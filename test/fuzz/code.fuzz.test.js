@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — Contract Code
+ * Fuzz Tests: Contract Code
  *
  * Tests that valid, mutated, and adversarial contract code never
  * crashes the host process and always produces correct result shapes.
@@ -64,7 +64,7 @@ const { validContractArb, mutatedContractArb, adversarialCodeArb, anyCodeArb } =
         checkResultShape(result);
         // The error should NOT be classified as out_of_gas since gas was not actually exhausted
         if (result.error && result.error.includes('out_of_gas')) {
-            throw new Error('Gas spoof succeeded — error classified as out_of_gas without actual exhaustion');
+            throw new Error('Gas spoof succeeded: error classified as out_of_gas without actual exhaustion');
         }
     });
 
@@ -74,7 +74,7 @@ const { validContractArb, mutatedContractArb, adversarialCodeArb, anyCodeArb } =
         checkResultShape(result);
         // The error should NOT be classified as a revert since execContext.reverted was not set
         if (result.error && result.error.startsWith('revert:')) {
-            throw new Error('Revert spoof succeeded — error classified as revert without actual revert');
+            throw new Error('Revert spoof succeeded: error classified as revert without actual revert');
         }
     });
 

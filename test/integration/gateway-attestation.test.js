@@ -26,7 +26,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping attestation gateway tests — isolated-vm not available:', e);
+    console.log('Skipping attestation gateway tests (isolated-vm not available):', e);
 }
 
 const GAS_SCHEDULE = {
@@ -68,7 +68,7 @@ function baseExecOpts(extra) {
     }, extra || {});
 }
 
-(XChainVM ? describe : describe.skip)('Gateway — attestation namespace', function () {
+(XChainVM ? describe : describe.skip)('Gateway: attestation namespace', function () {
 
     let vm;
     before(function () { vm = createVM(); });
@@ -122,7 +122,7 @@ function baseExecOpts(extra) {
             assert.strictEqual(emission.params.requestId.length, 64);
             // Feeless request → fee fields ride as empty strings (the indexer's
             // buildActionParams emits them as trailing empties, which the wire
-            // serializer trims — byte-identical to the pre-fee format).
+            // serializer trims (byte-identical to the pre-fee format).
             assert.strictEqual(emission.params.feeTick, '');
             assert.strictEqual(emission.params.feeAmount, '');
         });
@@ -270,7 +270,7 @@ function baseExecOpts(extra) {
 
         // The limit is BYTES, not characters: a multibyte name under the 64-char
         // count but over 64 UTF-8 bytes must still be rejected (regression for the
-        // chars-vs-bytes mismatch — providerId/callbackMethod were checking .length
+        // chars-vs-bytes mismatch: providerId/callbackMethod were checking .length
         // while requestPayload/callbackParams used byte length).
         it('rejects a multibyte callbackMethod that is <= 64 chars but > 64 bytes', async function () {
             const result = await vm.execute(baseExecOpts({
@@ -308,7 +308,7 @@ function baseExecOpts(extra) {
         // [1, 100] cap must be enforced at call time. Without injection, an
         // `llm` request (window 20) with deadlineBlocks 50 passed VM validation,
         // landed on-chain, and was then silently dead-lettered by the indexer's
-        // DEADLINE check — the contract callback was never invoked.
+        // DEADLINE check: the contract callback was never invoked.
         const PROVIDER_DEADLINES = { http_get: 100, llm: 20 };
 
         it('rejects deadlineBlocks above the injected per-provider window (llm=20, requested 50)', async function () {

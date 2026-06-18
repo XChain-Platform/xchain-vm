@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Out-of-process executor — the host-abort containment fix.
+ * Out-of-process executor: the host-abort containment fix.
  *
  * Verifies that subprocess execution: (1) produces results identical to
  * in-process for normal contracts, (2) survives a contract that aborts the
@@ -75,7 +75,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 
         assert.strictEqual(b.success, true, 'subprocess run should succeed: ' + b.error);
         // Compare via the consensus-equality function (sha256 of the normalized,
-        // JSON-serialized result) — the same hash the golden manifest uses. This
+        // JSON-serialized result): the same hash the golden manifest uses. This
         // is prototype-agnostic, which is correct: consensus sees the JSON form,
         // not the in-memory object's prototype.
         assert.strictEqual(hashResult(b), hashResult(a),
@@ -98,7 +98,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
             'must map to a deterministic resource failure, got: ' + r.error);
         assert.strictEqual(r.gasUsed, GAS_CEILING, 'must charge the gas ceiling (fork-safe fee)');
 
-        // The executor must have respawned — a normal contract still works.
+        // The executor must have respawned; a normal contract still works.
         const ok = await vm.execute({ ...BASE, code: `module.exports = function(){ return 'alive'; };` });
         assert.strictEqual(ok.success, true, 'executor should serve again after a crash: ' + ok.error);
         assert.strictEqual(ok.returnValue, '"alive"');
@@ -129,10 +129,10 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         assert.strictEqual(ok.success, true, 'still serving after repeated crashes');
     });
 
-    // F2 regression — deterministic dispatch after a worker death.
+    // F2 regression: deterministic dispatch after a worker death.
     //
     // The indexer runs contracts sequentially, so the contract IMMEDIATELY after one
-    // that killed its worker must still run — on the RESPAWNED worker — and return
+    // that killed its worker must still run on the RESPAWNED worker and return
     // its real result on every validator. Before the ready-gated-dispatch fix, that
     // next contract could be sent to the dying worker (in the window after the
     // watchdog kills it but before 'exit'/respawn) and resolve as a host-termination
@@ -140,8 +140,8 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     //
     // We exercise this at the EXECUTOR level (a contract can no longer reliably kill
     // the worker now that F3 gas-bounds bulk allocations): drive a worker death the
-    // way the watchdog does — kill the child and mark it un-dispatchable
-    // (_sawReady=false, exactly what the watchdog callback now sets) — then dispatch
+    // way the watchdog does: kill the child and mark it un-dispatchable
+    // (_sawReady=false, exactly what the watchdog callback now sets), then dispatch
     // the next request. It MUST queue and run on the respawn, never be host-terminated.
     it('F2: executor queues+recovers the next request after a worker death', async function () {
         const ProcessExecutor = require('../../src/process-executor.js');
@@ -170,7 +170,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         }
     });
 
-    // Halt-vs-fabricate — a PERMANENTLY broken executor (worker can never start)
+    // Halt-vs-fabricate: a PERMANENTLY broken executor (worker can never start)
     // must REJECT, not fabricate. Fabricating out_of_resource for work the fleet
     // runs would fork this node off the chain (a host fault is not a contract
     // property). The indexer turns the rejection into a halt-and-retry.
@@ -261,7 +261,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
             await exec.execute({ ...BASE, code: `module.exports = function(){ return 'warm'; };` });
 
             // Freeze (don't kill) the child so the next dispatch can never
-            // complete — the stuck-isolate / native-deadlock shape.
+            // complete (the stuck-isolate / native-deadlock shape).
             exec._watchdogMs = 300;
             exec._child.kill('SIGSTOP');
 
@@ -280,7 +280,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 
     // The deterministic case is UNCHANGED: a single worker death during an
     // in-flight execution still RESOLVES a fabricated host-termination (every
-    // validator sees the same poisoned-contract outcome) — it must NOT reject.
+    // validator sees the same poisoned-contract outcome); it must NOT reject.
     it('a single in-flight worker death still FABRICATES (resolves), not rejects', async function () {
         const ProcessExecutor = require('../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });

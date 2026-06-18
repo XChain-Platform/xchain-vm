@@ -35,7 +35,7 @@
  * This probe confirms REACHABILITY: it executes each method inside the
  * sandbox and reports whether it is callable and whether its output flows
  * out as a returnValue (the hashed surface). RED = reachable. (Proving
- * cross-ICU DIVERGENCE needs a second ICU build — framed as suspected,
+ * cross-ICU DIVERGENCE needs a second ICU build, framed as suspected,
  * exactly like Finding C was before its cross-arch confirmation.)
  *
  *   node test/determinism/probe-locale-determinism.js

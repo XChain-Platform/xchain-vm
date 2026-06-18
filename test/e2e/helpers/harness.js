@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * E2E Test Harness — Orchestrates deploy/execute cycles
+ * E2E Test Harness: Orchestrates deploy/execute cycles
  *
  * Wraps the real XChainVM with a MockLedger and MockIndexer to
  * simulate the full platform pipeline.

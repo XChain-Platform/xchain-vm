@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Generators — Contract Function Arguments
+ * Fuzz Generators: Contract Function Arguments
  *
  * Generates adversarial params arrays for vm.execute().
  ********************************************************************/

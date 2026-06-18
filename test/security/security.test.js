@@ -32,7 +32,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping security tests — isolated-vm not available:', e);
+    console.log('Skipping security tests (isolated-vm not available):', e);
 }
 
 const GAS_SCHEDULE = {
@@ -468,7 +468,7 @@ function executeCode(vm, code, opts) {
                 try {
                     xchain.revert('real reason');
                 } catch(e) {
-                    // Swallowed the revert — execContext.reverted is now true
+                    // Swallowed the revert; execContext.reverted is now true
                 }
                 // Now try to spoof with a different reason
                 throw new Error('\\x03REVERT:spoofed reason');
@@ -539,7 +539,7 @@ function executeCode(vm, code, opts) {
         assert.strictEqual(result.success, true);
         const val = JSON.parse(result.returnValue);
         // In strict mode, assignment to non-writable throws. In sloppy mode, silently fails.
-        // Either way, __gas should still function — test with an infinite loop next.
+        // Either way, __gas should still function; test with an infinite loop next.
         assert(val === 'blocked: Cannot assign to read only property \'__gas\' of object \'[object global]\'' ||
                val.startsWith('blocked') || val === 'overwrote',
             'got: ' + val);
@@ -673,7 +673,7 @@ function executeCode(vm, code, opts) {
             const sm = new StateManager({}, {
                 maxStateKeys: 100, maxStateValueSize: 65536, maxStateKeySize: 1024
             });
-            // Set __proto__ via the state API — should be stored as a regular key
+            // Set __proto__ via the state API; should be stored as a regular key
             sm.set('__proto__', 'injected');
             assert.strictEqual(sm.get('__proto__'), 'injected');
             assert.strictEqual(sm.has('__proto__'), true);
@@ -1166,7 +1166,7 @@ function executeCode(vm, code, opts) {
                 assert(val === 'undefined' || val === 'blocked' || val === 'clean' || val === null,
                     vec.name + ' should be blocked, got: ' + val);
             }
-            // If result.success is false, the contract errored — also acceptable
+            // If result.success is false, the contract errored (also acceptable)
         });
     }
 

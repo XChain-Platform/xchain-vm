@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — Emission Actions
+ * Fuzz Tests: Emission Actions
  *
  * Tests that all 16 emit methods handle valid, malformed, and
  * adversarial parameters correctly without violating invariants.

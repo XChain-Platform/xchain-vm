@@ -13,8 +13,8 @@
  **********************************************************************
  * Binary-allocation gas-metering activation gate (regression)
  *
- * The F3-binary charge — ArrayBuffer/TypedArray construction costs its byte
- * length in gas — is a consensus-affecting gas-schedule change: gasUsed is hashed
+ * The F3-binary charge (ArrayBuffer/TypedArray construction costs its byte
+ * length in gas) is a consensus-affecting gas-schedule change: gasUsed is hashed
  * into the per-block contract checkpoint and drives the fee debit. Applied to
  * ALL blocks it would fork any mixed-version fleet on the first binary-allocating
  * execution (a node with the charge out_of_gas-reverts where a node without it
@@ -54,7 +54,7 @@ const AT     = { height: 100, timestamp: GATE,     hash: 'at'  };
 
     it('(a) the same binary allocation produces a DIFFERENT gasUsed below vs at the flag day', async function () {
         // 50 KiB is comfortably under the gas ceiling AND the isolate memory limit,
-        // so it succeeds on BOTH sides — the only difference is the byte-length
+        // so it succeeds on BOTH sides. The only difference is the byte-length
         // charge. This is the exact divergence that forks a mixed-version fleet.
         const code = `module.exports = function(){ var a = new Uint8Array(50000); return a.length; };`;
 
@@ -78,7 +78,7 @@ const AT     = { height: 100, timestamp: GATE,     hash: 'at'  };
         // well under the 8 MiB isolate memory limit. At/after the flag day the
         // byte charge trips the gas ceiling (uncatchable out_of_gas); below it the
         // allocation is unmetered and the contract returns normally. Opposite
-        // consensus outcomes for the identical contract — the fork the gate exists
+        // consensus outcomes for the identical contract. This is the fork the gate exists
         // to prevent from landing on historical blocks.
         const code = `module.exports = function(){ var a = new Uint8Array(2000000); return a.length; };`;
 

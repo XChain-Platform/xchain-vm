@@ -18,7 +18,7 @@
  * padEnd) so a single bulk allocation can no longer outrun the gas
  * ceiling. Two families are STILL charged ~1 gas regardless of size:
  *
- *   (1) Compute/iteration builtins — Array.prototype.sort/join/reverse/
+ *   (1) Compute/iteration builtins: Array.prototype.sort/join/reverse/
  *       indexOf/includes/concat, String.prototype.split/indexOf/slice,
  *       JSON.parse/JSON.stringify. Each does O(n)…O(n log n) NATIVE work
  *       for one __gas(1) at the call site.
@@ -28,7 +28,7 @@
  *       ~21 gas.
  *
  * Post-F1 a contract that overruns the wall-clock backstop resolves to a
- * deterministic `out_of_resource` (no fork) — so this is a LIVENESS /
+ * deterministic `out_of_resource` (no fork), so this is a LIVENESS /
  * THROUGHPUT attack: a one-fee tx makes every validator grind to the
  * wall-clock net.
  *
@@ -39,7 +39,7 @@
  *     the NUMBER of native calls over it. Each extra call does O(K) native
  *     work. A faithful meter would charge ~K gas per extra call; the meter
  *     charges ~1 (just the loop body). So "native element-touches per extra
- *     gas" ≈ K — i.e. one gas unit buys K units of native work.
+ *     gas" ≈ K, i.e. one gas unit buys K units of native work.
  *
  *  B) WALL-CLOCK WITNESS: one combined vector (string-`+` build + split)
  *     reports gas spent vs. host CPU spent, to show the absolute scale.
@@ -50,7 +50,7 @@
 
 const { createVM, execute } = require('../fuzz/harness');
 
-const GAS_CEILING = 80000000; // 80M — generous so the work completes & is measurable
+const GAS_CEILING = 80000000; // 80M, generous so the work completes & is measurable
 const CPU_MS      = 30000;    // 30s wall-clock net
 const K           = 200000;   // FIXED working-set size (allocation cost held constant)
 const LOW         = 1;        // call counts swept while K is held fixed
@@ -95,7 +95,7 @@ const DIFF = [
 
 async function main() {
     process.stdout.write(`Native compute-amplification probe\n${'='.repeat(82)}\n`);
-    process.stdout.write(`A) CALL-SWEEP — working set FIXED at K=${K}; vary native calls ${LOW} -> ${HIGH}.\n`);
+    process.stdout.write(`A) CALL-SWEEP: working set FIXED at K=${K}; vary native calls ${LOW} -> ${HIGH}.\n`);
     process.stdout.write(`   Each added call touches ~K elements. Faithful meter => dGas ~= dCalls*K.\n`);
     process.stdout.write(`   "touches/gas" = added native work per added gas. >>1 => UN-METERED.\n`);
     process.stdout.write(`${'-'.repeat(82)}\n`);
@@ -120,7 +120,7 @@ async function main() {
     }
 
     // ── B) WALL-CLOCK WITNESS ───────────────────────────────────────────
-    process.stdout.write(`\nB) WALL-CLOCK WITNESS — string-'+' build + split, gas spent vs CPU spent\n`);
+    process.stdout.write(`\nB) WALL-CLOCK WITNESS: string-'+' build + split, gas spent vs CPU spent\n`);
     process.stdout.write(`${'-'.repeat(82)}\n`);
     const witness = wrap(`var s='7';for(var i=0;i<21;i++)s=s+','+s;var t=0;for(var i=0;i<200;i++)t+=s.split(',').length;return t;`);
     const w = await run(witness);

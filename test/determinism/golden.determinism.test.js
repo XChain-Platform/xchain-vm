@@ -21,7 +21,7 @@
  *
  * RESOURCE-tier scenarios are checked for deterministic FAILURE shape
  * (same success flag + same error class) but the memory-ceiling hazard
- * is asserted only to be a clean, contained failure — not byte-equal —
+ * is asserted only to be a clean, contained failure (not byte-equal,
  * because GC timing legitimately varies. The point is to surface, loudly,
  * if a resource outcome silently changes.
  ********************************************************************/
@@ -41,7 +41,7 @@ describe('determinism: golden-hash manifest', function () {
 
     if (!XChainVM) {
         it('REQUIRES isolated-vm (run under the validator Node version)', function () {
-            // Fail loudly rather than silently skip — a "pending" determinism
+            // Fail loudly rather than silently skip. A "pending" determinism
             // guard is worse than useless: it looks like coverage that isn't.
             assert.fail(
                 'isolated-vm failed to load. The determinism guard cannot run. ' +
@@ -58,7 +58,7 @@ describe('determinism: golden-hash manifest', function () {
     before(async function () {
         assert.ok(
             fs.existsSync(MANIFEST_PATH),
-            'golden-manifest.json missing — generate it once with ' +
+            'golden-manifest.json missing; generate it once with ' +
             '`node test/determinism/generate-golden.js`'
         );
         manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
@@ -73,14 +73,14 @@ describe('determinism: golden-hash manifest', function () {
         const manifestIds = new Set(manifest.scenarios.map(s => s.id));
         for (const id of live.keys()) {
             assert.ok(manifestIds.has(id),
-                `scenario "${id}" is executed but missing from the manifest — ` +
+                `scenario "${id}" is executed but missing from the manifest; ` +
                 'regenerate the golden manifest');
         }
         assert.strictEqual(manifest.scenarios.length, live.size,
             'manifest scenario count differs from executed count');
     });
 
-    describe('invariant tier — MUST be byte-identical across all platforms', function () {
+    describe('invariant tier: MUST be byte-identical across all platforms', function () {
         const invariants = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
             .scenarios.filter(s => s.tier === 'invariant');
         for (const sc of invariants) {
@@ -97,7 +97,7 @@ describe('determinism: golden-hash manifest', function () {
         }
     });
 
-    describe('resource tier — failure shape must stay deterministic', function () {
+    describe('resource tier: failure shape must stay deterministic', function () {
         const resources = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
             .scenarios.filter(s => s.tier === 'resource');
         for (const sc of resources) {
@@ -109,10 +109,10 @@ describe('determinism: golden-hash manifest', function () {
                     // points. We require ONLY: the contract still fails cleanly
                     // and contained (no success, no partial emissions/state).
                     assert.strictEqual(got.success, false,
-                        `memory-bomb unexpectedly SUCCEEDED on this platform — ` +
+                        `memory-bomb unexpectedly SUCCEEDED on this platform; ` +
                         `the memory ceiling did not contain it`);
                 } else {
-                    // Gas/count-bounded ceilings ARE deterministic — hold them
+                    // Gas/count-bounded ceilings ARE deterministic; hold them
                     // to the same standard as invariants.
                     assert.strictEqual(got.hash, sc.hash,
                         `RESOURCE DETERMINISM BREAK on "${sc.id}": a gas/count ` +

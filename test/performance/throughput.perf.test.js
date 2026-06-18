@@ -18,7 +18,7 @@
 //
 // The VM charges gas on every operation and runs every contract arithmetic op
 // through the deterministic mathjs-bignumber API. Both are pure modules (no
-// isolated-vm), so this suite runs on any Node — deliberately, so it never hits
+// isolated-vm), so this suite runs on any Node. Deliberately, so it never hits
 // the Node-22/isolated-vm "silent skip → false green" trap that affects the
 // sandbox-execution suites. (Full in-isolate execution throughput belongs in a
 // Node-22 perf run; this guards the metering + math hot paths that surround it.)
@@ -96,7 +96,7 @@ describe('Performance: VM deterministic math throughput', function () {
 
   it('transcendental ops (sqrt/pow/log) complete a bounded batch under ceiling', function () {
     const math = buildMathAPI();
-    const n = Math.min(ITERATIONS, 5000); // transcendentals are heavier — cap the batch
+    const n = Math.min(ITERATIONS, 5000); // transcendentals are heavier; cap the batch
     const ms = timeMs(() => {
       for (let i = 0; i < n; i++) {
         const a = String((i % 1000) + 1);

@@ -15,7 +15,7 @@
  *
  * Shared utilities for the regression test suite. Unlike the rest of
  * the test suite, regression tests FAIL LOUDLY if isolated-vm is
- * unavailable — silent skips are unacceptable in regression.
+ * unavailable. Silent skips are unacceptable in regression.
  ********************************************************************/
 // @ts-nocheck
 
@@ -33,7 +33,7 @@ try {
 } catch (e) {
     throw new Error(
         'REGRESSION SUITE FATAL: isolated-vm is not available.\n' +
-        'Regression tests must not silently skip — the VM cannot be tested.\n' +
+        'Regression tests must not silently skip (the VM cannot be tested).\n' +
         'Original error: ' + e.message
     );
 }
@@ -48,7 +48,7 @@ const GAS_SCHEDULE = {
     VM_CROSSCHAIN_READ: 100,
     VM_ATTEST_REQUEST:  5000,
     VM_EMISSION:        500,
-    // Cross-chain call buckets — must match the production per-chain configs
+    // Cross-chain call buckets; must match the production per-chain configs
     // (xchain-indexer/src/configs/{BTC,LTC,DOGE}.js).
     VM_XCALL_REQUEST:   2000,
     VM_XCALL_CALLBACK:  20000

@@ -18,7 +18,7 @@
  * discarded when the gateway throws.
  *
  * NOTE: opts.state is consumed by StateManager's constructor as a
- * plain object — we cannot intercept state.set() calls from outside.
+ * plain object, so we cannot intercept state.set() calls from outside.
  * Gateway fault injection works through oracleData/crossChainData
  * accessors, whose methods are called synchronously inside the bridge
  * closure in src/index.js.
@@ -164,7 +164,7 @@ const gatewayCallerCode = fs.readFileSync(
 
         const result = await execute(vm, code, { oracleData: mock.asOracleData() });
         checkResultShape(result);
-        // Should succeed — null is a valid oracle response
+        // Should succeed: null is a valid oracle response
         assert.strictEqual(result.success, true, 'Null oracle return should not crash: ' + result.error);
     });
 });

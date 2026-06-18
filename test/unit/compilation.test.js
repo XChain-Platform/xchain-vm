@@ -19,7 +19,7 @@ let ivm;
 try {
     ivm = require('isolated-vm');
 } catch (e) {
-    console.log('Skipping compilation tests — isolated-vm not available:', e);
+    console.log('Skipping compilation tests (isolated-vm not available):', e);
 }
 
 describe('Compilation', function() {

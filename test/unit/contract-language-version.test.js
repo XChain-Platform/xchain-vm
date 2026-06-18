@@ -13,8 +13,8 @@
 // The contract language version (ES2020) is a FROZEN consensus choice: every
 // acorn parse in the VM pins to CONTRACT_ECMA_VERSION, and V8 on the pinned
 // runtime accepts a superset, so acorn-accepted code parses identically at
-// execution time. These tests pin the choice against accidental drift —
-// bumping it is a deliberate protocol migration (re-verify the metering
+// execution time. These tests pin the choice against accidental drift.
+// Bumping it is a deliberate protocol migration (re-verify the metering
 // transform on every new AST node type), not a dependency-default change.
 
 const assert = require('assert');
@@ -23,7 +23,7 @@ const path   = require('path');
 const { CONTRACT_ECMA_VERSION, meterCode } = require('../../src/metering.js');
 
 // validateSyntax needs isolated-vm (V8 pre-check); skip those cases cleanly
-// where the binding doesn't load — the preflight suite is the loud guard.
+// where the binding doesn't load; the preflight suite is the loud guard.
 let HAVE_IVM = true;
 let validateSyntax = null;
 try { validateSyntax = require('../../src/syntax.js').validateSyntax; }
@@ -31,7 +31,7 @@ catch (e) { HAVE_IVM = false; }
 
 describe('Contract language version (frozen consensus pin)', function () {
 
-    it('CONTRACT_ECMA_VERSION is 2020 — bumping is a protocol migration, not a tweak', function () {
+    it('CONTRACT_ECMA_VERSION is 2020 (bumping is a protocol migration, not a tweak)', function () {
         assert.strictEqual(CONTRACT_ECMA_VERSION, 2020,
             'The contract language version is consensus once contracts exist. If this change is ' +
             'deliberate, re-verify the metering transform against every AST node type the new ' +
@@ -43,7 +43,7 @@ describe('Contract language version (frozen consensus pin)', function () {
             const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', file), 'utf8');
             const hardcoded = src.match(/ecmaVersion:\s*\d+/g) || [];
             assert.deepStrictEqual(hardcoded, [],
-                file + ' has a hardcoded ecmaVersion — use CONTRACT_ECMA_VERSION: ' + hardcoded.join(', '));
+                file + ' has a hardcoded ecmaVersion; use CONTRACT_ECMA_VERSION: ' + hardcoded.join(', '));
         }
     });
 

@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — Determinism
+ * Fuzz Tests: Determinism
  *
  * Verifies that identical inputs produce byte-identical results
  * across two independent VM instances. Any difference indicates a

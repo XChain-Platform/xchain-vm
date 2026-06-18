@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — Math Operations
+ * Fuzz Tests: Math Operations
  *
  * Tests that xchain.math methods handle adversarial numeric inputs
  * without crashing, and that algebraic properties hold.

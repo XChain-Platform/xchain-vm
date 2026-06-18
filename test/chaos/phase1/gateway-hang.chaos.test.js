@@ -63,7 +63,7 @@ const { checkResultShape, checkAtomicity } = require('../../fuzz/invariants');
         this.timeout(15000);
         const vm = createVM({ maxCpuTimeMs: 1000 });
 
-        // Delay 3s, timeout 1s — but since delay is host-side, it blocks the
+        // Delay 3s, timeout 1s; since delay is host-side, it blocks the
         // entire thread. The delay will complete (3s) and the timeout check
         // happens when control returns to V8. We verify the VM doesn't deadlock.
         const mock = new ProgrammableMock();

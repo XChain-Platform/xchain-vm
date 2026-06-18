@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Regression guard — resource-termination gasUsed must be deterministic.
+ * Regression guard: resource-termination gasUsed must be deterministic.
  *
  * Wall-clock timeout, isolate memory limit, and native stack overflow fire
  * at machine-/GC-/stack-depth-dependent points. The indexer computes
@@ -31,7 +31,7 @@ const { createVM, execute, XChainVM } = require('../fuzz/harness');
 
 // Each contract is bounded by a NON-gas, NON-deterministic ceiling. (The bulk
 // allocators new Array().fill / repeat / Array.from are now gas-bounded by F3, so
-// the wall-clock vector uses a SPREAD of a holey array — F3 can't wrap spread
+// the wall-clock vector uses a SPREAD of a holey array (F3 can't wrap spread
 // syntax, so this path still terminates via the isolate wall-clock / host backstop
 // and exercises the clamp.) out_of_gas is clamped to the ceiling too (F3), so all
 // three families report gasUsed == ceiling deterministically.
@@ -53,7 +53,7 @@ describe('determinism: resource-termination gasUsed is clamped (fork-safe fee)',
 
     if (!XChainVM) {
         it('REQUIRES isolated-vm (run under the validator Node version)', function () {
-            assert.fail('isolated-vm failed to load — cannot verify fee determinism.');
+            assert.fail('isolated-vm failed to load; cannot verify fee determinism.');
         });
         return;
     }

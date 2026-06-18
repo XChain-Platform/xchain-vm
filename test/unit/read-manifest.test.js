@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// readManifest() — Phase E permissions-manifest introspection.
+// readManifest(): Phase E permissions-manifest introspection.
 //
 // Surfaces a contract's exported `permissions` + `maxTakeBps` at deploy time by
 // instantiating the module top-level (no method dispatch), so it works even for
@@ -25,7 +25,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping read-manifest tests — isolated-vm not available:', e);
+    console.log('Skipping read-manifest tests (isolated-vm not available):', e);
 }
 
 const GAS_SCHEDULE = {
@@ -71,7 +71,7 @@ function createVM() {
     });
 
     it('works for a constructor-less contract (vm.execute never runs it otherwise)', async function () {
-        // No `initialize` export — the indexer would never have executed this at deploy,
+        // No `initialize` export; the indexer would never have executed this at deploy,
         // yet the manifest is still surfaced because readManifest only needs module top-level.
         const code = "module.exports = { permissions: [], maxTakeBps: 0 };";
         const res = await vm.readManifest(code);
@@ -94,12 +94,12 @@ function createVM() {
         const code = "module.exports = { maxTakeBps: 2.5 };";
         const res = await vm.readManifest(code);
         assert.strictEqual(res.success, true);
-        // 2.5 is a number — surfaced as-is; the indexer rejects non-integers.
+        // 2.5 is a number, surfaced as-is; the indexer rejects non-integers.
         assert.strictEqual(res.manifest.maxTakeBps, 2.5);
         assert.strictEqual(res.manifest.maxTakeBpsType, 'number');
     });
 
-    it('is deterministic — identical code yields an identical manifest', async function () {
+    it('is deterministic: identical code yields an identical manifest', async function () {
         const code = "module.exports = { permissions: ['SEND'], maxTakeBps: 100, guard: function(){} };";
         const a = await vm.readManifest(code);
         const b = await vm.readManifest(code);

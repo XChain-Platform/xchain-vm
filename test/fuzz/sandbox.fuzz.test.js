@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — Sandbox Escape
+ * Fuzz Tests: Sandbox Escape
  *
  * Tests that adversarial contracts cannot escape the V8 isolate
  * sandbox, access host objects, or pollute prototypes.
@@ -74,7 +74,7 @@ const ESCAPE_VECTORS = [
                 // callee is accessible in non-strict mode (returns the function itself)
                 // but caller should be null/undefined (no parent frame to leak)
                 if (caller && typeof caller === 'function') {
-                    // Try to use it to get host info — this is the real test
+                    // Try to use it to get host info (this is the real test)
                     try { return 'caller_result:' + caller(); } catch(e2) {}
                 }
                 return 'safe';

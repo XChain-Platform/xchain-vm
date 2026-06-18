@@ -43,7 +43,7 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
 
     it('CHAOS-401: metering failure returns clean error result', async function() {
         const vm = createVM();
-        // Code that acorn cannot parse — triggers metering failure
+        // Code that acorn cannot parse; triggers metering failure
         // The error should be caught and returned as a clean result
         const code = 'module.exports = function(xchain) { @#$%^ };';
         const result = await execute(vm, code);
@@ -103,7 +103,7 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
         // Cause a setup-phase failure
         await execute(vm, '@invalid@code@');
 
-        // Recovery — normal contract should work
+        // Recovery: normal contract should work
         await chaosAssertions.assertRecovery(vm);
     });
 
@@ -138,7 +138,7 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
         checkResultShape(result);
         assert.strictEqual(result.success, false);
         assert(result.error.includes('code size'), 'Should report code size error: ' + result.error);
-        // Gas should be 0 — no isolate was created
+        // Gas should be 0 (no isolate was created)
         assert.strictEqual(result.gasUsed, 0, 'No gas charged when code size check fails early');
     });
 

@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — State Manager
+ * XChain VM: State Manager
  *
  * Manages contract state during execution. Reads from the initial
  * state snapshot, collects writes/deletes, enforces limits.
@@ -56,13 +56,13 @@ class StateManager {
         if (typeof key === 'string' && Buffer.byteLength(key, 'utf8') > maxKeySize)
             throw new Error('state key exceeds max size (' + maxKeySize + ' bytes)');
 
-        // Reject null/undefined — use delete() to remove keys
+        // Reject null/undefined: use delete() to remove keys
         if (value === null || value === undefined)
-            throw new Error('state value cannot be null or undefined — use state.delete() to remove keys');
+            throw new Error('state value cannot be null or undefined; use state.delete() to remove keys');
 
-        // Reject NaN/Infinity — JSON.stringify(NaN) produces "null"
+        // Reject NaN/Infinity (JSON.stringify(NaN) produces "null")
         if (typeof value === 'number' && !isFinite(value))
-            throw new Error('state value cannot be NaN or Infinity — use xchain.math for numeric operations');
+            throw new Error('state value cannot be NaN or Infinity; use xchain.math for numeric operations');
 
         // Validate JSON-serializable
         const serialized = JSON.stringify(value);
@@ -73,7 +73,7 @@ class StateManager {
         if (Buffer.byteLength(serialized, 'utf8') > this.limits.maxStateValueSize)
             throw new Error('state value exceeds max size (' + this.limits.maxStateValueSize + ' bytes)');
 
-        // Enforce max key count — new key if it doesn't currently exist as live
+        // Enforce max key count: new key if it doesn't currently exist as live
         const isLive = this.has(key);
         if (!isLive && this.keyCount >= this.limits.maxStateKeys)
             throw new Error('contract exceeds max state keys (' + this.limits.maxStateKeys + ')');

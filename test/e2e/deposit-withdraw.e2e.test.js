@@ -28,7 +28,7 @@ const {
 
 let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
-catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
+catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
 (XChainVM ? describe : describe.skip)('E2E: Deposit & Withdraw', function() {
 
@@ -96,7 +96,7 @@ catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
             // Deposit only 100
             h.deposit('user1', 'C:BTC:1', 'TEST', '100');
 
-            // Try to send 200 — VM emits the SEND, but the mock indexer catches
+            // Try to send 200. VM emits the SEND, but the mock indexer catches
             // the overdraw when applying the action to the ledger
             const result = await h.execute({
                 contractAddress: 'C:BTC:1', method: 'send',

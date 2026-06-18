@@ -28,7 +28,7 @@ const {
 
 let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
-catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
+catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
 (XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
 
@@ -115,7 +115,7 @@ catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
                 params: [], caller: 'user1'
             });
             assert.strictEqual(result.success, false);
-            // On some systems, wall-clock timeout fires before OOM — both are valid
+            // On some systems, wall-clock timeout fires before OOM; both are valid
             assert(
                 result.error.includes('out_of_memory') || result.error.includes('timeout'),
                 `Expected out_of_memory or timeout, got: ${result.error}`

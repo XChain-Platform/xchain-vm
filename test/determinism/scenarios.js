@@ -14,17 +14,17 @@
  * Cross-architecture determinism scenarios
  *
  * The #1 catastrophic failure mode for a consensus VM is NOT a sandbox
- * escape — it is NON-DETERMINISM: two honest validators executing the
+ * escape. The real threat is NON-DETERMINISM: two honest validators executing the
  * same contract against the same inputs producing different results,
  * which halts or forks the chain.
  *
  * The existing determinism fuzz test runs two VM instances IN THE SAME
- * PROCESS on the SAME machine — they can never disagree on the things
+ * PROCESS on the SAME machine, so they can never disagree on the things
  * that actually split chains (CPU arch, V8 version, libc/Intl, GC
  * timing). This harness instead computes a portable GOLDEN HASH for a
  * fixed corpus of contracts. The manifest is generated on one machine
  * and VERIFIED on every other machine/arch/Node version. Dev runs ARM;
- * the validator fleet runs x86_64 node:22-bookworm — so checking the
+ * the validator fleet runs x86_64 node:22-bookworm, so checking the
  * same manifest on both CONTINUOUSLY PROVES cross-arch determinism.
  *
  * Each scenario is a PURE function of its declared inputs: a contract,
@@ -32,8 +32,8 @@
  * oracle/balance/token fixtures. No wall-clock, no randomness.
  *
  * Scenarios are tagged:
- *   - tier: 'invariant'  — MUST be byte-identical on every platform.
- *   - tier: 'resource'   — exercises a resource ceiling (gas/state/emit
+ *   - tier: 'invariant'  : MUST be byte-identical on every platform.
+ *   - tier: 'resource'   : exercises a resource ceiling (gas/state/emit
  *                          /memory). Gas- and count-bounded ceilings are
  *                          deterministic; memory/wall-clock ceilings are
  *                          NOT guaranteed deterministic and are flagged.

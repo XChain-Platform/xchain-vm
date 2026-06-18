@@ -11,12 +11,12 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Regression guard — recursion depth must NOT be contract-observable.
+ * Regression guard: recursion depth must NOT be contract-observable.
  *
  * A native V8 stack overflow (RangeError) fires at an architecture-dependent
  * depth, and at a depth that also varies with the host stack remaining when
  * execution begins. The host-side out_of_stack clamp only normalizes the failure
- * when the RangeError PROPAGATES to the host — a contract that CATCHES it in-
+ * when the RangeError PROPAGATES to the host. A contract that CATCHES it in-
  * isolate could previously read the raw native depth and commit it into hashed
  * state, so two validators on different CPUs (linux/arm64 vs linux/amd64), or the
  * same node at different host call depths, would commit different values →
@@ -46,7 +46,7 @@ describe('determinism: recursion depth is not contract-observable (fork-safe)', 
 
     if (!XChainVM) {
         it('REQUIRES isolated-vm (run under the validator Node version)', function () {
-            assert.fail('isolated-vm failed to load — cannot verify stack-depth determinism.');
+            assert.fail('isolated-vm failed to load; cannot verify stack-depth determinism.');
         });
         return;
     }

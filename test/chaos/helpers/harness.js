@@ -41,7 +41,7 @@ const {
 } = require('../../fuzz/harness');
 
 /**
- * ProgrammableMock — fault-injectable accessor object.
+ * ProgrammableMock: fault-injectable accessor object.
  *
  * Used to build oracleData/crossChainData objects whose methods can be
  * programmed to throw, return specific values, or busy-wait on the Nth call.
@@ -91,7 +91,7 @@ class ProgrammableMock {
     }
 
     /**
-     * Internal dispatch — called by accessor methods.
+     * Internal dispatch, called by accessor methods.
      */
     _dispatch() {
         this._callCount++;
@@ -143,7 +143,7 @@ class ProgrammableMock {
 }
 
 /**
- * MemoryTracker — records process.memoryUsage() snapshots for leak detection.
+ * MemoryTracker: records process.memoryUsage() snapshots for leak detection.
  */
 class MemoryTracker {
     constructor() {

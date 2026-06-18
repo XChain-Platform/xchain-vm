@@ -46,7 +46,7 @@ const memoryCliffCode = fs.readFileSync(
     it('CHAOS-102: allocation over limit triggers OOM with atomicity', async function() {
         this.timeout(15000);
         const vm = createVM({ maxMemory: 8 });
-        // Contract writes state before OOM — state must not persist
+        // Contract writes state before OOM; state must not persist
         const code = `module.exports = function(xchain) {
             xchain.state.set('before_oom', 'yes');
             xchain.emit.send({ destination: 'test', tick: 'T', quantity: '1' });
@@ -74,7 +74,7 @@ const memoryCliffCode = fs.readFileSync(
             var a = []; while(true) { a.push(new Array(100000).fill('x')); }
         };`;
         await execute(vm, oomCode);
-        // Recovery — simple contract should succeed
+        // Recovery: simple contract should succeed
         await chaosAssertions.assertRecovery(vm);
     });
 

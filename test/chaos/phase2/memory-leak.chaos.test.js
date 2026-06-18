@@ -44,7 +44,7 @@ const { checkResultShape } = require('../../fuzz/invariants');
             return 'done';
         };`;
 
-        // Warmup phase — let V8/Node stabilize
+        // Warmup phase: let V8/Node stabilize
         for (let i = 0; i < WARMUP; i++) {
             await execute(vm, code, { params: [String(i)] });
         }
@@ -71,7 +71,7 @@ const { checkResultShape } = require('../../fuzz/invariants');
         assert(tracker.isStable(tolerance * 1024 * 1024),
             'Memory grew by ' + growthMB.toFixed(1) + 'MB over ' + ITERATIONS +
             ' iterations (tolerance: ' + tolerance + 'MB)' +
-            (global.gc ? '' : ' — run with --expose-gc for tighter bounds'));
+            (global.gc ? '' : ' (run with --expose-gc for tighter bounds)'));
     });
 
     it('CHAOS-802: 500 executions with emissions show no leak', async function() {

@@ -65,7 +65,7 @@ const VECTORS = [
     { id: 'Object.entries',  mk: C => `${OBJ}var t=0;for(var i=0;i<${C};i++)t+=Object.entries(o).length;return t;` },
     { id: 'Object.assign',   mk: C => `${OBJ}var t=0;for(var i=0;i<${C};i++)t+=Object.keys(Object.assign({},o)).length;return t;` },
     { id: 'Object.getOwnPropertyNames', mk: C => `${OBJ}var t=0;for(var i=0;i<${C};i++)t+=Object.getOwnPropertyNames(o).length;return t;` },
-    // --- Spread (syntax, like `+` — not a method) ---
+    // --- Spread (syntax, like `+`, not a method) ---
     { id: 'spread [...array]',  mk: C => `${ARR}var t=0;for(var i=0;i<${C};i++)t+=[].concat(a).length;return t;` }, // baseline via concat (metered)
     { id: 'spread [...string]', mk: C => `${STR}var t=0;for(var i=0;i<${C};i++)t+=([...s]).length;return t;` }
 ];

@@ -54,7 +54,7 @@ function buildDeepObject(depth) {
         const result = await execute(vm, readerCode, { state });
         checkResultShape(result);
         checkNoPrototypePollution();
-        // Should not crash — null bytes in keys are valid strings
+        // Should not crash; null bytes in keys are valid strings
     });
 
     it('CHAOS-602: Unicode RTL override in state keys', async function() {

@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Benchmark Harness
+ * XChain VM: Benchmark Harness
  *
  * Core utilities for performance testing the VM runtime.
  * Provides timing, statistics, memory tracking, and formatted output.

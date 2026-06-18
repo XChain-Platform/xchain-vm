@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Out-of-process executor — sustained worker-respawn soak.
+ * Out-of-process executor: sustained worker-respawn soak.
  *
  * The subprocess executor (src/process-executor.js) forks a fresh worker on
  * every crash / hang / watchdog kill (the F2/F3 fault-recovery surface). A
@@ -23,7 +23,7 @@
  *
  * Allocation bombs no longer SIGABRT the worker (they are gas-contained as
  * of the G1/G3 metering work), so the realistic respawn driver here is a
- * SIGKILL of the live worker — a genuine worker-fault. Each cycle: run a
+ * SIGKILL of the live worker (a genuine worker-fault). Each cycle: run a
  * real execution, then kill the worker, then prove the executor recovers
  * (a follow-up execution succeeds on the respawned worker). Resource
  * counters are sampled with the garbage collector forced (run with
@@ -67,7 +67,7 @@ function childProcCount() {
             let stat;
             try { stat = fs.readFileSync(path.join('/proc', name, 'stat'), 'utf8'); }
             catch (e) { continue; }
-            // field 4 is ppid, but comm (field 2) may contain spaces/parens — split after ')'.
+            // field 4 is ppid, but comm (field 2) may contain spaces/parens; split after ')'.
             const after = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
             const ppid = parseInt(after[1], 10); // state=after[0], ppid=after[1]
             if (ppid === process.pid) n++;
@@ -94,7 +94,7 @@ function sample(vm) {
 async function main() {
     const vm = new XChainVM({ execution: 'subprocess', gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000, limits: LIMITS });
     const ex = vm._executor;
-    if (!ex) { console.error('subprocess executor not created — isolated-vm missing?'); process.exit(1); }
+    if (!ex) { console.error('subprocess executor not created (isolated-vm missing?)'); process.exit(1); }
 
     vm.beginBlock();
     const runOpts = (code) => ({ code, method: 'default', params: [], state: {}, contractAddress: 'C:BTC:1', contractIndex: 1 });
@@ -113,10 +113,10 @@ async function main() {
     for (let i = 1; i <= CYCLES; i++) {
         // Model a REAL worker crash: a contract is in-flight (dispatched, IPC
         // round-trip pending) when the worker dies. We SIGKILL mid-flight, then
-        // await that execution — it resolves via _onExit to a deterministic
+        // await that execution. It resolves via _onExit to a deterministic
         // host-terminated result and triggers the respawn synchronously.
         // A transient host fault (fork EAGAIN under load, a /proc read racing a
-        // dying pid) must not abort a multi-day soak — count it and continue.
+        // dying pid) must not abort a multi-day soak; count it and continue.
         // A genuine leak still shows in the flat-line resource counters.
         try {
             const pidBefore = ex._child && ex._child.pid;
@@ -124,7 +124,7 @@ async function main() {
             if (ex._child) { try { ex._child.kill('SIGKILL'); } catch (e) {} }
             const crashed = await inFlight;                // expected: success === false
             // Recovery: the NEXT contract must queue until the respawned worker is
-            // 'ready' and then succeed — the determinism-critical recovery path the
+            // 'ready' and then succeed. This is the determinism-critical recovery path the
             // real indexer relies on (a crash must not poison the following contract).
             const recovered = await vm.execute(runOpts(CHEAP));
             const pidAfter = ex._child && ex._child.pid;
@@ -136,7 +136,7 @@ async function main() {
         }
 
         // Periodically cycle the block boundary too (exercises beginBlock/endBlock
-        // re-issue to a fresh worker — another respawn-state surface).
+        // re-issue to a fresh worker, another respawn-state surface).
         if (i % 100 === 0) { vm.endBlock(); vm.beginBlock(); await vm.execute(runOpts(CHEAP)); }
 
         if (i % SAMPLE_EVERY === 0) {
@@ -173,16 +173,16 @@ async function main() {
     if (fdGrow > FD_TOL)       leaks.push(`fd leak: +${fdGrow}`);
     if (childGrow > CHILD_TOL) leaks.push(`child-process leak: +${childGrow}`);
     if (rssGrow > RSS_TOL_MB)  leaks.push(`rss growth: +${rssGrow}MB`);
-    if (recoveryFailures > RECOVERY_TOL) leaks.push(`recovery failures: ${recoveryFailures} (> ${RECOVERY_TOL} tolerance) — systematic, not transient`);
-    if (respawnsObserved < CYCLES * 0.5) leaks.push(`few respawns observed (${respawnsObserved}/${CYCLES}) — driver may not be faulting the worker`);
+    if (recoveryFailures > RECOVERY_TOL) leaks.push(`recovery failures: ${recoveryFailures} (> ${RECOVERY_TOL} tolerance); systematic, not transient`);
+    if (respawnsObserved < CYCLES * 0.5) leaks.push(`few respawns observed (${respawnsObserved}/${CYCLES}); driver may not be faulting the worker`);
     if (recoveryFailures > 0 && recoveryFailures <= RECOVERY_TOL)
-        process.stdout.write(`note: ${recoveryFailures} transient recovery failure(s) within tolerance (${RECOVERY_TOL}) — slow respawn under fork-pressure, not a leak\n`);
+        process.stdout.write(`note: ${recoveryFailures} transient recovery failure(s) within tolerance (${RECOVERY_TOL}); slow respawn under fork-pressure, not a leak\n`);
 
     if (leaks.length) {
         process.stdout.write(`RESULT: *** PROBLEM ***\n  - ${leaks.join('\n  - ')}\n`);
         process.exit(2);
     }
-    process.stdout.write(`RESULT: clean — no fd/process/memory leak under ${CYCLES} respawns.\n`);
+    process.stdout.write(`RESULT: clean, no fd/process/memory leak under ${CYCLES} respawns.\n`);
     process.exit(0);
 }
 

@@ -12,10 +12,10 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Contract Lint CLI (authoritative; Node 22)
+ * XChain VM: Contract Lint CLI (authoritative; Node 22)
  *
- * Runs the FULL deploy-time validation — validateSyntax (including the
- * isolated-vm V8 syntax compile) + checkFloatWarnings — over one or more
+ * Runs the FULL deploy-time validation: validateSyntax (including the
+ * isolated-vm V8 syntax compile) + checkFloatWarnings, over one or more
  * contract source files. This is exact deploy parity: a clean result here
  * means the DEPLOY will pass the indexer's syntax gate.
  *
@@ -65,7 +65,7 @@ function lintFile(file) {
 
     const errors = lint.errors.slice();
     // A V8-only step-1 failure (acorn parsed, but V8 rejected) won't appear in
-    // lint-core's errors — surface validateSyntax's message in that case.
+    // lint-core's errors. Surface validateSyntax's message in that case.
     if (!verdict.valid && !errors.some((e) => CONSENSUS_RULES.has(e.rule)))
         errors.unshift({ rule: 'syntax', message: verdict.error, line: null, severity: 'error' });
 

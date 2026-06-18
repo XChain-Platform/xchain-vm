@@ -17,14 +17,14 @@
  * The FIRST execute of a contract in a block compiles cold and stores
  * cachedData; subsequent executes of the same contract in the same block
  * compile WARM (cachedData passed to compileScriptSync). If a warm-cache
- * execution ever diverges from a cold one — different gasUsed, returnValue,
- * stateChanges, emissions — validators that hit the cache at different times
+ * execution ever diverges from a cold one (different gasUsed, returnValue,
+ * stateChanges, emissions), validators that hit the cache at different times
  * would commit different bytes -> fork.
  *
  * This probe asserts byte-identical result hashes for:
- *   (A) cold (1st in block) vs warm (2nd+ in block) — same VM instance
+ *   (A) cold (1st in block) vs warm (2nd+ in block), same VM instance
  *   (B) warm vs a fresh-VM cold run (cross-block / cross-validator analogue)
- *   (C) same code at a DIFFERENT contractIndex (distinct cache key — no
+ *   (C) same code at a DIFFERENT contractIndex (distinct cache key, no
  *       cross-contract cachedData bleed)
  *
  *   node test/determinism/probe-compilation-cache-determinism.js
@@ -88,7 +88,7 @@ async function main() {
     process.stdout.write(`\n${'='.repeat(72)}\n`);
     process.stdout.write(findings
         ? `FINDINGS: ${findings} contract(s) show cache-dependent divergence ***\n`
-        : 'No cache-dependent divergence — cold and warm executions are byte-identical.\n');
+        : 'No cache-dependent divergence; cold and warm executions are byte-identical.\n');
 }
 
 main().then(() => process.exit(0)).catch(e => {

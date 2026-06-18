@@ -97,7 +97,7 @@ describe('Math API', function() {
 
         it('should compute sqrt of 2 deterministically', function() {
             const result = math.sqrt('2');
-            // mathjs bignumber is pure software — identical on every architecture.
+            // mathjs bignumber is pure software, identical on every architecture.
             assert(result.startsWith('1.4142135623730950488'), result);
         });
 

@@ -10,12 +10,12 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// Controller-guard mode (isGuard) — the gateway must DISABLE the asynchronous
+// Controller-guard mode (isGuard): the gateway must DISABLE the asynchronous
 // frameworks when running a controller-bound token's `guard` method. A guard
 // returns an allow/deny decision synchronously inside a native action's
 // settlement, so a result that only arrives blocks later (attestation request,
 // cross-chain call) is nonsensical and is rejected at emit time. Pure host-side
-// gateway test — no isolated-vm — so it runs on any Node version.
+// gateway test (no isolated-vm), so it runs on any Node version.
 //
 // Spec: ../../../xchain-documentation/protocol/Controller_Bound_Tokens.md
 

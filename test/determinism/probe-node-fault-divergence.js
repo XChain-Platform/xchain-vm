@@ -14,17 +14,17 @@
  * Red-team: the FABRICATE node-fault stance can silently fork ONE node.
  *
  * The out-of-process executor (src/process-executor.js) answers ANY host
- * termination — crash, hang/watchdog, or a worker that can never start
- * (_broken) — with a deterministic `hostTerminatedResult` (out_of_resource,
+ * termination (crash, hang/watchdog, or a worker that can never start,
+ * _broken) with a deterministic `hostTerminatedResult` (out_of_resource,
  * gasUsed = ceiling) and lets the block ADVANCE. This is correct and
  * necessary when the termination is a DETERMINISTIC property of the
  * contract: every validator's worker aborts identically, so every validator
  * fabricates the same result and the chain stays consistent. It is also what
  * prevents a poisoned contract from halting the whole chain (a DoS).
  *
- * But the executor cannot tell a deterministic abort from a LOCAL fault —
+ * But the executor cannot tell a deterministic abort from a LOCAL fault:
  * this machine's worker hung under CPU contention / GC, or isolated-vm
- * failed to load on this box — on work that HEALTHY nodes complete normally.
+ * failed to load on this box. On work that HEALTHY nodes complete normally,
  * In that case the faulted node fabricates `out_of_resource` while the fleet
  * records `valid` / `out_of_gas`. The status_id is hashed into contract_hash
  * (xchain-indexer db.getBlockHashes), so the faulted node commits a
@@ -101,7 +101,7 @@ async function main() {
         process.stdout.write(`FAULTED node:  execute() REJECTED with ${faulted.faultErr.name} ` +
             `(code ${faulted.faultErr.code}) → the node HALTS, commits nothing.\n`);
         process.stdout.write(`\n${'='.repeat(78)}\n`);
-        process.stdout.write(`consensus STATUS diverges: no — the faulted node never commits a result.\n`);
+        process.stdout.write(`consensus STATUS diverges: no (the faulted node never commits a result).\n`);
         process.stdout.write(`\nFIXED: a permanently-broken executor no longer fabricates out_of_resource\n` +
             `for work the fleet completes (which would fork). It rejects → the indexer\n` +
             `halts block processing (defer-retry) + alerts, and self-heals once the host\n` +

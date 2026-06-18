@@ -19,7 +19,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping sandbox tests — isolated-vm not available:', e);
+    console.log('Skipping sandbox tests (isolated-vm not available):', e);
 }
 
 const GAS_SCHEDULE = {
@@ -240,8 +240,8 @@ function executeCode(vm, code) {
     // validators on different builds would format the same value differently and
     // diverge state hashes. Temporal and structuredClone are stripped pre-emptively
     // for the same non-determinism class. performance (the Web Performance API) is
-    // stripped because performance.now() returns wall-clock microseconds — a pure
-    // non-determinism source like Date — which a future V8 host build could expose
+    // stripped because performance.now() returns wall-clock microseconds, a pure
+    // non-determinism source like Date. A future V8 host build could expose
     // in the isolate. These assert the strip at the live-isolate layer.
     ['Intl', 'Temporal', 'structuredClone', 'performance'].forEach(function(name) {
         it('should block ' + name, async function() {

@@ -67,7 +67,7 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
             assert.strictEqual(actions[0].params.callbackMethod, 'onResult');
             assert.deepStrictEqual(actions[0].params.callbackParams, ['ctx']);
             assert.strictEqual(actions[0].params.deadlineBlocks, 200);
-            // crossHops is deliberately NOT in the emission — host-derived in the indexer.
+            // crossHops is deliberately NOT in the emission (host-derived in the indexer).
             assert.strictEqual(actions[0].params.crossHops, undefined);
         });
 
@@ -114,7 +114,7 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
         it('binds the call-path: two nested runs of the same contract derive distinct ids', function() {
             // The d631c28 collision regression: emissionIndex is per-execution, so two
             // runs of the same contract each emitting their FIRST cross-call both see
-            // emissionIndex 0 — only the call-path (set by the indexer per execution)
+            // emissionIndex 0: only the call-path (set by the indexer per execution)
             // keeps their call_ids distinct. Same everything except callPath here.
             const a = createEmitAPI({ callPath: '0' }).emit.crossExecute(GOOD);
             const b = createEmitAPI({ callPath: '1' }).emit.crossExecute(GOOD);

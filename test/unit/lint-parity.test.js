@@ -15,8 +15,8 @@
  *
  * The deploy-time validator (validateSyntax, including the isolated-vm V8
  * step-1 compile) and the dependency-light shared rules (lint-core.lintSource,
- * which the SDK/CLI consume) MUST agree on every acorn-coverable verdict — same
- * valid flag AND byte-identical first-error message — or contract authors get
+ * which the SDK/CLI consume) MUST agree on every acorn-coverable verdict: same
+ * valid flag AND byte-identical first-error message, or contract authors get
  * false greens / false reds. This is the authoritative cross-engine check;
  * because the SDK vendors lint-core/metering byte-identically (asserted below),
  * proving validateSyntax ⇆ lintSource here transitively covers the SDK linter.
@@ -42,7 +42,7 @@ function sha256(file) {
 }
 
 // All bad fixtures use syntax V8 accepts, so validateSyntax clears step 1 and the
-// failure must come from a shared (lint-core) rule — making the messages comparable.
+// failure must come from a shared (lint-core) rule, making the messages comparable.
 const BAD_FIXTURES = [
     { name: 'banned-math',           code: 'function f(){ return Math.sqrt(4); }' },
     { name: 'banned-literal-bigint', code: 'function f(){ return 2n; }' },
@@ -63,7 +63,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                 if (!haveSDK) return this.skip();
                 assert.strictEqual(
                     sha256(path.join(SDK_VENDOR_DIR, f)), sha256(path.join(VM_SRC_DIR, f)),
-                    'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical — re-sync the copy.'
+                    'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.'
                 );
             });
         }
@@ -76,7 +76,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
         });
     });
 
-    describe('bad fixtures — same verdict AND same first-error message', function () {
+    describe('bad fixtures: same verdict AND same first-error message', function () {
         for (const fx of BAD_FIXTURES) {
             it(fx.name + ': validateSyntax and lintSource agree', function () {
                 const v = validateSyntax(fx.code);
@@ -94,8 +94,8 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
 
     describe('Move 2 rules NEVER change the deploy verdict (parity invariant)', function () {
         // The critical guarantee: lint-core gained a new ERROR rule
-        // (crossCallable-not-array) and several warnings, but validateSyntax — the
-        // on-chain deploy gate — must block on CONSENSUS_RULES ONLY. A contract that
+        // (crossCallable-not-array) and several warnings, but validateSyntax (the
+        // on-chain deploy gate) must block on CONSENSUS_RULES ONLY. A contract that
         // only trips a Move-2 rule still deploys.
         const CC_NOT_ARRAY = 'module.exports = { foo: function(x){ return 1; }, crossCallable: "oops" };';
         const MOVE2_WARN   = 'function f(){ while(true){ break; } return new Array(5).fill(0); }';

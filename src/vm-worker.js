@@ -11,11 +11,11 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Worker (child side)
+ * XChain VM: Worker (child side)
  *
  * Forked by src/process-executor.js. Holds ONE in-process XChainVM and runs
  * contract executions on its behalf. If a contract aborts V8, THIS process
- * dies and the parent maps it to a deterministic resource-failure result —
+ * dies and the parent maps it to a deterministic resource-failure result.
  * the indexer host stays alive.
  *
  * Messages are processed strictly sequentially (one execute at a time) to
@@ -28,7 +28,7 @@ const XChainVM = require('./index.js');
 
 let vm = null;
 
-// Sequential message queue — chain handlers so executes never interleave.
+// Sequential message queue: chain handlers so executes never interleave.
 let chain = Promise.resolve();
 function enqueue(fn) {
     chain = chain.then(fn).catch(() => {});

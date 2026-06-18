@@ -110,7 +110,7 @@ async function main() {
         const avgBlockTime = blockResults.reduce((s, r) => s + r.blockTime, 0) / BLOCKS_PER_SIZE;
         const avgOps = (size / (avgBlockTime / 1000)).toFixed(1);
         const allTimings = blockResults.flatMap(r => {
-            // Reconstruct from stats — use the per-contract stats from last block
+            // Reconstruct from stats (use the per-contract stats from last block)
             return [];
         });
         const lastStats = blockResults[blockResults.length - 1].stats;
@@ -152,8 +152,8 @@ async function main() {
     }
 
     // Combined table
-    printTable('Block Throughput — With Cache', cachedRows);
-    printTable('Block Throughput — Without Cache', uncachedRows);
+    printTable('Block Throughput (With Cache)', cachedRows);
+    printTable('Block Throughput (Without Cache)', uncachedRows);
 
     // Cache impact summary
     console.log('\n  Cache Impact (uncached / cached block time):');

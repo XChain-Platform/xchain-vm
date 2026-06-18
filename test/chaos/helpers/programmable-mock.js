@@ -18,7 +18,7 @@
  * opts.crossChainData to vm.execute().
  *
  * NOTE: opts.state is a plain object consumed by StateManager's
- * constructor — we cannot intercept mid-execution state calls from
+ * constructor; we cannot intercept mid-execution state calls from
  * outside. For state-level fault injection, use corrupted opts.state
  * objects or contracts that trigger errors via their behavior.
  ********************************************************************/
@@ -28,7 +28,7 @@
 
 
 /**
- * ProgrammableOracleProvider — oracle accessor with per-method fault rules.
+ * ProgrammableOracleProvider: oracle accessor with per-method fault rules.
  *
  * @param {object} [baseData] - Default data to return
  * @param {string} [baseData.price] - Default price return
@@ -91,7 +91,7 @@ class ProgrammableOracleProvider {
 }
 
 /**
- * ProgrammableCrossChainProvider — cross-chain accessor with fault rules.
+ * ProgrammableCrossChainProvider: cross-chain accessor with fault rules.
  */
 class ProgrammableCrossChainProvider {
     constructor(baseData) {

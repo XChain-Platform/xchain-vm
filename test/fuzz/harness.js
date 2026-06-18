@@ -51,7 +51,7 @@ let XChainVM = null;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    // isolated-vm not compiled — tests will be skipped
+    // isolated-vm not compiled; tests will be skipped
 }
 
 const FUZZ_ITERATIONS = parseInt(process.env.FUZZ_ITERATIONS || '500', 10);
@@ -68,7 +68,7 @@ const FC_SEED = process.env.FC_SEED
     : (Date.now() >>> 0);
 // eslint-disable-next-line no-console -- fuzz harness logs the chosen seed for reproducibility
 console.log(`[fuzz] fast-check seed = ${FC_SEED}` +
-    (process.env.FC_SEED ? ' (pinned via FC_SEED)' : ' (random — pin with FC_SEED=<n> to reproduce)'));
+    (process.env.FC_SEED ? ' (pinned via FC_SEED)' : ' (random; pin with FC_SEED=<n> to reproduce)'));
 
 const FC_OPTIONS = {
     numRuns:      FUZZ_ITERATIONS,
@@ -110,7 +110,7 @@ async function execute(vm, code, extraOpts) {
     try {
         return await vm.execute(opts);
     } catch (e) {
-        // vm.execute() should never throw — if it does, that is itself a bug.
+        // vm.execute() should never throw. If it does, that is itself a bug.
         // Return a synthetic error result so invariant checkers can flag it.
         return {
             success:        false,
@@ -128,7 +128,7 @@ async function execute(vm, code, extraOpts) {
 // Consensus-status projection of a VM error. The resource-exhaustion family
 // (out_of_gas / timeout / out_of_memory / out_of_stack / out_of_resource) is a
 // host-timing race over WHICH ceiling fires (gas ceiling vs wall-clock net vs
-// parent watchdog) — not a consensus input. The indexer collapses the whole
+// parent watchdog), not a consensus input. The indexer collapses the whole
 // family to one status_id (xchain-indexer src/utility.js vmFailureStatus), which
 // is what actually gets hashed into contract_hash. The determinism guard hashes
 // the SAME collapsed projection so it asserts the real consensus invariant

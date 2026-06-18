@@ -17,7 +17,7 @@ try {
     IsolateManager = require('../../src/isolate.js');
     ivm = require('isolated-vm');
 } catch (e) {
-    console.log('Skipping isolate tests — isolated-vm not available:', e);
+    console.log('Skipping isolate tests (isolated-vm not available):', e);
 }
 
 (IsolateManager && ivm ? describe : describe.skip)('IsolateManager', function() {
@@ -97,13 +97,13 @@ try {
             const mgr = new IsolateManager(LIMITS);
             const { isolate, context } = mgr.createIsolate();
             const code = 'var x = 1 + 2;';
-            // Pass a fake Buffer as cachedData — ivm will ignore invalid cached data
+            // Pass a fake Buffer as cachedData; ivm will ignore invalid cached data
             // and fall back to a fresh compile, so this should not throw.
             let script;
             try {
                 script = mgr.compileScript(isolate, code, Buffer.alloc(0));
             } catch (e) {
-                // Some ivm versions throw on empty cachedData — just verify the path ran
+                // Some ivm versions throw on empty cachedData; just verify the path ran
                 assert(e, 'compileScript with cachedData threw (ok for this ivm version)');
                 mgr.dispose(isolate);
                 return;
@@ -152,7 +152,7 @@ try {
             }
             mgr.dispose(iso1);
 
-            // Recompile with cached data — should not throw
+            // Recompile with cached data (should not throw)
             const { isolate: iso2, context: ctx2 } = mgr.createIsolate();
             const script2 = mgr.compileScript(iso2, code, cached);
             const result = script2.runSync(ctx2);

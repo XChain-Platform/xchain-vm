@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Generators — Contract Code
+ * Fuzz Generators: Contract Code
  *
  * Three tiers: valid templates, AST mutations, adversarial patterns.
  ********************************************************************/
@@ -84,7 +84,7 @@ const VALID_TEMPLATES = [
         return xchain.state.get('data');
     };`,
 
-    // Revert path (always fails — for atomicity testing)
+    // Revert path (always fails, for atomicity testing)
     `module.exports = function(xchain) {
         xchain.state.set('shouldNotPersist', 'value');
         xchain.emit.send({ destination: 'addr1', tick: 'T', quantity: '1' });
@@ -110,7 +110,7 @@ const VALID_TEMPLATES = [
     };`,
 
     // Contract-targeted staking reads (getStake / getTotalStaked / getStakers).
-    // Without injected stake data these return '0'/'0'/[] — the point is to fuzz
+    // Without injected stake data these return '0'/'0'/[]. The point is to fuzz
     // the gas-charging + serialisation around the host call sites.
     `module.exports = function(xchain) {
         var pk = 'a'.repeat(64);
@@ -256,7 +256,7 @@ function deepBinary(count) {
 }
 
 const ADVERSARIAL_PATTERNS = [
-    // Infinite loop — must exhaust gas
+    // Infinite loop: must exhaust gas
     'module.exports = function(xchain) { while(true){} };',
 
     // Deeply nested ternary

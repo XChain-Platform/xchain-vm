@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Boundary Test Suite
+ * XChain VM: Boundary Test Suite
  *
  * Tests the VM at the exact edges of every configurable limit, hardcoded cap,
  * and validation threshold. Each section targets a specific boundary area
@@ -52,7 +52,7 @@ let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
 } catch (e) {
-    console.log('Skipping VM boundary tests — isolated-vm not available:', e);
+    console.log('Skipping VM boundary tests (isolated-vm not available):', e);
 }
 
 const GAS_SCHEDULE = {
@@ -118,8 +118,8 @@ describe('Boundary: Gas Ceiling', function() {
 
     it('G-3: gas ceiling of 1', function() {
         const tracker = new GasTracker(GAS_SCHEDULE, 1);
-        tracker.charge(1); // exactly at ceiling — allowed
-        assert.throws(() => tracker.charge(1)); // one more — rejected
+        tracker.charge(1); // exactly at ceiling (allowed)
+        assert.throws(() => tracker.charge(1)); // one more over: rejected
     });
 
     it('G-4: gas ceiling of 0 rejects first charge', function() {
@@ -203,7 +203,7 @@ describe('Boundary: Gas Ceiling', function() {
     it('T-2: infinite loop with high gas ceiling triggers timeout', async function() {
         this.timeout(15000);
         const vm = createVM({ gasCeiling: 999999999, maxCpuTimeMs: 1000 });
-        // Tight loop that charges minimal gas — timeout should fire first
+        // Tight loop that charges minimal gas; timeout should fire first
         const code = `module.exports = function(xchain) {
             while (true) {}
         };`;
@@ -224,7 +224,7 @@ describe('Boundary: Gas Ceiling', function() {
             return sum;
         };`;
         const result = await executeCode(vm, code);
-        // May succeed (tiny contract) or fail — must not crash
+        // May succeed (tiny contract) or fail; must not crash
         assert(typeof result.success === 'boolean');
     });
 
@@ -255,7 +255,7 @@ describe('Boundary: Gas Ceiling', function() {
         };`;
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, false);
-        // Could be OOM, gas, timeout, or V8 string length error — all are acceptable
+        // Could be OOM, gas, timeout, or V8 string length error; all are acceptable
         assert(result.error.includes('error') || result.error.includes('out_of'),
             'should fail gracefully: ' + result.error);
     });
@@ -317,7 +317,7 @@ describe('Boundary: Gas Ceiling', function() {
 
     it('CS-5: extremely long single line (comment padding) parses and executes', async function() {
         const vm = createVM({ maxCodeSize: 70000 });
-        // Long single line via comment padding — avoids gas explosion from many expressions
+        // Long single line via comment padding (avoids gas explosion from many expressions)
         const header = 'module.exports = function(xchain) { return 42; /* ';
         const footer = ' */ };';
         const padding = 60000 - Buffer.byteLength(header + footer, 'utf8');
@@ -370,7 +370,7 @@ describe('Boundary: State Management', function() {
         const sm = new StateManager({}, LIMITS);
         for (let i = 0; i < 5; i++) sm.set('k' + i, 'v');
         sm.delete('k0');
-        sm.set('new_key', 'v'); // should succeed — room for one
+        sm.set('new_key', 'v'); // should succeed: room for one
         assert.strictEqual(sm.get('new_key'), 'v');
     });
 
@@ -417,7 +417,7 @@ describe('Boundary: State Management', function() {
         const sm = new StateManager({}, { ...LIMITS, maxStateValueSize: 1000 });
         let obj = { v: 'x' };
         for (let i = 0; i < 50; i++) obj = { nested: obj };
-        // This will either fit within 1000 bytes or exceed — either way, no crash
+        // This will either fit within 1000 bytes or exceed; either way, no crash
         try {
             sm.set('key', obj);
             // If it fit, verify it round-trips
@@ -691,7 +691,7 @@ describe('Boundary: Log Limits', function() {
 
     it('R-5: return non-serializable value handled gracefully', async function() {
         const vm = createVM();
-        // Return a function — JSON.stringify(function) returns undefined
+        // Return a function (JSON.stringify(function) returns undefined)
         const code = 'module.exports = function(xchain) { return function() {}; };';
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, true);
@@ -747,7 +747,7 @@ describe('Boundary: Math Operations', function() {
     });
 
     it('MA-8: Infinity string input either throws or returns finite result', function() {
-        // mathjs may accept 'Infinity' as a valid bignumber — verify behavior is deterministic
+        // mathjs may accept 'Infinity' as a valid bignumber; verify behavior is deterministic
         try {
             const result = math.add('Infinity', '1');
             // If it doesn't throw, verify the result is a string (deterministic)
@@ -766,7 +766,7 @@ describe('Boundary: Math Operations', function() {
     });
 
     it('MA-10: mod by zero either throws or returns deterministic result', function() {
-        // mathjs mod(x, 0) may return NaN or throw — verify behavior is consistent
+        // mathjs mod(x, 0) may return NaN or throw; verify behavior is consistent
         try {
             const result = math.mod('10', '0');
             assert(typeof result === 'string');
@@ -790,7 +790,7 @@ describe('Boundary: Metering', function() {
         const expr = operands.join(' * ');
         const code = 'var result = ' + expr + ';';
         const metered = meterCode(code);
-        // Count __gas occurrences — should only have function-level injection, not binary depth injection
+        // Count __gas occurrences: should only have function-level injection, not binary depth injection
         const gasCount = (metered.match(/__gas\(/g) || []).length;
         // Store for comparison with depth 11
         this._depth10GasCount = gasCount;
@@ -836,12 +836,12 @@ describe('Boundary: Metering', function() {
     });
 
     it('ME-5: ES2020 features parse, ES2022+ rejected', function() {
-        // ES2020: optional chaining and nullish coalescing — should parse
+        // ES2020: optional chaining and nullish coalescing (should parse)
         const es2020 = 'var x = obj?.foo ?? "default";';
         const metered2020 = meterCode(es2020);
         assert(typeof metered2020 === 'string');
 
-        // ES2022: class fields — should fail
+        // ES2022: class fields (should fail)
         const es2022 = 'class Foo { x = 1; }';
         assert.throws(() => meterCode(es2022));
     });
@@ -1148,7 +1148,7 @@ describe('Boundary: Metering', function() {
             xchain.emit.dispenser(null);
         };`;
         const result = await executeCode(vm, code);
-        // null spreads to {} — should not crash
+        // null spreads to {} (should not crash)
         assert.strictEqual(result.success, true);
     });
 

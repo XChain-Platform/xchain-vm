@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Generators — Math Operations
+ * Fuzz Generators: Math Operations
  *
  * Generates adversarial numeric inputs for xchain.math methods.
  ********************************************************************/

@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Acceptance test (was KNOWN-RED) — gas-vs-wall-clock is a host-timing
+ * Acceptance test (was KNOWN-RED): gas-vs-wall-clock is a host-timing
  * race, so the consensus-visible result of a gas-burning contract MUST be
  * identical whether the gas ceiling or the wall-clock net fires first.
  *
@@ -24,7 +24,7 @@
  * validators committing different tokens would FORK.
  *
  * RED before the fix: the determinism harness hashed the RAW error, and the
- * indexer kept `out_of_gas` distinct from `out_of_resource` — so the two
+ * indexer kept `out_of_gas` distinct from `out_of_resource`, so the two
  * budgets below produced different consensus results. GREEN after: the
  * resource-exhaustion family (out_of_gas / timeout / out_of_memory /
  * out_of_stack / out_of_resource) collapses to one host-independent token
@@ -73,7 +73,7 @@ describe('gas-vs-wall-clock status must not fork (was KNOWN-RED)', function () {
         assert.strictEqual(slow.success, false, `slow run should fail: ${JSON.stringify(slow.error)}`);
         // Sanity: the two raw errors really did take different ceilings (else
         // the probe isn't exercising the race on this host).
-        // (Not asserted hard — on a very fast host both could be out_of_gas;
+        // (Not asserted hard: on a very fast host both could be out_of_gas;
         // the consensus assertions below hold regardless.)
     });
 

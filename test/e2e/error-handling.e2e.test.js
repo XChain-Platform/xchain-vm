@@ -28,7 +28,7 @@ const {
 
 let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
-catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
+catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
 (XChainVM ? describe : describe.skip)('E2E: Error Handling & Recovery', function() {
 
@@ -170,7 +170,7 @@ catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
     describe('E2E-055: Metering failure on execute', function() {
         it('should fail gracefully if code can not be metered', async function() {
             // Deploy a contract with code that will be stored but may fail at metering
-            // The harness deploys and runs initialize — if code is invalid it fails at deploy
+            // The harness deploys and runs initialize (if code is invalid it fails at deploy)
             // For this test we directly store broken code in the ledger
             h.ledger.deployContract('C:BTC:55', '???INVALID_NOT_JS???', 'deployer', 1);
 

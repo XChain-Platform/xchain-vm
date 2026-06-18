@@ -11,12 +11,12 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Process Executor (parent side)
+ * XChain VM: Process Executor (parent side)
  *
  * Runs every contract execution in a forked child (src/vm-worker.js) that
- * holds the real in-process VM. A contract that aborts V8 — e.g. a bulk
+ * holds the real in-process VM. A contract that aborts V8 (e.g. a bulk
  * allocation that bypasses the isolate memory limit and triggers a
- * process-wide SIGABRT — kills only the child, never this (indexer) host.
+ * process-wide SIGABRT) kills only the child, never this (indexer) host.
  *
  * On a child crash or hang, the in-flight execution resolves to a
  * DETERMINISTIC resource-failure result with gasUsed = gasCeiling (same
@@ -43,7 +43,7 @@ const WORKER_PATH = path.join(__dirname, 'vm-worker.js');
 const BROKEN_RESPAWN_BACKOFF_MS = 2000;
 
 // A spawned worker must signal 'ready' within this window or it is killed and
-// counted as a spawn failure (worker init is a require + isolated-vm load —
+// counted as a spawn failure (worker init is a require + isolated-vm load,
 // normally well under 2s). This keeps a child that hangs BEFORE ready inside
 // the spawn-failure → HostFaultError machinery (halt and retry, a local
 // fault), now that the per-request watchdog no longer covers queue wait.
@@ -78,7 +78,7 @@ class ProcessExecutor {
         // hangs (stuck isolate, native deadlock). Generous buffer above the
         // in-isolate timeout so the isolate's deterministic timeout wins normally.
         // Started at DISPATCH (see _flush), so it bounds one contract's
-        // execution only — never queue wait, which varies per host.
+        // execution only, never queue wait, which varies per host.
         const cpu = (config.limits && config.limits.maxCpuTimeMs) || 30000;
         this._watchdogMs = cpu + 5000;
 
@@ -122,7 +122,7 @@ class ProcessExecutor {
 
         // Initialize the worker's VM.
         this._send({ type: 'init', config: this._config });
-        // A respawn mid-block must restore the worker's block state (cache only —
+        // A respawn mid-block must restore the worker's block state (cache only;
         // correctness holds without it, but keep behavior consistent).
         if (this._inBlock) this._send({ type: 'beginBlock' });
     }
@@ -140,7 +140,7 @@ class ProcessExecutor {
             this._sawReady = true;
             this._consecutiveSpawnFailures = 0;
             if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
-            // A fresh worker is now dispatchable — send it any queued executions
+            // A fresh worker is now dispatchable; send it any queued executions
             // (e.g. the contract that followed a crashed/killed one in this block).
             this._flush();
             return;
@@ -158,8 +158,8 @@ class ProcessExecutor {
     // 'ready'. Gating on readiness (not merely channel-connected) is what makes
     // recovery deterministic: a contract that has not started executing always
     // runs on a fresh, ready worker on every validator, instead of racing a dying
-    // worker — which would resolve it as a host-termination on some nodes and run
-    // it on others → divergent result → fork.
+    // worker. Racing a dying worker would resolve it as a host-termination on some
+    // nodes and run it on others, producing a divergent result and a fork.
     _flush() {
         while (this._queue.length && this._child && this._sawReady && this._child.connected) {
             const entry = this._queue[0];
@@ -181,15 +181,15 @@ class ProcessExecutor {
 
     // Dispatched but unresponsive past the in-isolate timeout + buffer: the
     // worker is stuck (hung isolate, native deadlock). Kill it (triggers
-    // _onExit → respawn) and resolve THIS request deterministically — the same
-    // resource-failure clamp the in-isolate timeout would have produced.
+    // _onExit, then respawn) and resolve THIS request deterministically with
+    // the same resource-failure clamp the in-isolate timeout would have produced.
     _onWatchdog(id) {
         const entry = this._pending.get(id);
         if (!entry) return;
         this._pending.delete(id);
         // Per-entry ceiling: a host-terminated nested (cross-contract) call must
         // clamp to its caller-funded reservation, exactly like the in-isolate
-        // clamps — a 1M charge against a 50k reservation would diverge the fee.
+        // clamps. A 1M charge against a 50k reservation would diverge the fee.
         entry.resolve(hostTerminatedResult(entry.ceiling, 'watchdog timeout'));
         const child = this._child;
         if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
@@ -207,11 +207,11 @@ class ProcessExecutor {
         this._child = null;
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
 
-        // Resolve only DISPATCHED (in-flight) requests deterministically — a crash
+        // Resolve only DISPATCHED (in-flight) requests deterministically. A crash
         // here means the contract that was actually executing aborted the host. The
         // block must still advance. Queued (not-yet-dispatched) requests are left
         // intact: they never started, so they re-dispatch to the respawned worker
-        // (_flush on its 'ready') and run normally — identical on every validator.
+        // (_flush on its 'ready') and run normally, identical on every validator.
         const kind = signal ? ('signal ' + signal) : ('exit ' + code);
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
@@ -228,7 +228,7 @@ class ProcessExecutor {
         }
         if (this._consecutiveSpawnFailures >= 3) {
             this._broken = true;
-            // The worker can't start — this is a LOCAL host fault, not a contract
+            // The worker can't start. This is a LOCAL host fault, not a contract
             // outcome (a contract cannot make fork() fail). REJECT queued
             // (never-dispatched) executions with a host fault so the caller HALTS
             // and retries, instead of fabricating out_of_resource for work the
@@ -255,7 +255,7 @@ class ProcessExecutor {
 
     execute(opts) {
         if (this._broken) {
-            // The worker could not be started (host fault — fork EAGAIN,
+            // The worker could not be started (host fault: fork EAGAIN or
             // isolated-vm load failure). This is NOT a contract outcome and must
             // never be fabricated into a consensus result (it would fork). Try to
             // recover on a backoff so a TRANSIENT fault self-heals without a
@@ -280,13 +280,13 @@ class ProcessExecutor {
         const ceiling = effectiveCeiling(opts && opts.gasCeiling, this._gasCeiling);
         return new Promise((resolve, reject) => {
             // No timer here: the watchdog starts when the request DISPATCHES
-            // (_flush), so queue wait — which differs per host — is never part
+            // (_flush), so queue wait (which differs per host) is never part
             // of the bound. Queued requests are cleaned up by _onExit (broken
             // latch → HostFaultError) or shutdown().
             //
             // Accept into the queue, then dispatch only if a ready worker exists.
             // Never send to a worker that has not signaled 'ready' (a fresh or dying
-            // one) — that is the determinism-breaking race this fix closes.
+            // one): that is the determinism-breaking race this fix closes.
             this._queue.push({ id, opts, resolve, reject, timer: null, ceiling });
             this._flush();
         });

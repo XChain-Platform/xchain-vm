@@ -11,13 +11,13 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Regression — Deterministic Math Golden Values
+ * Regression: Deterministic Math Golden Values
  *
  * The contract math API (xchain.math.*) is the consensus-critical
  * arithmetic surface: every validator must compute bit-identical
  * results or state hashes diverge and the chain forks. The engine is
  * mathjs bignumber → decimal.js (pure-software decimal arithmetic,
- * architecture-independent — which is WHY native Math.sqrt/pow/log are
+ * architecture-independent (which is WHY native Math.sqrt/pow/log are
  * stripped from the sandbox, see src/sandbox.js).
  *
  * Architecture independence is guaranteed by decimal.js being pure JS.
@@ -25,7 +25,7 @@
  * build could round transcendentals differently. mathjs declares
  * decimal.js as `^10.4.3`, and the indexer (prod) lockfile and this
  * repo's lockfile have at times resolved to DIFFERENT patch versions
- * (10.4.3 vs 10.6.0) — they currently agree bit-for-bit, but nothing
+ * (10.4.3 vs 10.6.0) and currently agree bit-for-bit, but nothing
  * enforced it. This test is that enforcement: it freezes the exact
  * contract-facing output of every math op. If a dependency bump ever
  * changes a single digit, this fails loudly instead of silently
@@ -33,10 +33,10 @@
  *
  * Values were captured at decimal.js 10.4.3/10.6.0 (verified identical)
  * via buildMathAPI(). Do NOT "fix" a failure by editing the expected
- * strings — a change here means the arithmetic engine changed, which is
+ * strings. A change here means the arithmetic engine changed, which is
  * a consensus event that must be reviewed deliberately.
  *
- * No isolate required — buildMathAPI() is pure host-side, so this runs
+ * No isolate required: buildMathAPI() is pure host-side, so this runs
  * on any Node version.
  ********************************************************************/
 // @ts-nocheck
@@ -62,7 +62,7 @@ describe('Regression: deterministic math golden values @regression @determinism'
         ['log10',    '123456789', null, '8.091514977169270447518333623059547258515073338944666430292352231'],
         ['divide',   '1',   '3',   '0.3333333333333333333333333333333333333333333333333333333333333333'],
         ['divide',   '22',  '7',   '3.142857142857142857142857142857142857142857142857142857142857143'],
-        // Decimal (not IEEE-754 float) arithmetic — proves no binary-float drift:
+        // Decimal (not IEEE-754 float) arithmetic: proves no binary-float drift:
         ['multiply', '0.1', '0.2', '0.02'],
         ['add',      '0.1', '0.2', '0.3'],
     ];
@@ -72,7 +72,7 @@ describe('Regression: deterministic math golden values @regression @determinism'
         it(`${label} === golden`, function() {
             const actual = b !== null ? m[op](a, b) : m[op](a);
             assert.strictEqual(actual, expected,
-                `Arithmetic engine output changed for ${label} — this is a consensus event, ` +
+                `Arithmetic engine output changed for ${label}. This is a consensus event, ` +
                 `NOT a test to update. Check the mathjs/decimal.js version.`);
         });
     }

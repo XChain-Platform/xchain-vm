@@ -11,12 +11,12 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Determinism guard — per-block compilation cache must not change behavior.
+ * Determinism guard: per-block compilation cache must not change behavior.
  *
  * The VM caches V8 cachedData per block (key contractIndex:sha256(code)). The
  * first execute compiles cold and stores cachedData; later executes of the same
  * contract in the same block compile WARM. A warm execution that diverged from
- * a cold one — gasUsed, returnValue, state, emissions — would fork validators
+ * a cold one (gasUsed, returnValue, state, emissions) would fork validators
  * that hit the cache at different points. This guard asserts byte-identical
  * results across cold / warm / fresh-VM / different-contractIndex.
  *

@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * MockLedger — In-memory ledger for E2E testing
+ * MockLedger: In-memory ledger for E2E testing
  *
  * Simulates the indexer database tables:
  *   - balances:          address/tick → quantity (string)

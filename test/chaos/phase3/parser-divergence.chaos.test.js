@@ -142,11 +142,11 @@ const { checkResultShape, checkAtomicity, checkGasCeiling } = require('../../fuz
             expectSuccess: true
         },
         {
-            name: 'async function (should fail — async not useful in sync VM)',
+            name: 'async function (should fail: async is not useful in sync VM)',
             code: `module.exports = async function(xchain) {
                 return 'async';
             };`,
-            // async returns a Promise, not a value — may fail or return [object Promise]
+            // async returns a Promise, not a value; may fail or return [object Promise]
             expectSuccess: null
         },
         {
@@ -230,7 +230,7 @@ const { checkResultShape, checkAtomicity, checkGasCeiling } = require('../../fuz
             const vm = createVM({ gasCeiling: 100000 });
             const result = await execute(vm, tc.code);
 
-            // Must always return a valid result shape — never crash
+            // Must always return a valid result shape; never crash
             checkResultShape(result);
 
             if (tc.expectSuccess === true) {
@@ -284,7 +284,7 @@ const { checkResultShape, checkAtomicity, checkGasCeiling } = require('../../fuz
         this.timeout(10000);
         const vm = createVM();
 
-        // Fibonacci — verifies metering doesn't alter loop semantics
+        // Fibonacci: verifies metering doesn't alter loop semantics
         const code = `module.exports = function(xchain) {
             var a = 0, b = 1;
             for (var i = 0; i < 20; i++) {

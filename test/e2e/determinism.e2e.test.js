@@ -26,7 +26,7 @@ const { assertSuccess } = require('./helpers/assertions.js');
 
 let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
-catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
+catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
 function hashResult(result) {
     const normalized = JSON.stringify({

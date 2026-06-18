@@ -28,7 +28,7 @@ const {
 
 let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
-catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
+catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
 (XChainVM ? describe : describe.skip)('E2E: Complex Workflows', function() {
 
@@ -120,7 +120,7 @@ catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
             // Advance 11 blocks (past the cliff of 10)
             for (let i = 0; i < 11; i++) h.mineBlock();
 
-            // Now claim should work — 11 blocks elapsed out of 100
+            // Now claim should work: 11 blocks elapsed out of 100
             // vested = 1000 * 11 / 100 = 110
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:11', method: 'claim',

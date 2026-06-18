@@ -11,12 +11,12 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Acceptance test (was KNOWN-RED) — native compute/iteration builtins
+ * Acceptance test (was KNOWN-RED): native compute/iteration builtins
  * must be size-metered so the gas ceiling, not the wall-clock backstop,
  * is the binding constraint.
  *
  * RED before the G1 fix (the compute builtins were charged ~1 gas at the
- * call site regardless of input size — ~66,000 native element-touches per
+ * call site regardless of input size (~66,000 native element-touches per
  * gas, see probe), GREEN after `src/index.js` extends F3-style size
  * metering to them. Excluded from the green suites by the `.known-red.js`
  * suffix (the determinism globs match `*.test.js`). Run explicitly:
@@ -24,7 +24,7 @@
  *     npm run test:known-red
  *
  * Invariant: a workload whose native element-touches exceed the gas budget
- * by >10x MUST terminate `out_of_gas` — it cannot run to completion. Each
+ * by >10x MUST terminate `out_of_gas`; it cannot run to completion. Each
  * vector below performs C * K = 10,000,000 native touches against a default
  * 1,000,000 gas ceiling. A generous 30 s wall-clock net is used so that,
  * BEFORE the fix, the work completes successfully (the RED state) rather
@@ -76,7 +76,7 @@ describe('compute builtins must be size-metered (was KNOWN-RED)', function () {
           mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++)t+=JSON.stringify(a).length;return t;` },
         { id: 'String.prototype.split',
           mk: `var s=('7,').repeat(${K});var t=0;for(var i=0;i<${C};i++)t+=s.split(',').length;return t;` },
-        // Mutators (O(n) shift/copy) and ES2023 copying methods — added after the
+        // Mutators (O(n) shift/copy) and ES2023 copying methods, added after the
         // metering-completeness sweep found them un-metered by the initial G1 list.
         { id: 'Array.prototype.splice',
           mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++){a.splice(0,0,1);t+=a.length;}return t;` },
@@ -163,7 +163,7 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
     }
 
     // The metering pass rewrites + / += into __concat and template literals into
-    // __tmpl, charging by bytes grown beyond the largest operand — so doubling a
+    // __tmpl, charging by bytes grown beyond the largest operand, so doubling a
     // string trips out_of_gas instead of building megabytes for ~tens of gas.
     const BOMBS = [
         { id: '+ doubling (s = s + s)',          code: `var s='7';for(var i=0;i<25;i++)s=s+s;return s.length;` },
@@ -203,7 +203,7 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
     // ---- item #6: member-lhs += and tagged-template residuals are now gas-bound ----
     // Before the __setconcat / __tmpltag[m] fix these escaped the byte meter: a
     // doubling loop built a multi-megabyte string for ~tens of gas and tripped the
-    // V8 max-string-length RangeError (gasUsed ~ 59), NOT out_of_gas — gas was not
+    // V8 max-string-length RangeError (gasUsed ~ 59), NOT out_of_gas; gas was not
     // the binding constraint. Now each rewrite charges by bytes grown -> out_of_gas.
     const MEMBER_TMPL_BOMBS = [
         { id: 'computed-LHS += doubling (o[k] += o[k])',
@@ -224,7 +224,7 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
         });
     }
 
-    // Correctness guards — the rewrites must preserve JS semantics exactly.
+    // Correctness guards: the rewrites must preserve JS semantics exactly.
     it('member += evaluates object + computed key + rhs exactly once', async function () {
         // computed key: o[k()] += rhs -> k() must fire once (native ref semantics).
         const { r } = await runDefault(

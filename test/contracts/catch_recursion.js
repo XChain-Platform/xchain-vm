@@ -38,7 +38,7 @@ module.exports = {
         return 'committed';
     },
 
-    // Bounded recursion well under the limit — must still succeed and commit its
+    // Bounded recursion well under the limit; must still succeed and commit its
     // result, so the guard does not break legitimate recursive contracts.
     bounded: function (xchain) {
         function sum(n) {

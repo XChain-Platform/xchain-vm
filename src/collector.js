@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Emission Collector
+ * XChain VM: Emission Collector
  *
  * Queues emitted actions and debug logs during contract execution.
  * Enforces emission cap (maxEmissions) and log cap (100 entries, 1KB each).

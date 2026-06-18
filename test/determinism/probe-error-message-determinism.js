@@ -32,7 +32,7 @@
  *
  * This probe captures EXACTLY what a contract can observe today, so the
  * exposure is concrete. It cannot prove cross-version divergence on one
- * box (only one V8 here) — it documents the surface. Mitigation is a
+ * box (only one V8 here); it documents the surface. Mitigation is a
  * deployment/consensus decision (pin exact V8 + cross-version manifest
  * check) and/or sanitizing contract-visible messages where interceptable.
  *
@@ -45,7 +45,7 @@ const { createVM, execute } = require('../fuzz/harness');
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
 // Each vector triggers a NATIVE throw (created by V8 internals, not the JS
-// Error constructor — so it can't be intercepted by overriding Error) and
+// Error constructor, so it can't be intercepted by overriding Error) and
 // returns what the contract can observe.
 const VECTORS = [
     { id: 'TypeError: call undefined',

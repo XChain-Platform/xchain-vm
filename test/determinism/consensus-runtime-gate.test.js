@@ -16,7 +16,7 @@
  * Asserts the engine THIS process runs on matches the pinned consensus
  * runtime (src/consensus-runtime.js). Running in `ci` on every Node/V8 a
  * validator may use, this fails LOUDLY on any validator built against a
- * different V8/ICU — the deployment-side mitigation for the not-in-VM-
+ * different V8/ICU. The deployment-side mitigation for the not-in-VM-
  * fixable native-error-text / ICU-primitive residual. A pinned engine is
  * the only thing that makes those contract-observable-but-unspeccable bytes
  * deterministic fleet-wide.
@@ -40,8 +40,8 @@ describe('consensus-runtime gate', function () {
     });
 
     it('the checker REJECTS a mismatched engine (gate has teeth)', function () {
-        // Flip one pinned field — a validator on an older V8 whose native
-        // error wording differs. Must be caught.
+        // Flip one pinned field (a validator on an older V8 whose native
+        // error wording differs). Must be caught.
         const bad = { ...process.versions, v8: '11.0.000.0-node.0' };
         const result = checkConsensusRuntime(bad);
         assert.strictEqual(result.ok, false, 'a wrong V8 must not pass the gate');

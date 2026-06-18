@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Fuzz Tests — Resource Exhaustion
+ * Fuzz Tests: Resource Exhaustion
  *
  * Tests that resource limits (gas, memory, timeout) cannot be
  * bypassed and that exhaustion is handled gracefully.
@@ -35,7 +35,7 @@ const METERING_BYPASS_ATTEMPTS = [
     // Try to redefine __gas on global
     'module.exports = function(xchain) { try { Object.defineProperty(globalThis, "__gas", { value: function(){} }); } catch(e){} while(true){} };',
 
-    // Expression-heavy code (no control flow — tests that metering covers expressions)
+    // Expression-heavy code (no control flow; tests that metering covers expressions)
     'module.exports = function(xchain) { var a = 1; ' + 'a = a + a; '.repeat(500) + ' return a; };',
 
     // String concatenation bomb
@@ -117,7 +117,7 @@ const MEMORY_EXHAUSTION_ATTEMPTS = [
                 const elapsed = Date.now() - start;
                 checkResultShape(result);
                 checkAtomicity(result);
-                // Must terminate (not hang) — covered by mocha timeout, but also check wall-clock
+                // Must terminate (not hang). Covered by mocha timeout, but also check wall-clock
                 assert(elapsed < 10000, 'Bypass attempt hung for ' + elapsed + 'ms');
                 // Gas used should not wildly exceed ceiling
                 checkGasCeiling(result, 5000);

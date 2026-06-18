@@ -83,7 +83,7 @@ const mathExtremeCode = fs.readFileSync(
     });
 
     it('CHAOS-1005: very large multiplication succeeds', async function() {
-        // 100-digit * 100-digit — mathjs handles arbitrary precision
+        // 100-digit * 100-digit: mathjs handles arbitrary precision
         const a = '9'.repeat(100);
         const b = '9'.repeat(100);
         const result = await execute(vm, mathExtremeCode, {
@@ -204,7 +204,7 @@ const mathExtremeCode = fs.readFileSync(
         });
         checkResultShape(result);
         // Empty string may be parsed as 0 by mathjs bignumber, or may fail.
-        // Either outcome is acceptable — just verify no crash.
+        // Either outcome is acceptable; just verify no crash.
         if (!result.success) {
             checkAtomicity(result);
         }
@@ -224,7 +224,7 @@ const mathExtremeCode = fs.readFileSync(
             params: ['add', '1e10', '1']
         });
         checkResultShape(result);
-        // mathjs may or may not accept scientific notation — just verify no crash
+        // mathjs may or may not accept scientific notation; just verify no crash
         if (result.success && result.returnValue) {
             const val = JSON.parse(result.returnValue);
             assert(typeof val === 'string', 'Result should be a string');
@@ -239,7 +239,7 @@ const mathExtremeCode = fs.readFileSync(
             params: ['mod', '10', '0']
         });
         checkResultShape(result);
-        // Mod by zero behavior depends on mathjs — verify no crash
+        // Mod by zero behavior depends on mathjs; verify no crash
         if (!result.success) {
             checkAtomicity(result);
         }

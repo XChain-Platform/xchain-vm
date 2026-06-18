@@ -53,7 +53,7 @@ async function probe(sc) {
 
 async function main() {
     const resourceScenarios = SCENARIOS.filter(s => s.tier === 'resource');
-    process.stdout.write(`Resource determinism probe — ${RUNS} runs each on this machine\n`);
+    process.stdout.write(`Resource determinism probe: ${RUNS} runs each on this machine\n`);
     process.stdout.write(`${'-'.repeat(72)}\n`);
     let anyNondeterministic = false;
     for (const sc of resourceScenarios) {

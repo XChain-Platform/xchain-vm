@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Action Validator
+ * XChain VM: Action Validator
  *
  * Lightweight pre-validation of emitted actions before returning
  * to the indexer. Catches obvious errors early.

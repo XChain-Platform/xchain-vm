@@ -28,7 +28,7 @@ const {
 
 let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
-catch (e) { console.log('Skipping E2E tests — isolated-vm not available'); }
+catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
 (XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
 

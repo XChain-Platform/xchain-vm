@@ -97,7 +97,7 @@ describe('Metering', function() {
         });
 
         it('should inject gas at the top-level script entry point', function() {
-            // Pure top-level declaration with no calls — must still be charged
+            // Pure top-level declaration with no calls; must still be charged
             const code = 'const lookup = { a: 1, b: 2, c: 3 };';
             const metered = meterCode(code);
             assert(metered.includes('__gas'), 'should contain __gas calls');
@@ -236,7 +236,7 @@ describe('Metering', function() {
         });
 
         it('should not detect __gas in member expression property', function() {
-            // obj.__gas is a MemberExpression — the property Identifier is not
+            // obj.__gas is a MemberExpression; the property Identifier is not
             // visited as a standalone Identifier by acorn walk.full
             assert.strictEqual(hasGasIdentifier('var x = obj.__gas;'), false);
         });
@@ -280,7 +280,7 @@ describe('Metering', function() {
             `;
             const metered = meterCode(code);
             require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
-            // Count __gas occurrences — should be multiple
+            // Count __gas occurrences (should be multiple)
             const gasCount = (metered.match(/__gas/g) || []).length;
             assert(gasCount >= 4, 'should have multiple __gas injection points, got ' + gasCount);
         });
@@ -342,7 +342,7 @@ describe('Metering', function() {
 
         // Meter `src`, run it with a __gas stub that mirrors src/index.js
         // (every injected __gas() => gasTracker.chargeComputation()), and return
-        // the total gas charged. No isolated-vm needed — meterCode output is plain
+        // the total gas charged. No isolated-vm needed; meterCode output is plain
         // JS and the charge semantics are identical.
         function gasUsedFor(src) {
             const metered = meterCode(src);
@@ -379,7 +379,7 @@ describe('Metering', function() {
         it('WhileStatement charges only 1x VM_COMPUTATION per iteration (no update slot)', function() {
             const N = 5;
             // Contrast: while/do-while have no update expression, so they charge
-            // 1x VM_COMPUTATION per iteration — the asymmetry the for-loop test pins.
+            // 1x VM_COMPUTATION per iteration; this is the asymmetry the for-loop test pins.
             const used = gasUsedFor('var i = 0; while (i < ' + N + ') { i++; }') - baseline;
             assert.strictEqual(used, N * VM_COMPUTATION,
                 'while-loop of ' + N + ' iterations should charge N x VM_COMPUTATION');
@@ -438,7 +438,7 @@ describe('Metering', function() {
         });
 
         it('rewrites a computed-member += concat to __setconcat', function() {
-            // obj[k] += "x" — computed member key path of _memberKey.
+            // obj[k] += "x", the computed member key path of _memberKey.
             const metered = meterCode('obj[k] += "x";');
             assert(metered.includes('__setconcat('), 'computed member concat-assign → __setconcat');
         });
