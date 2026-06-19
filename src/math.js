@@ -26,6 +26,13 @@ const mathjs = require('mathjs');
 const { bignumber, add, subtract, multiply, divide, mod, compare } = mathjs;
 const { pow, sqrt, log, log2, log10 } = mathjs;
 
+// BigNumber precision is consensus-affecting (it determines every contract math root).
+// In mathjs 15 the global config is READONLY, so precision is fixed at the library
+// default (64) for a given mathjs version and cannot drift at runtime. The determinism
+// guard pins the mathjs/decimal.js versions and asserts mathjs.config().precision in the
+// consensus surface (consensus-runtime.js MATH_PINNED), so a dependency bump that would
+// change this default cannot ship without a coordinated CONSENSUS_VERSION change.
+
 // Maximum input length for math operations to prevent DoS via
 // extreme-precision bignumber parsing (RISK-12, RISK-18).
 const MAX_MATH_INPUT_LENGTH = 256;

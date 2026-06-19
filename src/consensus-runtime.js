@@ -59,6 +59,18 @@ const PINNED = Object.freeze({
     modules: '127'
 });
 
+// Math-library consensus pin (item 4629). The mathjs BigNumber engine and its
+// decimal.js backend determine every contract math root, so their versions and the
+// configured precision are consensus-affecting. Pinned here and asserted by the
+// determinism test so a dependency bump cannot ship without a coordinated
+// CONSENSUS_VERSION change. Behavior-preserving for the values below: src/math.js sets
+// precision explicitly at load and 64 is mathjs's current default.
+const MATH_PINNED = Object.freeze({
+    mathjs:    '15.2.0',
+    decimaljs: '10.4.3',
+    precision: 64
+});
+
 // The reference Node release the pin was taken from. Informational only:
 // a different Node PATCH that carries the SAME v8/icu/unicode/cldr/modules
 // is consensus-equivalent and intentionally NOT rejected. Recorded so the
@@ -142,7 +154,7 @@ function describeMismatch(result) {
 }
 
 module.exports = {
-    PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
+    PINNED, MATH_PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
     CONSENSUS_STATUS_TOKENS, STATUS_ERROR_PREFIXES,
     checkConsensusRuntime, describeMismatch
 };

@@ -85,6 +85,22 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.ok(Object.isFrozen(cr.PINNED));
     });
 
+    it('MATH_PINNED equals the golden and matches the installed mathjs + configured precision (item 4629)', function () {
+        assert.deepStrictEqual(cr.MATH_PINNED, {
+            mathjs:    '15.2.0',
+            decimaljs: '10.4.3',
+            precision: 64
+        });
+        assert.ok(Object.isFrozen(cr.MATH_PINNED));
+        // A mathjs bump must travel with a coordinated CONSENSUS_VERSION change, else
+        // contract math roots can fork. mathjs's global config is readonly, so precision
+        // is fixed by the library version; assert both the version and the precision.
+        assert.strictEqual(require('mathjs/package.json').version, cr.MATH_PINNED.mathjs,
+            'installed mathjs drifted from the consensus pin');
+        assert.strictEqual(require('mathjs').config().precision, cr.MATH_PINNED.precision,
+            'mathjs BigNumber precision drifted from the consensus pin');
+    });
+
     it('CONSENSUS_STATUS_TOKENS is the frozen closed set (resource family collapsed)', function () {
         assert.deepStrictEqual(cr.CONSENSUS_STATUS_TOKENS, ['reverted', 'out_of_resource', 'failed']);
         assert.ok(Object.isFrozen(cr.CONSENSUS_STATUS_TOKENS));
