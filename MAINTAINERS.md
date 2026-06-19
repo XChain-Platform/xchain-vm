@@ -28,7 +28,7 @@ Until additional maintainers join, the lead owns every area below. The table is 
 |---|---|
 | V8 isolate sandbox | `isolate.js`, `sandbox.js`, `vm-worker.js`, `process-executor.js`: isolate lifecycle, non-deterministic API stripping, cross-process execution |
 | Gas metering | `gas.js`, `metering.js`: AST injection of `__gas()` calls via acorn/astring, ceiling enforcement, computation charges |
-| Contract gateway | `gateway.js`, `gateway-emit.js`, `validator.js`, `readonly-accessors.js`: the `xchain` object exposed inside isolates, emit API (17 action types including cross-contract `emit.execute`), action validation |
+| Contract gateway | `gateway.js`, `gateway-emit.js`, `validator.js`, `readonly-accessors.js`: the `xchain` object exposed inside isolates, emit API (18 action types including cross-contract `emit.execute` and cross-chain `emit.crossExecute`), action validation |
 | Determinism and runtime | `index.js`, `consensus-runtime.js`: the `XChainVM` class, per-block compilation cache, determinism guarantees across indexer nodes |
 | State management | `state.js`: key-value state, dirty tracking, key count and value size limits |
 | Math | `math.js`: deterministic bignumber arithmetic wrapping mathjs, string I/O |

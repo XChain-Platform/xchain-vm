@@ -6,7 +6,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.11.2-blue" alt="Version">
   <img src="https://img.shields.io/badge/tests-974%20passing-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node">
+  <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-Dankest%20Community-orange" alt="License">
 </p>
 
@@ -18,17 +18,17 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 
 ## Features
 
-- **Sandboxed V8 isolates** — contracts run in isolated-vm with no access to the host process, filesystem, or network
-- **Deterministic execution** — all non-deterministic APIs (Date, Math.random, setTimeout, etc.) stripped; same input always produces same output
-- **AST-based gas metering** — acorn parses contract code and injects `__gas()` calls at control flow points; no V8 modifications required
-- **17 emittable actions** — contracts can emit SEND, DESTROY, ISSUE, MINT, ORDER, DISPENSER, DIVIDEND, AIRDROP, CALLBACK, FILE, LIST, COINPAY, SWEEP, LINK, BROADCAST, MESSAGE, and EXECUTE (cross-contract call: deferred, caller-funded gasLimit, max depth 4, no return value)
-- **External attestation** — `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
-- **Deterministic math** — `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point
-- **Contract state management** — key-value state with dirty tracking, key count limits, and value size limits
-- **Deploy-time validation** — syntax checking via V8 + acorn, reserved identifier detection, float usage warnings
-- **Per-block compilation cache** — V8 cached compilation data eliminates redundant parsing for hot contracts
-- **Resource limits** — configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap, wall-clock timeout
-- **Multi-method contracts** — contracts export a function (single entry) or an object with named methods
+- **Sandboxed V8 isolates**: contracts run in isolated-vm with no access to the host process, filesystem, or network
+- **Deterministic execution**: all non-deterministic APIs (Date, Math.random, setTimeout, etc.) stripped; same input always produces same output
+- **AST-based gas metering**: acorn parses contract code and injects `__gas()` calls at control flow points; no V8 modifications required
+- **17 emittable actions**: contracts can emit SEND, DESTROY, ISSUE, MINT, ORDER, DISPENSER, DIVIDEND, AIRDROP, CALLBACK, FILE, LIST, COINPAY, SWEEP, LINK, BROADCAST, MESSAGE, and EXECUTE (cross-contract call: deferred, caller-funded gasLimit, max depth 4, no return value)
+- **External attestation**: `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
+- **Deterministic math**: `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point
+- **Contract state management**: key-value state with dirty tracking, key count limits, and value size limits
+- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, float usage warnings
+- **Per-block compilation cache**: V8 cached compilation data eliminates redundant parsing for hot contracts
+- **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap, wall-clock timeout
+- **Multi-method contracts**: contracts export a function (single entry) or an object with named methods
 
 ## Documentation
 
@@ -37,14 +37,14 @@ Full VM architecture and protocol details are available in the [xchain-documenta
 | Document | Description |
 |---|---|
 | [Smart Contracts](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/SMART_CONTRACTS.md) | VM architecture, contract model, bounded execution, use cases |
-| [Block Hashes](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/BLOCK_HASHES.md) | Ledger, actions, and contract hashes — how contract state is verified |
-| [Ledger](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/LEDGER.md) | Double-entry ledger — how contract derived addresses participate |
-| [DEPLOY](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/DEPLOY.md) | DEPLOY action spec — code encoding, api_version, gas costs |
-| [EXECUTE](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/EXECUTE.md) | EXECUTE action spec — method calls, params, gas metering |
-| [DEPOSIT](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/DEPOSIT.md) | DEPOSIT action spec — transferring tokens into contract custody |
-| [WITHDRAW](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/WITHDRAW.md) | WITHDRAW action spec — owner-initiated withdrawal from contract |
-| [Indexer Database](https://github.com/XChain-platform/xchain-documentation/blob/master/components/indexer/DATABASE.md) | Schema reference — contracts, contract_state, executions, emissions tables |
-| [Fee Schedule](https://github.com/XChain-platform/xchain-documentation/blob/master/components/indexer/CONFIGURATION.md) | Unified gas schedule — VM gas costs, GAS_PRICE, fee conversion |
+| [Block Hashes](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/BLOCK_HASHES.md) | Ledger, actions, and contract hashes: how contract state is verified |
+| [Ledger](https://github.com/XChain-platform/xchain-documentation/blob/master/concepts/LEDGER.md) | Double-entry ledger: how contract derived addresses participate |
+| [DEPLOY](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/DEPLOY.md) | DEPLOY action spec: code encoding, api_version, gas costs |
+| [EXECUTE](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/EXECUTE.md) | EXECUTE action spec: method calls, params, gas metering |
+| [DEPOSIT](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/DEPOSIT.md) | DEPOSIT action spec: transferring tokens into contract custody |
+| [WITHDRAW](https://github.com/XChain-platform/xchain-documentation/blob/master/protocol/actions/WITHDRAW.md) | WITHDRAW action spec: owner-initiated withdrawal from contract |
+| [Indexer Database](https://github.com/XChain-platform/xchain-documentation/blob/master/components/indexer/DATABASE.md) | Schema reference: contracts, contract_state, executions, emissions tables |
+| [Fee Schedule](https://github.com/XChain-platform/xchain-documentation/blob/master/components/indexer/CONFIGURATION.md) | Unified gas schedule: VM gas costs, GAS_PRICE, fee conversion |
 
 ## Quick Start
 
@@ -169,7 +169,7 @@ const result = await vm.execute({
 | Errors | 12 | ContractRevertError, GasExhaustedError construction and instanceof checks |
 | Isolate | 10 | Isolate creation, compilation, disposal, cached data |
 | Index (Integration) | 72 | Full pipeline: result structure, atomicity, return values, method routing, error classification, context, all 16 emit types |
-| Security | 72 | Sandbox escape vectors (RISK-01–03), error spoofing (RISK-04), gas bypass (RISK-05–06), prototype pollution (RISK-10–11), math abuse (RISK-12), info leakage (RISK-15) |
+| Security | 72 | Sandbox escape vectors (RISK-01-03), error spoofing (RISK-04), gas bypass (RISK-05-06), prototype pollution (RISK-10-11), math abuse (RISK-12), info leakage (RISK-15) |
 | Boundary | 106 | 15 sections: gas ceiling, timeout, memory, code size, state management, emissions, logs, return values, math, metering, sandbox, gateway, emit fields, compound interactions, determinism |
 | Smoke | 10 | VM instantiation, sandbox creation, basic execution, method dispatch, gateway, math, syntax, revert |
 
@@ -235,24 +235,24 @@ Fixture contracts in `test/contracts/` cover real-world and adversarial scenario
 
 ```
 Contract Source Code
-    ↓
+    |
   acorn (parse AST)
-    ↓
+    |
   metering.js (inject __gas() calls at control flow points)
-    ↓
+    |
   astring (regenerate source from modified AST)
-    ↓
+    |
   isolated-vm (V8 isolate)
-    ├── sandbox.js (strip non-deterministic globals)
-    ├── gateway.js (inject xchain object via ivm.Reference callbacks)
-    ├── gas.js (__gas → chargeComputation on host side)
-    └── script.runSync() (execute with wall-clock timeout)
-    ↓
+    |-- sandbox.js (strip non-deterministic globals)
+    |-- gateway.js (inject xchain object via ivm.Reference callbacks)
+    |-- gas.js (__gas -> chargeComputation on host side)
+    +-- script.runSync() (execute with wall-clock timeout)
+    |
   Collect results
-    ├── state.js → stateChanges, stateDeletes
-    ├── collector.js → emittedActions, logs
-    └── gas.js → gasUsed
-    ↓
+    |-- state.js -> stateChanges, stateDeletes
+    |-- collector.js -> emittedActions, logs
+    +-- gas.js -> gasUsed
+    |
   Return to indexer (execute.js)
 ```
 
@@ -260,31 +260,31 @@ Contract Source Code
 
 ```
 xchain-vm/
-├── package.json
-├── src/
-│   ├── index.js          — XChainVM class (main entry point)
-│   ├── isolate.js        — V8 isolate management (create, compile, dispose)
-│   ├── gateway.js        — builds the xchain gateway object
-│   ├── gateway-emit.js   — emit API (17 action types, incl. cross-contract emit.execute)
-│   ├── gas.js            — gas tracking and ceiling enforcement
-│   ├── sandbox.js        — strips non-deterministic APIs
-│   ├── metering.js       — AST-based gas injection
-│   ├── validator.js      — validates emitted actions
-│   ├── syntax.js         — deploy-time validation + float warnings
-│   ├── math.js           — deterministic math (wraps mathjs bignumber)
-│   ├── state.js          — contract state management
-│   ├── collector.js      — emission and log collection
-│   └── errors.js         — ContractRevertError, GasExhaustedError
-├── test/
-│   ├── *.test.js         — 19 unit test files (580 tests)
-│   ├── contracts/        — 13 test fixture contracts
-│   ├── e2e/              — 10 E2E test files (64 tests) + helpers + contracts
-│   ├── fuzz/             — 8 fuzz test files (86 tests) + harness + generators
-│   ├── chaos/            — 3-phase chaos tests (92 tests) + helpers + contracts
-│   └── regression/       — 4-tier regression suite (152 tests) + helpers
-├── bench/                — 5 benchmark scenarios + harness + contracts
-├── reports/              — 9 test plan reports
-└── stryker-xchain-vm-mutator/  — custom mutation testing operators
+|-- package.json
+|-- src/
+|   |-- index.js          (XChainVM class, main entry point)
+|   |-- isolate.js        (V8 isolate management: create, compile, dispose)
+|   |-- gateway.js        (builds the xchain gateway object)
+|   |-- gateway-emit.js   (emit API: 17 action types, incl. cross-contract emit.execute)
+|   |-- gas.js            (gas tracking and ceiling enforcement)
+|   |-- sandbox.js        (strips non-deterministic APIs)
+|   |-- metering.js       (AST-based gas injection)
+|   |-- validator.js      (validates emitted actions)
+|   |-- syntax.js         (deploy-time validation + float warnings)
+|   |-- math.js           (deterministic math, wraps mathjs bignumber)
+|   |-- state.js          (contract state management)
+|   |-- collector.js      (emission and log collection)
+|   +-- errors.js         (ContractRevertError, GasExhaustedError)
+|-- test/
+|   |-- *.test.js         (19 unit test files, 580 tests)
+|   |-- contracts/        (13 test fixture contracts)
+|   |-- e2e/              (10 E2E test files, 64 tests + helpers + contracts)
+|   |-- fuzz/             (8 fuzz test files, 86 tests + harness + generators)
+|   |-- chaos/            (3-phase chaos tests, 92 tests + helpers + contracts)
+|   +-- regression/       (4-tier regression suite, 152 tests + helpers)
+|-- bench/                (5 benchmark scenarios + harness + contracts)
+|-- reports/              (9 test plan reports)
++-- stryker-xchain-vm-mutator/  (custom mutation testing operators)
 ```
 
 ## Integration
