@@ -63,8 +63,12 @@ const PINNED = Object.freeze({
 // decimal.js backend determine every contract math root, so their versions and the
 // configured precision are consensus-affecting. Pinned here and asserted by the
 // determinism test so a dependency bump cannot ship without a coordinated
-// CONSENSUS_VERSION change. Behavior-preserving for the values below: src/math.js sets
-// precision explicitly at load and 64 is mathjs's current default.
+// CONSENSUS_VERSION change. Precision is the readonly mathjs library default: in mathjs 15
+// the global config is readonly, so src/math.js cannot (and does not) set it; 64 is that
+// default. decimal.js, the BigNumber backend that performs the precision-64 arithmetic and
+// transcendentals, is pinned exactly via a package.json `overrides` entry (mathjs declares
+// it with a caret range) and its installed version is asserted alongside mathjs's, so a
+// lockfile re-resolve cannot float it while the guard stays green.
 const MATH_PINNED = Object.freeze({
     mathjs:    '15.2.0',
     decimaljs: '10.4.3',

@@ -94,11 +94,22 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.ok(Object.isFrozen(cr.MATH_PINNED));
         // A mathjs bump must travel with a coordinated CONSENSUS_VERSION change, else
         // contract math roots can fork. mathjs's global config is readonly, so precision
-        // is fixed by the library version; assert both the version and the precision.
+        // is fixed by the library version; assert the version, the precision, and the
+        // decimal.js backend version.
         assert.strictEqual(require('mathjs/package.json').version, cr.MATH_PINNED.mathjs,
             'installed mathjs drifted from the consensus pin');
         assert.strictEqual(require('mathjs').config().precision, cr.MATH_PINNED.precision,
             'mathjs BigNumber precision drifted from the consensus pin');
+        // decimal.js is the BigNumber backend that actually performs the precision-64
+        // arithmetic and the xchain.math transcendentals, and mathjs declares it with a
+        // caret range, so a lockfile re-resolve (e.g. npm audit fix) could float it while
+        // mathjs stays pinned. package.json pins it via an `overrides` entry; assert the
+        // installed nested copy too, so the guard fails if either the override or the
+        // resolution drifts. mathjs's `exports` block a direct subpath require, so resolve
+        // decimal.js through mathjs's own require.
+        const mathjsRequire = require('module').createRequire(require.resolve('mathjs'));
+        assert.strictEqual(mathjsRequire('decimal.js/package.json').version, cr.MATH_PINNED.decimaljs,
+            'installed decimal.js (mathjs BigNumber backend) drifted from the consensus pin');
     });
 
     it('CONSENSUS_STATUS_TOKENS is the frozen closed set (resource family collapsed)', function () {
