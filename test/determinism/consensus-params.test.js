@@ -12,7 +12,7 @@
  * Consensus-parameter FREEZE guard (LAUNCH-PLAN track 8).
  *
  * The VM half of the frozen consensus surface: the declared CONSENSUS_VERSION,
- * the pinned runtime, and the status vocabulary. These are golden literals —
+ * the pinned runtime, and the status vocabulary. These are golden literals:
  * any drift reddens here, and a real change must bump CONSENSUS_VERSION + a new
  * golden in BOTH repos (the indexer asserts the bundled VM's version) and, post-
  * launch, a protocol_changes.js block-height activation. See
@@ -27,8 +27,51 @@ const vm = require('../../src/index');
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '1');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '1', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '2');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '2', 're-export must match');
+    });
+
+    it('sandbox strip set is frozen (any change is a consensus event → bump CONSENSUS_VERSION)', function () {
+        // The set of non-deterministic/dangerous globals the sandbox deletes is
+        // consensus-critical surface: adding or removing one changes what a contract
+        // can observe and therefore what bytes can enter hashed state. Freeze it as a
+        // sorted golden so an edit to sandbox.js STRIPPED_GLOBAL_NAMES reddens here
+        // until CONSENSUS_VERSION is bumped + this golden regenerated in lockstep.
+        // (Promise stays in the SET; its DELETION is flag-day gated at runtime; the
+        // membership is frozen, the activation is the separate gate pinned below.)
+        const GOLDEN_STRIPPED_GLOBAL_NAMES = [
+            'Atomics', 'BigInt', 'Date', 'FinalizationRegistry', 'Intl',
+            'Promise', 'Proxy', 'Reflect', 'SharedArrayBuffer', 'Temporal',
+            'WeakRef', 'WebSocket', 'XMLHttpRequest', 'clearImmediate', 'clearInterval',
+            'clearTimeout', 'fetch', 'performance', 'queueMicrotask', 'setImmediate',
+            'setInterval', 'setTimeout', 'structuredClone'
+        ];
+        assert.ok(Object.isFrozen(vm.STRIPPED_GLOBAL_NAMES), 'strip set must be frozen');
+        assert.deepStrictEqual([...vm.STRIPPED_GLOBAL_NAMES].sort(), GOLDEN_STRIPPED_GLOBAL_NAMES,
+            'sandbox strip set drifted: a sandbox surface change must bump CONSENSUS_VERSION + regolden in both repos');
+    });
+
+    it('deploy CONSENSUS_RULES set is frozen (any change is a consensus event → bump CONSENSUS_VERSION)', function () {
+        // CONSENSUS_RULES is the closed set of lint findings the on-chain deploy
+        // validator (validateSyntax) acts on; adding/removing one changes which
+        // contracts the chain accepts (a hashed deploy verdict). Freeze it sorted so
+        // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
+        const GOLDEN_CONSENSUS_RULES = [
+            'banned-async', 'banned-literal', 'banned-math',
+            'invalid-type', 'reserved-identifier', 'unsupported-syntax'
+        ];
+        assert.deepStrictEqual([...vm.CONSENSUS_RULES].sort(), GOLDEN_CONSENSUS_RULES,
+            'deploy CONSENSUS_RULES drifted: a deploy-rule change must bump CONSENSUS_VERSION + regolden in both repos');
+    });
+
+    it('ASYNC_SURFACE_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // The async/Promise surface change (Promise strip + banned-async deploy
+        // rejection) activates fleet-wide at this block time on mainnet. It flips a
+        // hashed deploy verdict and a hashed execution result, so two nodes that
+        // disagree on the flag day diverge on the first such DEPLOY/EXECUTE. Pin it
+        // like any other consensus parameter. Matches the indexer's VM_BANNED_ASYNC /
+        // other 2.0.0 flag-day activations (protocol_changes.js: 1798761600).
+        assert.strictEqual(vm.ASYNC_SURFACE_GATE_BLOCK_TIME, 1798761600);
     });
 
     it('PINNED runtime equals the golden (re-pinning is a consensus event)', function () {

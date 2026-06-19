@@ -11,64 +11,77 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Sandbox
+ * XChain VM - Sandbox
  *
  * Strips non-deterministic and dangerous APIs from the V8 isolate
  * context. Only safe, deterministic builtins survive.
  ********************************************************************/
 // @ts-nocheck
 
-// 
+//
 
 
 const ivm = require('isolated-vm');
 
-// Script that runs inside the isolate to strip globals that can't
-// be reached via setSync from the host (e.g., properties on existing objects)
-const STRIP_SCRIPT = `
+// The canonical, FROZEN set of non-deterministic / dangerous global identifiers
+// the sandbox deletes from the isolate. This is consensus-critical surface: a
+// contract that reaches one of these can route a non-deterministic value into
+// hashed state and fork the fleet, so the set is frozen with CONSENSUS_VERSION
+// and digested by the determinism guard (test/determinism/consensus-params.test.js)
+// Any add/remove must bump CONSENSUS_VERSION and re-golden in lockstep.
+//
+// Per-entry rationale:
+//   - Date / timers (setTimeout, setInterval, setImmediate, clear*): wall-clock
+//     and scheduling are pure non-determinism.
+//   - WeakRef / FinalizationRegistry: GC-timing-observable.
+//   - Proxy / Reflect: trap-based metering/identity escapes.
+//   - fetch / XMLHttpRequest / WebSocket: network I/O.
+//   - SharedArrayBuffer / Atomics: shared-memory / timing side channels.
+//   - queueMicrotask + Promise: contracts run SYNCHRONOUSLY under the
+//     CONTRACT_WRAPPER (runSync), so any microtask a contract schedules
+//     (.then continuation, post-await write) drains on isolated-vm-version-
+//     dependent timing that is outside the consensus pin, forking validators on
+//     success-vs-timeout or post-await state. async/await/Promise are also
+//     rejected at deploy time (lint-core findBannedAsync); stripping the Promise
+//     global is defense in depth. The host still derives AsyncFunction below from
+//     async-function syntax, which does not depend on the Promise global binding.
+//     NOTE: the Promise strip is GATED on a block-time flag-day (see stripGlobals
+//     opts.stripPromise) so a from-genesis replay reproduces the historical
+//     pre-flag-day behaviour (Promise present); queueMicrotask was stripped from
+//     the start and is NOT gated.
+//   - BigInt: BigInt arithmetic (** / *) is a native operation whose cost is
+//     super-linear in operand size but invisible to the AST gas meter -- e.g.
+//     2n ** 5000000n costs ~2 gas yet burns heavy CPU under the memory limit.
+//     Removed to close the unmetered-CPU DoS surface; contracts use the metered
+//     xchain.math bignumber API. BigInt literals (10n) are rejected at deploy
+//     time (syntax.js) since a global delete cannot disable literal syntax.
+//   - Intl / Temporal / structuredClone / performance: Intl (ECMAScript 402) is
+//     locale-sensitive and depends on the host ICU data; Temporal exposes
+//     time-zone-sensitive output; structuredClone's serialization edge cases
+//     have varied across V8 versions; performance.now() returns wall-clock
+//     microseconds. All are non-deterministic risks (the deletes are no-ops if a
+//     given build does not expose them, and critical guards if it does).
+const STRIPPED_GLOBAL_NAMES = Object.freeze([
+    'Date', 'setTimeout', 'setInterval', 'setImmediate',
+    'clearTimeout', 'clearInterval', 'clearImmediate',
+    'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
+    'fetch', 'XMLHttpRequest', 'WebSocket',
+    'SharedArrayBuffer', 'Atomics',
+    'queueMicrotask', 'Promise',
+    'BigInt',
+    'Intl', 'Temporal', 'structuredClone', 'performance'
+]);
+
+// Build the in-isolate strip script for a resolved identifier list. The list is
+// decided HOST-side (stripGlobals), so a gated entry (e.g. Promise pre-flag-day)
+// is simply absent from `names` and never deleted (exactly how a pre-activation
+// node behaves). Everything after the toDelete loop is fixed neutering logic that
+// does not depend on the list.
+const buildStripScript = (names) => `
 (function() {
-    // Remove non-deterministic globals
-    const toDelete = [
-        'Date', 'setTimeout', 'setInterval', 'setImmediate',
-        'clearTimeout', 'clearInterval', 'clearImmediate',
-        'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
-        'fetch', 'XMLHttpRequest', 'WebSocket',
-        'SharedArrayBuffer', 'Atomics',
-        // queueMicrotask + Promise are removed together: contracts run
-        // SYNCHRONOUSLY under the CONTRACT_WRAPPER (runSync), so any microtask
-        // a contract schedules (.then continuation, post-await write) drains on
-        // isolated-vm-version-dependent timing that is outside the consensus
-        // pin, forking validators on success-vs-timeout or post-await state.
-        // async/await/Promise are also rejected at deploy time (lint-core
-        // findBannedAsync); stripping the Promise global is defense in depth.
-        // The host still derives AsyncFunction below from async-function
-        // syntax, which does not depend on the Promise global binding.
-        'queueMicrotask', 'Promise',
-        // BigInt arithmetic (** / *) is a native operation whose cost is super-linear
-        // in operand size but is invisible to the AST gas meter -- e.g. 2n ** 5000000n
-        // costs ~2 gas yet burns heavy CPU under the memory limit. Removed to close the
-        // unmetered-CPU DoS surface; contracts use the metered xchain.math bignumber API
-        // for large-number arithmetic. BigInt literals (10n) are rejected at deploy time
-        // (see syntax.js) since a global delete cannot disable literal syntax.
-        'BigInt',
-        // Intl (ECMAScript 402) is locale-sensitive and its output depends on the
-        // ICU data compiled into the host binary (full-icu vs small-icu, and the
-        // ICU version that ships with each Node.js release). Two validators on
-        // different Node.js/ICU builds would format the same value differently,
-        // diverging state hashes across the fleet. Temporal and structuredClone
-        // are stripped pre-emptively: Temporal exposes time-zone-sensitive output,
-        // and structuredClone's serialization edge cases have varied across V8
-        // versions — both are non-deterministic risks if a future V8 build exposes
-        // them in the isolate.
-        //
-        // performance (the Web Performance API) is stripped for the same reason:
-        // performance.now() returns wall-clock microseconds, a pure non-determinism
-        // source equivalent to Date. A bare V8 isolate likely does not expose it
-        // today, but V8 10.4+ ships a minimal performance stub for Wasm tooling that
-        // may surface on newer host builds. The delete is a no-op if absent and a
-        // critical guard if present, so it is stripped pre-emptively.
-        'Intl', 'Temporal', 'structuredClone', 'performance'
-    ];
+    // Remove non-deterministic globals (host-resolved from STRIPPED_GLOBAL_NAMES;
+    // gated entries the caller excludes are simply not present here).
+    const toDelete = ${JSON.stringify(names)};
     for (const name of toDelete) {
         try { delete globalThis[name]; } catch(e) {}
         try { globalThis[name] = undefined; } catch(e) {}
@@ -120,7 +133,7 @@ const STRIP_SCRIPT = `
     try { globalThis.RegExp = undefined; } catch(e) {}
 
     // Neuter locale/ICU-sensitive PROTOTYPE METHODS (consensus determinism).
-    // Deleting the Intl global above does NOT disable these — they live on the
+    // Deleting the Intl global above does NOT disable these. They live on the
     // built-in prototypes and work without Intl. Their output depends on the ICU
     // data/version compiled into the host (which varies across Node.js/V8 builds),
     // so a contract that returns or stores their result would route an
@@ -131,7 +144,7 @@ const STRIP_SCRIPT = `
     //   - String.prototype.localeCompare       (ICU collation order/sign)
     //   - String.prototype.toLocaleLowerCase/UpperCase (locale case mapping)
     //   - Number/Array/Object.prototype.toLocaleString (locale separators)
-    // Note: String.prototype.toLowerCase/toUpperCase are NOT neutered here — they are
+    // Note: String.prototype.toLowerCase/toUpperCase are NOT neutered here. They are
     // non-locale methods whose Unicode case-folding output is pinned by the
     // 'unicode: 17.0' setting in consensus-runtime.js. This is analogous to the
     // e.message residual: covered by the runtime pin, not by prototype deletion.
@@ -157,15 +170,15 @@ const STRIP_SCRIPT = `
     // A contract can catch its own errors and return/store e.stack, which lands
     // in hashed state. V8's stack text is non-deterministic across builds and
     // leaks isolate-internal frame data: line/column offsets into the harness
-    // wrapper (e.g. "<isolated-vm>:11:6"), frame formatting, and depth — all of
-    // which change between V8 patch releases and whenever HARNESS_SOURCE is
+    // wrapper (e.g. "<isolated-vm>:11:6"), frame formatting, and depth. All of
+    // these change between V8 patch releases and whenever HARNESS_SOURCE is
     // edited. Force it to a constant: stackTraceLimit=0 plus a frozen
     // prepareStackTrace hook so every e.stack is the empty string, and lock both
     // so a contract cannot restore richer stacks. (NB: must run BEFORE
     // Object.defineProperty is stripped below.) The error MESSAGE text is a
     // V8-set own property on native throws and cannot be intercepted here; that
     // residual exposure is mitigated operationally by pinning the exact V8/ICU
-    // build as a consensus parameter — see the cross-version determinism gate.
+    // build as a consensus parameter (see the cross-version determinism gate).
     try {
         Object.defineProperty(Error, 'stackTraceLimit', { value: 0, writable: false, configurable: false });
     } catch(e) {}
@@ -206,7 +219,7 @@ const STRIP_SCRIPT = `
         });
     } catch(e) {}
 
-    // Remove console (replaced by xchain.log)
+    // Remove console (xchain.log is provided separately by the gateway)
     try { globalThis.console = undefined; } catch(e) {}
 
     // Remove process/require/import (shouldn't exist in isolate, but defensive)
@@ -220,12 +233,12 @@ const STRIP_SCRIPT = `
     //
     // The transcendental functions (sqrt, pow, log, log2, log10) are also
     // INTENTIONALLY ABSENT. IEEE 754 only mandates correctly-rounded results
-    // for sqrt — not for pow, log, log2, or log10 — so the host libm can differ
+    // for sqrt, but not for pow, log, log2, or log10, so the host libm can differ
     // by 1 ULP in the last bit across CPU architectures (e.g. x86-64 vs ARM64).
     // A 1-ULP difference in a serialized result is enough to produce divergent
     // state hashes across a heterogeneous validator fleet, i.e. a consensus
-    // split. Contracts that need these must use xchain.math.* (mathjs bignumber
-    // — pure software arithmetic that is identical on every platform).
+    // split. Contracts that need these must use xchain.math.* (mathjs bignumber,
+    // pure software arithmetic that is identical on every platform).
     //
     // The retained members (floor/ceil/round/abs/min/max/sign/trunc and the
     // PI/E constants) are exact, spec-defined operations with no rounding
@@ -251,10 +264,21 @@ const STRIP_SCRIPT = `
  * Must be called BEFORE injecting the gateway and __gas.
  * @param {ivm.Isolate} isolate
  * @param {ivm.Context} context
+ * @param {object} [opts]
+ * @param {boolean} [opts.stripPromise=false] - delete the global `Promise`.
+ *        CONSENSUS-GATED on a block-time flag-day (see index.js): below the
+ *        flag day (or for an un-gated/un-timestamped caller) Promise is LEFT
+ *        IN PLACE, exactly as pre-activation nodes leave it, so a from-genesis
+ *        replay reproduces the historical execution; at/after it Promise is
+ *        stripped fleet-wide. queueMicrotask is always stripped (unchanged).
  */
-function stripGlobals(isolate, context) {
-    const script = isolate.compileScriptSync(STRIP_SCRIPT);
+function stripGlobals(isolate, context, opts) {
+    const stripPromise = !!(opts && opts.stripPromise);
+    const names = stripPromise
+        ? STRIPPED_GLOBAL_NAMES
+        : STRIPPED_GLOBAL_NAMES.filter((n) => n !== 'Promise');
+    const script = isolate.compileScriptSync(buildStripScript(names));
     script.runSync(context);
 }
 
-module.exports = { stripGlobals };
+module.exports = { stripGlobals, STRIPPED_GLOBAL_NAMES };

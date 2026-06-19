@@ -11,12 +11,12 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Pinned consensus runtime — the engine the validator fleet agrees on.
+ * Pinned consensus runtime: the engine the validator fleet agrees on.
  *
  * WHY THIS EXISTS
  * Some contract-observable values are produced by the JS engine, are NOT
  * spec-mandated, and have changed across engine versions:
- *   - native V8 error message TEXT (e.message / e.stack wording) — e.g.
+ *   - native V8 error message TEXT (e.message / e.stack wording), e.g.
  *     "Cannot read property 'x' of undefined" became
  *     "Cannot read properties of undefined (reading 'x')" at V8 8.4;
  *   - ICU-backed collation / normalization / number+date formatting
@@ -38,7 +38,7 @@
  *
  * RE-PINNING IS A CONSENSUS EVENT. Do not bump these to silence a failing
  * gate on a dev box running a different Node. Either run the canonical
- * runtime, or — if the fleet is deliberately upgrading its engine — re-pin
+ * runtime, or (if the fleet is deliberately upgrading its engine) re-pin
  * here AND regenerate the determinism manifests AND coordinate an atomic
  * fleet activation (a mixed-engine fleet can fork). The canonical runtime
  * below was confirmed BYTE-IDENTICAL on linux/arm64 and linux/amd64
@@ -67,21 +67,34 @@ const REFERENCE_NODE = 'v22.22.3';
 
 // The declared consensus epoch. ONE number that covers the whole consensus
 // surface frozen with the wire format (LAUNCH-PLAN track 8): this PINNED
-// runtime, the indexer's GAS_SCHEDULE + GAS_PRICE, and the status vocabulary
-// below. Bumping it is a CONSENSUS EVENT — it must accompany a new golden in
-// both repos and (post-launch) a protocol_changes.js block-height activation.
-// The indexer asserts the bundled VM's CONSENSUS_VERSION equals its expected
-// value (test/unit/consensus-params.test.js), so a VM consensus change cannot
-// ship without an explicit indexer bump.
-const CONSENSUS_VERSION = '1';
+// runtime, the indexer's GAS_SCHEDULE + GAS_PRICE, the status vocabulary below,
+// AND the deploy-time/execution-time contract surface (the sandbox strip set
+// in sandbox.js STRIPPED_GLOBAL_NAMES and the deploy validator's CONSENSUS_RULES
+// in lint-core.js). Bumping it is a CONSENSUS EVENT and must accompany a new
+// golden in both repos and (post-launch) a protocol_changes.js block-height
+// activation. The indexer asserts the bundled VM's CONSENSUS_VERSION equals its
+// expected value (test/unit/consensus-params.test.js), and the VM determinism
+// guard (test/determinism/consensus-params.test.js) freezes a digest of the
+// strip set and CONSENSUS_RULES against THIS version, so a change to either
+// surface cannot ship without bumping this epoch in lockstep.
+//
+// Epoch '2' (this bump) froze the async/Promise contract surface: the sandbox
+// now strips the Promise global and the deploy validator rejects async/await/
+// Promise (CONSENSUS_RULES 'banned-async'). Both are gated on a coordinated
+// block-time flag-day (mainnet) so a from-genesis replay reproduces the
+// historical accept-below/reject-above verdict.
+const CONSENSUS_VERSION = '2';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash
 // (utility.vmFailureStatus). The whole resource-exhaustion family collapses to
-// 'out_of_resource' (the gas-vs-wallclock fork fix) — adding/splitting a token
+// 'out_of_resource' (the gas-vs-wallclock fork fix); adding/splitting a token
 // is a consensus change. STATUS_ERROR_PREFIXES documents the raw error prefixes
 // the VM's _classifyError (+ process-executor) can emit, which the indexer maps
 // into the tokens above; the cross-service parity test locks the mapping.
+// NOTE: 'out_of_gas' remains in STATUS_ERROR_PREFIXES as a raw prefix the VM
+// can still emit; the indexer's vmFailureStatus normalises it to 'out_of_resource',
+// but the parity gate still asserts the prefix exists here to lock that mapping.
 const CONSENSUS_STATUS_TOKENS = Object.freeze(['reverted', 'out_of_resource', 'failed']);
 const STATUS_ERROR_PREFIXES = Object.freeze([
     'revert', 'out_of_gas', 'timeout', 'out_of_memory', 'out_of_stack', 'out_of_resource', 'error'
@@ -118,7 +131,7 @@ function describeMismatch(result) {
     const lines = result.mismatches.map(m =>
         `  ${m.key}: running ${JSON.stringify(m.actual)} != pinned ${JSON.stringify(m.expected)}`);
     return (
-        'CONSENSUS RUNTIME MISMATCH — this engine can produce different ' +
+        'CONSENSUS RUNTIME MISMATCH: this engine can produce different ' +
         'contract-observable bytes (V8 error text / ICU-backed primitives) ' +
         'than the rest of the fleet, which would FORK the chain:\n' +
         lines.join('\n') +

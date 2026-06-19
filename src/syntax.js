@@ -11,11 +11,11 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Syntax Validation
+ * XChain VM: Syntax Validation
  *
  * Deploy-time validation: V8 syntax check (the only step needing
- * isolated-vm), then the acorn-coverable rules — metering pass, reserved
- * identifiers, banned Math.*, banned literals, and float warnings — which
+ * isolated-vm), then the acorn-coverable rules (metering pass, reserved
+ * identifiers, banned Math.*, banned literals, and float warnings) which
  * live in the dependency-light, vendorable ./lint-core.js. Keeping the
  * rules in one place guarantees the deploy path and the SDK/CLI linter
  * never diverge.
@@ -28,7 +28,7 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
 /**
  * Validate contract code syntax before deployment.
  * Runs five blocking checks in order:
- * 1. V8 syntax check (compileScriptSync in throwaway isolate) — needs isolated-vm
+ * 1. V8 syntax check (compileScriptSync in throwaway isolate; needs isolated-vm)
  * 2. Acorn metering pass (supported syntax = min(V8, acorn))
  * 3. Reserved identifier check (__gas + allocator metering helpers)
  * 4. Banned transcendental Math.* check (Math.sqrt/pow/log/log2/log10)
@@ -39,9 +39,19 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  * deploy-path verdict (and its on-chain execution record) is unchanged.
  *
  * @param {string} code - Contract source code
+ * @param {object} [opts]
+ * @param {boolean} [opts.enforceBannedAsync=true] - whether the 'banned-async'
+ *        rule (async/await/Promise) is deploy-blocking. CONSENSUS-GATED: the
+ *        indexer passes the resolved VM_BANNED_ASYNC flag-day activation
+ *        (deploy.js) so that BELOW the flag day an async/Promise DEPLOY resolves
+ *        exactly as it did pre-activation (accepted), and a from-genesis replay
+ *        reproduces the historical verdict. Defaults to true so author-facing
+ *        callers (the SDK/CLI linter, unit tests) always see the rule.
  * @returns {{ valid: boolean, error?: string }}
  */
-function validateSyntax(code) {
+function validateSyntax(code, opts) {
+    const enforceBannedAsync = !opts || opts.enforceBannedAsync !== false;
+
     // 1. V8 syntax check (the only step that requires isolated-vm)
     let testIsolate;
     try {
@@ -54,9 +64,15 @@ function validateSyntax(code) {
     }
 
     // 2–5. Acorn-coverable rules (shared canonical source of truth). Block ONLY on
-    // consensus rules — lintSource also returns Move-2 advisory findings, which are
-    // author-facing signal and must never change the on-chain deploy verdict.
-    const blocking = lintSource(code).errors.filter((e) => CONSENSUS_RULES.has(e.rule));
+    // consensus rules. lintSource also returns Move-2 advisory findings, which are
+    // author-facing signal and must never change the on-chain deploy verdict. When
+    // the banned-async flag-day is not yet active for this deploy, drop that rule
+    // from the blocking set (pre-activation parity); all other consensus rules and
+    // the byte-identical error ordering are unchanged.
+    const blocking = lintSource(code).errors.filter((e) => {
+        if (e.rule === 'banned-async' && !enforceBannedAsync) return false;
+        return CONSENSUS_RULES.has(e.rule);
+    });
     if (blocking.length > 0)
         return { valid: false, error: blocking[0].message };
 
@@ -65,7 +81,7 @@ function validateSyntax(code) {
 
 /**
  * Scan contract code for patterns suggesting native float arithmetic.
- * Non-blocking warning — does not reject the contract.
+ * Non-blocking warning; does not reject the contract.
  *
  * @param {string} code - Contract source code
  * @returns {string[]} Array of warning messages

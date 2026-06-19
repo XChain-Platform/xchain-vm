@@ -11,9 +11,9 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM — Contract Lint Core (dependency-light, no isolated-vm)
+ * XChain VM: Contract Lint Core (dependency-light, no isolated-vm)
  *
- * The canonical, acorn-only contract validation rules — every deploy-time
+ * The canonical, acorn-only contract validation rules. Every deploy-time
  * check EXCEPT the V8 syntax compile (step 1), which needs isolated-vm and
  * stays in syntax.js. Depends only on acorn / acorn-walk / astring (via
  * metering.js), so it is safe to run in a browser / any-Node context.
@@ -25,7 +25,7 @@
  * lintSource(code) -> { errors: Rule[], warnings: Rule[] }
  *   where Rule = { rule: string, message: string, line: number|null }
  *
- * Message strings are BYTE-IDENTICAL to what syntax.js historically emitted —
+ * Message strings are BYTE-IDENTICAL to what syntax.js historically emitted.
  * validateSyntax returns errors[0].message verbatim, and checkFloatWarnings
  * returns warnings.map(w => w.message), so the deploy-path verdict (recorded
  * in on-chain execution records) is unchanged.
@@ -59,7 +59,7 @@ function findBannedMathCalls(code) {
             locations: true
         });
     } catch (e) {
-        // Parse failure — validateSyntax's earlier checks would have caught this.
+        // Parse failure; validateSyntax's earlier checks would have caught this.
         return hits;
     }
     walk.simple(ast, {
@@ -182,7 +182,7 @@ function findFloatWarnings(code) {
                         message:
                             'WARNING: decimal number literal (' + node.value +
                             ') detected at line ' + line +
-                            ' — use xchain.math for deterministic arithmetic',
+                            '; use xchain.math for deterministic arithmetic',
                         line: node.loc ? node.loc.start.line : null,
                         severity: 'warning'
                     });
@@ -190,16 +190,16 @@ function findFloatWarnings(code) {
             }
         });
     } catch (e) {
-        // Parse failure — validateSyntax/lintSource report it as a blocking error.
+        // Parse failure; validateSyntax/lintSource report it as a blocking error.
     }
     return warnings;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Move 2 — logic-level lint rules (advisory; NEVER deploy-blocking).
+// Move 2: logic-level lint rules (advisory; NEVER deploy-blocking).
 //
 // CONSENSUS_RULES are the only findings the on-chain deploy validator
-// (validateSyntax → xchain-indexer/deploy.js) acts on. Everything analyzeContract
+// (validateSyntax -> xchain-indexer/deploy.js) acts on. Everything analyzeContract
 // adds is author-facing signal for the SDK linter and the CLI; it must not change
 // what the chain accepts, or the Move-1 deploy-parity invariant breaks. Keep this
 // set in lockstep with the error-severity rules emitted above lintSource's Move-2
@@ -307,7 +307,7 @@ function analyzeContract(code) {
                             warnings.push({
                                 rule: 'crossCallable-unknown-method',
                                 message: 'crossCallable lists "' + el.value + '" at line ' + lineOf(el) +
-                                         ', which is not an exported method — it will be uncallable cross-chain (typo?)',
+                                         ', which is not an exported method (it will be uncallable cross-chain; typo?)',
                                 line: lineOf(el),
                                 severity: 'warning'
                             });
@@ -320,7 +320,7 @@ function analyzeContract(code) {
                     errors.push({
                         rule: 'crossCallable-not-array',
                         message: 'crossCallable must be an array of method names at line ' + lineOf(v) +
-                                 ' — a non-array value makes every cross-chain call to this contract fail (XCALL_NOT_CALLABLE)',
+                                 '; a non-array value makes every cross-chain call to this contract fail (XCALL_NOT_CALLABLE)',
                         line: lineOf(v),
                         severity: 'error'
                     });
@@ -342,7 +342,7 @@ function analyzeContract(code) {
             warnings.push({
                 rule: 'unbounded-loop',
                 message: 'unbounded loop at line ' + lineOf(n) +
-                         ' — termination depends entirely on an internal break; the gas ceiling will halt it otherwise',
+                         '; termination depends entirely on an internal break (the gas ceiling will halt it otherwise)',
                 line: lineOf(n),
                 severity: 'warning'
             });
@@ -368,7 +368,7 @@ function analyzeContract(code) {
             warnings.push({
                 rule: 'large-allocation',
                 message: 'bulk allocation (' + what + ') at line ' + lineOf(n) +
-                         ' — gas-metered at runtime; keep the size bounded so it cannot hit the gas ceiling',
+                         '; gas-metered at runtime, keep the size bounded so it cannot hit the gas ceiling',
                 line: lineOf(n),
                 severity: 'warning'
             });
@@ -376,7 +376,7 @@ function analyzeContract(code) {
 
         // ── unchecked-state-get ──────────────────────────────────────────────
         // A state.get(...) result dereferenced directly. state.get returns null for
-        // an absent key, so `state.get('k').foo` throws on a missing key — guard with
+        // an absent key, so `state.get('k').foo` throws on a missing key. Guard with
         // a default (`|| '0'`) or a require() first.
         walk.simple(ast, {
             MemberExpression(n) { if (isStateGetCall(n.object)) pushUnchecked(n); }
@@ -385,7 +385,7 @@ function analyzeContract(code) {
             warnings.push({
                 rule: 'unchecked-state-get',
                 message: 'state.get(...) result dereferenced at line ' + lineOf(n) +
-                         ' without a null guard — an absent key returns null and will throw; default it (e.g. `|| \'0\'`) or require() it first',
+                         ' without a null guard; an absent key returns null and will throw. Default it (e.g. `|| \'0\'`) or require() it first',
                 line: lineOf(n),
                 severity: 'warning'
             });
@@ -393,7 +393,7 @@ function analyzeContract(code) {
 
         // ── missing-input-validation ─────────────────────────────────────────
         // An exported method that reads call inputs (getInputParam) but contains no
-        // require() check — likely accepting unvalidated input.
+        // require() check, likely accepting unvalidated input.
         if (obj) {
             for (const p of obj.properties) {
                 if (p.type !== 'Property' || p.computed) continue;
@@ -404,7 +404,7 @@ function analyzeContract(code) {
                     CallExpression(c) {
                         const n = calleeName(c);
                         if (n === 'getInputParam') readsInput = true;
-                        // Any require()/require*-named call counts as validation — this
+                        // Any require()/require*-named call counts as validation. This
                         // covers xchain.require AND helper guards (requirePositive,
                         // requireAddress, requireStatus, …) so delegating validation to
                         // a helper is not flagged as missing.
@@ -416,7 +416,7 @@ function analyzeContract(code) {
                     warnings.push({
                         rule: 'missing-input-validation',
                         message: 'method "' + key + '" at line ' + lineOf(v) +
-                                 ' reads input params but has no require() validation — validate inputs before use',
+                                 ' reads input params but has no require() validation; validate inputs before use',
                         line: lineOf(v),
                         severity: 'warning'
                     });
@@ -424,7 +424,7 @@ function analyzeContract(code) {
             }
         }
     } catch (e) {
-        // Any detector failure → drop Move-2 findings; never break lintSource.
+        // Any detector failure -> drop Move-2 findings; never break lintSource.
         return { errors, warnings };
     }
 
@@ -434,10 +434,10 @@ function analyzeContract(code) {
 /**
  * Run every acorn-coverable contract rule (steps 2–5 of validateSyntax + the
  * float warnings) plus the Move-2 logic-level advisories. The V8 syntax compile
- * (step 1) is NOT here — it needs isolated-vm and stays in syntax.js.
+ * (step 1) is NOT here; it needs isolated-vm and stays in syntax.js.
  *
- * Consensus errors are returned in deploy-check order (metering → reserved →
- * banned-math → banned-literal) FIRST, so errors[0] (filtered to CONSENSUS_RULES)
+ * Consensus errors are returned in deploy-check order (metering -> reserved ->
+ * banned-math -> banned-literal) FIRST, so errors[0] (filtered to CONSENSUS_RULES)
  * is exactly the failure validateSyntax surfaces. Move-2 findings (advisory) are
  * appended after and never affect the deploy verdict.
  *
@@ -454,7 +454,7 @@ function lintSource(code) {
 
     const errors = [];
 
-    // 2. Acorn metering pass — if acorn can't parse it (or it uses post-ES2020
+    // 2. Acorn metering pass. If acorn can't parse it (or it uses post-ES2020
     //    syntax), reject. This also doubles as the blocking parse check.
     try {
         meterCode(code);
@@ -470,8 +470,8 @@ function lintSource(code) {
     }
 
     // 3. Reserved identifier check (__gas + the allocator metering helpers
-    //    __concat/__tmpl/__arrspread/__objspread — referencing them could
-    //    bypass or forge size metering)
+    //    __concat/__tmpl/__arrspread/__objspread). Referencing them could
+    //    bypass or forge size metering.
     const reserved = findReservedIdentifier(code);
     if (reserved)
         errors.push({ rule: 'reserved-identifier', message: 'reserved identifier: ' + reserved, line: null, severity: 'error' });
@@ -482,8 +482,8 @@ function lintSource(code) {
         errors.push({
             rule: 'banned-math',
             message: 'banned API: Math.' + hit.name + ' at line ' + hit.line +
-                     ' — IEEE 754 floating-point transcendentals are non-deterministic ' +
-                     'across CPU architectures; use xchain.math.' + hit.name + '() instead',
+                     '; IEEE 754 floating-point transcendentals are non-deterministic ' +
+                     'across CPU architectures. Use xchain.math.' + hit.name + '() instead',
             line: typeof hit.line === 'number' ? hit.line : null,
             severity: 'error'
         });
@@ -500,7 +500,7 @@ function lintSource(code) {
             : 'regular-expression literals can backtrack catastrophically and are unmetered';
         errors.push({
             rule: 'banned-literal',
-            message: 'banned literal: ' + hit.kind + ' literal at line ' + hit.line + ' — ' + advice,
+            message: 'banned literal: ' + hit.kind + ' literal at line ' + hit.line + '; ' + advice,
             line: typeof hit.line === 'number' ? hit.line : null,
             severity: 'error'
         });
@@ -530,7 +530,7 @@ function lintSource(code) {
     const warnings = findFloatWarnings(code);
 
     // Move 2: logic-level advisories (crossCallable integrity, gas/footgun heuristics).
-    // These run AFTER the consensus checks above and NEVER affect the deploy verdict —
+    // These run AFTER the consensus checks above and NEVER affect the deploy verdict.
     // validateSyntax blocks only on CONSENSUS_RULES. analyzeContract is fully wrapped so
     // a detector bug can never throw into the deploy path.
     const move2 = analyzeContract(code);
