@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-//
-
-
 function validateRequired(params, fields) {
     if (typeof params !== 'object' || params === null)
         throw new Error('emit params must be an object');

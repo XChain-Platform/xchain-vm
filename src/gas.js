@@ -19,21 +19,13 @@
 
 const { GasExhaustedError } = require('./errors.js');
 
-// Every gas key the VM itself charges against during execution (see gateway.js
-// and gateway-emit.js). A schedule handed to the VM MUST define all of these:
-// a missing key resolves to `undefined` the first time that operation is metered,
-// which charge() then rejects deep inside execution. Validating membership up
-// front turns that latent, execution-time failure into a deterministic
-// construction-time error. Two operators whose schedules disagree on any of
-// these keys fail loudly at startup instead of silently reaching divergent
-// contract outcomes on the same block.
-//
-// Extra keys are intentionally tolerated. The VM is a generic library; its caller
-// (the indexer) passes the full protocol fee schedule, which also carries keys the
-// VM never charges (ISSUE, OWNERSHIP_ESCROW, AIRDROP_PER_RECIPIENT, VM_DEPLOY_*,
-// VM_EXECUTE_BASE, ...). Those are charged by the caller, not here, so requiring
-// an *exact* key set would reject every real schedule. The invariant we enforce is
-// "no charged key is missing", not "no unknown key is present".
+// Every gas key the VM charges against during execution (gateway.js,
+// gateway-emit.js). The constructor asserts each is present so a schedule gap
+// fails at construction, not mid-execution where a missing key resolves to
+// `undefined` and two operators with disagreeing schedules diverge on the same
+// block. Extra keys are tolerated: the indexer passes the full protocol fee
+// schedule, which carries keys the VM never charges. The invariant is "no
+// charged key is missing", not "no unknown key present".
 const CANONICAL_GAS_KEYS = Object.freeze([
     'VM_COMPUTATION',
     'VM_STATE_READ',
@@ -43,21 +35,16 @@ const CANONICAL_GAS_KEYS = Object.freeze([
     'VM_CROSSCHAIN_READ',
     'VM_ATTEST_REQUEST',
     'VM_EMISSION',
-    // XCALL buckets are charged unconditionally by emit.crossExecute
-    // (gateway-emit.js); listing them here makes a missing/mistyped schedule
-    // value fail loud at construction instead of silently charging a fallback
-    // default that diverges gasUsed (and therefore fee) across the fleet.
+    // XCALL buckets, charged unconditionally by emit.crossExecute (gateway-emit.js).
     'VM_XCALL_REQUEST',
     'VM_XCALL_CALLBACK'
 ]);
 
 // Resolve the gas ceiling for ONE execution. A cross-contract call runs the
-// callee with the caller-funded reservation (opts.gasCeiling = gasLimit) as its
-// ceiling; anything non-positive/non-integer/over the configured ceiling falls
-// back to the configured ceiling. Lives here so the in-process execute path
-// (index.js) and the subprocess host-termination clamp (process-executor.js)
-// resolve the SAME ceiling. If they drifted, a host-terminated nested call
-// would bill a different gasUsed than the in-isolate clamp → fee divergence → fork.
+// callee with the caller-funded reservation (opts.gasCeiling = gasLimit);
+// invalid or over-ceiling requests fall back to the configured ceiling. Shared
+// by the in-process path (index.js) and the subprocess host-termination clamp
+// (process-executor.js) so both bill the SAME gasUsed; drift would fork.
 function effectiveCeiling(requested, configCeiling) {
     if (typeof requested === 'number' && Number.isInteger(requested) &&
         requested > 0 && requested < configCeiling)
@@ -70,16 +57,14 @@ class GasTracker {
         // Validate schedule: all values must be non-negative integers
         for (const key in gasSchedule) {
             const val = gasSchedule[key];
-            // `typeof val !== 'number'` is redundant defense: Number.isInteger
-            // never coerces, so !Number.isInteger(val) already rejects every
-            // non-number. Kept for clarity/intent. Equivalent mutant, proven
-            // exhaustively, see test/unit/gas.test.js boundary tests.
+            // typeof is a redundant guard: Number.isInteger never coerces, so it
+            // already rejects every non-number. Kept for intent; equivalent mutant
+            // (proven in test/unit/gas.test.js boundary tests).
             // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
             if (typeof val !== 'number' || !Number.isInteger(val) || val < 0)
                 throw new Error('gas schedule value for ' + key + ' must be a non-negative integer, got: ' + val);
         }
-        // Validate schedule: every key the VM charges against must be present, so a
-        // schedule gap surfaces at construction rather than mid-execution.
+        // Every charged key must be present (rationale at CANONICAL_GAS_KEYS above).
         for (const key of CANONICAL_GAS_KEYS) {
             if (!(key in gasSchedule))
                 throw new Error('gas schedule is missing required key: ' + key);
@@ -90,13 +75,10 @@ class GasTracker {
     }
 
     charge(amount) {
-        // A missing GAS_SCHEDULE key resolves to undefined; without this guard
-        // `used += undefined` becomes NaN and silently disables the ceiling for
-        // the rest of execution. Reject any non-finite amount so a config gap
-        // surfaces immediately instead of charging zero gas.
-        // `typeof amount !== 'number'` is redundant defense: Number.isFinite
-        // never coerces, so !Number.isFinite(amount) already rejects every
-        // non-number (and NaN/Infinity). Kept for intent. Equivalent mutant.
+        // A missing GAS_SCHEDULE key resolves to undefined; `used += undefined`
+        // becomes NaN and silently disables the ceiling. Reject non-finite amounts
+        // so a config gap surfaces immediately instead of charging zero gas.
+        // (typeof is a redundant guard kept for intent; equivalent mutant.)
         // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
         if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)
             throw new Error('gas charge amount must be a non-negative finite number, got: ' + amount);

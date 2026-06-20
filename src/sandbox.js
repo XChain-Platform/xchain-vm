@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-//
-
-
 const ivm = require('isolated-vm');
 
 // The canonical, FROZEN set of non-deterministic / dangerous global identifiers

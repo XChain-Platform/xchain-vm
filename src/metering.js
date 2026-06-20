@@ -22,9 +22,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-//
-
-
 const acorn = require('acorn');
 const walk  = require('acorn-walk');
 const { generate } = require('astring');

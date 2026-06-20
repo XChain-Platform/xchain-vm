@@ -22,9 +22,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const crypto = require('crypto');
 const { ContractRevertError } = require('./errors.js');
 const { buildEmitAPI } = require('./gateway-emit.js');

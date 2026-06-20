@@ -19,9 +19,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const ivm = require('isolated-vm');
 
 class IsolateManager {

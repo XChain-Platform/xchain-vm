@@ -195,16 +195,13 @@ function findFloatWarnings(code) {
     return warnings;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Move 2: logic-level lint rules (advisory; NEVER deploy-blocking).
-//
 // CONSENSUS_RULES are the only findings the on-chain deploy validator
 // (validateSyntax -> xchain-indexer/deploy.js) acts on. Everything analyzeContract
 // adds is author-facing signal for the SDK linter and the CLI; it must not change
 // what the chain accepts, or the Move-1 deploy-parity invariant breaks. Keep this
 // set in lockstep with the error-severity rules emitted above lintSource's Move-2
 // section.
-// ─────────────────────────────────────────────────────────────────────────────
 const CONSENSUS_RULES = new Set([
     'invalid-type',
     'unsupported-syntax',

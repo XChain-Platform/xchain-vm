@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const { ContractRevertError } = require('./errors.js');
 const mathjs = require('mathjs');
 const { bignumber, add, subtract, multiply, divide, mod, compare } = mathjs;
@@ -57,7 +54,6 @@ function toRealFixed(val) {
     return s;
 }
 
-// Validate math input length
 function validateInput(val) {
     const s = String(val);
     if (s.length > MAX_MATH_INPUT_LENGTH)

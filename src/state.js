@@ -19,13 +19,9 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 class StateManager {
     constructor(initialState, limits) {
         // Use Object.create(null) to prevent prototype pollution (RISK-11).
-        // Keys like '__proto__', 'constructor', 'hasOwnProperty' are safe.
         this.state = Object.create(null);
         for (const [key, value] of Object.entries(initialState)) {
             if (value !== null && value !== undefined)

@@ -23,9 +23,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const crypto = require('crypto');
 const ivm    = require('isolated-vm');
 const fs     = require('fs');
@@ -1314,8 +1311,8 @@ class XChainVM {
                     'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }
         }
-        // ── Non-deterministic resource terminations ──────────────────────────
-        // Wall-clock timeout, isolate memory limit, and native stack overflow all
+        // Non-deterministic resource terminations: wall-clock timeout, isolate
+        // memory limit, and native stack overflow all
         // fire at machine-/GC-/stack-depth-dependent points, so gasTracker.getUsed()
         // at that instant DIFFERS across validators. Since the indexer computes
         // fee = gasUsed * GAS_PRICE (consensus-critical), a nondeterministic gasUsed

@@ -26,17 +26,10 @@ const ivm = require('isolated-vm');
 const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, CONSENSUS_RULES } = require('./lint-core.js');
 
 /**
- * Validate contract code syntax before deployment.
- * Runs five blocking checks in order:
- * 1. V8 syntax check (compileScriptSync in throwaway isolate; needs isolated-vm)
- * 2. Acorn metering pass (supported syntax = min(V8, acorn))
- * 3. Reserved identifier check (__gas + allocator metering helpers)
- * 4. Banned transcendental Math.* check (Math.sqrt/pow/log/log2/log10)
- * 5. Banned native-DoS literals (BigInt + RegExp)
- *
- * Steps 2–5 are delegated to lint-core.lintSource(); the returned error
- * messages are byte-identical to this function's historical output, so the
- * deploy-path verdict (and its on-chain execution record) is unchanged.
+ * Validate contract code syntax before deployment. Runs a V8 syntax check
+ * (the only step needing isolated-vm) then the acorn-coverable consensus rules
+ * via lint-core.lintSource(); error messages are byte-identical to the
+ * historical output, so the on-chain deploy verdict is unchanged.
  *
  * @param {string} code - Contract source code
  * @param {object} [opts]
@@ -63,12 +56,10 @@ function validateSyntax(code, opts) {
         try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
     }
 
-    // 2–5. Acorn-coverable rules (shared canonical source of truth). Block ONLY on
-    // consensus rules. lintSource also returns Move-2 advisory findings, which are
-    // author-facing signal and must never change the on-chain deploy verdict. When
-    // the banned-async flag-day is not yet active for this deploy, drop that rule
-    // from the blocking set (pre-activation parity); all other consensus rules and
-    // the byte-identical error ordering are unchanged.
+    // 2-5. Acorn-coverable consensus rules. Block ONLY on consensus rules;
+    // lintSource also returns Move-2 advisory findings, which must never change
+    // the on-chain verdict. When banned-async is not yet flag-day-active, drop
+    // that rule from the blocking set (pre-activation parity).
     const blocking = lintSource(code).errors.filter((e) => {
         if (e.rule === 'banned-async' && !enforceBannedAsync) return false;
         return CONSENSUS_RULES.has(e.rule);
