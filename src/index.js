@@ -1477,3 +1477,11 @@ module.exports.HostFaultError = require('./errors.js').HostFaultError;
 // Any change to either must bump CONSENSUS_VERSION + re-golden in lockstep.
 module.exports.STRIPPED_GLOBAL_NAMES = require('./sandbox.js').STRIPPED_GLOBAL_NAMES;
 module.exports.CONSENSUS_RULES = require('./lint-core.js').CONSENSUS_RULES;
+// Fail loudly if either frozen export goes missing (e.g. an internal rename in
+// sandbox.js / lint-core.js). Without this, the re-export silently becomes
+// undefined and the cross-repo freeze guards that digest it would skip rather
+// than redden, defeating the whole point of the surface freeze.
+if(!module.exports.STRIPPED_GLOBAL_NAMES)
+    throw new Error('xchain-vm: sandbox.js no longer exports STRIPPED_GLOBAL_NAMES (frozen consensus surface)');
+if(!module.exports.CONSENSUS_RULES)
+    throw new Error('xchain-vm: lint-core.js no longer exports CONSENSUS_RULES (frozen consensus surface)');
