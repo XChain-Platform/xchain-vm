@@ -4,14 +4,14 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.11.2-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.11.13-blue" alt="Version">
   <img src="https://img.shields.io/badge/tests-974%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
-  <img src="https://img.shields.io/badge/license-Dankest%20Community-orange" alt="License">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/coverage-unit%20%7C%20e2e%20%7C%20security%20%7C%20fuzz%20%7C%20chaos%20%7C%20boundary%20%7C%20regression-brightgreen" alt="Coverage">
+  <img src="https://img.shields.io/badge/coverage-unit%20%7C%20integration%20%7C%20e2e%20%7C%20smoke%20%7C%20boundary%20%7C%20security%20%7C%20fuzz%20%7C%20chaos%20%7C%20mutation%20%7C%20regression%20%7C%20performance%20%7C%20determinism-brightgreen" alt="Coverage">
 </p>
 
 Deterministic smart contract execution engine for the XChain Platform. Runs JavaScript contracts in sandboxed V8 isolates with AST-based gas metering, ensuring identical results across all indexer nodes. Plugs into the XChain Indexer as the runtime for DEPLOY and EXECUTE actions.
@@ -21,9 +21,10 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **Sandboxed V8 isolates**: contracts run in isolated-vm with no access to the host process, filesystem, or network
 - **Deterministic execution**: all non-deterministic APIs (Date, Math.random, setTimeout, etc.) stripped; same input always produces same output
 - **AST-based gas metering**: acorn parses contract code and injects `__gas()` calls at control flow points; no V8 modifications required
-- **17 emittable actions**: contracts can emit SEND, DESTROY, ISSUE, MINT, ORDER, DISPENSER, DIVIDEND, AIRDROP, CALLBACK, FILE, LIST, COINPAY, SWEEP, LINK, BROADCAST, MESSAGE, and EXECUTE (cross-contract call: deferred, caller-funded gasLimit, max depth 4, no return value)
+- **18 emittable actions**: contracts can emit SEND, DESTROY, ISSUE, MINT, ORDER, DISPENSER, DIVIDEND, AIRDROP, CALLBACK, FILE, LIST, COINPAY, SWEEP, LINK, BROADCAST, MESSAGE, EXECUTE (cross-contract call: deferred, caller-funded gasLimit, max depth 4, no return value), and XCALL (cross-chain call via `emit.crossExecute`: federation-relayed to a contract on another chain, outcome delivered to a callback method)
+- **Cross-chain contract calls**: `emit.crossExecute(...)` emits an XCALL for federation relay to a target chain; the receiving contract must list the method in its exported `crossCallable` array; outcomes arrive asynchronously via a named callback method; `crossChain.getCallResult(callId)` reads the terminal result
 - **External attestation**: `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
-- **Deterministic math**: `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point
+- **Deterministic math**: `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point; native `Math.sqrt/pow/log/log2/log10` rejected at deploy time
 - **Contract state management**: key-value state with dirty tracking, key count limits, and value size limits
 - **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, float usage warnings
 - **Per-block compilation cache**: V8 cached compilation data eliminates redundant parsing for hot contracts
@@ -265,7 +266,7 @@ xchain-vm/
 |   |-- index.js          (XChainVM class, main entry point)
 |   |-- isolate.js        (V8 isolate management: create, compile, dispose)
 |   |-- gateway.js        (builds the xchain gateway object)
-|   |-- gateway-emit.js   (emit API: 17 action types, incl. cross-contract emit.execute)
+|   |-- gateway-emit.js   (emit API: 18 action types, incl. cross-contract emit.execute and cross-chain emit.crossExecute)
 |   |-- gas.js            (gas tracking and ceiling enforcement)
 |   |-- sandbox.js        (strips non-deterministic APIs)
 |   |-- metering.js       (AST-based gas injection)
@@ -330,14 +331,3 @@ with a commercial license available for proprietary use.
 You may use, modify, and distribute this material under the terms of the License.
 See [LICENSE](./LICENSE.md) and [NOTICE](./NOTICE.md) for full terms.
 See the [licensing overview](https://docs.xchain.io/legal/licensing).
-
-## License
-
-XChain Platform is **open source**, dual-licensed under:
-
-- the **[GNU Affero General Public License v3.0](./LICENSE.md)** (`AGPL-3.0-or-later`), free for everyone, and
-- a **[commercial license](https://docs.xchain.io/legal/commercial-license)** for companies that need to keep modifications private.
-
-See the **[licensing overview](https://docs.xchain.io/legal/licensing)** for which one applies to you. "XChain" is a trademark of Dankest, LLC. See the **[Trademark Policy](https://docs.xchain.io/legal/trademark)**.
-
-Copyright © 2025-2026 Dankest, LLC.
