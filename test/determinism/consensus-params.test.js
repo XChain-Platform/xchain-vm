@@ -112,6 +112,42 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
             'installed decimal.js (mathjs BigNumber backend) drifted from the consensus pin');
     });
 
+    it('AST_TOOLCHAIN_PINNED equals the golden and matches the installed acorn/acorn-walk/astring (item 5012)', function () {
+        assert.deepStrictEqual(cr.AST_TOOLCHAIN_PINNED, {
+            acorn:     '8.16.0',
+            acornWalk: '8.3.5',
+            astring:   '1.9.0'
+        });
+        assert.ok(Object.isFrozen(cr.AST_TOOLCHAIN_PINNED));
+        // The metering transform (meterCode) parses with acorn, walks with acorn-walk,
+        // and regenerates with astring; injection placement => gasUsed => contract_hash.
+        // A bump must travel with a coordinated CONSENSUS_VERSION change, so assert the
+        // installed versions against the pin. acorn / acorn-walk expose package.json
+        // directly; astring's `exports` block the subpath, so read its package.json by
+        // walking up from its resolved main entry.
+        const path = require('path'), fs = require('fs');
+        function installedVersion(name){
+            let dir = path.dirname(require.resolve(name));
+            for(let i = 0; i < 8; i++){
+                const pj = path.join(dir, 'package.json');
+                if(fs.existsSync(pj)){
+                    const j = JSON.parse(fs.readFileSync(pj, 'utf8'));
+                    if(j.name === name) return j.version;
+                }
+                const up = path.dirname(dir);
+                if(up === dir) break;
+                dir = up;
+            }
+            return null;
+        }
+        assert.strictEqual(require('acorn/package.json').version, cr.AST_TOOLCHAIN_PINNED.acorn,
+            'installed acorn drifted from the consensus pin');
+        assert.strictEqual(require('acorn-walk/package.json').version, cr.AST_TOOLCHAIN_PINNED.acornWalk,
+            'installed acorn-walk drifted from the consensus pin');
+        assert.strictEqual(installedVersion('astring'), cr.AST_TOOLCHAIN_PINNED.astring,
+            'installed astring drifted from the consensus pin');
+    });
+
     it('CONSENSUS_STATUS_TOKENS is the frozen closed set (resource family collapsed)', function () {
         assert.deepStrictEqual(cr.CONSENSUS_STATUS_TOKENS, ['reverted', 'out_of_resource', 'failed']);
         assert.ok(Object.isFrozen(cr.CONSENSUS_STATUS_TOKENS));

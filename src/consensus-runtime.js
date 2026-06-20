@@ -75,6 +75,21 @@ const MATH_PINNED = Object.freeze({
     precision: 64
 });
 
+// AST-metering toolchain consensus pin (item 5012). meterCode() parses with acorn,
+// walks with acorn-walk, and regenerates with astring; the number and placement of
+// injected __gas() points (and therefore gasUsed, which feeds contract_hash and the
+// fee debit) is a direct function of how these three libraries parse/traverse/emit
+// the AST. They are exactly as consensus-affecting as the math backend, so they are
+// pinned here and asserted against the installed versions by the determinism test,
+// so a bump (manual or a lockfile re-resolve) cannot ship without a coordinated
+// CONSENSUS_VERSION change. The golden manifest only catches a metering change for
+// constructs its corpus exercises; this guard catches the toolchain itself.
+const AST_TOOLCHAIN_PINNED = Object.freeze({
+    acorn:     '8.16.0',
+    acornWalk: '8.3.5',
+    astring:   '1.9.0'
+});
+
 // The reference Node release the pin was taken from. Informational only:
 // a different Node PATCH that carries the SAME v8/icu/unicode/cldr/modules
 // is consensus-equivalent and intentionally NOT rejected. Recorded so the
@@ -158,7 +173,7 @@ function describeMismatch(result) {
 }
 
 module.exports = {
-    PINNED, MATH_PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
+    PINNED, MATH_PINNED, AST_TOOLCHAIN_PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
     CONSENSUS_STATUS_TOKENS, STATUS_ERROR_PREFIXES,
     checkConsensusRuntime, describeMismatch
 };
