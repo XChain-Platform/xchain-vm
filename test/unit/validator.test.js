@@ -18,14 +18,16 @@ describe('ActionValidator', function() {
     let validator;
     beforeEach(function() { validator = new ActionValidator(); });
 
-    const ALLOWED_ACTIONS = [
-        'SEND', 'DESTROY', 'ISSUE', 'MINT', 'ORDER',
-        'DISPENSER', 'DIVIDEND', 'AIRDROP', 'CALLBACK',
-        'FILE', 'LIST', 'COINPAY', 'SWEEP', 'LINK', 'BROADCAST', 'MESSAGE',
-        'ATTEST', 'SLASH', 'EXECUTE'
-    ];
+    // Bind to the production allow-list (not a hand-maintained copy) so every allowed
+    // action gets a positive-acceptance assertion and a removal from the production Set
+    // can never pass unnoticed (#5152: the old mirror had drifted, omitting XCALL).
+    const ALLOWED_ACTIONS = [...ActionValidator.ALLOWED_ACTIONS];
 
     describe('allowed actions', function() {
+        it('every production-allowed action is covered (mirror is bound, not copied)', function() {
+            assert.ok(ALLOWED_ACTIONS.includes('XCALL'), 'XCALL must be exercised');
+            assert.strictEqual(ALLOWED_ACTIONS.length, 20);
+        });
         for (const action of ALLOWED_ACTIONS) {
             it('should accept ' + action, function() {
                 assert.strictEqual(validator.validate({ action, params: {} }), true);

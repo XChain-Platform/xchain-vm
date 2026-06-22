@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Export `ActionValidator.ALLOWED_ACTIONS` and bind the validator unit test to it, so the suite exercises every production-allowed emission (previously a hand-copy that had drifted, omitting `XCALL`) and a removal from the allow-list can no longer pass green.
+
 ## [1.11.13] - 2026-06-20
 
 ### Added

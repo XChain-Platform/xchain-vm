@@ -36,4 +36,9 @@ class ActionValidator {
     }
 }
 
+// Expose the allow-list so tests can assert acceptance against the production set
+// directly instead of a hand-maintained mirror that can silently drift (e.g. omitting
+// XCALL would leave a removal from this Set undetected by the unit suite).
+ActionValidator.ALLOWED_ACTIONS = ALLOWED_ACTIONS;
+
 module.exports = ActionValidator;
