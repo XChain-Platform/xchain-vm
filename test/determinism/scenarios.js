@@ -192,6 +192,44 @@ const SCENARIOS = [
         method: 'default',
         params: [],
         state: {}
+    },
+    // ---- G4 syntax-level allocation-metering scenarios (item #5013) ----
+    // These pin the exact gasUsed for the __concat / __arrspread / __objspread
+    // helpers and the __GROW_THRESHOLD = 256 constant. A change to the threshold,
+    // the "grew beyond largest operand" formula, or the metering-rewrite pass
+    // (metering.js) will alter gasUsed and redden this guard.
+    {
+        id: 'g4_alloc_metering/string_concat',
+        tier: 'invariant',
+        // A 300-char base string; base + base grows by 300 chars (> __GROW_THRESHOLD
+        // of 256), so __concat charges 300 gas units. Result length 600 is stored
+        // in state so the hash covers both gasUsed and the state write.
+        code: load('g4_alloc_metering'),
+        method: 'string_concat',
+        params: ['x'.repeat(300)],
+        state: {}
+    },
+    {
+        id: 'g4_alloc_metering/arr_spread',
+        tier: 'invariant',
+        // Spreads a 300-element array plus [1,2,3]; total spread count = 303 >
+        // __GROW_THRESHOLD, so __arrspread charges 303 gas units. The result
+        // length (303) is written to state.
+        code: load('g4_alloc_metering'),
+        method: 'arr_spread',
+        params: ['300'],
+        state: {}
+    },
+    {
+        id: 'g4_alloc_metering/obj_spread',
+        tier: 'invariant',
+        // Merges a 300-key object with {z:1}; total keys spread = 301 >
+        // __GROW_THRESHOLD, so __objspread charges 301 gas units. Key count
+        // written to state so the hash covers both paths.
+        code: load('g4_alloc_metering'),
+        method: 'obj_spread',
+        params: ['300'],
+        state: {}
     }
 ];
 

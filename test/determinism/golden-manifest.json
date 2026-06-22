@@ -32,6 +32,27 @@
       "error": "error: emission limit exceeded (50)"
     },
     {
+      "id": "g4_alloc_metering/arr_spread",
+      "tier": "invariant",
+      "hash": "64611ba40e7dc2274f13c8a24e5834d878d3981f6de036e81248a276b9c5507d",
+      "gasUsed": 1441,
+      "error": null
+    },
+    {
+      "id": "g4_alloc_metering/obj_spread",
+      "tier": "invariant",
+      "hash": "557b15d068aeb2834c3777e1868472a8f677308c6d76eed760ecd1ebc0253372",
+      "gasUsed": 1748,
+      "error": null
+    },
+    {
+      "id": "g4_alloc_metering/string_concat",
+      "tier": "invariant",
+      "hash": "c718bf02950ff9a29c4f4ce6c4b40294a5a6bc657c12a2db90701c2b98356af6",
+      "gasUsed": 1131,
+      "error": null
+    },
+    {
       "id": "infinite_loop/out_of_gas",
       "tier": "resource",
       "hash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",

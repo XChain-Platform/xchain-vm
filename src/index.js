@@ -783,6 +783,14 @@ class XChainVM {
 
         // Pre-compile the harness script source (it's the same every time)
         this._harnessSource = HARNESS_SOURCE;
+        // Lazily-populated V8 cached data for the harness. The harness source
+        // is the same constant string on every execution; per-execution inputs
+        // (__blockTime, __BINARY_ALLOC_GATE_BLOCK_TIME) are injected as context
+        // globals BEFORE the script runs, not baked into the source, so the
+        // compiled bytecode is identical across calls. Storing cachedData here
+        // and passing it to compileScriptSync avoids re-parsing the harness on
+        // every contract execution, mirroring the per-block contract cache.
+        this._harnessCachedData = null;
 
         // Execution mode.
         //   'in-process' (default): run the isolate in THIS process. Fast; used
@@ -1018,8 +1026,15 @@ class XChainVM {
             context.global.setSync('__blockTime', Number.isFinite(__blockTime) ? __blockTime : 0);
             context.global.setSync('__BINARY_ALLOC_GATE_BLOCK_TIME', BINARY_ALLOC_GATE_BLOCK_TIME);
 
-            // Run harness script to assemble xchain object inside isolate
-            const harnessScript = isolate.compileScriptSync(this._harnessSource);
+            // Run harness script to assemble xchain object inside isolate.
+            // Reuse cached V8 bytecode when available: the harness source is a
+            // fixed constant, so the compiled form is identical for every call.
+            const harnessScript = this.isolateManager.compileScript(
+                isolate, this._harnessSource, this._harnessCachedData
+            );
+            if (!this._harnessCachedData) {
+                try { this._harnessCachedData = this.isolateManager.getCachedData(harnessScript); } catch (e) { /* non-fatal */ }
+            }
             harnessScript.runSync(context);
 
             // Meter the contract code
