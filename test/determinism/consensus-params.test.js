@@ -64,6 +64,49 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
             'deploy CONSENSUS_RULES drifted: a deploy-rule change must bump CONSENSUS_VERSION + regolden in both repos');
     });
 
+    it('sandbox PROTOTYPE-METHOD neuters are frozen (regex + locale/ICU strips)', function () {
+        // The strip set above only covers GLOBAL deletes. The sandbox also neuters
+        // consensus-critical PROTOTYPE methods that survive a global delete: the regex
+        // methods (match/matchAll/search) that coerce to %RegExp% (ReDoS the gas meter
+        // cannot see) and the locale/ICU methods whose output is host-ICU-dependent.
+        // These lived as inline literals inside buildStripScript and were frozen by
+        // nothing; freeze them here so an edit reddens until the goldens are updated in
+        // lockstep across both repos. Order-independent: compared as a sorted key set.
+        const GOLDEN_STRIPPED_PROTO_METHODS = [
+            'Array.toLocaleString', 'Number.toLocaleString', 'Object.toLocaleString',
+            'String.localeCompare', 'String.match', 'String.matchAll', 'String.normalize',
+            'String.search', 'String.toLocaleLowerCase', 'String.toLocaleUpperCase'
+        ];
+        assert.ok(Object.isFrozen(vm.STRIPPED_PROTO_METHODS), 'proto-method set must be frozen');
+        const keys = vm.STRIPPED_PROTO_METHODS.map(e => e.proto + '.' + e.method).sort();
+        assert.deepStrictEqual(keys, GOLDEN_STRIPPED_PROTO_METHODS,
+            'sandbox prototype-method neuters drifted: update this golden + the indexer twin in lockstep');
+    });
+
+    it('sandbox prototype .constructor neuter targets are frozen (prototype-chain escape block)', function () {
+        // The set of built-in prototypes whose .constructor is neutered to block
+        // ({}).__proto__.constructor("return process")() escapes. Frozen for the same
+        // reason as the strip set: removing one re-opens a sandbox escape.
+        const GOLDEN_NEUTERED_PROTO_CONSTRUCTORS = [
+            'Array', 'Boolean', 'Number', 'Object', 'RegExp', 'String'
+        ];
+        assert.ok(Object.isFrozen(vm.NEUTERED_PROTO_CONSTRUCTORS), 'ctor-neuter set must be frozen');
+        assert.deepStrictEqual([...vm.NEUTERED_PROTO_CONSTRUCTORS].sort(), GOLDEN_NEUTERED_PROTO_CONSTRUCTORS,
+            'prototype .constructor neuter targets drifted: update this golden + the indexer twin in lockstep');
+    });
+
+    it('SafeMath member whitelist is frozen (exposed Math surface is consensus-critical)', function () {
+        // The deterministic Math subset a contract sees. Adding a member (e.g. a native
+        // transcendental that differs by 1 ULP cross-arch, or Math.random) would route
+        // non-deterministic bytes into hashed state. Freeze the exact member set.
+        const GOLDEN_SAFE_MATH_MEMBERS = [
+            'E', 'PI', 'abs', 'ceil', 'floor', 'max', 'min', 'round', 'sign', 'trunc'
+        ];
+        assert.ok(Object.isFrozen(vm.SAFE_MATH_MEMBERS), 'SafeMath member set must be frozen');
+        assert.deepStrictEqual([...vm.SAFE_MATH_MEMBERS].sort(), GOLDEN_SAFE_MATH_MEMBERS,
+            'SafeMath member whitelist drifted: update this golden + the indexer twin in lockstep');
+    });
+
     it('ASYNC_SURFACE_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // The async/Promise surface change (Promise strip + banned-async deploy
         // rejection) activates fleet-wide at this block time on mainnet. It flips a

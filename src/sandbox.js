@@ -69,6 +69,59 @@ const STRIPPED_GLOBAL_NAMES = Object.freeze([
     'Intl', 'Temporal', 'structuredClone', 'performance'
 ]);
 
+// The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
+// sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
+// these: they live on built-in prototypes and stay reachable. Each entry names the
+// owning intrinsic (resolved to its `.prototype` inside the isolate) and the method
+// to neuter. This list is the single source of truth that buildStripScript
+// interpolates, and it is frozen + digested by the determinism guard
+// (test/determinism/consensus-params.test.js) exactly like STRIPPED_GLOBAL_NAMES;
+// any add/remove is a consensus change that must update both repos' goldens.
+//
+// Two categories, same fork risk:
+//   - REGEX methods (match/matchAll/search): coerce a string argument to a RegExp
+//     via the %RegExp% intrinsic, so a "(a+)+$"-style ReDoS still runs through them
+//     even after the RegExp global is deleted, for ~1 gas while burning unbounded
+//     wall-clock. Gas counts ops, not backtracking steps, so a slow validator times
+//     out where a fast one commits -> wall-clock-dependent divergence.
+//   - LOCALE/ICU methods (normalize/localeCompare/toLocale*): their output depends
+//     on the host ICU data/version, which varies across builds, so a stored result
+//     routes an ICU-version-dependent value into hashed state -> divergent Merkle
+//     root across a heterogeneous fleet.
+// Both are hard-neutered so a contract that calls one fails DETERMINISTICALLY
+// (TypeError). NB: String.prototype.toLowerCase/toUpperCase are deliberately NOT
+// here; their Unicode case-folding is pinned by 'unicode: 17.0' in
+// consensus-runtime.js, the same way the e.message residual is covered by the pin.
+const STRIPPED_PROTO_METHODS = Object.freeze([
+    { proto: 'String', method: 'match' },
+    { proto: 'String', method: 'matchAll' },
+    { proto: 'String', method: 'search' },
+    { proto: 'String', method: 'normalize' },
+    { proto: 'String', method: 'localeCompare' },
+    { proto: 'String', method: 'toLocaleLowerCase' },
+    { proto: 'String', method: 'toLocaleUpperCase' },
+    { proto: 'Number', method: 'toLocaleString' },
+    { proto: 'Array',  method: 'toLocaleString' },
+    { proto: 'Object', method: 'toLocaleString' }
+]);
+
+// The FROZEN set of built-in prototypes whose `.constructor` is neutered to block
+// prototype-chain escapes (e.g. ({}).__proto__.constructor('return process')()).
+// Same consensus-critical / frozen / digested treatment as the lists above.
+const NEUTERED_PROTO_CONSTRUCTORS = Object.freeze([
+    'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp'
+]);
+
+// The FROZEN whitelist of Math members the deterministic SafeMath subset exposes.
+// Math.random and the transcendentals (sqrt/pow/log/log2/log10) are intentionally
+// ABSENT (non-deterministic / up-to-1-ULP cross-arch differences); contracts use
+// xchain.math.* instead. The retained members are exact, spec-defined operations
+// with no rounding ambiguity. Frozen + digested so adding/removing one is a
+// consensus change.
+const SAFE_MATH_MEMBERS = Object.freeze([
+    'floor', 'ceil', 'round', 'abs', 'min', 'max', 'sign', 'trunc', 'PI', 'E'
+]);
+
 // Build the in-isolate strip script for a resolved identifier list. The list is
 // decided HOST-side (stripGlobals), so a gated entry (e.g. Promise pre-flag-day)
 // is simply absent from `names` and never deleted (exactly how a pre-activation
@@ -114,68 +167,44 @@ const buildStripScript = (names) => `
         } catch(e) {}
     } catch(e) {}
 
-    // Neuter Object.prototype.constructor to prevent prototype chain traversal
-    // e.g. ({}).__proto__.constructor('return process')()
-    try { Object.defineProperty(Object.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
-
-    // Neuter Array/String/Number/Boolean/RegExp prototype constructors
-    try { Object.defineProperty(Array.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
-    try { Object.defineProperty(String.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
-    try { Object.defineProperty(Number.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
-    try { Object.defineProperty(Boolean.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
-    try { Object.defineProperty(RegExp.prototype, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
-
-    // Neuter RegExp to prevent catastrophic backtracking (ReDoS)
-    // Contracts should not need regex; string operations suffice.
-    try { globalThis.RegExp = undefined; } catch(e) {}
-
-    // Neuter the String regex methods (consensus determinism + ReDoS).
-    // Deleting the RegExp global is NOT enough: String.prototype.match, matchAll,
-    // and search coerce a string argument to a RegExp via the %RegExp% intrinsic,
-    // so "(a+)+$".repeat-style ReDoS still runs through e.g. str.search(pattern)
-    // for ~1 gas unit while burning unbounded wall-clock. Gas metering counts ops,
-    // not backtracking steps, so a slow validator would time out where a fast one
-    // commits -> wall-clock-dependent divergence. Hard-neuter them so a contract
-    // that calls one fails DETERMINISTICALLY (TypeError) like the locale methods below.
+    // Neuter the .constructor on built-in prototypes to prevent prototype-chain
+    // traversal, e.g. ({}).__proto__.constructor('return process')(). The target
+    // set is the frozen NEUTERED_PROTO_CONSTRUCTORS (host-interpolated). Runs
+    // before the RegExp global is deleted below so RegExp.prototype stays reachable.
     (function() {
-        var regexMethods = ['match', 'matchAll', 'search'];
-        for (var i = 0; i < regexMethods.length; i++) {
+        var ctorProtos = {
+            Object: Object.prototype, Array: Array.prototype, String: String.prototype,
+            Number: Number.prototype, Boolean: Boolean.prototype, RegExp: RegExp.prototype
+        };
+        var ctorTargets = ${JSON.stringify(NEUTERED_PROTO_CONSTRUCTORS)};
+        for (var i = 0; i < ctorTargets.length; i++) {
             try {
-                Object.defineProperty(String.prototype, regexMethods[i],
+                Object.defineProperty(ctorProtos[ctorTargets[i]], 'constructor',
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
         }
     })();
 
-    // Neuter locale/ICU-sensitive PROTOTYPE METHODS (consensus determinism).
-    // Deleting the Intl global above does NOT disable these. They live on the
-    // built-in prototypes and work without Intl. Their output depends on the ICU
-    // data/version compiled into the host (which varies across Node.js/V8 builds),
-    // so a contract that returns or stores their result would route an
-    // ICU-version-dependent value into hashed state -> divergent Merkle root
-    // across a heterogeneous validator fleet -> consensus fork. Neuter them so a
-    // contract that calls one fails DETERMINISTICALLY (TypeError) instead.
-    //   - String.prototype.normalize          (ICU normalization tables)
-    //   - String.prototype.localeCompare       (ICU collation order/sign)
-    //   - String.prototype.toLocaleLowerCase/UpperCase (locale case mapping)
-    //   - Number/Array/Object.prototype.toLocaleString (locale separators)
-    // Note: String.prototype.toLowerCase/toUpperCase are NOT neutered here. They are
-    // non-locale methods whose Unicode case-folding output is pinned by the
-    // 'unicode: 17.0' setting in consensus-runtime.js. This is analogous to the
-    // e.message residual: covered by the runtime pin, not by prototype deletion.
+    // Neuter RegExp to prevent catastrophic backtracking (ReDoS)
+    // Contracts should not need regex; string operations suffice.
+    try { globalThis.RegExp = undefined; } catch(e) {}
+
+    // Neuter consensus-critical PROTOTYPE METHODS (regex coercion + locale/ICU).
+    // Deleting the RegExp/Intl globals above does NOT disable these: they live on
+    // the built-in prototypes and stay reachable. The frozen STRIPPED_PROTO_METHODS
+    // list (host-interpolated) is the single source of truth; see its definition
+    // for the per-category rationale (ReDoS via %RegExp% coercion that gas metering
+    // cannot see; ICU-version-dependent output). Hard-neutered so a contract that
+    // calls one fails DETERMINISTICALLY (TypeError).
     (function() {
-        var locale = [
-            [String.prototype, 'normalize'],
-            [String.prototype, 'localeCompare'],
-            [String.prototype, 'toLocaleLowerCase'],
-            [String.prototype, 'toLocaleUpperCase'],
-            [Number.prototype, 'toLocaleString'],
-            [Array.prototype,  'toLocaleString'],
-            [Object.prototype, 'toLocaleString']
-        ];
-        for (var i = 0; i < locale.length; i++) {
+        var protos = {
+            String: String.prototype, Number: Number.prototype,
+            Array: Array.prototype, Object: Object.prototype
+        };
+        var protoMethods = ${JSON.stringify(STRIPPED_PROTO_METHODS)};
+        for (var i = 0; i < protoMethods.length; i++) {
             try {
-                Object.defineProperty(locale[i][0], locale[i][1],
+                Object.defineProperty(protos[protoMethods[i].proto], protoMethods[i].method,
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
         }
@@ -258,18 +287,15 @@ const buildStripScript = (names) => `
     // The retained members (floor/ceil/round/abs/min/max/sign/trunc and the
     // PI/E constants) are exact, spec-defined operations with no rounding
     // ambiguity, so they are safe to expose directly.
-    var SafeMath = {
-        floor: Math.floor,
-        ceil:  Math.ceil,
-        round: Math.round,
-        abs:   Math.abs,
-        min:   Math.min,
-        max:   Math.max,
-        sign:  Math.sign,
-        trunc: Math.trunc,
-        PI:    Math.PI,
-        E:     Math.E
-    };
+    // SafeMath is built from the frozen SAFE_MATH_MEMBERS whitelist (host-
+    // interpolated) so the exposed member set is the single source of truth the
+    // determinism guard digests. Each name is copied straight off the native Math.
+    var SafeMath = (function() {
+        var m = {};
+        var members = ${JSON.stringify(SAFE_MATH_MEMBERS)};
+        for (var i = 0; i < members.length; i++) { m[members[i]] = Math[members[i]]; }
+        return m;
+    })();
     globalThis.Math = _freeze(SafeMath);
 })();
 `;
@@ -296,4 +322,10 @@ function stripGlobals(isolate, context, opts) {
     script.runSync(context);
 }
 
-module.exports = { stripGlobals, STRIPPED_GLOBAL_NAMES };
+module.exports = {
+    stripGlobals,
+    STRIPPED_GLOBAL_NAMES,
+    STRIPPED_PROTO_METHODS,
+    NEUTERED_PROTO_CONSTRUCTORS,
+    SAFE_MATH_MEMBERS
+};

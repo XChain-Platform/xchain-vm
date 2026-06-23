@@ -1489,7 +1489,15 @@ module.exports.HostFaultError = require('./errors.js').HostFaultError;
 // Any change to either must bump CONSENSUS_VERSION + re-golden in lockstep.
 module.exports.STRIPPED_GLOBAL_NAMES = require('./sandbox.js').STRIPPED_GLOBAL_NAMES;
 module.exports.CONSENSUS_RULES = require('./lint-core.js').CONSENSUS_RULES;
-// Fail loudly if either frozen export goes missing (e.g. an internal rename in
+// The sandbox neuters more than the global deletes: prototype-method strips
+// (regex + locale/ICU), the prototype .constructor neuters, and the SafeMath
+// member whitelist are each consensus-critical surface. Expose them frozen so the
+// same guards digest them too; otherwise an edit to one of those lists changes
+// consensus behaviour without reddening anything.
+module.exports.STRIPPED_PROTO_METHODS = require('./sandbox.js').STRIPPED_PROTO_METHODS;
+module.exports.NEUTERED_PROTO_CONSTRUCTORS = require('./sandbox.js').NEUTERED_PROTO_CONSTRUCTORS;
+module.exports.SAFE_MATH_MEMBERS = require('./sandbox.js').SAFE_MATH_MEMBERS;
+// Fail loudly if any frozen export goes missing (e.g. an internal rename in
 // sandbox.js / lint-core.js). Without this, the re-export silently becomes
 // undefined and the cross-repo freeze guards that digest it would skip rather
 // than redden, defeating the whole point of the surface freeze.
@@ -1497,3 +1505,9 @@ if(!module.exports.STRIPPED_GLOBAL_NAMES)
     throw new Error('xchain-vm: sandbox.js no longer exports STRIPPED_GLOBAL_NAMES (frozen consensus surface)');
 if(!module.exports.CONSENSUS_RULES)
     throw new Error('xchain-vm: lint-core.js no longer exports CONSENSUS_RULES (frozen consensus surface)');
+if(!module.exports.STRIPPED_PROTO_METHODS)
+    throw new Error('xchain-vm: sandbox.js no longer exports STRIPPED_PROTO_METHODS (frozen consensus surface)');
+if(!module.exports.NEUTERED_PROTO_CONSTRUCTORS)
+    throw new Error('xchain-vm: sandbox.js no longer exports NEUTERED_PROTO_CONSTRUCTORS (frozen consensus surface)');
+if(!module.exports.SAFE_MATH_MEMBERS)
+    throw new Error('xchain-vm: sandbox.js no longer exports SAFE_MATH_MEMBERS (frozen consensus surface)');

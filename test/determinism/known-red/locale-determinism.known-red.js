@@ -36,6 +36,14 @@
  *     npm run test:known-red
  *
  * Evidence: `test/determinism/probe-locale-determinism.js` (all 5 reachable).
+ *
+ * The second block below covers the String REGEX methods (match/matchAll/
+ * search): a different fork class (they coerce a string arg to a RegExp via
+ * %RegExp%, so ReDoS runs through them for ~1 gas while burning unbounded
+ * wall-clock -> a slow validator times out where a fast one commits). Same
+ * post-fix invariant: they must be neutered so the failure is deterministic.
+ * Both lists are the frozen sandbox.js STRIPPED_PROTO_METHODS (single source
+ * of truth digested by the consensus-params freeze guard).
  ********************************************************************/
 // @ts-nocheck
 
@@ -74,6 +82,34 @@ describe('KNOWN-RED: locale/unicode prototype methods must be neutered', functio
                 `${v.id} is reachable and returned ${JSON.stringify(r.returnValue)} ` +
                 `(success=${r.success}). ICU-version-dependent output can reach hashed ` +
                 `state -> consensus fork. It must be neutered in sandbox.js.`
+            );
+        });
+    }
+});
+
+describe('KNOWN-RED: String regex methods must be neutered (ReDoS / %RegExp% coercion)', function () {
+    this.timeout(30000);
+
+    // These coerce their string argument to a RegExp via the %RegExp% intrinsic,
+    // so deleting the RegExp GLOBAL does not stop them. Neutered => calling one
+    // throws a TypeError => success:false. Reachable => the call returns a value
+    // (match array / search index / iterator) => success:true.
+    const REGEX_VECTORS = [
+        { id: 'String.prototype.match',    code: wrap(`return JSON.stringify('abc'.match('b'));`) },
+        { id: 'String.prototype.matchAll', code: wrap(`return String('abc'.matchAll('b'));`) },
+        { id: 'String.prototype.search',   code: wrap(`return String('abc'.search('b'));`) }
+    ];
+
+    for (const v of REGEX_VECTORS) {
+        it(`${v.id} must be neutered (deterministic TypeError)`, async function () {
+            const r = await run(v.code);
+            const neutered = r.success === false;
+            assert(
+                neutered,
+                `${v.id} is reachable and returned ${JSON.stringify(r.returnValue)} ` +
+                `(success=${r.success}). Regex methods coerce to %RegExp% and run ReDoS ` +
+                `the gas meter cannot see -> wall-clock-dependent divergence. It must be ` +
+                `neutered in sandbox.js.`
             );
         });
     }
