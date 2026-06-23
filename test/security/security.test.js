@@ -326,6 +326,28 @@ function executeCode(vm, code, opts) {
         assert.strictEqual(JSON.parse(result.returnValue), true);
     });
 
+    it('M-07c: String regex methods (match/matchAll/search) are neutered', async function() {
+        // These coerce a string argument to a RegExp via the %RegExp% intrinsic,
+        // so they would otherwise run ReDoS-prone backtracking past both the
+        // RegExp-global deletion and the deploy-time regex-literal linter, burning
+        // unbounded wall-clock for ~1 gas unit (a wall-clock-dependent fork risk).
+        for (const method of ['match', 'matchAll', 'search']) {
+            const result = await executeCode(vm, `
+                module.exports = function(xchain) {
+                    try {
+                        ''.${method}('(a+)+$');
+                        return 'available';
+                    } catch(e) {
+                        return 'blocked';
+                    }
+                };
+            `);
+            assert.strictEqual(result.success, true, method + ' execution');
+            assert.strictEqual(JSON.parse(result.returnValue), 'blocked',
+                'String.prototype.' + method + ' should be neutered');
+        }
+    });
+
     // --- Object.defineProperty removal ---
 
     it('should block Object.defineProperty inside contracts', async function() {

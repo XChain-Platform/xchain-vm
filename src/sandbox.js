@@ -129,6 +129,24 @@ const buildStripScript = (names) => `
     // Contracts should not need regex; string operations suffice.
     try { globalThis.RegExp = undefined; } catch(e) {}
 
+    // Neuter the String regex methods (consensus determinism + ReDoS).
+    // Deleting the RegExp global is NOT enough: String.prototype.match, matchAll,
+    // and search coerce a string argument to a RegExp via the %RegExp% intrinsic,
+    // so "(a+)+$".repeat-style ReDoS still runs through e.g. str.search(pattern)
+    // for ~1 gas unit while burning unbounded wall-clock. Gas metering counts ops,
+    // not backtracking steps, so a slow validator would time out where a fast one
+    // commits -> wall-clock-dependent divergence. Hard-neuter them so a contract
+    // that calls one fails DETERMINISTICALLY (TypeError) like the locale methods below.
+    (function() {
+        var regexMethods = ['match', 'matchAll', 'search'];
+        for (var i = 0; i < regexMethods.length; i++) {
+            try {
+                Object.defineProperty(String.prototype, regexMethods[i],
+                    { value: undefined, writable: false, configurable: false });
+            } catch(e) {}
+        }
+    })();
+
     // Neuter locale/ICU-sensitive PROTOTYPE METHODS (consensus determinism).
     // Deleting the Intl global above does NOT disable these. They live on the
     // built-in prototypes and work without Intl. Their output depends on the ICU
