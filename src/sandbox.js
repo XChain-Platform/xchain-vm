@@ -129,6 +129,18 @@ const SAFE_MATH_MEMBERS = Object.freeze([
 // does not depend on the list.
 const buildStripScript = (names) => `
 (function() {
+    // Capture built-in prototype references ONCE, up front, before any global is
+    // deleted (RegExp's global is removed further down). Both neuter loops below
+    // resolve their target proto through this single six-key map. Fail-closed: an
+    // entry in NEUTERED_PROTO_CONSTRUCTORS or STRIPPED_PROTO_METHODS naming a proto
+    // absent here THROWS and aborts sandbox setup, rather than silently no-opping
+    // while the consensus-params freeze guard (which digests only list membership)
+    // stays green and certifies a neuter that never ran (item 5309).
+    var _PROTOS = {
+        Object: Object.prototype, Array: Array.prototype, String: String.prototype,
+        Number: Number.prototype, Boolean: Boolean.prototype, RegExp: RegExp.prototype
+    };
+
     // Remove non-deterministic globals (host-resolved from STRIPPED_GLOBAL_NAMES;
     // gated entries the caller excludes are simply not present here).
     const toDelete = ${JSON.stringify(names)};
@@ -169,17 +181,16 @@ const buildStripScript = (names) => `
 
     // Neuter the .constructor on built-in prototypes to prevent prototype-chain
     // traversal, e.g. ({}).__proto__.constructor('return process')(). The target
-    // set is the frozen NEUTERED_PROTO_CONSTRUCTORS (host-interpolated). Runs
-    // before the RegExp global is deleted below so RegExp.prototype stays reachable.
+    // set is the frozen NEUTERED_PROTO_CONSTRUCTORS (host-interpolated), resolved
+    // through the up-front _PROTOS map.
     (function() {
-        var ctorProtos = {
-            Object: Object.prototype, Array: Array.prototype, String: String.prototype,
-            Number: Number.prototype, Boolean: Boolean.prototype, RegExp: RegExp.prototype
-        };
         var ctorTargets = ${JSON.stringify(NEUTERED_PROTO_CONSTRUCTORS)};
         for (var i = 0; i < ctorTargets.length; i++) {
+            var proto = _PROTOS[ctorTargets[i]];
+            // Fail-closed: an unmapped proto name aborts setup (see _PROTOS note).
+            if (!proto) throw new Error('NEUTERED_PROTO_CONSTRUCTORS: unmapped proto ' + ctorTargets[i]);
             try {
-                Object.defineProperty(ctorProtos[ctorTargets[i]], 'constructor',
+                Object.defineProperty(proto, 'constructor',
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
         }
@@ -197,14 +208,14 @@ const buildStripScript = (names) => `
     // cannot see; ICU-version-dependent output). Hard-neutered so a contract that
     // calls one fails DETERMINISTICALLY (TypeError).
     (function() {
-        var protos = {
-            String: String.prototype, Number: Number.prototype,
-            Array: Array.prototype, Object: Object.prototype
-        };
         var protoMethods = ${JSON.stringify(STRIPPED_PROTO_METHODS)};
         for (var i = 0; i < protoMethods.length; i++) {
+            var proto = _PROTOS[protoMethods[i].proto];
+            // Fail-closed: an unmapped proto name aborts setup rather than leaving
+            // the method reachable while the freeze guard greens (item 5309).
+            if (!proto) throw new Error('STRIPPED_PROTO_METHODS: unmapped proto ' + protoMethods[i].proto);
             try {
-                Object.defineProperty(protos[protoMethods[i].proto], protoMethods[i].method,
+                Object.defineProperty(proto, protoMethods[i].method,
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
         }
