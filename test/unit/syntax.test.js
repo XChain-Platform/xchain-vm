@@ -42,7 +42,7 @@ try {
         });
 
         it('should reject the allocator metering helpers as reserved', function() {
-            for (const id of ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread']) {
+            for (const id of ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread', '__objspreadmeter']) {
                 const result = validateSyntax('var x = ' + id + ';');
                 assert.strictEqual(result.valid, false, id + ' should be reserved');
                 assert(result.error.includes(id), result.error);

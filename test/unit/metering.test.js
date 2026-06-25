@@ -417,9 +417,12 @@ describe('Metering', function() {
             assert(metered.includes('__arrspread('), 'array spread → __arrspread');
         });
 
-        it('skips array spread when the array has holes', function() {
+        it('rewrites array spread when the array also has holes', function() {
+            // Holes mixed with spread are now metered (previously skipped, which let
+            // [, ...rest] perform a free O(n) copy). The hole rides as an ['h'] segment.
             const metered = meterCode('var a = [x, , ...rest];');
-            assert(!metered.includes('__arrspread('), 'holes → left untransformed');
+            assert(metered.includes('__arrspread('), 'holes + spread → __arrspread');
+            assert(metered.includes("'h'") || metered.includes('"h"'), 'hole encoded as h segment');
         });
 
         it('rewrites object spread to __objspread', function() {
@@ -427,9 +430,14 @@ describe('Metering', function() {
             assert(metered.includes('__objspread('), 'object spread → __objspread');
         });
 
-        it('skips object spread when combined with a method/accessor', function() {
+        it('wraps the spread source when object spread is combined with a method/accessor', function() {
+            // The literal keeps its method shorthand verbatim (so `this`/getter
+            // semantics are untouched), but each spread source is now wrapped in
+            // __objspreadmeter so the copy is charged instead of being free.
             const metered = meterCode('var o = {...base, m() { return 1; }};');
-            assert(!metered.includes('__objspread('), 'method + spread → left untransformed');
+            assert(!metered.includes('__objspread('), 'method + spread → not rebuilt via __objspread');
+            assert(metered.includes('__objspreadmeter('), 'spread source metered via __objspreadmeter');
+            assert(metered.includes('m('), 'method shorthand preserved');
         });
 
         it('rewrites a member += concat to __setconcat', function() {

@@ -131,7 +131,14 @@ describe('Object statics must be size-metered (was KNOWN-RED)', function () {
         { id: 'array spread [...a]',
           mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++){t+=[...a].length;}return t;` },
         { id: 'object spread {...o}',
-          mk: `var o={};for(var j=0;j<20000;j++)o['k'+j]=j;var t=0;for(var i=0;i<300;i++){var z={...o};t+=1;}return t;` }
+          mk: `var o={};for(var j=0;j<20000;j++)o['k'+j]=j;var t=0;for(var i=0;i<300;i++){var z={...o};t+=1;}return t;` },
+        // Previously-skipped cases (#5313): a hole mixed with spread, and an object
+        // spread sitting next to a method shorthand. Both used to copy O(n) for free;
+        // they must now be gas-bounded exactly like the plain spreads above.
+        { id: 'array hole + spread [, ...a]',
+          mk: `var a=new Array(${K}).fill(7);var t=0;for(var i=0;i<${C};i++){t+=[, ...a].length;}return t;` },
+        { id: 'object spread + method {...o, m(){}}',
+          mk: `var o={};for(var j=0;j<20000;j++)o['k'+j]=j;var t=0;for(var i=0;i<300;i++){var z={...o, m(){return 1;}};t+=1;}return t;` }
     ];
     for (const b of SYNTAX) {
         it(`${b.id}: O(n) copy must consume gas (out_of_gas under budget)`, async function () {
@@ -147,6 +154,20 @@ describe('Object statics must be size-metered (was KNOWN-RED)', function () {
             );
         });
     }
+
+    // Correctness guard for the object-spread+method rewrite: wrapping the spread
+    // SOURCE in __objspreadmeter must NOT disturb the method's `this`. A method that
+    // reads a spread-in field through `this` must still see the spread value, and a
+    // small spread+method literal must execute successfully (not trip out_of_gas).
+    it('object spread + method preserves method `this` binding', async function () {
+        const vm = createVM({ maxCpuTimeMs: CPU_MS });
+        if (typeof vm.beginBlock === 'function') vm.beginBlock();
+        const code = wrap('var base={k:41};var o={...base, bump(){return this.k + 1;}};return o.bump();');
+        const r = await execute(vm, code, { method: 'default' });
+        if (typeof vm.endBlock === 'function') vm.endBlock();
+        assert(r.success === true, `expected success, got error=${JSON.stringify(r.error)}`);
+        assert.strictEqual(JSON.parse(r.returnValue), 42, 'method this.k must resolve to the spread-in value');
+    });
 });
 
 describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {

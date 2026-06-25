@@ -561,6 +561,11 @@ const HARNESS_SOURCE = `
                 var a = [...val];
                 spread += a.length;
                 for (var j = 0; j < a.length; j++) r.push(a[j]);
+            } else if (kind === 'h') {
+                // Array hole: extend the result by one empty slot so it stays sparse,
+                // matching [a, , b] semantics. No data is copied, so no gas is charged
+                // for the hole itself (only spread sources cost gas).
+                r.length = r.length + 1;
             } else {
                 r.push(val);
             }
@@ -589,6 +594,20 @@ const HARNESS_SOURCE = `
         }
         if (spread > __GROW_THRESHOLD) __gas(spread);
         return r;
+    });
+
+    // Object spread mixed with a method/accessor  {...x, m(){}}  keeps its literal
+    // form (so the method/getter this-binding and lazy-evaluation semantics are
+    // untouched) and instead wraps each spread SOURCE as __objspreadmeter(x). This
+    // charges by the source's own-key count (the same O(n) copy __objspread bills)
+    // and returns the source unchanged, so the native spread that follows is no
+    // longer free.
+    __lockGlobal('__objspreadmeter', function(val) {
+        if (val != null) {
+            var ks = __okeys(val);
+            if (ks.length > __GROW_THRESHOLD) __gas(ks.length);
+        }
+        return val;
     });
     // ----- end G4 -----
 })();

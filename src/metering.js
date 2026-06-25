@@ -142,7 +142,7 @@ function binaryDepth(node) {
 // Harness-injected helpers (src/index.js) that meter syntax-level allocators.
 // The pass below rewrites operators/syntax into calls to these; they must never
 // be wrapped as ordinary call sites, and contract source may not reference them.
-const ALLOC_HELPERS = ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread'];
+const ALLOC_HELPERS = ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread', '__objspreadmeter'];
 // Deterministic call-depth metering helpers (src/index.js harness). Phase 4 below
 // wraps every contract function body in __depth_enter()/finally __depth_exit() so
 // intra-contract recursion is bounded by a fixed, platform-independent depth (not
@@ -174,9 +174,11 @@ function _memberKey(member) {
  * Post-order so nested forms (a + b + c) are converted leaf-up. Mutates the AST in
  * place.
  *
- * Out of scope (left unmetered; rare and otherwise bounded): arrays with holes
- * mixed with spread, and object spread alongside accessor/method properties. Call
- * spread f(...x) is bounded by V8's argument-count limit (RangeError).
+ * Arrays with holes mixed with spread are now metered (holes ride as ['h']
+ * segments that copy nothing); object spread alongside accessor/method properties
+ * keeps its literal verbatim but wraps each spread source in __objspreadmeter so
+ * the copy is charged without altering getter/method semantics. Call spread f(...x)
+ * is left unmetered, bounded by V8's argument-count limit (RangeError).
  */
 function transformAllocators(ast) {
     // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's
@@ -238,10 +240,15 @@ function transformAllocators(ast) {
             return _call('__tmpl', [_arr(parts)]);
         }
         // array spread: [a, ...x]  ->  __arrspread([['e',a], ['s',x]])
+        // Arrays that mix holes with spread are rewritten too: a hole becomes an
+        // ['h'] segment so __arrspread can recreate the sparse slot without copying
+        // (and without charging gas, since a hole moves no data), while spread
+        // sources are still charged O(n) by element count. Previously such arrays
+        // were returned unmetered, letting [,...x] perform a free native O(n) copy.
         if (node.type === 'ArrayExpression' &&
             node.elements.some(function (e) { return e && e.type === 'SpreadElement'; })) {
-            if (node.elements.some(function (e) { return e === null; })) return node; // holes: skip
             const segs = node.elements.map(function (e) {
+                if (e === null) return _arr([_lit('h')]); // hole: preserve slot, no gas
                 return e.type === 'SpreadElement'
                     ? _arr([_lit('s'), e.argument])
                     : _arr([_lit('e'), e]);
@@ -255,7 +262,22 @@ function transformAllocators(ast) {
                 return p.type === 'SpreadElement' ||
                     (p.type === 'Property' && p.kind === 'init' && !p.method);
             });
-            if (!simple) return node; // accessors/methods + spread: skip
+            if (!simple) {
+                // Accessor/method shorthand mixed with spread (e.g. {...o, m(){}}).
+                // We cannot rebuild this through __objspread without changing the
+                // getter/setter/method definition semantics (a method's `this` and a
+                // getter's lazy evaluation must stay exactly as written), so we keep
+                // the literal verbatim and only wrap each spread SOURCE in a
+                // metering-only pass-through that charges by its own-key count and
+                // returns it unchanged. The native spread still copies; it is no
+                // longer a free O(n) operation, and method/accessor `this` is intact.
+                node.properties.forEach(function (p) {
+                    if (p.type === 'SpreadElement') {
+                        p.argument = _call('__objspreadmeter', [p.argument]);
+                    }
+                });
+                return node;
+            }
             const segs = node.properties.map(function (p) {
                 if (p.type === 'SpreadElement') return _arr([_lit('s'), p.argument]);
                 const keyExpr = p.computed ? p.key

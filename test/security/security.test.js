@@ -1194,14 +1194,14 @@ function executeCode(vm, code, opts) {
 
     it('should verify no __* globals leak to contract scope', async function() {
         // __gas, the allocator metering helpers (__concat/__setconcat/__tmpl/
-        // __tmpltag/__tmpltagm/__arrspread/__objspread), and the call-depth hooks
-        // (__depth_enter/__depth_exit) are intentional, locked (non-writable/
-        // non-configurable) metering hooks the AST pass emits calls to; they are
-        // also reserved at deploy time. Everything else __* must be cleaned from the
-        // contract scope.
+        // __tmpltag/__tmpltagm/__arrspread/__objspread/__objspreadmeter), and the
+        // call-depth hooks (__depth_enter/__depth_exit) are intentional, locked
+        // (non-writable/non-configurable) metering hooks the AST pass emits calls to;
+        // they are also reserved at deploy time. Everything else __* must be cleaned
+        // from the contract scope.
         const result = await executeCode(vm, `
             module.exports = function(xchain) {
-                var allow = { __gas: 1, __concat: 1, __setconcat: 1, __tmpl: 1, __tmpltag: 1, __tmpltagm: 1, __arrspread: 1, __objspread: 1, __depth_enter: 1, __depth_exit: 1 };
+                var allow = { __gas: 1, __concat: 1, __setconcat: 1, __tmpl: 1, __tmpltag: 1, __tmpltagm: 1, __arrspread: 1, __objspread: 1, __objspreadmeter: 1, __depth_enter: 1, __depth_exit: 1 };
                 var leaks = [];
                 var names = Object.getOwnPropertyNames(globalThis);
                 for (var i = 0; i < names.length; i++) {
