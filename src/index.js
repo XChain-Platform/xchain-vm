@@ -276,6 +276,7 @@ const HARNESS_SOURCE = `
             link:      wrap(globalThis.__emit_link),
             broadcast: wrap(globalThis.__emit_broadcast),
             message:   wrap(globalThis.__emit_message),
+            vote:      wrap(globalThis.__emit_vote),
             execute:   wrap(globalThis.__emit_execute),
             crossExecute: wrap(globalThis.__emit_crossExecute)
         }),
@@ -1268,6 +1269,7 @@ class XChainVM {
         g.setSync('__emit_link',      bridge(gateway.emit.link));
         g.setSync('__emit_broadcast', bridge(gateway.emit.broadcast));
         g.setSync('__emit_message',   bridge(gateway.emit.message));
+        g.setSync('__emit_vote',      bridge(gateway.emit.vote));
         g.setSync('__emit_execute',   bridge(gateway.emit.execute));
         g.setSync('__emit_crossExecute', bridge(gateway.emit.crossExecute));
 

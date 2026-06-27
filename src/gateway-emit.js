@@ -364,6 +364,25 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             validateRequired(params, ['destination']);
             validateTypes(params, { destination: 'string' });
             emissionCollector.add('MESSAGE', params);
+        },
+        // Governance: a contract acts as its own poll actor. version 0 = create a
+        // poll, version 1 = cast a ballot; v2 (finalize) and v3 (delegation) are not
+        // contract-emittable (Section 16). The contract is the SOURCE, so hold-to-
+        // create / hold-to-vote and any deposit/gas_escrow apply to its own balance.
+        vote: (params) => {
+            charge();
+            if (typeof params !== 'object' || params === null) params = {};
+            let version = Number(params.version);
+            if (version === 1) {
+                validateRequired(params, ['pollRef', 'ballot']);
+                validateTypes(params, { ballot: 'string' });
+            } else if (version === 0) {
+                validateRequired(params, ['tick', 'endBlock', 'options']);
+                validateTypes(params, { tick: 'string', options: 'string' });
+            } else {
+                throw new Error('emit.vote: version must be 0 (create) or 1 (ballot)');
+            }
+            emissionCollector.add('VOTE', params);
         }
     };
 }
