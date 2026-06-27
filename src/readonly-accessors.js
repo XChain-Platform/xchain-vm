@@ -118,6 +118,22 @@ function buildAttestationAccessor(snap) {
     };
 }
 
+function buildPollAccessor(snap) {
+    if (snap == null) return null;
+    if (isAccessor(snap, 'getPollResult')) return snap; // legacy passthrough
+    const polls = snap.polls || {};
+    return {
+        // Frozen result of a finalized VOTE poll, or null if the poll does not
+        // exist or has not finalized yet. Keys are poll indices (the VOTE v0
+        // action_index). Shape: { status, winning_option, total_weight,
+        // total_voters, decided_early, options:[{index,weight,voters}] }.
+        getPollResult: (pollIndex) => {
+            const p = polls[String(pollIndex)];
+            return p != null ? p : null;
+        }
+    };
+}
+
 /**
  * Resolve all four read-only-data fields from execute() opts into synchronous
  * accessor objects, accepting either plain snapshots or legacy accessor objects.
@@ -129,7 +145,8 @@ function resolveAccessors(opts) {
         oracleData:        buildOracleAccessor(opts.oracleData),
         crossChainData:    buildCrossChainAccessor(opts.crossChainData),
         attestationData:   buildAttestationAccessor(opts.attestationData),
-        contractStakeData: buildContractStakeAccessor(opts.contractStakeData)
+        contractStakeData: buildContractStakeAccessor(opts.contractStakeData),
+        pollData:          buildPollAccessor(opts.pollData)
     };
 }
 
@@ -138,5 +155,6 @@ module.exports = {
     buildContractStakeAccessor,
     buildCrossChainAccessor,
     buildAttestationAccessor,
+    buildPollAccessor,
     resolveAccessors
 };

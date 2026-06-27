@@ -67,6 +67,16 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             if (!readOnlyData.tokenInfo) return null;
             return readOnlyData.tokenInfo[tick] || null;
         },
+        // Frozen result of a finalized VOTE governance poll (the governance hook:
+        // a contract branches on a poll outcome - release a treasury, flip a
+        // parameter). Returns null for an unknown or not-yet-finalized poll, so a
+        // contract can tell "not decided" from a real result. Deterministic: the
+        // result is immutable post-finalization and identical on every node.
+        getPollResult: (pollIndex) => {
+            gasTracker.charge(gasSchedule.VM_STATE_READ);
+            if (!readOnlyData.pollData) return null;
+            return readOnlyData.pollData.getPollResult(pollIndex);
+        },
 
         // Contract state (metered)
         state: {

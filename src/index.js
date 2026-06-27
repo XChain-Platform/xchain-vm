@@ -218,6 +218,7 @@ const HARNESS_SOURCE = `
         // Ledger queries (metered)
         getBalance:    wrap(globalThis.__getBalance),
         getTokenInfo:  wrap(globalThis.__getTokenInfo),
+        getPollResult: wrap(globalThis.__getPollResult),
 
         // State (metered)
         state: Object.freeze({
@@ -998,6 +999,7 @@ class XChainVM {
                     crossChainData:    accessors.crossChainData,
                     attestationData:   accessors.attestationData,
                     contractStakeData: accessors.contractStakeData,
+                    pollData:          accessors.pollData,
                     providerDeadlines: opts.providerDeadlines || null
                 },
                 this.gasSchedule,
@@ -1222,6 +1224,7 @@ class XChainVM {
         // Ledger queries (metered)
         g.setSync('__getBalance',   bridge(gateway.getBalance));
         g.setSync('__getTokenInfo', bridge(gateway.getTokenInfo));
+        g.setSync('__getPollResult', bridge(gateway.getPollResult));
 
         // State (metered)
         g.setSync('__state_get',    bridge(gateway.state.get));
