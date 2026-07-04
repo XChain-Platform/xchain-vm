@@ -26,7 +26,8 @@ describe('ActionValidator', function() {
     describe('allowed actions', function() {
         it('every production-allowed action is covered (mirror is bound, not copied)', function() {
             assert.ok(ALLOWED_ACTIONS.includes('XCALL'), 'XCALL must be exercised');
-            assert.strictEqual(ALLOWED_ACTIONS.length, 20);
+            assert.ok(ALLOWED_ACTIONS.includes('VOTE'), 'VOTE must be exercised');
+            assert.strictEqual(ALLOWED_ACTIONS.length, 21);
         });
         for (const action of ALLOWED_ACTIONS) {
             it('should accept ' + action, function() {
