@@ -46,6 +46,14 @@ const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 const ARR = `var a=new Array(${K}).fill(7);`;
 const OBJ = `var o={};for(var j=0;j<${K};j++)o['k'+j]=j;`;
 const STR = `var s=('7,').repeat(${K});`;
+// A K-char string of a single valid URI/numeric char, for the global-function
+// vectors (encode/decode/escape/parse). '5' is identity under encode/escape and
+// a legal parseInt/parseFloat body, so the op work is O(len) with no throw.
+const GSTR = `var s=('5').repeat(${K});`;
+// The F3-globals metering (like F3-binary) is flag-day-gated on block time, so
+// these vectors must run AT/ABOVE the gate to exercise the ACTIVATED ruleset;
+// below it they are intentionally un-metered (historical replay behaviour).
+const POST_GATE_BLOCK = { height: 100, timestamp: 1798761600, hash: 'gate' };
 
 const VECTORS = [
     // --- Array methods G1 should already cover (regression) ---
@@ -67,14 +75,22 @@ const VECTORS = [
     { id: 'Object.getOwnPropertyNames', mk: C => `${OBJ}var t=0;for(var i=0;i<${C};i++)t+=Object.getOwnPropertyNames(o).length;return t;` },
     // --- Spread (syntax, like `+`, not a method) ---
     { id: 'spread [...array]',  mk: C => `${ARR}var t=0;for(var i=0;i<${C};i++)t+=[].concat(a).length;return t;` }, // baseline via concat (metered)
-    { id: 'spread [...string]', mk: C => `${STR}var t=0;for(var i=0;i<${C};i++)t+=([...s]).length;return t;` }
+    { id: 'spread [...string]', mk: C => `${STR}var t=0;for(var i=0;i<${C};i++)t+=([...s]).length;return t;` },
+    // --- O(n) GLOBAL functions, flag-day-gated (F3-globals). Run POST-gate. ---
+    { id: 'encodeURIComponent', gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=encodeURIComponent(s).length;return t;` },
+    { id: 'decodeURIComponent', gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=decodeURIComponent(s).length;return t;` },
+    { id: 'encodeURI',          gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=encodeURI(s).length;return t;` },
+    { id: 'escape',             gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=escape(s).length;return t;` },
+    { id: 'unescape',           gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=unescape(s).length;return t;` },
+    { id: 'parseInt',           gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=(parseInt(s,10)>0?1:0);return t;` },
+    { id: 'parseFloat',         gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=(parseFloat(s)>0?1:0);return t;` }
 ];
 
-async function run(code) {
+async function run(code, blockContext) {
     const vm = createVM({ gasCeiling: GAS_CEILING, maxCpuTimeMs: CPU_MS });
     if (typeof vm.beginBlock === 'function') vm.beginBlock();
     let r;
-    try { r = await execute(vm, code, { method: 'default' }); }
+    try { r = await execute(vm, code, { method: 'default', blockContext: blockContext }); }
     catch (e) { r = { success: false, error: 'THROW: ' + e.message, gasUsed: -1 }; }
     if (typeof vm.endBlock === 'function') vm.endBlock();
     return r;
@@ -86,8 +102,9 @@ async function main() {
     process.stdout.write(`${'-'.repeat(80)}\n`);
     const findings = [];
     for (const v of VECTORS) {
-        const lo = await run(wrap(v.mk(LOW)));
-        const hi = await run(wrap(v.mk(HIGH)));
+        const bc = v.gated ? POST_GATE_BLOCK : undefined;
+        const lo = await run(wrap(v.mk(LOW)), bc);
+        const hi = await run(wrap(v.mk(HIGH)), bc);
         let verdict, tpg = '';
         const oog = /out_of_gas/.test(lo.error || '') || /out_of_gas/.test(hi.error || '');
         if (oog || hi.gasUsed >= GAS_CEILING || lo.gasUsed >= GAS_CEILING) {

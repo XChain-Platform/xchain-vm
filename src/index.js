@@ -191,12 +191,48 @@ const HARNESS_SOURCE = `
     // exactly as pre-activation nodes leave them; at/after it every node charges
     // the byte length identically. (Both injected names are __-prefixed and so
     // are stripped by the cleanup pass below, unreachable from contract code.)
+    // ----- Compute-size gas metering for O(n) GLOBAL functions (F3-globals) -----
+    // The G1 block below meters the O(n) Array/String/Object/JSON *methods*, but
+    // the standalone global functions that scan or transcode a whole string in
+    // native code for one call site were left uncharged: encode/decodeURIComponent,
+    // encode/decodeURI, escape/unescape (each ALLOCATES an O(n) transcoded copy)
+    // and parseInt/parseFloat (each SCANS the full string). Measured ~66k+
+    // char-touches per gas: decodeURIComponent(s) over a 120k-char string looped
+    // under a 1 M-gas budget burns ~13.5 s of wall-clock while gasUsed stays at
+    // ~540k, so the wall-clock net (per-node maxCpuTimeMs, not a consensus value)
+    // is the binding constraint -> a cheap-fee throughput DoS and a timeout-vs-
+    // commit divergence across a fleet with heterogeneous CPU-time limits. Charge
+    // the argument's string length BEFORE delegating (only for string args, so a
+    // numeric parseInt(42) stays free), exactly as F3 does for repeat/fill, so the
+    // deterministic gas ceiling binds first. Same flag-day as F3-binary (below):
+    // both add native-builtin charges that move gasUsed, so they flip atomically.
+    var __meterGlobalFn = function(nm) {
+        var orig = globalThis[nm];
+        if (typeof orig !== 'function') return;
+        __lockMethod(globalThis, nm, function(s) {
+            if (typeof s === 'string') __allocGas(s.length);
+            return orig.apply(this, arguments);
+        });
+    };
+    var __globalFns = ['encodeURIComponent', 'decodeURIComponent', 'encodeURI',
+        'decodeURI', 'escape', 'unescape', 'parseInt', 'parseFloat'];
+    // CONSENSUS GATE: this byte-length charge changes gasUsed (→ contract_hash →
+    // fee debit), so it must activate fleet-wide at a coordinated block-time
+    // flag-day, never the instant an individual node upgrades, otherwise a
+    // mixed-version fleet forks on the first binary-allocating execution. The
+    // host injects __blockTime (this execution's block time) and the flag-day
+    // constant before this harness runs. Below the flag day (or when no block
+    // time was supplied → __blockTime is 0) the constructors are left unmetered,
+    // exactly as pre-activation nodes leave them; at/after it every node charges
+    // the byte length identically. (Both injected names are __-prefixed and so
+    // are stripped by the cleanup pass below, unreachable from contract code.)
     if (typeof __blockTime === 'number' &&
         typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
         __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME) {
         for (var __bi = 0; __bi < __binCtors.length; __bi++) __meterBinaryCtor(__binCtors[__bi]);
+        for (var __gi = 0; __gi < __globalFns.length; __gi++) __meterGlobalFn(__globalFns[__gi]);
     }
-    // ----- end F3-binary -----
+    // ----- end F3-binary / F3-globals -----
 
     // Clean up __defineProperty (no longer needed)
     delete globalThis.__defineProperty;
