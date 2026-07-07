@@ -134,7 +134,8 @@ class E2EHarness {
             balances:        this.ledger.buildBalancesMap(),
             tokenInfo:       this.ledger.buildTokenInfoMap(),
             oracleData:      this.ledger.buildOracleAccessor(),
-            crossChainData:  this.ledger.buildCrossChainAccessor()
+            crossChainData:  this.ledger.buildCrossChainAccessor(),
+            pollData:        this.ledger.buildPollAccessor()
         });
 
         // On success, apply state changes and process emitted actions

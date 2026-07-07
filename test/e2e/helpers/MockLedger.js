@@ -40,6 +40,7 @@ class MockLedger {
         this.stateHistory     = {};  // { contractAddress: [{ key, value, blockIndex, deleted }] }
         this.oraclePrices     = {};  // { coinPair: { current: priceStr, rounds: {}, snapshotAge: N } }
         this.crossChain       = {};  // { "chain:idx": attestation }
+        this.pollResults      = {};  // { pollIndex: frozen VOTE poll result }
         this.blockHeight      = 1;
         this.blockTimestamp    = 1700000000;
         this.blockHash        = 'e2e_block_hash_1';
@@ -210,6 +211,22 @@ class MockLedger {
         };
     }
 
+    // --- Poll helpers (VOTE governance) ---
+
+    // Seed a finalized poll readable via xchain.getPollResult. `result` mirrors
+    // the indexer's getPollResultsForVM map entries: { status, winning_option,
+    // total_weight, total_voters, decided_early, options:[{index,weight,voters}] }.
+    seedPollResult(pollIndex, result) {
+        this.pollResults[String(pollIndex)] = result;
+    }
+
+    buildPollAccessor() {
+        const self = this;
+        return {
+            getPollResult: (pollIndex) => self.pollResults[String(pollIndex)] || null
+        };
+    }
+
     // --- Block simulation ---
 
     advanceBlock() {
@@ -280,6 +297,7 @@ class MockLedger {
         this.stateHistory = {};
         this.oraclePrices = {};
         this.crossChain = {};
+        this.pollResults = {};
         this.blockHeight = 1;
         this.blockTimestamp = 1700000000;
         this.blockHash = 'e2e_block_hash_1';
