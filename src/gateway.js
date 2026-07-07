@@ -331,8 +331,15 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             isGuard:         readOnlyData.isGuard
         }),
 
-        // Deterministic math (wraps mathjs bignumber)
-        math: buildMathAPI(),
+        // Deterministic math (wraps mathjs bignumber). F-MO: above the flag-day
+        // (host sets readOnlyData.mathOutputMeterOn) an oversized result (e.g. a
+        // tiny-input pow producing a multi-MB fixed-notation string host-side) is
+        // charged gas by predicted length BEFORE mathjs.format() allocates, so it
+        // trips the deterministic gas ceiling instead of the host allocator. Below
+        // the gate the hook is null and behaviour is unchanged.
+        math: buildMathAPI(
+            readOnlyData.mathOutputMeterOn ? (units) => gasTracker.charge(units) : null
+        ),
 
         // Control flow (gas-free)
         // Store the revert reason in execContext so the error classifier can

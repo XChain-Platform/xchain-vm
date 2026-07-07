@@ -234,6 +234,69 @@ const HARNESS_SOURCE = `
     }
     // ----- end F3-binary / F3-globals -----
 
+    // ----- Deterministic structural-depth guard for native-recursive builtins (F-NR) -----
+    // JSON.stringify and Array.prototype.join/flat (join also backs toString,
+    // String(arr), arr+empty-string, and template interpolation of an array)
+    // recurse in native C++ down to the value's NESTING depth. That native
+    // recursion bypasses the __depth_enter meter, which
+    // only wraps contract JS frames, so its only backstop is V8's native stack
+    // limit. isolated-vm derives that limit from the HOST THREAD stack
+    // (environment.cc AsyncEntry: SetStackLimit(GetStackBase()+24KB)), which its own
+    // comment notes is 512KB per pthread on macOS versus ~2MB on Linux (and ~128KB
+    // on musl/Alpine). So a value nested past that depth overflows at a
+    // HOST-DEPENDENT depth. A contract can build such a spine with a cheap loop
+    // (a=[a]; a plain loop, no recursion, so no __depth_enter charge), feed it to one
+    // of these sinks, CATCH the RangeError, and branch on caught-vs-not: divergent
+    // hashed state across a heterogeneous-OS fleet (the same fork class the
+    // __depth_enter/__DEPTH_LIMIT guard closes for contract recursion, left open on
+    // the native-builtin path). Pre-check nesting depth against the SAME
+    // platform-independent __DEPTH_LIMIT, ITERATIVELY (explicit stack, never
+    // recurses, so the guard itself cannot overflow), and route an over-depth value
+    // into the SAME un-swallowable __stackPoison the recursion guard uses: once
+    // poisoned every metered __gas point re-throws, so catching the fault cannot
+    // resume, and the collapsed out_of_stack outcome is identical on every host.
+    // No memo: __gasFunc(1) is charged per node visited, so a shared-reference DAG
+    // that unfolds exponentially (a=[a,a]) trips the deterministic gas ceiling
+    // (out_of_gas) instead of exploring forever, while a genuine deep spine aborts
+    // after ~__DEPTH_LIMIT nodes. CONSENSUS GATE: the extra per-node gas and the
+    // poison both move the hashed outcome, so this is active only at/after the same
+    // block-time flag-day as F3-binary/globals; below it the guard is inert and the
+    // legacy native-recursion behaviour replays unchanged.
+    var __hasOwn = Object.prototype.hasOwnProperty;
+    var __isArray = Array.isArray;   // captured native (contract cannot repoint the guard)
+    var __nrGuardOn = (typeof __blockTime === 'number' &&
+        typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
+        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME &&
+        __DEPTH_LIMIT > 0);
+    var __guardNativeDepth = function(root) {
+        if (!__nrGuardOn) return;
+        if (__stackPoison) throw __stackError();
+        if (root === null || typeof root !== 'object') return;
+        var stack = [root];
+        var depths = [1];
+        while (stack.length) {
+            var v = stack.pop();
+            var d = depths.pop();
+            __gasFunc(1);
+            if (d > __DEPTH_LIMIT) { __stackPoison = true; throw __stackError(); }
+            var i, c;
+            if (__isArray(v)) {
+                for (i = 0; i < v.length; i++) {
+                    c = v[i];
+                    if (c !== null && typeof c === 'object') { stack.push(c); depths.push(d + 1); }
+                }
+            } else {
+                for (var k in v) {
+                    if (__hasOwn.call(v, k)) {
+                        c = v[k];
+                        if (c !== null && typeof c === 'object') { stack.push(c); depths.push(d + 1); }
+                    }
+                }
+            }
+        }
+    };
+    // ----- end F-NR -----
+
     // Clean up __defineProperty (no longer needed)
     delete globalThis.__defineProperty;
 
@@ -419,9 +482,27 @@ const HARNESS_SOURCE = `
     // Includes the O(n) mutators (splice/unshift/shift shift every element) and
     // the ES2023 copying methods (toSorted/toReversed/toSpliced/with allocate a
     // full copy). __meterLen no-ops for any absent on the host V8.
-    ['indexOf', 'lastIndexOf', 'includes', 'join', 'reverse', 'sort',
-     'flat', 'slice', 'copyWithin', 'splice', 'unshift', 'shift',
+    // join/flat are handled by dedicated wrappers below (they recurse into nested
+    // arrays in native code, so they additionally get the structural-depth guard).
+    ['indexOf', 'lastIndexOf', 'includes', 'reverse', 'sort',
+     'slice', 'copyWithin', 'splice', 'unshift', 'shift',
      'toSorted', 'toReversed', 'toSpliced', 'with'].forEach(function(m) { __meterLen(Array.prototype, m); });
+    // join recurses into nested-array elements (and backs Array.prototype.toString,
+    // String(arr), arr + empty-string, template interpolation); flat recurses to its
+    // depth argument. Guard the
+    // structural depth (F-NR) BEFORE delegating, then charge length like __meterLen.
+    var __ajoin = Array.prototype.join;
+    if (typeof __ajoin === 'function') __lockMethod(Array.prototype, 'join', function() {
+        __guardNativeDepth(this);
+        __allocGas(this == null ? 0 : this.length);
+        return __ajoin.apply(this, arguments);
+    });
+    var __aflat = Array.prototype.flat;
+    if (typeof __aflat === 'function') __lockMethod(Array.prototype, 'flat', function() {
+        __guardNativeDepth(this);
+        __allocGas(this == null ? 0 : this.length);
+        return __aflat.apply(this, arguments);
+    });
     // String: native scan / copy (regex literals are banned at deploy time; the
     // locale-sensitive case methods are neutered in sandbox.js). repeat/padStart/
     // padEnd are owned by F3.
@@ -458,7 +539,8 @@ const HARNESS_SOURCE = `
     // and return-value caps.
     if (typeof JSON !== 'undefined') {
         var __jstr = JSON.stringify;
-        if (typeof __jstr === 'function') __lockMethod(JSON, 'stringify', function() {
+        if (typeof __jstr === 'function') __lockMethod(JSON, 'stringify', function(value) {
+            __guardNativeDepth(value);   // native recursion sink (F-NR)
             var r = __jstr.apply(this, arguments);
             if (typeof r === 'string') __allocGas(r.length);
             return r;
@@ -957,7 +1039,15 @@ class XChainVM {
         const execCeiling       = effectiveCeiling(opts.gasCeiling, this.gasCeiling);
         const gasTracker        = new GasTracker(this.gasSchedule, execCeiling);
         const stateManager      = new StateManager(opts.state || {}, this.limits);
-        const emissionCollector = new EmissionCollector(this.limits.maxEmissions);
+        // F-PS gate: recursive prototype-key stripping of emitted params (defense in
+        // depth; the shallow top-level strip left nested __proto__/constructor own
+        // keys in emissions). It can drop keys from a pathological emitted param, so
+        // it moves that emission's hash and activates fleet-wide only at/after the
+        // same block-time flag-day as F3-binary/globals + F-NR + F-MO.
+        const __psBlockTime     = opts.blockContext && Number(opts.blockContext.timestamp);
+        const emissionDeepStrip = Number.isFinite(__psBlockTime) &&
+            __psBlockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
+        const emissionCollector = new EmissionCollector(this.limits.maxEmissions, emissionDeepStrip);
         const execContext       = { reverted: false };
 
         let isolate = null;
@@ -991,9 +1081,17 @@ class XChainVM {
             const accessors = resolveAccessors(opts);
 
             // Build gateway on host side
+            // F-MO gate: math output metering (charge for an oversized pow()/format
+            // result host-side) moves gasUsed, so it activates fleet-wide only at/
+            // after the same block-time flag-day as F3-binary/globals + F-NR. Below
+            // it the gateway passes a null hook and math billing is unchanged.
+            const mathBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
+            const mathOutputMeterOn = Number.isFinite(mathBlockTime) &&
+                mathBlockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
             const gateway = buildGateway(
                 gasTracker, stateManager, emissionCollector,
                 {
+                    mathOutputMeterOn,
                     caller:          opts.caller,
                     contractAddress: opts.contractAddress,
                     contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
