@@ -113,8 +113,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // hashed deploy verdict and a hashed execution result, so two nodes that
         // disagree on the flag day diverge on the first such DEPLOY/EXECUTE. Pin it
         // like any other consensus parameter. Matches the indexer's VM_BANNED_ASYNC /
-        // other 2.0.0 flag-day activations (protocol_changes.js: 1798761600).
-        assert.strictEqual(vm.ASYNC_SURFACE_GATE_BLOCK_TIME, 1798761600);
+        // other 2.0.0 flag-day activations (protocol_changes.js: 1790812800).
+        assert.strictEqual(vm.ASYNC_SURFACE_GATE_BLOCK_TIME, 1790812800);
     });
 
     it('PINNED runtime equals the golden (re-pinning is a consensus event)', function () {
@@ -204,8 +204,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // on the first binary-allocating execution after the earlier of the two.
         // Pin it like any other consensus parameter; changing it is a coordinated
         // release-team event, NOT a silent edit. Matches the indexer's other 2.0.0
-        // flag-day activations (protocol_changes.js: 1798761600).
-        assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1798761600);
+        // flag-day activations (protocol_changes.js: 1790812800).
+        assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1790812800);
     });
 
     it('STATUS_ERROR_PREFIXES documents every raw prefix the VM can emit', function () {

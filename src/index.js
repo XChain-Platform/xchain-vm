@@ -850,9 +850,9 @@ const XCALL_MAX_RETURN_BYTES    = 1024;
 // Below the flag day the constructors are UNMETERED (the pre-activation
 // behavior); at/after it the byte-length charge applies on every node alike.
 // Same coordinated timestamp as the indexer's other 2.0.0 flag-day activations
-// (protocol_changes.js). PLACEHOLDER: must be confirmed by the release team
-// before mainnet; a value that differs across the fleet is itself a fork.
-const BINARY_ALLOC_GATE_BLOCK_TIME = 1798761600;
+// (protocol_changes.js). CONFIRMED 2026-07-07 (2026-10-01 00:00:00 UTC); a value
+// that differs across the fleet is itself a fork.
+const BINARY_ALLOC_GATE_BLOCK_TIME = 1790812800;
 
 // Coordinated activation (block time, unix seconds) for the async/Promise
 // contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
@@ -872,10 +872,10 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1798761600;
 // so keeping it on from block 0 preserves their current behaviour). An unknown /
 // empty network is treated like mainnet (conservative: requires the flag-day).
 // Same coordinated timestamp value as the indexer's other 2.0.0 flag-days and
-// BINARY_ALLOC_GATE_BLOCK_TIME (protocol_changes.js: 1798761600). PLACEHOLDER:
-// must be confirmed by the release team before mainnet; a value that differs
-// across the fleet is itself a fork.
-const ASYNC_SURFACE_GATE_BLOCK_TIME = 1798761600;
+// BINARY_ALLOC_GATE_BLOCK_TIME (protocol_changes.js: 1790812800). CONFIRMED
+// 2026-07-07 (2026-10-01 00:00:00 UTC); a value that differs across the fleet
+// is itself a fork.
+const ASYNC_SURFACE_GATE_BLOCK_TIME = 1790812800;
 
 // Resolve whether the async/Promise surface change is active for a given network
 // at a given block time. Used to gate the execution-side Promise strip; the
