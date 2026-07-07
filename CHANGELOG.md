@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Export `ActionValidator.ALLOWED_ACTIONS` and bind the validator unit test to it, so the suite exercises every production-allowed emission (previously a hand-copy that had drifted, omitting `XCALL`) and a removal from the allow-list can no longer pass green.
+- `test/e2e/helpers/`: the E2E harness now models per-tick decimals (`getTokenInfo` plus half-even normalization of emitted amounts, mirroring the indexer), so contract templates can be tested against real ledger-write precision (opt-in per tick via `setTokenDecimals`; unregistered ticks behave as before).
 
 ## [1.11.13] - 2026-06-20
 

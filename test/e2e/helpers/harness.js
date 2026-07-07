@@ -132,7 +132,7 @@ class E2EHarness {
             contractAddress: opts.contractAddress,
             blockContext:     blockContext,
             balances:        this.ledger.buildBalancesMap(),
-            tokenInfo:       {},
+            tokenInfo:       this.ledger.buildTokenInfoMap(),
             oracleData:      this.ledger.buildOracleAccessor(),
             crossChainData:  this.ledger.buildCrossChainAccessor()
         });

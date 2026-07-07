@@ -36,6 +36,7 @@ class MockLedger {
         this.contracts        = {};  // { contractAddress: { code, deployer, blockIndex } }
         this.contractState    = {};  // { contractAddress: { key: value } }
         this.contractBalances = {};  // { contractAddress: { tick: quantityStr } }
+        this.tokenDecimals    = {};  // { tick: decimalsInt } (registered ticks only)
         this.stateHistory     = {};  // { contractAddress: [{ key, value, blockIndex, deleted }] }
         this.oraclePrices     = {};  // { coinPair: { current: priceStr, rounds: {}, snapshotAge: N } }
         this.crossChain       = {};  // { "chain:idx": attestation }
@@ -128,6 +129,41 @@ class MockLedger {
         if (math.smaller(result, math.bignumber('0')))
             throw new Error(`insufficient contract balance: ${contractAddress} has ${current} ${tick}, tried to debit ${amount}`);
         this.contractBalances[contractAddress][tick] = math.format(result, { notation: 'fixed' });
+    }
+
+    // --- Token metadata (decimals) ---
+    //
+    // The real indexer knows every issued tick's decimal precision and (a) exposes
+    // it to contracts via xchain.getTokenInfo and (b) normalizes emitted amounts to
+    // it at write time. Tests opt in per tick with setTokenDecimals; unregistered
+    // ticks behave exactly as before (no tokenInfo entry, no emission normalization),
+    // so suites that never call this are unaffected.
+
+    setTokenDecimals(tick, decimals) {
+        this.tokenDecimals[tick] = parseInt(decimals, 10);
+    }
+
+    getTokenDecimals(tick) {
+        return this.tokenDecimals[tick];
+    }
+
+    // The tokenInfo snapshot the VM gateway hands to xchain.getTokenInfo(tick).
+    // Mirrors the indexer's shape (uppercase keys, integer DECIMALS).
+    buildTokenInfoMap() {
+        const out = {};
+        for (const tick in this.tokenDecimals) {
+            out[tick] = { TICK: tick, DECIMALS: this.tokenDecimals[tick] };
+        }
+        return out;
+    }
+
+    // Normalize an emitted amount to a tick's decimals the way the real indexer does
+    // at ledger write time (util.bcadd(amount,0,decimals) -> mathjs.format half-even).
+    // Returns the amount unchanged when the tick's decimals are unregistered.
+    normalizeToTick(tick, amount) {
+        const d = this.tokenDecimals[tick];
+        if (d === undefined) return String(amount);
+        return math.format(math.bignumber(amount), { notation: 'fixed', precision: d });
     }
 
     // --- Oracle helpers ---
@@ -240,6 +276,7 @@ class MockLedger {
         this.contracts = {};
         this.contractState = {};
         this.contractBalances = {};
+        this.tokenDecimals = {};
         this.stateHistory = {};
         this.oraclePrices = {};
         this.crossChain = {};
