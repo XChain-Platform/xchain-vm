@@ -888,6 +888,27 @@ function isAsyncSurfaceActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= ASYNC_SURFACE_GATE_BLOCK_TIME;
 }
 
+// Coordinated activation for rejecting raw NUL (0x00) bytes in contract state
+// keys at the state-write boundary. A NUL-bearing state_key row breaks the
+// indexer's 0x00-joined merkle leaf encoding (merkle.js joinFields throws on
+// any 0x00-bearing field to keep the join injective), so computing the block
+// merkle root wedges every state-commitment indexer at that block: an
+// F-12-class liveness halt any deployer can trigger. Rejecting the write
+// fails the execution deterministically on every node instead. Consensus-
+// visible (a rejected write flips an execution from success to failure), so
+// it is gated like the other 2.0.0 contract-era changes: testnet/regtest from
+// genesis (pre-launch nets, no history to preserve; a NUL key in committed
+// history is impossible anyway since it would have wedged the chain at that
+// block), mainnet at the shared coordinated flag-day. Values need no guard:
+// they are JSON.stringify'd before storage/hashing, which escapes control
+// characters. Same coordinated timestamp as BINARY_ALLOC/ASYNC_SURFACE; a
+// value that differs across the fleet is itself a fork.
+const STATE_KEY_NUL_GATE_BLOCK_TIME = 1790812800;
+function isStateKeyNulRejectActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= STATE_KEY_NUL_GATE_BLOCK_TIME;
+}
+
 class XChainVM {
     /**
      * @param {object} config
@@ -1038,7 +1059,13 @@ class XChainVM {
         // gasTracker.ceiling, so the clamp follows this resolution automatically.
         const execCeiling       = effectiveCeiling(opts.gasCeiling, this.gasCeiling);
         const gasTracker        = new GasTracker(this.gasSchedule, execCeiling);
-        const stateManager      = new StateManager(opts.state || {}, this.limits);
+        // H-5 gate: NUL-byte state keys wedge the indexer's block merkle root
+        // (see isStateKeyNulRejectActive). Network-aware like the async-surface
+        // gate; a missing/garbage timestamp resolves to NaN → pre-activation on
+        // mainnet.
+        const __skBlockTime     = opts.blockContext && Number(opts.blockContext.timestamp);
+        const stateManager      = new StateManager(opts.state || {}, this.limits,
+            { rejectNulKeys: isStateKeyNulRejectActive(opts.network, __skBlockTime) });
         // F-PS gate: recursive prototype-key stripping of emitted params (defense in
         // depth; the shallow top-level strip left nested __proto__/constructor own
         // keys in emissions). It can drop keys from a pathological emitted param, so
@@ -1621,6 +1648,11 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.ASYNC_SURFACE_GATE_BLOCK_TIME = ASYNC_SURFACE_GATE_BLOCK_TIME;
+// Coordinated flag-day (block time) that activates NUL-byte state-key rejection
+// at the state-write boundary (H-5: a NUL-bearing state_key wedges the indexer's
+// block merkle root). Exposed so the consensus-params freeze guard can pin it;
+// consensus-critical.
+module.exports.STATE_KEY_NUL_GATE_BLOCK_TIME = STATE_KEY_NUL_GATE_BLOCK_TIME;
 // Cross-CHAIN call (XCALL) protocol constants, same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;

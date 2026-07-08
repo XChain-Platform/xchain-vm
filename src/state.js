@@ -20,7 +20,7 @@
 // @ts-nocheck
 
 class StateManager {
-    constructor(initialState, limits) {
+    constructor(initialState, limits, opts) {
         // Use Object.create(null) to prevent prototype pollution (RISK-11).
         this.state = Object.create(null);
         for (const [key, value] of Object.entries(initialState)) {
@@ -30,6 +30,13 @@ class StateManager {
         this.dirty    = new Map();  // key -> value (null = deleted)
         this.keyCount = Object.keys(this.state).length;
         this.limits   = limits;
+        // Consensus-gated (index.js isStateKeyNulRejectActive): a raw NUL in a
+        // state key breaks the indexer's 0x00-joined merkle leaf encoding
+        // (merkle.js joinFields throws), wedging every state-commitment indexer
+        // at that block. Rejecting at the write boundary fails the execution
+        // deterministically instead. Values are safe: they are JSON.stringify'd
+        // before storage/hashing, which escapes control characters.
+        this.rejectNulKeys = !!(opts && opts.rejectNulKeys);
     }
 
     get(key) {
@@ -51,6 +58,9 @@ class StateManager {
         const maxKeySize = this.limits.maxStateKeySize || 1024;
         if (typeof key === 'string' && Buffer.byteLength(key, 'utf8') > maxKeySize)
             throw new Error('state key exceeds max size (' + maxKeySize + ' bytes)');
+
+        if (this.rejectNulKeys && typeof key === 'string' && key.indexOf('\u0000') !== -1)
+            throw new Error('state key contains a NUL (0x00) byte');
 
         // Reject null/undefined: use delete() to remove keys
         if (value === null || value === undefined)
@@ -82,6 +92,9 @@ class StateManager {
         const maxKeySize = this.limits.maxStateKeySize || 1024;
         if (typeof key === 'string' && Buffer.byteLength(key, 'utf8') > maxKeySize)
             throw new Error('state key exceeds max size (' + maxKeySize + ' bytes)');
+
+        if (this.rejectNulKeys && typeof key === 'string' && key.indexOf('\u0000') !== -1)
+            throw new Error('state key contains a NUL (0x00) byte');
 
         const isLive = this.has(key);
         if (isLive) {

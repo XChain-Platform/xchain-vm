@@ -85,6 +85,25 @@ describe('StateManager', function() {
         assert.throws(() => sm.set('key', 'a'.repeat(100)), /max size/);
     });
 
+    // H-5: a raw NUL in a state key wedges the indexer's 0x00-joined merkle
+    // leaf encoding, so the gated write boundary must reject it (set and
+    // delete alike); below the gate the historical accept behavior holds.
+    it('should reject NUL-byte state keys when the gate is active', function() {
+        const sm = new StateManager({}, LIMITS, { rejectNulKeys: true });
+        const nulKey = 'a\u0000b';
+        assert.throws(() => sm.set(nulKey, 'v'), /NUL \(0x00\)/);
+        assert.throws(() => sm.delete(nulKey), /NUL \(0x00\)/);
+        sm.set('clean', 'v');   // non-NUL keys unaffected
+        assert.strictEqual(sm.get('clean'), 'v');
+    });
+
+    it('should accept NUL-byte state keys when the gate is inactive (pre-flag-day)', function() {
+        const sm = new StateManager({}, LIMITS);
+        const nulKey = 'a\u0000b';
+        sm.set(nulKey, 'v');
+        assert.strictEqual(sm.get(nulKey), 'v');
+    });
+
     it('should reject null values', function() {
         const sm = new StateManager({}, LIMITS);
         assert.throws(() => sm.set('key', null), /null or undefined/);
