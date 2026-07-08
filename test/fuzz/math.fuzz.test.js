@@ -108,7 +108,11 @@ const {
                 checkResultShape(result);
                 if (result.success && result.returnValue) {
                     const { c1, c2 } = JSON.parse(result.returnValue);
-                    assert.strictEqual(c1, -c2,
+                    // Use === (not assert.strictEqual, which is Object.is): for equal
+                    // inputs compare returns 0, and negating c2=0 yields -0. Object.is(0,-0)
+                    // is false, but the antisymmetry property (c1 === -c2) holds under ===,
+                    // which treats 0 === -0 as true. compare itself never returns -0.
+                    assert.ok(c1 === -c2,
                         'compare not antisymmetric: compare(' + a + ',' + b + ') = ' + c1 + ', compare(' + b + ',' + a + ') = ' + c2);
                 }
             }
