@@ -36,7 +36,13 @@ function enqueue(fn) {
 
 function send(msg) {
     if (process.connected) {
-        try { process.send(msg); } catch (e) { /* parent gone */ }
+        // process.send can fail SYNCHRONOUSLY (caught here) or ASYNCHRONOUSLY: the IPC
+        // write is buffered and may fail later (e.g. EPIPE when the parent disconnected
+        // during teardown). Per Node docs, an async failure with no send callback emits an
+        // unhandled 'error' on the process and crashes the worker; passing a no-op callback
+        // absorbs it. The worker is being torn down in that case, so the dropped message is
+        // moot (the parent already reads execution results as a value, not from late IPC).
+        try { process.send(msg, undefined, () => {}); } catch (e) { /* parent gone */ }
     }
 }
 
