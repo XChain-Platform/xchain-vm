@@ -1,7 +1,7 @@
-# XChain VM — Security Audit Plan
+# XChain VM - Security Audit Plan
 
 **Component:** `xchain-vm`  
-**Criticality:** Extremely High — compromised VM security could allow unauthorized state changes, sandbox escape, or platform-wide exploitation.  
+**Criticality:** Extremely High - compromised VM security could allow unauthorized state changes, sandbox escape, or platform-wide exploitation.  
 **Date:** 2026-04-03  
 **Status:** Initial Audit Plan
 
@@ -34,9 +34,9 @@ This audit covers the security posture of the XChain VM smart contract execution
 
 For each area, perform line-by-line review of the source modules listed above, tracing data flow from contract input through execution to result output. Focus on:
 
-1. **Boundary trust analysis** — identify every point where data crosses the isolate/host boundary (`ivm.Reference` callbacks, `applySync`, `runSync`). Verify serialization/deserialization is tamper-proof.
-2. **Negative-path analysis** — for each validation check, determine what happens if the check is absent or bypassed. Enumerate edge cases the check does not cover.
-3. **Control flow tracing** — follow contract code from parsing (acorn) → metering injection → compilation → execution → result collection. Identify any code path that avoids gas metering.
+1. **Boundary trust analysis** - identify every point where data crosses the isolate/host boundary (`ivm.Reference` callbacks, `applySync`, `runSync`). Verify serialization/deserialization is tamper-proof.
+2. **Negative-path analysis** - for each validation check, determine what happens if the check is absent or bypassed. Enumerate edge cases the check does not cover.
+3. **Control flow tracing** - follow contract code from parsing (acorn) → metering injection → compilation → execution → result collection. Identify any code path that avoids gas metering.
 
 ### 2.2 Threat Modeling
 
@@ -70,7 +70,7 @@ Systematically attempt (conceptually) the following attack vectors against the c
 
 ## 3. Prioritized Risk Register
 
-### CRITICAL — Sandbox Escape
+### CRITICAL - Sandbox Escape
 
 #### RISK-01: Prototype Chain Traversal to Host Objects
 
@@ -82,7 +82,7 @@ Systematically attempt (conceptually) the following attack vectors against the c
 - The `xchain` object is `Object.freeze()`'d (harness lines 56, 72, 77, etc.).
 - Injected `__*` references are cleaned up from `globalThis` after harness assembly (harness lines 142-147).
 
-**Residual Risk:** The `__Function` reference is stored on `globalThis` during harness execution and used in the contract wrapper (index.js:163-164). Although it is `delete`d from `globalThis` at line 163, there is a window between harness execution and contract wrapper execution. If the harness cleanup (lines 142-147) runs before the contract wrapper, `__Function` would already be removed from globals. However, the contract wrapper itself reads `__Function` before deleting it — this is the designed flow. **Verify:** Can a contract observe `__Function` before the wrapper deletes it? The wrapper runs as a single compiled script, so the contract code inside the `new __Fn(...)` call should not have access to `__Function` since it's passed via `module`/`exports`/`xchain` parameters only. **Action:** Confirm with targeted testing.
+**Residual Risk:** The `__Function` reference is stored on `globalThis` during harness execution and used in the contract wrapper (index.js:163-164). Although it is `delete`d from `globalThis` at line 163, there is a window between harness execution and contract wrapper execution. If the harness cleanup (lines 142-147) runs before the contract wrapper, `__Function` would already be removed from globals. However, the contract wrapper itself reads `__Function` before deleting it - this is the designed flow. **Verify:** Can a contract observe `__Function` before the wrapper deletes it? The wrapper runs as a single compiled script, so the contract code inside the `new __Fn(...)` call should not have access to `__Function` since it's passed via `module`/`exports`/`xchain` parameters only. **Action:** Confirm with targeted testing.
 
 **Additional Concern:** `Object.getPrototypeOf(xchain)` returns `Object.prototype`. From `Object.prototype`, can the contract reach `Function`? In standard V8: `Object.prototype.constructor` → `Object` → `Object.constructor` → `Function`. But `Function` is set to `undefined` on `globalThis`. **Verify:** Does `Object.constructor` still reference the original `Function` constructor even after `globalThis.Function = undefined`? If so, this is a potential escape vector:
 ```javascript
@@ -93,12 +93,12 @@ Object.constructor('return process')()
 - Freeze `Object.prototype.constructor` to `undefined` or to a no-op.
 - After `globalThis.Function = undefined`, also set `Object.constructor = undefined`.
 - Consider using `Object.freeze(Object.prototype)` to prevent all prototype chain manipulation.
-- Test: `({}).__proto__.constructor('return this')()` — does it return the global object?
+- Test: `({}).__proto__.constructor('return this')()` - does it return the global object?
 
 #### RISK-02: `eval` and `Function` via Indirect References
 
 **Threat:** Even with `eval` and `Function` set to `undefined` on `globalThis`, V8 may retain indirect references accessible via:
-- `(0, eval)('...')` — indirect eval
+- `(0, eval)('...')` - indirect eval
 - `[].constructor.constructor('return process')()`
 - `''.constructor.constructor('return process')()`
 - `(async function(){}).constructor('return process')()`
@@ -131,7 +131,7 @@ Object.constructor('return process')()
 
 ---
 
-### CRITICAL — Error Type Spoofing
+### CRITICAL - Error Type Spoofing
 
 #### RISK-04: `\x03`-Prefixed Error Spoofing
 
@@ -144,7 +144,7 @@ Object.constructor('return process')()
 
 **Residual Risk:** Low but nonzero.
 - If a contract calls `xchain.revert()` (setting `execContext.reverted = true`) and then catches the resulting error within a try/catch, `execContext.reverted` remains `true`. A subsequent `throw new Error('\x03REVERT:custom message')` would pass the verification check, allowing the contract to spoof the revert reason.
-- **Verify:** Can contract code catch a `ContractRevertError` thrown by `xchain.revert()`? The error crosses the isolate boundary — it's thrown on the host side inside the `bridge()` wrapper. The `ivm.Reference.applySync()` call would propagate the error into the isolate. If the contract wraps `xchain.revert()` in a try/catch, it might intercept the error, leaving `execContext.reverted = true` but allowing execution to continue with a spoofed throw.
+- **Verify:** Can contract code catch a `ContractRevertError` thrown by `xchain.revert()`? The error crosses the isolate boundary - it's thrown on the host side inside the `bridge()` wrapper. The `ivm.Reference.applySync()` call would propagate the error into the isolate. If the contract wraps `xchain.revert()` in a try/catch, it might intercept the error, leaving `execContext.reverted = true` but allowing execution to continue with a spoofed throw.
 
 **Recommendation:**
 - Reset `execContext.reverted = false` on every gateway call entry, or make `revert()` throw an error that cannot be caught inside the isolate.
@@ -152,7 +152,7 @@ Object.constructor('return process')()
 
 ---
 
-### CRITICAL — Gas Metering Bypass
+### CRITICAL - Gas Metering Bypass
 
 #### RISK-05: Unmetered Code Paths via AST Gaps
 
@@ -167,21 +167,21 @@ Object.constructor('return process')()
 - CallExpressions (all except `__gas` calls)
 
 **Gaps Identified:**
-1. **Property access chains** — `a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p` — arbitrarily long property access chains with no gas cost. A contract could construct a deep object graph and traverse it in computationally expensive ways without triggering gas charges.
-2. **Array/object literals** — `[[[[[[[...n deep...]]]]]]]` or `{a:{b:{c:...}}}` — constructing massive nested structures without gas charges for each level.
-3. **Template literals** — `` `${a}${b}${c}...${z}` `` with many interpolations — string concatenation without gas charges per interpolation.
-4. **Destructuring** — `const {a,b,c,...z} = obj` — complex destructuring with no gas cost.
-5. **Spread operator** — `[...a, ...b, ...c, ...d]` — spreading large arrays.
-6. **Getter/setter abuse** — A contract can define getters on objects that perform expensive computation. Property access triggers the getter, which is not metered.
-7. **`toString`/`valueOf` override** — Objects with custom `toString` that perform computation are invoked during string concatenation and comparison without gas metering.
-8. **RegExp backtracking** — While `Function` and `eval` are blocked, `RegExp` is available. Catastrophic backtracking: `/^(a+)+$/` on a long string could consume unbounded CPU.
+1. **Property access chains** - `a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p` - arbitrarily long property access chains with no gas cost. A contract could construct a deep object graph and traverse it in computationally expensive ways without triggering gas charges.
+2. **Array/object literals** - `[[[[[[[...n deep...]]]]]]]` or `{a:{b:{c:...}}}` - constructing massive nested structures without gas charges for each level.
+3. **Template literals** - `` `${a}${b}${c}...${z}` `` with many interpolations - string concatenation without gas charges per interpolation.
+4. **Destructuring** - `const {a,b,c,...z} = obj` - complex destructuring with no gas cost.
+5. **Spread operator** - `[...a, ...b, ...c, ...d]` - spreading large arrays.
+6. **Getter/setter abuse** - A contract can define getters on objects that perform expensive computation. Property access triggers the getter, which is not metered.
+7. **`toString`/`valueOf` override** - Objects with custom `toString` that perform computation are invoked during string concatenation and comparison without gas metering.
+8. **RegExp backtracking** - While `Function` and `eval` are blocked, `RegExp` is available. Catastrophic backtracking: `/^(a+)+$/` on a long string could consume unbounded CPU.
 
 **Recommendation:**  
 - **RegExp:** Either remove `RegExp` from the sandbox or meter regex operations. At minimum, test catastrophic backtracking patterns and verify the wall-clock timeout catches them.  
 - **Property access chains:** Consider instrumenting MemberExpression nodes, or at least deeply nested chains.  
-- **Getter/setter traps:** Freeze `Object.defineProperty` and `Object.defineProperties` inside the isolate to prevent runtime getter/setter creation. (Static getters in contract source would still be a risk — meter property access or limit object depth.)  
+- **Getter/setter traps:** Freeze `Object.defineProperty` and `Object.defineProperties` inside the isolate to prevent runtime getter/setter creation. (Static getters in contract source would still be a risk - meter property access or limit object depth.)  
 - **toString/valueOf:** Freeze `Object.prototype.toString` and `Object.prototype.valueOf`, or meter implicit coercions at string concatenation points.  
-- **Wall-clock timeout:** The 30-second timeout is the backstop. Verify it always fires even under extreme CPU pressure (e.g., tight regex backtracking or CPU-bound property access loops). Note: the timeout is labeled a "consensus risk" in the code — different nodes may time out at different wall-clock times, producing different execution results.
+- **Wall-clock timeout:** The 30-second timeout is the backstop. Verify it always fires even under extreme CPU pressure (e.g., tight regex backtracking or CPU-bound property access loops). Note: the timeout is labeled a "consensus risk" in the code - different nodes may time out at different wall-clock times, producing different execution results.
 
 #### RISK-06: `__gas` Identifier Collision
 
@@ -192,8 +192,8 @@ Object.constructor('return process')()
 - `hasGasIdentifier()` walks the full AST looking for `Identifier` nodes named `__gas` (metering.js:255-271).
 
 **Residual Risk:** Low. The check is comprehensive (walks ALL nodes including nested identifiers). However:
-- `metering.js:267-269`: If acorn parsing fails, `hasGasIdentifier` returns `false` (no `__gas` found). This is acceptable because `validateSyntax` calls V8 compile first, then metering, then `hasGasIdentifier` — if acorn can't parse it, `meterCode()` would have already failed at step 2.
-- **Verify:** Could a contract use computed property names like `globalThis['__' + 'gas'] = null` to overwrite the gas callback after deployment? The injected `__gas` is a `globalThis` property — after the harness cleanup (lines 142-147), `__gas` is explicitly kept (`names[i] !== '__gas'`). A contract could potentially do `globalThis.__gas = function(){}` to neuter metering.
+- `metering.js:267-269`: If acorn parsing fails, `hasGasIdentifier` returns `false` (no `__gas` found). This is acceptable because `validateSyntax` calls V8 compile first, then metering, then `hasGasIdentifier` - if acorn can't parse it, `meterCode()` would have already failed at step 2.
+- **Verify:** Could a contract use computed property names like `globalThis['__' + 'gas'] = null` to overwrite the gas callback after deployment? The injected `__gas` is a `globalThis` property - after the harness cleanup (lines 142-147), `__gas` is explicitly kept (`names[i] !== '__gas'`). A contract could potentially do `globalThis.__gas = function(){}` to neuter metering.
 
 **Recommendation:**
 - Make `__gas` non-configurable and non-writable on `globalThis` via `Object.defineProperty(globalThis, '__gas', { value: gasRef, writable: false, configurable: false })`.
@@ -201,11 +201,11 @@ Object.constructor('return process')()
 
 ---
 
-### CRITICAL — Resource Exhaustion / Denial of Service
+### CRITICAL - Resource Exhaustion / Denial of Service
 
 #### RISK-07: Wall-Clock Timeout Non-Determinism
 
-**Threat:** The wall-clock timeout (`limits.maxCpuTimeMs`, default 30s) is the final safety net for resource exhaustion. However, wall-clock time is inherently non-deterministic — the same contract may time out on a slow node but succeed on a fast node, producing divergent consensus results.
+**Threat:** The wall-clock timeout (`limits.maxCpuTimeMs`, default 30s) is the final safety net for resource exhaustion. However, wall-clock time is inherently non-deterministic - the same contract may time out on a slow node but succeed on a fast node, producing divergent consensus results.
 
 **Current Mitigations Observed:**
 - The code logs at ERROR level when timeout fires and explicitly labels it a "consensus risk" (index.js:536-537).
@@ -249,7 +249,7 @@ Object.constructor('return process')()
 
 ---
 
-### HIGH — Input Validation Gaps
+### HIGH - Input Validation Gaps
 
 #### RISK-10: Emit Parameter Injection
 
@@ -277,7 +277,7 @@ Object.constructor('return process')()
 **Threat:** A contract sets state keys like `__proto__`, `constructor`, `toString`, or `hasOwnProperty` that could interfere with JavaScript object operations on the state object.
 
 **Current Mitigations Observed:**
-- `StateManager` uses `key in this.state` (state.js:33) and `this.state[key]` (state.js:28) — both are vulnerable to prototype key collisions.
+- `StateManager` uses `key in this.state` (state.js:33) and `this.state[key]` (state.js:28) - both are vulnerable to prototype key collisions.
 - The `has()` method uses `key in this.state` which checks the prototype chain.
 
 **Residual Risk:** Medium. Setting `key = '__proto__'` or `key = 'constructor'` could cause unexpected behavior in state operations or downstream consumers.
@@ -306,7 +306,7 @@ Object.constructor('return process')()
 
 ---
 
-### HIGH — State Isolation
+### HIGH - State Isolation
 
 #### RISK-13: Cross-Execution State Leakage
 
@@ -317,7 +317,7 @@ Object.constructor('return process')()
 - Each `execute()` creates a new V8 isolate (index.js:263-264) and disposes it in `finally` (index.js:400-401).
 - No global mutable state in the `XChainVM` class except `_blockCache` (Map of cached compilation data).
 
-**Residual Risk:** Low. The compilation cache (`_blockCache`) stores V8 cached data keyed by `contractIndex:codeHash`. If two different contracts produce the same hash, they would share cached compilation data. **Verify:** Is `codeHash` computed on the original code or the metered code? It's computed on the original code (index.js:315). Could a contract with different metering produce the same original code hash? No — same code means same hash means same metering.
+**Residual Risk:** Low. The compilation cache (`_blockCache`) stores V8 cached data keyed by `contractIndex:codeHash`. If two different contracts produce the same hash, they would share cached compilation data. **Verify:** Is `codeHash` computed on the original code or the metered code? It's computed on the original code (index.js:315). Could a contract with different metering produce the same original code hash? No - same code means same hash means same metering.
 
 **Recommendation:**
 - Verify that `_blockCache` entries cannot be poisoned (e.g., by storing malicious cached data).
@@ -333,11 +333,11 @@ Object.constructor('return process')()
 
 **Residual Risk:** Very low. The JSON serialization in the bridge layer (index.js:414-419) means objects are deep-copied when crossing the boundary. The shallow copy in the collector is a defense-in-depth measure.
 
-**Recommendation:** No action needed — the JSON boundary serialization provides effective deep-copy isolation.
+**Recommendation:** No action needed - the JSON boundary serialization provides effective deep-copy isolation.
 
 ---
 
-### MEDIUM — Information Leakage
+### MEDIUM - Information Leakage
 
 #### RISK-15: Error Message Verbosity
 
@@ -373,7 +373,7 @@ Object.constructor('return process')()
 
 ---
 
-### MEDIUM — Dependency Security
+### MEDIUM - Dependency Security
 
 #### RISK-17: `isolated-vm` Native Module Vulnerabilities
 
@@ -381,7 +381,7 @@ Object.constructor('return process')()
 
 **Current Version:** `isolated-vm` v5.0.4
 
-**Residual Risk:** Medium. This is the most critical dependency — it IS the sandbox. Any vulnerability in `isolated-vm` directly compromises VM security.
+**Residual Risk:** Medium. This is the most critical dependency - it IS the sandbox. Any vulnerability in `isolated-vm` directly compromises VM security.
 
 **Recommendation:**
 - Subscribe to `isolated-vm` security advisories and GitHub releases.
@@ -574,10 +574,10 @@ The XChain VM demonstrates a well-engineered security architecture with multiple
 
 However, several areas require attention before production deployment:
 
-- **Critical:** Prototype chain traversal to function constructors (RISK-01, RISK-02) — if `Object.constructor` still resolves to `Function`, the sandbox can be escaped.  
-- **Critical:** Gas metering gaps for unmetered operations (RISK-05) — property access, getters, RegExp backtracking.  
-- **Critical:** `__gas` callback overwritability (RISK-06) — contracts may be able to neuter metering.  
-- **High:** Error spoofing via caught reverts (RISK-04) — `execContext.reverted` flag manipulation.  
+- **Critical:** Prototype chain traversal to function constructors (RISK-01, RISK-02) - if `Object.constructor` still resolves to `Function`, the sandbox can be escaped.  
+- **Critical:** Gas metering gaps for unmetered operations (RISK-05) - property access, getters, RegExp backtracking.  
+- **Critical:** `__gas` callback overwritability (RISK-06) - contracts may be able to neuter metering.  
+- **High:** Error spoofing via caught reverts (RISK-04) - `execContext.reverted` flag manipulation.  
 - **High:** Input validation gaps in emit parameters and state keys (RISK-10, RISK-11).
 
 The recommended audit sequence is: **sandbox escape testing → gas metering verification → error spoofing testing → input validation review → determinism verification → dependency audit**.

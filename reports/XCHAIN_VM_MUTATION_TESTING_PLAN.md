@@ -1,10 +1,10 @@
-# XChain VM — Mutation Testing Plan
+# XChain VM - Mutation Testing Plan
 
 ## 1. Objective
 
 Assess the quality and detection power of the existing XChain VM test suite (1,284+ tests across unit, boundary, security, chaos, E2E, and fuzz categories) by systematically introducing small, artificial mutations into the source code and verifying that at least one test fails for each mutation. A high "killed mutation" rate confirms the suite can catch subtle regressions, logic flaws, and security vulnerabilities. A surviving mutation exposes a blind spot.
 
-The VM is the most security-critical component in the XChain Platform. A single undetected logic change in gas metering, sandbox enforcement, or state atomicity could cause consensus divergence, ledger manipulation, or host-process compromise. Code coverage alone cannot prove detection power — mutation testing can.
+The VM is the most security-critical component in the XChain Platform. A single undetected logic change in gas metering, sandbox enforcement, or state atomicity could cause consensus divergence, ledger manipulation, or host-process compromise. Code coverage alone cannot prove detection power - mutation testing can.
 
 ---
 
@@ -12,7 +12,7 @@ The VM is the most security-critical component in the XChain Platform. A single 
 
 ### 2.1 Priority Tiers
 
-Modules are tiered by blast radius — how much platform damage a single undetected mutation could cause.
+Modules are tiered by blast radius - how much platform damage a single undetected mutation could cause.
 
 | Tier | Module | Lines | Why |
 |------|--------|-------|-----|
@@ -46,7 +46,7 @@ Mutating the error-path cleanup to skip clearing `stateChanges` or `emittedActio
 ```
 if (execContext.reverted) { ... } else { ... }
 ```
-Negating the `reverted` flag check simulates revert spoofing — a contract could trick the host into treating a revert as success or vice versa.
+Negating the `reverted` flag check simulates revert spoofing - a contract could trick the host into treating a revert as success or vice versa.
 
 #### Gas Ceiling Check (`gas.js:27-28`)
 ```
@@ -60,7 +60,7 @@ Changing `>` to `>=`, `<`, or removing the check entirely simulates gas exhausti
 \x02  → revert marker
 \x03  → error marker
 ```
-Swapping, removing, or altering prefix characters simulates protocol corruption — the host misinterprets contract output.
+Swapping, removing, or altering prefix characters simulates protocol corruption - the host misinterprets contract output.
 
 #### `__gas` Protection (`index.js:72-82`)
 ```
@@ -154,7 +154,7 @@ Beyond standard operators, these patterns target XChain VM architectural invaria
 
 Some mutations produce functionally identical behavior (equivalent mutants). These cannot be killed and inflate the denominator. Known categories for this codebase:
 
-- **Dead code paths**: Code reachable only in configurations not tested (none identified — the VM has a single execution path)
+- **Dead code paths**: Code reachable only in configurations not tested (none identified - the VM has a single execution path)
 - **Redundant guards**: A mutation that disables a guard already covered by an earlier check (e.g., `gas.js` negative-amount check is also implicitly caught by the ceiling)
 - **String-only changes**: Altering error messages when tests check for error type, not message content
 
@@ -171,7 +171,7 @@ For each mutation M in the mutation set:
     1. Apply mutation M to a copy of the source code
     2. Run the full test suite against the mutated code
     3. If any test fails → mutation is "killed" (good)
-    4. If all tests pass → mutation "survived" (bad — test gap)
+    4. If all tests pass → mutation "survived" (bad - test gap)
     5. Revert the mutation
 ```
 
@@ -181,7 +181,7 @@ Different test categories serve different roles in mutation killing:
 
 | Test Category | Files | Tests | Role in Mutation Testing |
 |---------------|-------|-------|--------------------------|
-| Unit tests | 14 files | ~300+ | Primary killers — fast, targeted, one assertion per behavior |
+| Unit tests | 14 files | ~300+ | Primary killers - fast, targeted, one assertion per behavior |
 | Boundary tests | 1 file | 106 | Kill boundary mutations (off-by-one in limits, caps) |
 | Security tests | 1 file | 68 | Kill sandbox escape and error spoofing mutations |
 | E2E tests | 11 files | ~50+ | Kill integration-level mutations (cross-module data flow) |
@@ -195,20 +195,20 @@ Different test categories serve different roles in mutation killing:
 | Term | Definition |
 |------|------------|
 | **Killed** | At least one test failed when run against the mutated code |
-| **Survived** | All tests passed despite the mutation — indicates a test gap |
-| **Timed out** | Test suite exceeded the timeout threshold — treated as killed (the mutation likely caused an infinite loop, which is itself a detectable failure) |
-| **No coverage** | No test executes the mutated line — treated as survived |
-| **Equivalent** | The mutation produces identical behavior — excluded from scoring |
+| **Survived** | All tests passed despite the mutation - indicates a test gap |
+| **Timed out** | Test suite exceeded the timeout threshold - treated as killed (the mutation likely caused an infinite loop, which is itself a detectable failure) |
+| **No coverage** | No test executes the mutated line - treated as survived |
+| **Equivalent** | The mutation produces identical behavior - excluded from scoring |
 | **Mutation Score** | `killed / (total - equivalent) * 100` |
 
 ### 4.4 Target Mutation Scores
 
 | Tier | Target Score | Rationale |
 |------|-------------|-----------|
-| **Critical** (metering, index, sandbox, gas) | **>95%** | These modules protect consensus and security — virtually every logic path must be test-covered and test-detected |
-| **High** (gateway, gateway-emit, state, math) | **>90%** | Core business logic — high detection required but minor edge cases are lower risk |
-| **Medium** (collector, validator, syntax) | **>85%** | Supporting modules — important but lower blast radius |
-| **Low** (isolate, errors) | **>80%** | Infrastructure — lifecycle and type definitions |
+| **Critical** (metering, index, sandbox, gas) | **>95%** | These modules protect consensus and security - virtually every logic path must be test-covered and test-detected |
+| **High** (gateway, gateway-emit, state, math) | **>90%** | Core business logic - high detection required but minor edge cases are lower risk |
+| **Medium** (collector, validator, syntax) | **>85%** | Supporting modules - important but lower blast radius |
+| **Low** (isolate, errors) | **>80%** | Infrastructure - lifecycle and type definitions |
 | **Overall** | **>90%** | Aggregate across all modules |
 
 ### 4.5 Interpreting Survived Mutations
@@ -230,9 +230,9 @@ Stryker is the most mature mutation testing framework for JavaScript/Node.js.
 
 **Why Stryker:**
 - Native JavaScript/Node.js support via `@stryker-mutator/javascript-mutator`
-- Mocha test runner plugin (`@stryker-mutator/mocha-runner`) — matches the existing test framework
+- Mocha test runner plugin (`@stryker-mutator/mocha-runner`) - matches the existing test framework
 - Supports all standard mutation operators (conditional boundary, arithmetic, logical, statement deletion, etc.)
-- Incremental mode — only re-tests mutations in changed files
+- Incremental mode - only re-tests mutations in changed files
 - HTML reporter with per-file mutation scores and surviving mutation locations
 - Configurable mutation scope (target specific files/directories)
 - Early termination on first failing test per mutation
@@ -270,7 +270,7 @@ npm install --save-dev @stryker-mutator/core @stryker-mutator/mocha-runner
 
 | Tool | Purpose | When to Use |
 |------|---------|-------------|
-| **`stryker-diff-runner`** (Stryker incremental) | Only mutate lines changed since last run | CI integration — avoid full-suite mutation on every commit |
+| **`stryker-diff-runner`** (Stryker incremental) | Only mutate lines changed since last run | CI integration - avoid full-suite mutation on every commit |
 | **`mutation-testing-elements`** | Interactive HTML dashboard for results | Browsing survived mutations, drilling into specific files |
 | **Custom mutation scripts** | Targeted mutations Stryker doesn't support (e.g., array element deletion, string prefix swaps) | VM-specific patterns in Section 3.2 |
 
@@ -317,13 +317,13 @@ The VM test suite has 1,284+ tests with some tests taking 5-30 seconds (chaos, E
 **Steps:**
 1. Install Stryker and configure for Mocha
 2. Run mutation testing against `gas.js` (37 lines, ~15-20 mutants) as a proof of concept
-3. Triage survived mutations — are they equivalent or genuine gaps?
+3. Triage survived mutations - are they equivalent or genuine gaps?
 4. Expand to `sandbox.js` (146 lines, ~50-80 mutants)
 5. Expand to `metering.js` (271 lines, ~100-150 mutants)
 
 **Success criteria:** All three modules achieve >95% mutation score. Any surviving non-equivalent mutations have corresponding test improvement tickets filed.
 
-**Why start here:** These three modules are small enough for fast iteration, critical enough that gaps matter, and well-tested enough that the initial score should be high — building confidence in the approach.
+**Why start here:** These three modules are small enough for fast iteration, critical enough that gaps matter, and well-tested enough that the initial score should be high - building confidence in the approach.
 
 ### 6.2 Phase 2: High Tier + `index.js` (Weeks 3-4)
 
@@ -348,7 +348,7 @@ The VM test suite has 1,284+ tests with some tests taking 5-30 seconds (chaos, E
 **Steps:**
 1. Run Stryker against `collector.js`, `validator.js`, `syntax.js`, `isolate.js`, `errors.js`
 2. Configure Stryker incremental mode for CI
-3. Add mutation score thresholds to CI — fail the build if score drops below `thresholds.break` (80%)
+3. Add mutation score thresholds to CI - fail the build if score drops below `thresholds.break` (80%)
 4. Generate the first full mutation testing report
 
 **Success criteria:** Overall mutation score >90%. CI pipeline blocks PRs that reduce the score below threshold.
@@ -376,7 +376,7 @@ reports/mutation/
 **MUTATION_SUMMARY.md structure:**
 
 ```markdown
-# Mutation Testing Report — [date]
+# Mutation Testing Report - [date]
 
 ## Overall Score: XX.X% (XXX killed / XXX total, XX equivalent excluded)
 
@@ -390,7 +390,7 @@ reports/mutation/
 
 ## Survived Mutations (Action Required)
 
-### [module.js:line] — Mutation Operator: [type]
+### [module.js:line] - Mutation Operator: [type]
 - **Original:** `code`  
 - **Mutated:** `mutated code`  
 - **Impact:** [what this mutation simulates]  
@@ -418,7 +418,7 @@ Code coverage measures **whether code was executed**, not **whether tests would 
 
 **Concrete XChain VM example:**
 
-A test that executes `gas.charge(100)` and only asserts that no exception is thrown would give 100% line coverage on `gas.js:26-28`. But it would *not* detect a mutation that changes `this.used += amount` to `this.used -= amount` — the charge call succeeds either way. Only an assertion on `gas.getUsed()` returning the expected value would kill that mutation.
+A test that executes `gas.charge(100)` and only asserts that no exception is thrown would give 100% line coverage on `gas.js:26-28`. But it would *not* detect a mutation that changes `this.used += amount` to `this.used -= amount` - the charge call succeeds either way. Only an assertion on `gas.getUsed()` returning the expected value would kill that mutation.
 
 ### 7.2 Security Implications
 
@@ -436,13 +436,13 @@ For a VM that executes untrusted contract code, mutation testing directly answer
 
 Based on the current test suite composition (1,284+ tests including boundary, security, chaos, and fuzz):
 
-- **gas.js:** Expected >98% — 15 focused unit tests directly target ceiling enforcement and accumulation  
-- **sandbox.js:** Expected >90% — 27 unit tests + 68 security tests cover most escape vectors, but individual `toDelete` entries may not all be individually tested  
-- **metering.js:** Expected >85% — 40 unit tests cover most AST node types, but some edge cases (Phase 2 binary depth, Phase 3 SequenceExpression) may have gaps  
-- **state.js:** Expected >95% — 34 unit tests with explicit validation checks for each guard  
-- **index.js:** Expected >80% — 57 unit tests cover the main paths, but the error classification logic and prefix protocol have many branches
+- **gas.js:** Expected >98% - 15 focused unit tests directly target ceiling enforcement and accumulation  
+- **sandbox.js:** Expected >90% - 27 unit tests + 68 security tests cover most escape vectors, but individual `toDelete` entries may not all be individually tested  
+- **metering.js:** Expected >85% - 40 unit tests cover most AST node types, but some edge cases (Phase 2 binary depth, Phase 3 SequenceExpression) may have gaps  
+- **state.js:** Expected >95% - 34 unit tests with explicit validation checks for each guard  
+- **index.js:** Expected >80% - 57 unit tests cover the main paths, but the error classification logic and prefix protocol have many branches
 
-The highest value will come from identifying the **10-15% of mutations that survive** — these represent the specific logic paths where a subtle bug could go undetected by the current suite.
+The highest value will come from identifying the **10-15% of mutations that survive** - these represent the specific logic paths where a subtle bug could go undetected by the current suite.
 
 ---
 
@@ -452,7 +452,7 @@ The highest value will come from identifying the **10-15% of mutations that surv
 |------|--------|------------|
 | **Long runtime** | Full mutation run takes 20-50 hours | Phase by tier; use incremental mode in CI; full runs overnight |
 | **Equivalent mutants inflate denominator** | Score appears lower than actual detection power | Manually review survived mutations; mark equivalents; Stryker supports `// Stryker disable` comments |
-| **Flaky tests cause false kills** | A mutation appears killed but the test was just flaky | Stryker reruns failed tests — configure `--tempDirName` and review flaky kills |
+| **Flaky tests cause false kills** | A mutation appears killed but the test was just flaky | Stryker reruns failed tests - configure `--tempDirName` and review flaky kills |
 | **`isolated-vm` native module** | Stryker may have issues with native V8 bindings | Test the pilot phase with `gas.js` (pure JS, no native deps) first |
 | **Custom plugin maintenance** | VM-specific mutator plugin needs updating as code evolves | Keep the plugin scoped to the 4-5 patterns in Section 3.2; review on major refactors |
 

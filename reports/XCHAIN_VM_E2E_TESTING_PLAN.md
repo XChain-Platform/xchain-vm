@@ -1,4 +1,4 @@
-# XChain VM — End-to-End Testing Plan
+# XChain VM - End-to-End Testing Plan
 
 ## 1. Objective
 
@@ -61,7 +61,7 @@ The xchain-vm already has 81+ unit/integration tests covering individual modules
 |----|----------|-------|-------------|
 | E2E-030 | Sandbox escape attempts (full pipeline) | 1. Deploy contract containing all known escape vectors (constructor access, prototype pollution, process access, require, eval, Function constructor) 2. EXECUTE | Every escape attempt fails. Contract either reverts or returns without gaining host access. No process-level side effects. |
 | E2E-031 | Non-deterministic API usage | 1. Deploy contract using `Date.now()`, `Math.random()`, `setTimeout` 2. EXECUTE | All calls throw or return undefined (globals stripped). Contract execution fails predictably. Error message indicates the blocked API. |
-| E2E-032 | Gas identifier injection | 1. Deploy contract containing a variable named `__gas` (attempting to shadow the metering function) 2. Process through `validateSyntax` | Deployment rejected — `__gas` is a reserved identifier. |
+| E2E-032 | Gas identifier injection | 1. Deploy contract containing a variable named `__gas` (attempting to shadow the metering function) 2. Process through `validateSyntax` | Deployment rejected - `__gas` is a reserved identifier. |
 | E2E-033 | Emission of invalid action | 1. Deploy contract that calls `emit.send()` with missing required fields 2. EXECUTE | ActionValidator rejects the emission. Execution fails. No partial actions applied. |
 | E2E-034 | Cross-contract interference attempt | 1. Deploy Contract A 2. Deploy Contract B 3. EXECUTE Contract A (sets state) 4. EXECUTE Contract B (attempts to read Contract A's state) | Contract B cannot access Contract A's state. Each contract has isolated state namespace. |
 
@@ -96,7 +96,7 @@ The xchain-vm already has 81+ unit/integration tests covering individual modules
 | E2E-061 | State isolation between contracts | 1. Deploy Contract A and Contract B 2. Both use state key "count" 3. EXECUTE A (sets count=10) 4. EXECUTE B (sets count=20) 5. EXECUTE A (reads count) | Contract A reads count=10, not 20. State namespaced by contract address. |
 | E2E-062 | State rollback on reorg | 1. EXECUTE contract in block N (state change) 2. Simulate reorg at block N 3. Reindex from block N-1 | `contract_state` rows for block >= N deleted. State reverts to pre-block-N values. Subsequent execution sees rolled-back state. |
 | E2E-063 | Delete-then-set cycle | 1. EXECUTE: set key "x" = "1" 2. EXECUTE: delete key "x" 3. EXECUTE: set key "x" = "2" | Final state: key "x" = "2". Intermediate deletion correctly tracked. Append-only history preserves all three operations. |
-| E2E-064 | State dirty tracking accuracy | 1. EXECUTE contract that reads a key, writes same value back 2. Check `stateChanges` | Even if value unchanged, write is recorded (dirty tracking doesn't compare values). This is correct behavior — ensures deterministic replay. |
+| E2E-064 | State dirty tracking accuracy | 1. EXECUTE contract that reads a key, writes same value back 2. Check `stateChanges` | Even if value unchanged, write is recorded (dirty tracking doesn't compare values). This is correct behavior - ensures deterministic replay. |
 
 ### 3.8 Fee Accounting & Gas Schedule
 
@@ -165,17 +165,17 @@ The xchain-vm already has 81+ unit/integration tests covering individual modules
 
 ### 4.2 Component Roles
 
-**XChainVM (real instance)**: Use the actual `XChainVM` class — no mocking. E2E tests validate the real execution engine. Configure with production-like `gasSchedule`, `gasCeiling`, and `limits`.
+**XChainVM (real instance)**: Use the actual `XChainVM` class - no mocking. E2E tests validate the real execution engine. Configure with production-like `gasSchedule`, `gasCeiling`, and `limits`.
 
 **Mock Ledger (in-memory)**: An in-memory key-value store simulating the indexer database tables:
-- `balances` — address/tick → quantity
-- `contract_state` — contractAddress/key → value (append-only with block_index)
-- `contract_balances` — contractAddress/tick → quantity
-- `contracts` — contractAddress → { code, deployer, block_index }
-- `oracle_prices` — coinPair/round → price
-- `crosschain_attestations` — chain/actionIndex → attestation
+- `balances` - address/tick → quantity
+- `contract_state` - contractAddress/key → value (append-only with block_index)
+- `contract_balances` - contractAddress/tick → quantity
+- `contracts` - contractAddress → { code, deployer, block_index }
+- `oracle_prices` - coinPair/round → price
+- `crosschain_attestations` - chain/actionIndex → attestation
 
-**Mock Indexer State Engine**: Processes the VM's `emittedActions` array and applies them to the mock ledger. This is the critical glue — it translates SEND, DESTROY, MINT, etc. into balance changes. Must implement the same validation rules as the real indexer.
+**Mock Indexer State Engine**: Processes the VM's `emittedActions` array and applies them to the mock ledger. This is the critical glue - it translates SEND, DESTROY, MINT, etc. into balance changes. Must implement the same validation rules as the real indexer.
 
 **Ledger Query Callbacks**: The VM's `execute()` accepts callback functions for `getBalance`, `getTokenInfo`, `getOraclePrice`, etc. Wire these to read from the mock ledger.
 
@@ -189,12 +189,12 @@ Each E2E test follows this lifecycle:
    ├─ Create XChainVM instance with production config
    └─ Prepare contract source code
 
-2. ACT — DEPLOY
+2. ACT - DEPLOY
    ├─ Validate syntax via vm.validateSyntax(code)
    ├─ Store contract in mock ledger contracts table
    └─ Charge DEPLOY gas fee
 
-3. ACT — EXECUTE (one or more times)
+3. ACT - EXECUTE (one or more times)
    ├─ Load contract code + current state from mock ledger
    ├─ Call vm.execute({ code, state, method, params, caller, contractAddress, blockContext })
    ├─ On success:
@@ -263,16 +263,16 @@ test/e2e/contracts/
 
 Build assertion utilities that make tests readable and debuggable:
 
-- `assertBalance(address, tick, expectedAmount)` — reads mock ledger, compares with `mathjs` precision
-- `assertContractState(contractAddress, key, expectedValue)` — reads latest state
-- `assertContractStateDeleted(contractAddress, key)` — confirms key no longer exists
-- `assertEmittedActions(result, expectedActions)` — deep comparison of action array
-- `assertGasInRange(result, min, max)` — gas consumed within expected range
-- `assertReverted(result, messageSubstring)` — checks `success: false` and error contains substring
-- `assertOutOfGas(result)` — checks for gas exhaustion error pattern
-- `assertOutOfMemory(result)` — checks for OOM error pattern
-- `assertTimeout(result)` — checks for timeout error pattern
-- `assertLogsContain(result, substring)` — checks logs array
+- `assertBalance(address, tick, expectedAmount)` - reads mock ledger, compares with `mathjs` precision
+- `assertContractState(contractAddress, key, expectedValue)` - reads latest state
+- `assertContractStateDeleted(contractAddress, key)` - confirms key no longer exists
+- `assertEmittedActions(result, expectedActions)` - deep comparison of action array
+- `assertGasInRange(result, min, max)` - gas consumed within expected range
+- `assertReverted(result, messageSubstring)` - checks `success: false` and error contains substring
+- `assertOutOfGas(result)` - checks for gas exhaustion error pattern
+- `assertOutOfMemory(result)` - checks for OOM error pattern
+- `assertTimeout(result)` - checks for timeout error pattern
+- `assertLogsContain(result, substring)` - checks logs array
 
 ### 4.6 Block Context Simulation
 
@@ -293,7 +293,7 @@ For multi-block scenarios (E2E-013, E2E-060), increment block context between ex
 - **Framework**: Mocha (consistent with existing xchain-vm and xchain-e2e-test suites)
 - **Timeout**: `--timeout 0` (some E2E scenarios involve multiple sequential executions)
 - **Assertion library**: Node.js `assert` (consistent with existing tests)
-- **Math comparisons**: Always use `mathjs` bignumber for amount assertions — never native JS comparison
+- **Math comparisons**: Always use `mathjs` bignumber for amount assertions - never native JS comparison
 - **Parallelism**: E2E tests should run sequentially (shared mock ledger state within each test, but fresh state per test)
 - **CI integration**: Separate npm script (`npm run test:e2e`) from unit tests, as E2E tests are slower
 
@@ -369,7 +369,7 @@ Oracle and cross-chain integration
 | Dependency | Status | Notes |
 |-----------|--------|-------|
 | `isolated-vm` npm package | Required | Must be compiled for target platform. Tests skip gracefully if unavailable. |
-| Mock indexer state engine | To build | Core piece — translates emitted actions into ledger state changes. |
+| Mock indexer state engine | To build | Core piece - translates emitted actions into ledger state changes. |
 | Contract fixture library | To build | Reuse existing `test/contracts/` as starting point, extend for E2E scenarios. |
 | Oracle data seeding | To build | Required for Phase 4 scenarios. |
 | Block replay harness | To build | For determinism and reorg scenarios (E2E-062, E2E-080–082). |

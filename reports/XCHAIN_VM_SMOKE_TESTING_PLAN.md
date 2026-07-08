@@ -1,4 +1,4 @@
-# XChain VM — Smoke Testing Plan
+# XChain VM - Smoke Testing Plan
 
 **Date:** 2026-04-03  
 **Component:** `xchain-vm`  
@@ -8,13 +8,13 @@
 
 ## 1. Objective
 
-Provide a sub-5-second test suite that answers one question: **"Is the VM fundamentally operational?"** If any smoke test fails, the build is broken and no further testing is meaningful. The suite covers VM instantiation, sandbox isolation, end-to-end contract execution, and gateway interaction — the four pillars without which no smart contract can run.
+Provide a sub-5-second test suite that answers one question: **"Is the VM fundamentally operational?"** If any smoke test fails, the build is broken and no further testing is meaningful. The suite covers VM instantiation, sandbox isolation, end-to-end contract execution, and gateway interaction - the four pillars without which no smart contract can run.
 
 ---
 
 ## 2. Critical Smoke Test Scenarios (Prioritized)
 
-### S1 — VM Instantiation (Priority: P0)
+### S1 - VM Instantiation (Priority: P0)
 
 | Aspect | Detail |
 |--------|--------|
@@ -23,16 +23,16 @@ Provide a sub-5-second test suite that answers one question: **"Is the VM fundam
 | **Why critical** | Every other operation depends on a valid VM instance. If `isolated-vm` native module is missing or misconfigured, this fails immediately and surfaces the root cause. |
 | **Estimated time** | < 100 ms |
 
-### S2 — Sandbox Environment Creation (Priority: P0)
+### S2 - Sandbox Environment Creation (Priority: P0)
 
 | Aspect | Detail |
 |--------|--------|
 | **What** | Call `vm.execute()` with a trivial contract that accesses a stripped global (e.g., `typeof Date`) and returns the result. |
 | **Verify** | Execution succeeds (`result.success === true`). The return value confirms `Date` is `"undefined"`, proving the sandbox stripped non-deterministic APIs. |
-| **Why critical** | If the sandbox fails to initialize or strip globals, contracts run in a non-deterministic environment — a consensus-breaking defect. This is the single cheapest way to verify the entire isolate-creation + `stripGlobals()` + harness-injection pipeline. |
+| **Why critical** | If the sandbox fails to initialize or strip globals, contracts run in a non-deterministic environment - a consensus-breaking defect. This is the single cheapest way to verify the entire isolate-creation + `stripGlobals()` + harness-injection pipeline. |
 | **Estimated time** | < 500 ms |
 
-### S3 — Basic Contract Execution (Priority: P0)
+### S3 - Basic Contract Execution (Priority: P0)
 
 | Aspect | Detail |
 |--------|--------|
@@ -41,7 +41,7 @@ Provide a sub-5-second test suite that answers one question: **"Is the VM fundam
 | **Why critical** | Exercises the full execution pipeline end-to-end: code metering (`acorn` parse + `__gas()` injection + `astring` regeneration), V8 compilation, contract wrapper invocation, state manager CRUD, and result collection. A failure here means the core execution engine is broken. |
 | **Estimated time** | < 500 ms |
 
-### S4 — Multi-Method Dispatch (Priority: P1)
+### S4 - Multi-Method Dispatch (Priority: P1)
 
 | Aspect | Detail |
 |--------|--------|
@@ -50,16 +50,16 @@ Provide a sub-5-second test suite that answers one question: **"Is the VM fundam
 | **Why critical** | The contract wrapper dispatches to methods via `contractExports[__methodName]`. If method dispatch is broken, no real-world contract (which almost universally uses multi-method exports) will work, even though single-function contracts might. |
 | **Estimated time** | < 500 ms |
 
-### S5 — Platform Action Gateway — Emit (Priority: P0)
+### S5 - Platform Action Gateway - Emit (Priority: P0)
 
 | Aspect | Detail |
 |--------|--------|
 | **What** | Execute a contract that calls `xchain.emit.send()` with valid parameters (destination, tick, quantity). |
 | **Verify** | `result.success === true`. `result.emittedActions` contains exactly one action of type `SEND` with the expected fields. The `ActionValidator` did not reject it. |
-| **Why critical** | Emission is the VM's primary side-effect mechanism — it's how contracts move tokens, create assets, and trigger cross-chain actions. This verifies the full gateway bridge: host-side `ivm.Reference` callback, JSON serialization across the isolate boundary, `EmissionCollector` accumulation, and `ActionValidator` post-validation. |
+| **Why critical** | Emission is the VM's primary side-effect mechanism - it's how contracts move tokens, create assets, and trigger cross-chain actions. This verifies the full gateway bridge: host-side `ivm.Reference` callback, JSON serialization across the isolate boundary, `EmissionCollector` accumulation, and `ActionValidator` post-validation. |
 | **Estimated time** | < 500 ms |
 
-### S6 — Platform Action Gateway — Context Accessors (Priority: P1)
+### S6 - Platform Action Gateway - Context Accessors (Priority: P1)
 
 | Aspect | Detail |
 |--------|--------|
@@ -68,7 +68,7 @@ Provide a sub-5-second test suite that answers one question: **"Is the VM fundam
 | **Why critical** | Context accessors are the contract's only view of the outside world. If the gateway bridge silently returns `undefined` or corrupts values, contracts will malfunction in subtle ways that are hard to debug downstream. |
 | **Estimated time** | < 300 ms |
 
-### S7 — Deterministic Math (Priority: P1)
+### S7 - Deterministic Math (Priority: P1)
 
 | Aspect | Detail |
 |--------|--------|
@@ -77,16 +77,16 @@ Provide a sub-5-second test suite that answers one question: **"Is the VM fundam
 | **Why critical** | All token amounts and fee calculations go through the `mathjs` bignumber bridge. If the math gateway is broken, every financial operation in every contract is wrong. |
 | **Estimated time** | < 300 ms |
 
-### S8 — Syntax Validation (Priority: P1)
+### S8 - Syntax Validation (Priority: P1)
 
 | Aspect | Detail |
 |--------|--------|
 | **What** | Call `vm.validateSyntax()` with a valid contract and an invalid one (e.g., `"function {{{"`). |
 | **Verify** | Valid code returns `{ valid: true }`. Invalid code returns `{ valid: false, error: <string> }`. |
-| **Why critical** | `validateSyntax()` gates DEPLOY actions in the indexer. If it incorrectly accepts or rejects code, the indexer either stores broken contracts or rejects valid ones — both are protocol-level failures. |
+| **Why critical** | `validateSyntax()` gates DEPLOY actions in the indexer. If it incorrectly accepts or rejects code, the indexer either stores broken contracts or rejects valid ones - both are protocol-level failures. |
 | **Estimated time** | < 50 ms |
 
-### S9 — Error Classification — Revert (Priority: P2)
+### S9 - Error Classification - Revert (Priority: P2)
 
 | Aspect | Detail |
 |--------|--------|
@@ -99,16 +99,16 @@ Provide a sub-5-second test suite that answers one question: **"Is the VM fundam
 
 ## 3. Execution Strategy
 
-### 3.1 — Runner
+### 3.1 - Runner
 
 | Aspect | Recommendation |
 |--------|---------------|
-| **Framework** | Mocha (already used for the full test suite — no new dependency). |
-| **Entry point** | `npm run smoke` — a dedicated script in `package.json` that runs only the smoke test file. |
-| **File location** | `test/smoke.test.js` — single file, clearly separated from the full suite. |
+| **Framework** | Mocha (already used for the full test suite - no new dependency). |
+| **Entry point** | `npm run smoke` - a dedicated script in `package.json` that runs only the smoke test file. |
+| **File location** | `test/smoke.test.js` - single file, clearly separated from the full suite. |
 | **Timeout** | `--timeout 10000` (10 s hard ceiling; expected wall-clock is < 3 s). |
 
-### 3.2 — CI/CD Integration
+### 3.2 - CI/CD Integration
 
 ```
 Build → npm install → npm run smoke → (if pass) → npm test (full suite)
@@ -118,9 +118,9 @@ Build → npm install → npm run smoke → (if pass) → npm test (full suite)
 - Smoke tests run **before** the full 81+ test suite. If smoke fails, the full suite is skipped entirely, saving ~30 s of CI time and providing an immediate, clear signal.
 - Smoke tests should also run as a **post-deployment health check** in staging/production-like environments where the VM is deployed as part of the indexer.
 
-### 3.3 — Isolation
+### 3.3 - Isolation
 
-- Each smoke test scenario creates its own `XChainVM` instance — no shared state between tests.
+- Each smoke test scenario creates its own `XChainVM` instance - no shared state between tests.
 - No external dependencies (no MariaDB, no coin node, no network). The VM is a pure in-process library; smoke tests exercise it as such.
 - Inline contract source strings (not fixture files) to keep the smoke suite self-contained and immune to fixture changes breaking the health check.
 
@@ -158,13 +158,13 @@ Build → npm install → npm run smoke → (if pass) → npm test (full suite)
 
 ---
 
-## 6. Rationale — Why Smoke Testing is Critical for the VM
+## 6. Rationale - Why Smoke Testing is Critical for the VM
 
 The XChain VM sits at the center of the platform's smart contract pipeline. Every DEPLOY and EXECUTE action processed by the indexer flows through it. A broken VM means:
 
-1. **Silent consensus failure** — If the sandbox doesn't strip globals or metering doesn't inject correctly, contracts produce non-deterministic results. Different nodes diverge without any error being raised.
-2. **Total contract blackout** — If the VM can't instantiate an isolate or compile the harness, every contract execution fails. No tokens move, no state updates, no emissions.
-3. **Cascading indexer failure** — The indexer calls `vm.execute()` synchronously per block. An unhandled exception or hang in the VM stalls the entire indexing pipeline.
+1. **Silent consensus failure** - If the sandbox doesn't strip globals or metering doesn't inject correctly, contracts produce non-deterministic results. Different nodes diverge without any error being raised.
+2. **Total contract blackout** - If the VM can't instantiate an isolate or compile the harness, every contract execution fails. No tokens move, no state updates, no emissions.
+3. **Cascading indexer failure** - The indexer calls `vm.execute()` synchronously per block. An unhandled exception or hang in the VM stalls the entire indexing pipeline.
 
 A fast smoke suite that runs in seconds catches all three failure modes before the full test suite (30+ seconds) or, worse, production traffic discovers them. The cost of running 9 scenarios in < 5 seconds is negligible; the cost of deploying a VM that can't create an isolate is catastrophic.
 
@@ -174,12 +174,12 @@ A fast smoke suite that runs in seconds catches all three failure modes before t
 
 These are conceptual templates showing what each smoke test contract would look like. They are provided for planning clarity, not as production test code.
 
-**S2 — Sandbox check:**
+**S2 - Sandbox check:**
 ```javascript
 module.exports = function(xchain) { return typeof Date; };
 ```
 
-**S3 — Basic execution with state:**
+**S3 - Basic execution with state:**
 ```javascript
 module.exports = function(xchain) {
     xchain.state.set('counter', '0');
@@ -187,7 +187,7 @@ module.exports = function(xchain) {
 };
 ```
 
-**S5 — Emit SEND:**
+**S5 - Emit SEND:**
 ```javascript
 module.exports = function(xchain) {
     xchain.emit.send({ destination: '...', tick: 'TEST', quantity: '100' });
@@ -195,12 +195,12 @@ module.exports = function(xchain) {
 };
 ```
 
-**S7 — Math bridge:**
+**S7 - Math bridge:**
 ```javascript
 module.exports = function(xchain) { return xchain.math.add('1', '2'); };
 ```
 
-**S9 — Revert:**
+**S9 - Revert:**
 ```javascript
 module.exports = function(xchain) { xchain.revert('test revert'); };
 ```

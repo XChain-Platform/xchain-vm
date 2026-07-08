@@ -1,4 +1,4 @@
-# XChain VM — Boundary Testing Plan
+# XChain VM - Boundary Testing Plan
 
 ## 1. Rationale
 
@@ -90,7 +90,7 @@ Testing exact boundary values (at, one below, one above each limit) is the most 
 | T-1 | Execution completes just under timeout | Contract with a calibrated busy loop finishing at ~`maxCpuTimeMs - 500ms` | `success: true` |
 | T-2 | Execution exceeds timeout | Infinite loop with `gasCeiling` set very high so gas doesn't trigger first | `error: timeout` |
 | T-3 | Timeout of 1ms | `maxCpuTimeMs: 1` | Nearly all contracts fail with timeout |
-| T-4 | Timeout of 0ms | `maxCpuTimeMs: 0` | Behavior undefined — should fail gracefully, not crash |
+| T-4 | Timeout of 0ms | `maxCpuTimeMs: 0` | Behavior undefined - should fail gracefully, not crash |
 
 ### 3.3 Memory Limit
 
@@ -106,7 +106,7 @@ Testing exact boundary values (at, one below, one above each limit) is the most 
 | # | Scenario | Input | Expected Outcome |
 |---|---|---|---|
 | CS-1 | Code at exactly maxCodeSize (65,536 bytes) | Pad with comments to reach exactly 65,536 bytes | Accepted: parses, meters, and executes |
-| CS-2 | Code at maxCodeSize + 1 byte | 65,537 bytes | **Gap identified**: `maxCodeSize` is stored in limits but not enforced in `index.js` — verify if the indexer enforces this before calling `vm.execute()`. If not, this is a missing validation. |
+| CS-2 | Code at maxCodeSize + 1 byte | 65,537 bytes | **Gap identified**: `maxCodeSize` is stored in limits but not enforced in `index.js` - verify if the indexer enforces this before calling `vm.execute()`. If not, this is a missing validation. |
 | CS-3 | Empty code (0 bytes) | `code: ""` | Should fail at parse/compilation, not crash |
 | CS-4 | Code = 1 byte | `code: ";"` | Parses but exports nothing → `error: contract must export a function or object` |
 | CS-5 | Code with extremely long single line | 65,536 characters on one line, no newlines | Must not cause parser stack overflow or metering failure |
@@ -118,16 +118,16 @@ Testing exact boundary values (at, one below, one above each limit) is the most 
 |---|---|---|---|
 | S-1 | Set key count to exactly maxStateKeys | Start with 0 keys, set exactly 10,000 | `success: true`, all 10,000 keys in `stateChanges` |
 | S-2 | Set key count to maxStateKeys + 1 | Set 10,001st key | `error: contract exceeds max state keys` |
-| S-3 | Delete then re-add at limit | At 10,000 keys, delete one, add a new one | `success: true` — `keyCount` decrements on delete, allowing one more |
+| S-3 | Delete then re-add at limit | At 10,000 keys, delete one, add a new one | `success: true` - `keyCount` decrements on delete, allowing one more |
 | S-4 | Value at exactly maxStateValueSize | JSON.stringify of value = exactly 65,536 UTF-8 bytes | `success: true` |
 | S-5 | Value at maxStateValueSize + 1 byte | 65,537 bytes after serialization | `error: state value exceeds max size` |
-| S-6 | Multi-byte UTF-8 at boundary | String with multi-byte characters where `string.length < 65536` but `Buffer.byteLength > 65536` | Must reject — the check uses `Buffer.byteLength`, not `string.length` |
-| S-7 | State value: empty string `""` | `xchain.state.set('key', '')` | Should succeed — empty string is valid, not null |
-| S-8 | State value: empty object `{}` | `xchain.state.set('key', {})` | Should succeed — serializes to `"{}"` (2 bytes) |
-| S-9 | State value: deeply nested object | Object nested 100+ levels deep | JSON.stringify succeeds but may be large — should be caught by size limit, not crash |
+| S-6 | Multi-byte UTF-8 at boundary | String with multi-byte characters where `string.length < 65536` but `Buffer.byteLength > 65536` | Must reject - the check uses `Buffer.byteLength`, not `string.length` |
+| S-7 | State value: empty string `""` | `xchain.state.set('key', '')` | Should succeed - empty string is valid, not null |
+| S-8 | State value: empty object `{}` | `xchain.state.set('key', {})` | Should succeed - serializes to `"{}"` (2 bytes) |
+| S-9 | State value: deeply nested object | Object nested 100+ levels deep | JSON.stringify succeeds but may be large - should be caught by size limit, not crash |
 | S-10 | State value: circular reference | Object with circular reference | `JSON.stringify` throws → should produce a clear error |
-| S-11 | State key: empty string `""` | `xchain.state.set('', 'value')` | Should succeed (no key validation exists) — verify this is acceptable |
-| S-12 | State key: very long string | 100KB key name | No key size limit exists — potential resource concern |
+| S-11 | State key: empty string `""` | `xchain.state.set('', 'value')` | Should succeed (no key validation exists) - verify this is acceptable |
+| S-12 | State key: very long string | 100KB key name | No key size limit exists - potential resource concern |
 | S-13 | Pre-loaded state at maxStateKeys | `initialState` with 10,000 keys, then try to add one more | `keyCount` initialized from `Object.keys(initialState).length` → should reject new key |
 | S-14 | Delete-set-delete cycle | Delete key, set same key, delete again | `keyCount` should be correct; dirty map should show `null` |
 
@@ -153,7 +153,7 @@ Testing exact boundary values (at, one below, one above each limit) is the most 
 | L-4 | Log entry at 1,025 bytes | Single log message of 1,025 chars | Truncated to 1,024 + `'...(truncated)'` suffix |
 | L-5 | Log empty string | `xchain.log('')` | Preserved as empty string |
 | L-6 | Logs preserved on failure | Log 50 entries, then revert | `success: false`, `logs.length === 50` |
-| L-7 | Multi-byte characters in log | Log entry with emoji/CJK near 1,024 byte boundary | `message.length` vs byte length — **potential issue**: truncation uses `message.substring(0, 1024)` which counts characters, not bytes. A 1,024-character CJK string could be ~3,072 bytes. |
+| L-7 | Multi-byte characters in log | Log entry with emoji/CJK near 1,024 byte boundary | `message.length` vs byte length - **potential issue**: truncation uses `message.substring(0, 1024)` which counts characters, not bytes. A 1,024-character CJK string could be ~3,072 bytes. |
 
 ### 3.8 Return Value Truncation
 
@@ -170,7 +170,7 @@ Testing exact boundary values (at, one below, one above each limit) is the most 
 | # | Scenario | Input | Expected Outcome |
 |---|---|---|---|
 | MA-1 | Division by zero | `xchain.math.divide('100', '0')` | `ContractRevertError: math error: Division by zero` |
-| MA-2 | Extremely large numbers | `xchain.math.add('9'.repeat(10000), '1')` | Should succeed — mathjs bignumber has arbitrary precision |
+| MA-2 | Extremely large numbers | `xchain.math.add('9'.repeat(10000), '1')` | Should succeed - mathjs bignumber has arbitrary precision |
 | MA-3 | Extremely small decimal | `xchain.math.divide('1', '3')` → very long result | Should return a fixed-notation string, not scientific notation |
 | MA-4 | Negative numbers | `xchain.math.subtract('0', '1')` → `'-1'` | Should handle correctly |
 | MA-5 | Non-numeric string input | `xchain.math.add('abc', '1')` | `ContractRevertError: math error: ...` |
@@ -185,11 +185,11 @@ Testing exact boundary values (at, one below, one above each limit) is the most 
 | # | Scenario | Input | Expected Outcome |
 |---|---|---|---|
 | ME-1 | Binary expression depth exactly 10 | `a + b + c + ... + k` (10 levels) | No extra gas injection at this depth |
-| ME-2 | Binary expression depth 11 | 11-level chain | Gas injection inserted at depth 10 — extra gas charged |
-| ME-3 | Deeply nested ternaries | 50+ nested `a ? b : c ? d : ...` | Each wraps test with gas — must not stack overflow during metering |
+| ME-2 | Binary expression depth 11 | 11-level chain | Gas injection inserted at depth 10 - extra gas charged |
+| ME-3 | Deeply nested ternaries | 50+ nested `a ? b : c ? d : ...` | Each wraps test with gas - must not stack overflow during metering |
 | ME-4 | Contract using `__gas` identifier | `var __gas = 1;` | Rejected at deploy: `syntax.js` reserved identifier check |
-| ME-5 | Code that is valid ES2020 but invalid ES2021+ | Optional chaining (`?.`), nullish coalescing (`??`) are ES2020 ✓ — class fields are ES2022 ✗ | ES2022+ syntax should fail at parse |
-| ME-6 | Enormous switch statement | Switch with 10,000 cases | Each case gets a gas call — metering output may be very large. Verify metering completes and output is within code size bounds for V8 compilation |
+| ME-5 | Code that is valid ES2020 but invalid ES2021+ | Optional chaining (`?.`), nullish coalescing (`??`) are ES2020 ✓ - class fields are ES2022 ✗ | ES2022+ syntax should fail at parse |
+| ME-6 | Enormous switch statement | Switch with 10,000 cases | Each case gets a gas call - metering output may be very large. Verify metering completes and output is within code size bounds for V8 compilation |
 | ME-7 | Arrow function with expression body | `const f = () => heavyExpression` | Body wrapped with `(__gas(1), heavyExpression)` |
 
 ### 3.11 Sandbox Escape Boundaries
@@ -197,39 +197,39 @@ Testing exact boundary values (at, one below, one above each limit) is the most 
 | # | Scenario | Input | Expected Outcome |
 |---|---|---|---|
 | SB-1 | Access stripped globals | `typeof process`, `typeof require`, `typeof fetch` | All return `'undefined'` |
-| SB-2 | Reconstruct Function from prototype | `(function(){}).constructor('return this')()` | Should fail — sandbox strips `Function` constructor |
+| SB-2 | Reconstruct Function from prototype | `(function(){}).constructor('return this')()` | Should fail - sandbox strips `Function` constructor |
 | SB-3 | Access `globalThis` properties | Enumerate `Object.getOwnPropertyNames(globalThis)` | Should not include `__state_get`, etc. (cleaned up by harness) |
 | SB-4 | Prototype pollution | `Object.prototype.polluted = true` | Succeeds within isolate but must not affect host |
-| SB-5 | Eval via indirect means | `var e = eval; e('1+1')` | Should fail — eval is stripped |
-| SB-6 | `Date` usage | `new Date()`, `Date.now()` | Should be undefined/throw — stripped by sandbox |
-| SB-7 | `Math.random()` | `Math.random()` | Should be undefined — only deterministic Math functions allowed |
-| SB-8 | SharedArrayBuffer | `new SharedArrayBuffer(8)` | Should be undefined — stripped |
+| SB-5 | Eval via indirect means | `var e = eval; e('1+1')` | Should fail - eval is stripped |
+| SB-6 | `Date` usage | `new Date()`, `Date.now()` | Should be undefined/throw - stripped by sandbox |
+| SB-7 | `Math.random()` | `Math.random()` | Should be undefined - only deterministic Math functions allowed |
+| SB-8 | SharedArrayBuffer | `new SharedArrayBuffer(8)` | Should be undefined - stripped |
 
 ### 3.12 Gateway Parameter Boundaries
 
 | # | Scenario | Input | Expected Outcome |
 |---|---|---|---|
 | GW-1 | Empty params array | `opts.params: []`, contract calls `getInputParamCount()` | Returns `0` |
-| GW-2 | Very large params array | 10,000 elements in `opts.params` | Should work — no cap on params array. Verify JSON serialization across isolate boundary handles this. |
+| GW-2 | Very large params array | 10,000 elements in `opts.params` | Should work - no cap on params array. Verify JSON serialization across isolate boundary handles this. |
 | GW-3 | Params with special characters | Strings containing `\x00`, `\x01`, `\x02`, `\x03` (protocol control chars used in bridge) | **Critical**: `\x01` is used as JSON return prefix, `\x02` as return value prefix, `\x03` as error type prefix. Params containing these characters could confuse the bridge. |
-| GW-4 | Missing blockContext fields | `blockContext: {}` or with null height/timestamp/hash | Should not crash — may return undefined values |
+| GW-4 | Missing blockContext fields | `blockContext: {}` or with null height/timestamp/hash | Should not crash - may return undefined values |
 | GW-5 | Null caller address | `caller: null` | Should be accessible as `null` in contract |
 | GW-6 | getBalance for nonexistent address | Query balance of address not in `opts.balances` | Should return `undefined` or `null`, not throw |
 | GW-7 | getTokenInfo for nonexistent token | Query token not in `opts.tokenInfo` | Should return `undefined` or `null`, not throw |
 | GW-8 | Oracle data unavailable | `oracleData: null`, contract calls `oracle.getPrice()` | Should handle gracefully |
-| GW-9 | Oracle getSnapshotAge fallback | No snapshot data available | Returns `Number.MAX_SAFE_INTEGER` — verify contract handles this correctly |
+| GW-9 | Oracle getSnapshotAge fallback | No snapshot data available | Returns `Number.MAX_SAFE_INTEGER` - verify contract handles this correctly |
 
 ### 3.13 Emit Action Field Boundaries
 
 | # | Scenario | Input | Expected Outcome |
 |---|---|---|---|
-| EA-1 | SEND with quantity = "0" | `emit.send({ destination: 'x', tick: 'T', quantity: '0' })` | Passes gateway validation (no quantity range check in VM — full validation in indexer) |
-| EA-2 | SEND with negative quantity | `quantity: '-1'` | Passes gateway validation — **potential gap**: VM only checks presence, not value range |
-| EA-3 | SEND with non-string quantity | `quantity: 12345` (number instead of string) | Passes — no type checking on field values |
-| EA-4 | ISSUE with tick = "" | `emit.issue({ tick: '' })` | Passes — empty string is not null/undefined |
-| EA-5 | DISPENSER with no params | `emit.dispenser({})` | Passes — no required fields for DISPENSER |
+| EA-1 | SEND with quantity = "0" | `emit.send({ destination: 'x', tick: 'T', quantity: '0' })` | Passes gateway validation (no quantity range check in VM - full validation in indexer) |
+| EA-2 | SEND with negative quantity | `quantity: '-1'` | Passes gateway validation - **potential gap**: VM only checks presence, not value range |
+| EA-3 | SEND with non-string quantity | `quantity: 12345` (number instead of string) | Passes - no type checking on field values |
+| EA-4 | ISSUE with tick = "" | `emit.issue({ tick: '' })` | Passes - empty string is not null/undefined |
+| EA-5 | DISPENSER with no params | `emit.dispenser({})` | Passes - no required fields for DISPENSER |
 | EA-6 | DISPENSER with null params | `emit.dispenser(null)` | `validateRequired` not called, but `params` is null → `{ ...null }` → `{}`. Should work. |
-| EA-7 | Emit with extra unknown fields | `emit.send({ destination: 'x', tick: 'T', quantity: '1', evil: 'payload' })` | Extra fields passed through in `{ ...params }` — verify indexer strips unknown fields |
+| EA-7 | Emit with extra unknown fields | `emit.send({ destination: 'x', tick: 'T', quantity: '1', evil: 'payload' })` | Extra fields passed through in `{ ...params }` - verify indexer strips unknown fields |
 | EA-8 | LINK with very large actionIndex values | `coin1ActionIndex: Number.MAX_SAFE_INTEGER` | Passes VM, may fail in indexer |
 
 ---
@@ -254,14 +254,14 @@ Tests should be organized in pairs:
 
 - Use `createVM(overrides)` helper (as in existing `limits.test.js`) to configure precise limits
 - Set small limits (e.g., `gasCeiling: 100`, `maxStateKeys: 5`) to make boundary conditions reachable with minimal test contracts
-- Use inline contract code for precision — crafting exact gas consumption requires knowing the metering output
+- Use inline contract code for precision - crafting exact gas consumption requires knowing the metering output
 
 ### 4.3 Gas Precision Testing Approach
 
 To test gas boundaries precisely:
 1. Write a minimal contract (e.g., `module.exports = function(xchain) {};`)
-2. Execute it and record `gasUsed` — this is the **base cost**
-3. Add one computation step, re-execute, record the delta — this is the **per-step cost**
+2. Execute it and record `gasUsed` - this is the **base cost**
+3. Add one computation step, re-execute, record the delta - this is the **per-step cost**
 4. Calculate the exact number of steps needed to hit `gasCeiling`
 5. Test at that count (should succeed) and count + 1 (should fail)
 
@@ -276,14 +276,14 @@ These are the most critical and least obvious:
 
 | Interaction | Risk |
 |---|---|
-| Gas + Emissions | Contract reaches gas ceiling during an emission — is the emission counted or discarded? |
-| Gas + State writes | Contract reaches gas ceiling after a state write — write is charged but result is atomically discarded |
-| State keys + deletes | Delete-then-add at exactly the key limit — keyCount tracking must be precise |
-| Memory + Gas | V8 may OOM before gas runs out — the VM must classify this correctly |
-| Timeout + Gas | Wall-clock timeout fires before gas ceiling — must not produce different errors on different hardware |
-| Code size + Metering | Metered code is significantly larger than input code — a 64KB contract may produce 200KB+ metered output. V8 must handle this. |
-| Return value + Emissions | Contract returns large value AND emits 50 actions — total result size is large |
-| Multiple state writes at value limit | 100 state writes each at 65KB — total dirty state ~6.5MB approaches memory limit |
+| Gas + Emissions | Contract reaches gas ceiling during an emission - is the emission counted or discarded? |
+| Gas + State writes | Contract reaches gas ceiling after a state write - write is charged but result is atomically discarded |
+| State keys + deletes | Delete-then-add at exactly the key limit - keyCount tracking must be precise |
+| Memory + Gas | V8 may OOM before gas runs out - the VM must classify this correctly |
+| Timeout + Gas | Wall-clock timeout fires before gas ceiling - must not produce different errors on different hardware |
+| Code size + Metering | Metered code is significantly larger than input code - a 64KB contract may produce 200KB+ metered output. V8 must handle this. |
+| Return value + Emissions | Contract returns large value AND emits 50 actions - total result size is large |
+| Multiple state writes at value limit | 100 state writes each at 65KB - total dirty state ~6.5MB approaches memory limit |
 
 ### 4.6 Determinism Verification
 
@@ -299,11 +299,11 @@ Non-deterministic boundary behavior is a consensus-breaking bug.
 
 Tests should be implemented in this order, from highest to lowest risk:
 
-1. **P0 — Consensus-critical**: Gas ceiling precision (G-1, G-2), timeout classification (T-2), determinism of boundary outcomes
-2. **P0 — Security**: Sandbox escapes (SB-1 through SB-8), control character injection (GW-3), `__gas` identifier bypass (ME-4)
-3. **P1 — Data integrity**: State key/value boundaries (S-1 through S-14), emission atomicity (E-5), return value truncation (R-1, R-2)
-4. **P1 — Robustness**: Memory limits (M-1 through M-4), math edge cases (MA-1 through MA-10), metering edge cases (ME-1 through ME-7)
-5. **P2 — Completeness**: Log limits (L-1 through L-7), gateway parameter edges (GW-1 through GW-9), emit field validation (EA-1 through EA-8)
+1. **P0 - Consensus-critical**: Gas ceiling precision (G-1, G-2), timeout classification (T-2), determinism of boundary outcomes
+2. **P0 - Security**: Sandbox escapes (SB-1 through SB-8), control character injection (GW-3), `__gas` identifier bypass (ME-4)
+3. **P1 - Data integrity**: State key/value boundaries (S-1 through S-14), emission atomicity (E-5), return value truncation (R-1, R-2)
+4. **P1 - Robustness**: Memory limits (M-1 through M-4), math edge cases (MA-1 through MA-10), metering edge cases (ME-1 through ME-7)
+5. **P2 - Completeness**: Log limits (L-1 through L-7), gateway parameter edges (GW-1 through GW-9), emit field validation (EA-1 through EA-8)
 
 ---
 
@@ -313,14 +313,14 @@ Tests should be implemented in this order, from highest to lowest risk:
 
 | Gap | Location | Risk | Severity |
 |---|---|---|---|
-| `maxCodeSize` not enforced in VM | `index.js` — limit is stored but never checked before metering/compilation | Oversized code could slow metering or exhaust memory during AST parsing | Medium |
-| No state key size limit | `state.js` — validates value size but not key size | Extremely long keys could bloat state storage | Low |
-| Log truncation uses character count, not byte count | `collector.js:23` — `message.substring(0, 1024)` | Multi-byte strings could exceed intended storage limits | Low |
-| Emit field values not type-checked | `gateway-emit.js` — only checks presence, not type | Invalid types (numbers for strings, objects for scalars) pass to indexer | Low (indexer validates) |
-| Bridge control characters in user data | `index.js:44,182,286,509` — `\x01`, `\x02`, `\x03` used as protocol markers | User strings containing these characters could confuse the bridge deserializer | **High** |
-| Negative gas schedule values not rejected | `gas.js` — `charge()` does `this.used += amount` with no sign check | Negative costs could reduce used gas, bypassing the ceiling | **High** |
-| `gasCeiling: 0` behavior | `gas.js:19` — check is `this.used > this.ceiling` (strict greater-than) | A contract that uses exactly 0 gas would pass a ceiling of 0 — edge case | Low |
-| Oracle snapshot age fallback | `gateway.js:82` — returns `Number.MAX_SAFE_INTEGER` | Contracts comparing snapshot age may misinterpret this sentinel value | Medium |
+| `maxCodeSize` not enforced in VM | `index.js` - limit is stored but never checked before metering/compilation | Oversized code could slow metering or exhaust memory during AST parsing | Medium |
+| No state key size limit | `state.js` - validates value size but not key size | Extremely long keys could bloat state storage | Low |
+| Log truncation uses character count, not byte count | `collector.js:23` - `message.substring(0, 1024)` | Multi-byte strings could exceed intended storage limits | Low |
+| Emit field values not type-checked | `gateway-emit.js` - only checks presence, not type | Invalid types (numbers for strings, objects for scalars) pass to indexer | Low (indexer validates) |
+| Bridge control characters in user data | `index.js:44,182,286,509` - `\x01`, `\x02`, `\x03` used as protocol markers | User strings containing these characters could confuse the bridge deserializer | **High** |
+| Negative gas schedule values not rejected | `gas.js` - `charge()` does `this.used += amount` with no sign check | Negative costs could reduce used gas, bypassing the ceiling | **High** |
+| `gasCeiling: 0` behavior | `gas.js:19` - check is `this.used > this.ceiling` (strict greater-than) | A contract that uses exactly 0 gas would pass a ceiling of 0 - edge case | Low |
+| Oracle snapshot age fallback | `gateway.js:82` - returns `Number.MAX_SAFE_INTEGER` | Contracts comparing snapshot age may misinterpret this sentinel value | Medium |
 
 ### 5.2 Compound Risk Scenarios
 

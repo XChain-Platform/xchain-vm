@@ -1,4 +1,4 @@
-# XChain VM — Fuzz Testing Plan
+# XChain VM - Fuzz Testing Plan
 
 ## 1. Objective
 
@@ -32,7 +32,7 @@ Params are an array of strings passed through `getInputParam(i)` / `getInputPara
 | Input vector | Risk |
 |---|---|
 | Non-string array elements | Type confusion in contracts; unexpected `JSON.stringify` / `JSON.parse` round-trip behavior |
-| Strings containing `\x01` or `\x02` control prefixes | Collision with the harness protocol markers — could trick `wrap()` into JSON-parsing a user-supplied string |
+| Strings containing `\x01` or `\x02` control prefixes | Collision with the harness protocol markers - could trick `wrap()` into JSON-parsing a user-supplied string |
 | Extremely large param arrays | Memory pressure before gas metering kicks in |
 | Params with `__proto__`, `constructor`, `prototype` keys | Prototype pollution if params are spread into objects |
 
@@ -42,9 +42,9 @@ Each of the 16 emit methods (`gateway-emit.js`) validates required fields then q
 
 | Input vector | Risk |
 |---|---|
-| Missing required fields | Already validated — but fuzzing can find fields that *should* be required but aren't (e.g., `dispenser`, `file`, `list`, `broadcast` accept anything) |
-| Extra unexpected fields | Param spreading (`{ ...params }` in `collector.js:19`) copies all properties — could inject `action` or `__proto__` keys |
-| Non-object params | `typeof params !== 'object'` check passes for arrays — arrays are objects |
+| Missing required fields | Already validated - but fuzzing can find fields that *should* be required but aren't (e.g., `dispenser`, `file`, `list`, `broadcast` accept anything) |
+| Extra unexpected fields | Param spreading (`{ ...params }` in `collector.js:19`) copies all properties - could inject `action` or `__proto__` keys |
+| Non-object params | `typeof params !== 'object'` check passes for arrays - arrays are objects |
 | Params with circular references | `JSON.stringify` would throw in the harness `wrap()` function |
 | Extremely large param objects | Memory exhaustion before emission cap is hit |
 
@@ -58,7 +58,7 @@ State operations go through `StateManager` (`state.js`) with limits enforcement.
 | Values that fail `JSON.stringify` (functions, symbols, circular refs) | Could bypass the serialization check or crash the state manager |
 | Keys named `__proto__`, `constructor`, `hasOwnProperty` | Prototype pollution in the `this.state` plain object |
 | Rapid set/delete cycles on the same key | `keyCount` tracking may drift, allowing the key cap to be bypassed |
-| Values that are exactly `null` after JSON round-trip | `NaN` → `JSON.stringify` → `"null"` → `JSON.parse` → `null` — the NaN check at `state.js:48` should block this, but fuzzing can verify |
+| Values that are exactly `null` after JSON round-trip | `NaN` → `JSON.stringify` → `"null"` → `JSON.parse` → `null` - the NaN check at `state.js:48` should block this, but fuzzing can verify |
 
 ### 2.5 Math Operations (`xchain.math.*`)
 
@@ -75,7 +75,7 @@ All 15 math methods wrap `mathjs` bignumber with string I/O.
 
 | Input vector | Risk |
 |---|---|
-| Missing or null `blockContext` fields | `gateway.js:29-31` accesses `.height`, `.timestamp`, `.hash` directly — null deref |
+| Missing or null `blockContext` fields | `gateway.js:29-31` accesses `.height`, `.timestamp`, `.hash` directly - null deref |
 | Non-numeric height/timestamp | Type confusion in contracts; determinism violations |
 | Extremely large height values | Overflow in arithmetic |
 
@@ -86,7 +86,7 @@ The harness uses `\x01` and `\x02` as protocol markers for return value and gate
 | Input vector | Risk |
 |---|---|
 | Contract returning strings starting with `\x02` | Misinterpreted as JSON-serialized return value (`index.js:353`) |
-| Gateway functions returning strings starting with `\x01` | Already handled by always prepending `\x01` in `bridge()` — but fuzzing should verify edge cases |
+| Gateway functions returning strings starting with `\x01` | Already handled by always prepending `\x01` in `bridge()` - but fuzzing should verify edge cases |
 | `JSON.parse` failures on malformed strings | Unhandled exception crossing the boundary |
 
 ---
@@ -181,23 +181,23 @@ This catches non-determinism introduced by:
 |--------|-----------------|
 | Node.js process crash (segfault in `isolated-vm`) | Process-level monitoring; run fuzzer as child process, detect non-zero exit |
 | Unhandled exception in host | Wrap `vm.execute()` in try/catch at the fuzzer level; any exception that isn't a clean `{ success, error }` result is a bug |
-| V8 isolate crash | `isolated-vm` throws; `_classifyError` should catch — if it doesn't, that's a bug |
+| V8 isolate crash | `isolated-vm` throws; `_classifyError` should catch - if it doesn't, that's a bug |
 | Infinite hang (bypass of wall-clock timeout) | Fuzzer-level timeout (e.g., 60s) wrapping each `vm.execute()` call |
 
 ### 4.2 Security Violation Detection
 
 | Violation | Detection |
 |-----------|-----------|
-| Sandbox escape | Instrument the host environment: set sentinel values on `process.env`, `global`, `require` — if any contract can read them, flag immediately |
-| Prototype pollution | Before/after each execution, snapshot `Object.prototype`, `Array.prototype`, `Function.prototype` — any new properties indicate pollution |
-| Error type spoofing | The `_classifyError` method already guards against `\x03` prefix spoofing by checking `execContext.reverted` and `gasTracker.used > gasTracker.ceiling` — fuzzing should verify contracts cannot produce false `revert` or `out_of_gas` classifications |
+| Sandbox escape | Instrument the host environment: set sentinel values on `process.env`, `global`, `require` - if any contract can read them, flag immediately |
+| Prototype pollution | Before/after each execution, snapshot `Object.prototype`, `Array.prototype`, `Function.prototype` - any new properties indicate pollution |
+| Error type spoofing | The `_classifyError` method already guards against `\x03` prefix spoofing by checking `execContext.reverted` and `gasTracker.used > gasTracker.ceiling` - fuzzing should verify contracts cannot produce false `revert` or `out_of_gas` classifications |
 
 ### 4.3 Incorrect State Detection
 
 | Invariant | Assertion |
 |-----------|-----------|
 | Atomicity on error | If `result.success === false`, then `result.stateChanges`, `result.stateDeletes`, and `result.emittedActions` must all be empty arrays |
-| State key count integrity | After execution, count live keys (initial - deleted + added) — must match `StateManager.keyCount` |
+| State key count integrity | After execution, count live keys (initial - deleted + added) - must match `StateManager.keyCount` |
 | State value round-trip | All values in `result.stateChanges` must survive `JSON.parse(JSON.stringify(value))` unchanged |
 | Emission validity | Every action in `result.emittedActions` must have `action` in the 16 allowed types and `params` as a non-null object |
 
@@ -229,8 +229,8 @@ Given the VM's unique architecture (AST-metered JavaScript in V8 isolates), off-
 | Library | Purpose |
 |---------|---------|
 | `fast-check` | Property-based testing framework for Node.js. Excellent arbitrary generators for strings, objects, arrays, numbers. Automatic shrinking finds minimal failing inputs. |
-| `acorn` + `astring` | Already dependencies — use them for AST-level code mutation and regeneration |
-| `acorn-walk` | Already a dependency — use for targeted AST node selection for mutation |
+| `acorn` + `astring` | Already dependencies - use them for AST-level code mutation and regeneration |
+| `acorn-walk` | Already a dependency - use for targeted AST node selection for mutation |
 
 ### 5.2 Secondary: Coverage-Guided Fuzzing
 
@@ -244,7 +244,7 @@ Given the VM's unique architecture (AST-metered JavaScript in V8 isolates), off-
 | Tool | Purpose |
 |------|---------|
 | `esfuzz` | Random JavaScript program generator. Can produce syntactically valid programs for code fuzzing seeds. |
-| `crosshatch` | Grammar-based fuzzer — define a JavaScript subset grammar and generate programs from it. |
+| `crosshatch` | Grammar-based fuzzer - define a JavaScript subset grammar and generate programs from it. |
 | `clinic.js` / `0x` | Profiling tools to detect CPU/memory anomalies during fuzz runs. |
 
 ### 5.4 Test Harness Architecture
@@ -285,50 +285,50 @@ The harness instantiates `XChainVM` with a known gas schedule and runs each fuzz
 
 ## 6. Prioritization
 
-### Tier 1 — Critical (implement first)
+### Tier 1 - Critical (implement first)
 
 These areas have the highest blast radius if a bug is found:
 
-1. **Metering bypass fuzzing** — Can a contract execute unbounded computation?
+1. **Metering bypass fuzzing** - Can a contract execute unbounded computation?
    - Target: `metering.js` AST injection completeness
    - Method: Generate code with unusual control flow constructs and verify every execution terminates within the gas ceiling
-   - Why first: A metering bypass is a consensus-level DoS vulnerability — any node running this contract would hang
+   - Why first: A metering bypass is a consensus-level DoS vulnerability - any node running this contract would hang
 
-2. **Sandbox escape fuzzing** — Can a contract access the host process?
+2. **Sandbox escape fuzzing** - Can a contract access the host process?
    - Target: `sandbox.js` global stripping, isolate boundary
    - Method: Generate code that walks prototype chains, overrides builtins, probes for leaked references
    - Why first: A sandbox escape could compromise every node running the indexer
 
-3. **Serialization boundary fuzzing** — Can a contract confuse the `\x01`/`\x02`/`\x03` protocol markers?
+3. **Serialization boundary fuzzing** - Can a contract confuse the `\x01`/`\x02`/`\x03` protocol markers?
    - Target: `index.js` harness `wrap()` function, `bridge()` function, `_classifyError()`
    - Method: Generate contracts that return or throw strings with control prefixes
    - Why first: Error type spoofing could cause incorrect gas accounting or hide reverts
 
-### Tier 2 — High (implement second)
+### Tier 2 - High (implement second)
 
-4. **State manager fuzzing** — Can a contract corrupt state or bypass limits?
+4. **State manager fuzzing** - Can a contract corrupt state or bypass limits?
    - Target: `state.js` key/value validation, `keyCount` tracking
    - Method: Property-based testing with `fast-check` on state CRUD sequences
    
-5. **Emission validation fuzzing** — Can a contract emit invalid actions that survive validation?
+5. **Emission validation fuzzing** - Can a contract emit invalid actions that survive validation?
    - Target: `gateway-emit.js`, `validator.js`, `collector.js`
    - Method: Generate all combinations of valid/invalid params for each of 16 action types
 
-6. **Math operation fuzzing** — Can malformed inputs crash or produce non-deterministic results?
+6. **Math operation fuzzing** - Can malformed inputs crash or produce non-deterministic results?
    - Target: `math.js` wrapping of `mathjs`
    - Method: Random string inputs, boundary values, non-string types
 
-### Tier 3 — Medium (implement third)
+### Tier 3 - Medium (implement third)
 
-7. **Compilation bomb fuzzing** — Can a small contract cause excessive compilation time/memory?
+7. **Compilation bomb fuzzing** - Can a small contract cause excessive compilation time/memory?
    - Target: `isolate.js`, `metering.js` (acorn parse + astring generate)
    - Method: Generate small-source-but-complex-AST patterns
 
-8. **Determinism fuzzing** — Does the VM produce identical results for identical inputs across runs?
+8. **Determinism fuzzing** - Does the VM produce identical results for identical inputs across runs?
    - Target: Full pipeline
    - Method: Execute every Tier 1/2 fuzz input twice and compare
 
-9. **Block context and environment fuzzing** — Can malformed environment data crash the VM?
+9. **Block context and environment fuzzing** - Can malformed environment data crash the VM?
    - Target: `gateway.js` context accessors, `index.js` opts handling
    - Method: Generate opts objects with missing/null/wrong-type fields
 
@@ -408,7 +408,7 @@ These are concrete scenarios the fuzzer should be designed to probe, derived fro
 | H7 | Rapid set/delete cycles on the same key cause `keyCount` to go negative | `state.js:60-66, 73-79` | 1000x `set('k','v')` then `delete('k')` alternating |
 | H8 | `xchain.math.divide('1', '0')` crashes the host process | `math.js` | Division by zero with various representations of zero |
 | H9 | A contract overriding `JSON.stringify` can intercept all gateway return values | harness `wrap()` function | `JSON.stringify = () => 'hacked'` before any gateway call |
-| H10 | Getter traps on objects passed to `xchain.state.set()` execute unmetered code | `state.js:51` (`JSON.stringify(value)`) | `xchain.state.set('k', {get x() { while(true){} }})` — but this runs on the host side via the bridge, so the getter runs in the isolate before serialization |
+| H10 | Getter traps on objects passed to `xchain.state.set()` execute unmetered code | `state.js:51` (`JSON.stringify(value)`) | `xchain.state.set('k', {get x() { while(true){} }})` - but this runs on the host side via the bridge, so the getter runs in the isolate before serialization |
 
 ---
 

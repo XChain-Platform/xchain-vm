@@ -11,10 +11,10 @@
 
 The XChain VM is the deterministic smart contract execution engine for the XChain Platform. It runs untrusted JavaScript inside sandboxed V8 isolates, with every ledger-affecting operation funneled through 16 predefined platform actions. Flaws in this component can directly lead to:
 
-- **Unauthorized ledger mutations** — if emit validation or action enforcement is bypassed
-- **Non-determinism** — if sandbox stripping misses a global, consensus across nodes diverges
-- **Denial of service** — if gas metering or resource limits have gaps, a single contract can stall the indexer
-- **State corruption** — if dirty-tracking, key limits, or serialization have edge-case bugs
+- **Unauthorized ledger mutations** - if emit validation or action enforcement is bypassed
+- **Non-determinism** - if sandbox stripping misses a global, consensus across nodes diverges
+- **Denial of service** - if gas metering or resource limits have gaps, a single contract can stall the indexer
+- **State corruption** - if dirty-tracking, key limits, or serialization have edge-case bugs
 
 Unit tests are the fastest, most targeted way to verify these invariants in isolation before integration with the indexer.
 
@@ -24,19 +24,19 @@ Unit tests are the fastest, most targeted way to verify these invariants in isol
 
 ### 2.1 Gas Metering (`metering.js`, `gas.js`)
 
-**Current coverage:** 28 metering tests, 7 gas tracker tests — solid baseline.
+**Current coverage:** 28 metering tests, 7 gas tracker tests - solid baseline.
 
 **Gaps to address:**
 
 | Area | Specific Tests Needed |
 |------|----------------------|
 | Deep binary expressions | Verify `__gas()` injection at depth-10 boundary for chains like `a+b+c+d+...` (12+ operands). Confirm gas is charged, not just injected. |
-| Interaction of injection phases | Code combining loops, ternaries, deep binaries, and call expressions — verify total gas call count matches expectations. |
-| Arrow function edge cases | Arrow with destructured params, default values, rest params — metered source must remain syntactically valid. |
-| Directive prologue correctness | Multiple directives (`"use strict"; "use asm"`) — gas inserted after all of them. |
-| `hasGasIdentifier` false negatives | Property access (`obj.__gas`), string containing `__gas`, comment containing `__gas` — must not false-positive. |
-| Negative/zero gas charge | `GasTracker.charge(0)` and `charge(-1)` — define expected behavior (no-op vs error). |
-| Ceiling exactly zero | `new GasTracker(schedule, 0)` — first charge should immediately exhaust. |
+| Interaction of injection phases | Code combining loops, ternaries, deep binaries, and call expressions - verify total gas call count matches expectations. |
+| Arrow function edge cases | Arrow with destructured params, default values, rest params - metered source must remain syntactically valid. |
+| Directive prologue correctness | Multiple directives (`"use strict"; "use asm"`) - gas inserted after all of them. |
+| `hasGasIdentifier` false negatives | Property access (`obj.__gas`), string containing `__gas`, comment containing `__gas` - must not false-positive. |
+| Negative/zero gas charge | `GasTracker.charge(0)` and `charge(-1)` - define expected behavior (no-op vs error). |
+| Ceiling exactly zero | `new GasTracker(schedule, 0)` - first charge should immediately exhaust. |
 
 ### 2.2 Sandbox & Determinism (`sandbox.js`, `determinism.test.js`)
 
@@ -46,28 +46,28 @@ Unit tests are the fastest, most targeted way to verify these invariants in isol
 
 | Area | Specific Tests Needed |
 |------|----------------------|
-| Complete global removal | `WeakRef`, `FinalizationRegistry`, `Proxy`, `SharedArrayBuffer`, `Atomics`, `fetch`, `XMLHttpRequest`, `WebSocket`, `importScripts`, `queueMicrotask` — each must be `undefined` inside isolate. |
+| Complete global removal | `WeakRef`, `FinalizationRegistry`, `Proxy`, `SharedArrayBuffer`, `Atomics`, `fetch`, `XMLHttpRequest`, `WebSocket`, `importScripts`, `queueMicrotask` - each must be `undefined` inside isolate. |
 | Indirect access patterns | `(0, eval)('1+1')` (indirect eval), `Object.getPrototypeOf(Object.getPrototypeOf({})).constructor('return this')()` (prototype chain escape), `Reflect.construct` shenanigans. |
 | Math object freezing | Confirm `Math.random = () => 0.5` throws or is silently ignored inside the isolate. Confirm allowed methods (`floor`, `ceil`, `abs`, etc.) are callable. |
-| Cross-run determinism with math | Same contract using `xchain.math.divide` with long decimal results — identical string output across 10 runs. |
-| Date/timing channels | `new Date`, `Date.now`, `performance.now` — all must be undefined or throw. |
+| Cross-run determinism with math | Same contract using `xchain.math.divide` with long decimal results - identical string output across 10 runs. |
+| Date/timing channels | `new Date`, `Date.now`, `performance.now` - all must be undefined or throw. |
 
 ### 2.3 Gateway API (`gateway.js`)
 
-**Current coverage:** 20+ tests — context accessors and state ops covered, but many API surfaces untested.
+**Current coverage:** 20+ tests - context accessors and state ops covered, but many API surfaces untested.
 
 **Gaps to address:**
 
 | Area | Specific Tests Needed |
 |------|----------------------|
-| Missing context accessors | `getBlockTimestamp()`, `getBlockHash()`, `getInputParamCount()` — verify they return the values passed in blockContext/params. |
-| `getInputParam` boundaries | Index -1, 0, length-1, length, non-integer — expected: null for out-of-bounds. |
+| Missing context accessors | `getBlockTimestamp()`, `getBlockHash()`, `getInputParamCount()` - verify they return the values passed in blockContext/params. |
+| `getInputParam` boundaries | Index -1, 0, length-1, length, non-integer - expected: null for out-of-bounds. |
 | `getInputParams` isolation | Mutating the returned array must not affect the gateway's internal copy. |
 | `getBalance` / `getTokenInfo` | With and without matching entries; with empty balances object; with null/undefined readOnlyData. |
 | Oracle accessors | `oracle.getPrice(pair)` with matching/missing data, `oracle.getPriceAtRound(pair, round)`, `oracle.getSnapshotAge()`. |
-| Cross-chain accessors | `crossChain.getAttestation(chain, idx)` and `crossChain.isSettled(chain, idx)` — with present/absent data. |
+| Cross-chain accessors | `crossChain.getAttestation(chain, idx)` and `crossChain.isSettled(chain, idx)` - with present/absent data. |
 | Gas charging per operation | Verify each gateway method charges the correct gas schedule entry (VM_STATE_READ, VM_STATE_WRITE, VM_STATE_DELETE, VM_ORACLE_READ, VM_CROSSCHAIN_READ, VM_EMISSION). Context accessors must charge 0. |
-| `revert()` / `require()` | `revert()` with no reason, `require(false)` with no reason, `require(true, 'msg')` — no error. Verify error type is `ContractRevertError`. |
+| `revert()` / `require()` | `revert()` with no reason, `require(false)` with no reason, `require(true, 'msg')` - no error. Verify error type is `ContractRevertError`. |
 | Logging edge cases | `log()` with no args, `log()` with object/array args (should stringify), `isLogFull()` at exactly 99 and 100 entries, `getLogCount()` accuracy. |
 | Gateway object freezing | Confirm `xchain.state = {}` or `xchain.emit.send = null` throws or is ignored inside contract code. |
 
@@ -79,28 +79,28 @@ Unit tests are the fastest, most targeted way to verify these invariants in isol
 
 | Area | Specific Tests Needed |
 |------|----------------------|
-| All 16 action types | Each emit method called with valid params — verify action is queued with correct type and deep-copied params. |
+| All 16 action types | Each emit method called with valid params - verify action is queued with correct type and deep-copied params. |
 | Required field validation per type | For each of the 16 methods, call with each required field missing individually. Expect descriptive error. |
-| Extra fields passthrough | Emit with extra params beyond required — verify they are preserved (not stripped). |
-| Params deep copy | Mutate the params object after calling emit — queued action must retain original values. |
+| Extra fields passthrough | Emit with extra params beyond required - verify they are preserved (not stripped). |
+| Params deep copy | Mutate the params object after calling emit - queued action must retain original values. |
 | Gas charging | Each emit charges `VM_EMISSION` exactly once, regardless of param count. |
 | `ActionValidator.validate` | Test with each allowed action string, unknown action string ("TRANSFER", "DEPLOY"), null action, params as null, params as non-object (string, array, number). |
 
 ### 2.5 State Management (`state.js`)
 
-**Current coverage:** 18 tests — CRUD, limits, and dirty tracking well covered.
+**Current coverage:** 18 tests - CRUD, limits, and dirty tracking well covered.
 
 **Gaps to address:**
 
 | Area | Specific Tests Needed |
 |------|----------------------|
-| Circular reference in `set()` | Object with circular ref — should fail JSON.stringify validation. |
-| Non-serializable values | Functions, Symbols, BigInt, `undefined` nested in object — expected behavior. |
-| Key count after repeated delete-set | Delete key A, set key B, delete key B, set key A — verify count equals initial count. |
-| Exactly at maxStateKeys | Set exactly N keys (at limit), then attempt N+1 — verify error. Then delete one and set again — should succeed. |
-| Exactly at maxStateValueSize | Value whose byte length === limit — should succeed. Value at limit+1 — should fail. Test with multi-byte UTF-8 characters. |
+| Circular reference in `set()` | Object with circular ref - should fail JSON.stringify validation. |
+| Non-serializable values | Functions, Symbols, BigInt, `undefined` nested in object - expected behavior. |
+| Key count after repeated delete-set | Delete key A, set key B, delete key B, set key A - verify count equals initial count. |
+| Exactly at maxStateKeys | Set exactly N keys (at limit), then attempt N+1 - verify error. Then delete one and set again - should succeed. |
+| Exactly at maxStateValueSize | Value whose byte length === limit - should succeed. Value at limit+1 - should fail. Test with multi-byte UTF-8 characters. |
 | `getChanges()` ordering | Changes and deletes should be returned in insertion order (Map iteration order). |
-| Empty string key | `state.set('', 'value')` — define expected behavior. |
+| Empty string key | `state.set('', 'value')` - define expected behavior. |
 | Boolean/number/array values | Ensure all JSON-serializable types work and round-trip correctly through get/set. |
 
 ### 2.6 Emission Collector (`collector.js`)
@@ -111,29 +111,29 @@ Unit tests are the fastest, most targeted way to verify these invariants in isol
 
 | Area | Specific Tests Needed |
 |------|----------------------|
-| Emission at exactly maxEmissions | Add N actions (at limit) — should succeed. Add N+1 — should throw. |
+| Emission at exactly maxEmissions | Add N actions (at limit) - should succeed. Add N+1 - should throw. |
 | Log at boundary | 100th log accepted, 101st silently dropped. |
-| Log truncation accuracy | Message of exactly 1024 bytes — no truncation. Message of 1025 bytes — truncated with marker. Verify marker text. |
-| Multi-byte log truncation | Log with emoji/CJK at the 1024-byte boundary — verify no broken character encoding. |
-| Empty action params | `add('SEND', {})` — should succeed (validation is in gateway-emit, not collector). |
+| Log truncation accuracy | Message of exactly 1024 bytes - no truncation. Message of 1025 bytes - truncated with marker. Verify marker text. |
+| Multi-byte log truncation | Log with emoji/CJK at the 1024-byte boundary - verify no broken character encoding. |
+| Empty action params | `add('SEND', {})` - should succeed (validation is in gateway-emit, not collector). |
 | `getActions()` returns reference | Verify callers cannot corrupt internal array via the returned reference (or document this as by-design). |
 
 ### 2.7 Math API (`math.js`)
 
-**Current coverage:** 16 tests — arithmetic, comparison, and error handling covered.
+**Current coverage:** 16 tests - arithmetic, comparison, and error handling covered.
 
 **Gaps to address:**
 
 | Area | Specific Tests Needed |
 |------|----------------------|
-| Extreme precision | 50+ decimal places — verify no silent rounding or truncation. |
-| Scientific notation input | `"1e18"`, `"1.5e-10"` — verify correct parsing and string output in fixed notation. |
-| Very large numbers | 100+ digit integers — verify no overflow or precision loss. |
-| Negative zero | `subtract("1", "1")` — should return `"0"`, not `"-0"`. |
+| Extreme precision | 50+ decimal places - verify no silent rounding or truncation. |
+| Scientific notation input | `"1e18"`, `"1.5e-10"` - verify correct parsing and string output in fixed notation. |
+| Very large numbers | 100+ digit integers - verify no overflow or precision loss. |
+| Negative zero | `subtract("1", "1")` - should return `"0"`, not `"-0"`. |
 | `mod` edge cases | `mod("10", "3")`, `mod("-10", "3")`, `mod("10", "-3")`, `mod("0", "5")`, `mod("5", "0")` (should error). |
-| `isZero` with near-zero | `isZero("0.0000000000000001")` — should return false. `isZero("0.00")` — should return true. |
-| Invalid input types | Non-string input (number, null, undefined, object) — verify ContractRevertError. |
-| `compare` result type | Returns number (-1, 0, 1) not string — verify. |
+| `isZero` with near-zero | `isZero("0.0000000000000001")` - should return false. `isZero("0.00")` - should return true. |
+| Invalid input types | Non-string input (number, null, undefined, object) - verify ContractRevertError. |
+| `compare` result type | Returns number (-1, 0, 1) not string - verify. |
 
 ### 2.8 Syntax Validation (`syntax.js`)
 
@@ -143,13 +143,13 @@ Unit tests are the fastest, most targeted way to verify these invariants in isol
 
 | Area | Specific Tests Needed |
 |------|----------------------|
-| ES2020 boundary | ES2021+ features (logical assignment `??=`, `||=`) — verify rejection. |
-| Acorn-unsupported V8 syntax | Syntax valid in V8 but not acorn ES2020 — verify caught in step 2. |
-| `__gas` in various positions | As variable name, function name, property name, in destructuring, as label — verify only variable/function usage is rejected. |
-| Empty code | `""` — define expected behavior. |
-| Code with only comments | `"// nothing"` — should be valid. |
-| Float warnings accuracy | Multiple float literals on different lines — verify all reported with correct line numbers. Integer that looks like float (`1.0`) — check behavior. |
-| Large code input | Near maxCodeSize — verify validation completes without timeout. |
+| ES2020 boundary | ES2021+ features (logical assignment `??=`, `||=`) - verify rejection. |
+| Acorn-unsupported V8 syntax | Syntax valid in V8 but not acorn ES2020 - verify caught in step 2. |
+| `__gas` in various positions | As variable name, function name, property name, in destructuring, as label - verify only variable/function usage is rejected. |
+| Empty code | `""` - define expected behavior. |
+| Code with only comments | `"// nothing"` - should be valid. |
+| Float warnings accuracy | Multiple float literals on different lines - verify all reported with correct line numbers. Integer that looks like float (`1.0`) - check behavior. |
+| Large code input | Near maxCodeSize - verify validation completes without timeout. |
 
 ### 2.9 XChainVM Orchestration (`index.js`)
 
@@ -160,14 +160,14 @@ Unit tests are the fastest, most targeted way to verify these invariants in isol
 | Area | Specific Tests Needed |
 |------|----------------------|
 | `execute()` return structure | Verify all 8 fields present in success and failure cases. |
-| Atomicity on revert | Contract that sets state + emits actions then reverts — stateChanges and emittedActions must be empty, logs preserved. |
+| Atomicity on revert | Contract that sets state + emits actions then reverts - stateChanges and emittedActions must be empty, logs preserved. |
 | Atomicity on gas exhaustion | Same as above but triggered by gas ceiling. |
-| Atomicity on timeout | Contract with wall-clock timeout — verify clean result. |
-| Return value truncation | Contract returning string > 64KB — verify truncation to 64KB. |
-| Return value serialization | Contract returning object, array, number, null — verify JSON serialization. |
-| Method routing: function export | `module.exports = function(xchain) {...}` — method param is ignored. |
-| Method routing: object export | `module.exports = { foo, bar }` — correct method called. Unknown method — error. |
-| Method routing: missing export | Code that doesn't set `module.exports` — define expected behavior. |
+| Atomicity on timeout | Contract with wall-clock timeout - verify clean result. |
+| Return value truncation | Contract returning string > 64KB - verify truncation to 64KB. |
+| Return value serialization | Contract returning object, array, number, null - verify JSON serialization. |
+| Method routing: function export | `module.exports = function(xchain) {...}` - method param is ignored. |
+| Method routing: object export | `module.exports = { foo, bar }` - correct method called. Unknown method - error. |
+| Method routing: missing export | Code that doesn't set `module.exports` - define expected behavior. |
 | `beginBlock()` / `endBlock()` | Verify compilation cache is used for same code within a block. Verify cache is cleared between blocks. |
 | Error classification | Each error type (revert, gas, timeout, OOM, generic) produces the correct error prefix string. |
 | Code with existing `__gas` | Should be rejected at syntax validation, not at execute time. |
@@ -198,7 +198,7 @@ Unit tests are the fastest, most targeted way to verify these invariants in isol
 |------|----------------------|
 | `ContractRevertError` | Verify `instanceof Error`, `name` property, `message` matches reason, `stack` exists. |
 | `GasExhaustedError` | Verify `instanceof Error`, `name`, `used`, `ceiling` properties, message format. |
-| Reason-less revert | `new ContractRevertError()` — message should be undefined or empty, not crash. |
+| Reason-less revert | `new ContractRevertError()` - message should be undefined or empty, not crash. |
 
 ---
 
@@ -221,21 +221,21 @@ Group tests by: **happy path** -> **boundary conditions** -> **error cases** -> 
 ### 3.2 Input/Output Design
 
 **Contract Execution Tests:**
-- Input: Minimal contract code strings exercising one behavior each. Avoid reusing complex fixture contracts for unit tests — write targeted inline snippets.
+- Input: Minimal contract code strings exercising one behavior each. Avoid reusing complex fixture contracts for unit tests - write targeted inline snippets.
 - State: Plain objects `{ key: 'value' }` with known contents.
 - Block context: Fixed objects `{ height: 100, timestamp: 1700000000, hash: '0xabc...' }`.
 - Expected output: Assert on specific fields of the result object, not the entire object.
 
 **Module-Level Tests:**
 - Instantiate modules directly (`new GasTracker(schedule, ceiling)`, `new StateManager(state, limits)`, `buildGateway(...)`, etc.).
-- Use minimal constructor arguments — only what's needed for the test.
+- Use minimal constructor arguments - only what's needed for the test.
 - Assert on return values, thrown errors, and side effects (e.g., `getChanges()` after state ops).
 
 ### 3.3 Mocking Strategy
 
 | Dependency | How to Mock | When to Mock |
 |------------|-------------|--------------|
-| `isolated-vm` | Skip tests with `before()` check if native module unavailable (already implemented). For unit tests of gateway/state/gas/math/collector, no isolate needed — test the module directly. | Always for pure-logic module tests. |
+| `isolated-vm` | Skip tests with `before()` check if native module unavailable (already implemented). For unit tests of gateway/state/gas/math/collector, no isolate needed - test the module directly. | Always for pure-logic module tests. |
 | Blockchain state | Pass plain objects as `balances`, `tokenInfo`, `oracleData`, `crossChainData` to `buildGateway()`. | All gateway tests. |
 | Gas tracker | Pass a real `GasTracker` instance with high ceiling for non-gas tests. Pass a tracker with ceiling=0 or ceiling=N for gas boundary tests. | Gateway and emit tests that aren't specifically testing gas. |
 | State manager | Pass a real `StateManager` with known initial state. | Gateway state operation tests. |
@@ -247,16 +247,16 @@ Group tests by: **happy path** -> **boundary conditions** -> **error cases** -> 
 
 - **Equality:** Use `assert.strictEqual` for primitives, `assert.deepStrictEqual` for objects/arrays.  
 - **Errors:** Use `assert.throws` with error type and message matching. For async: `assert.rejects`.  
-- **Gas accounting:** Assert exact gas values, not ranges — gas metering is deterministic.  
+- **Gas accounting:** Assert exact gas values, not ranges - gas metering is deterministic.  
 - **Determinism:** Run the same execution N times (N >= 3) and compare full result objects.  
-- **Isolation:** Mutate inputs after passing them to the module — verify outputs are unaffected.
+- **Isolation:** Mutate inputs after passing them to the module - verify outputs are unaffected.
 
 ### 3.5 Test Independence
 
 - Each `describe` block creates its own module instances in `beforeEach`.
 - No shared mutable state between tests.
 - Tests must pass in any order and in isolation (`--grep` friendly).
-- No filesystem, network, or database access — pure in-memory.
+- No filesystem, network, or database access - pure in-memory.
 
 ### 3.6 Edge Case Checklist (Apply to Every Module)
 
@@ -271,31 +271,31 @@ Group tests by: **happy path** -> **boundary conditions** -> **error cases** -> 
 
 ## 4. Priority Ordering
 
-### P0 — Security-Critical (implement first)
+### P0 - Security-Critical (implement first)
 
-1. **Sandbox escape vectors** (2.2) — indirect eval, prototype chain traversal, constructor escape
-2. **Emit validation completeness** (2.4) — all 16 action types, required field enforcement
-3. **Gas metering completeness** (2.1) — deep binary expressions, combined injection phases
-4. **Atomicity guarantees** (2.9) — revert/gas/timeout all discard state and emissions
+1. **Sandbox escape vectors** (2.2) - indirect eval, prototype chain traversal, constructor escape
+2. **Emit validation completeness** (2.4) - all 16 action types, required field enforcement
+3. **Gas metering completeness** (2.1) - deep binary expressions, combined injection phases
+4. **Atomicity guarantees** (2.9) - revert/gas/timeout all discard state and emissions
 
-### P1 — Correctness-Critical
+### P1 - Correctness-Critical
 
-5. **Gateway API completeness** (2.3) — all untested context, oracle, cross-chain accessors
-6. **State management edge cases** (2.5) — circular refs, key count accuracy, byte boundaries
-7. **Math precision edge cases** (2.7) — extreme precision, negative zero, mod with zero
-8. **Error classification** (2.9) — each error type maps to correct prefix
+5. **Gateway API completeness** (2.3) - all untested context, oracle, cross-chain accessors
+6. **State management edge cases** (2.5) - circular refs, key count accuracy, byte boundaries
+7. **Math precision edge cases** (2.7) - extreme precision, negative zero, mod with zero
+8. **Error classification** (2.9) - each error type maps to correct prefix
 
-### P2 — Robustness
+### P2 - Robustness
 
-9. **Collector boundaries** (2.6) — exact limit behavior, multi-byte truncation
-10. **Syntax validation boundaries** (2.8) — ES2020 limit, empty code, large code
-11. **Isolate management** (2.10) — dispose idempotency, cache behavior
-12. **Method routing** (2.9) — function vs object export, missing export
+9. **Collector boundaries** (2.6) - exact limit behavior, multi-byte truncation
+10. **Syntax validation boundaries** (2.8) - ES2020 limit, empty code, large code
+11. **Isolate management** (2.10) - dispose idempotency, cache behavior
+12. **Method routing** (2.9) - function vs object export, missing export
 
-### P3 — Confidence
+### P3 - Confidence
 
-13. **Determinism expansion** (2.2) — cross-block, math precision, timing channels
-14. **Error class properties** (2.11) — instanceof checks, property existence
+13. **Determinism expansion** (2.2) - cross-block, math precision, timing channels
+14. **Error class properties** (2.11) - instanceof checks, property existence
 
 ---
 
@@ -341,5 +341,5 @@ Existing files to extend: `metering.test.js`, `gas.test.js`, `math.test.js`, `st
 - All sandbox-stripped globals verified as undefined inside isolate
 - Atomicity verified for every failure mode (revert, gas, timeout, OOM)
 - All boundary conditions at configured limits tested (keys, value size, emissions, gas ceiling, code size, log count)
-- Zero reliance on external services — all tests run in-memory with sub-second execution
+- Zero reliance on external services - all tests run in-memory with sub-second execution
 - Tests pass deterministically on repeated runs (no flaky timing dependencies)

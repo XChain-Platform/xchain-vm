@@ -5,6 +5,6 @@
 .stryker-tmp/
 reports/mutation/
 
-# Coverage output (c8/nyc) — generated, not source
+# Coverage output (c8/nyc) - generated, not source
 coverage/
 .nyc_output/
