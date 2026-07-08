@@ -48,23 +48,38 @@ class IsolateManager {
 
     /**
      * Compile source code in an isolate.
+     *
+     * Cache handling is API-version-specific. Under isolated-vm 5.x cached
+     * compilation data is an ExternalCopy<ArrayBuffer> handle carried on the
+     * ScriptInfo, NOT a Script method: you CONSUME it by passing `cachedData`,
+     * and you PRODUCE it by passing `produceCachedData: true` (V8 then attaches
+     * the handle as `script.cachedData`). Passing a known-good handle skips the
+     * parse; absent one we produce a handle so the caller can store it. V8
+     * validates the handle against the source and transparently recompiles from
+     * source on any mismatch (surfaced as `script.cachedDataRejected`), so the
+     * cache is a pure parse-time speedup that can never change the compiled
+     * program, its gas metering, or its execution result.
      * @param {ivm.Isolate} isolate
-     * @param {string} code
-     * @param {Buffer} [cachedData] - V8 cached compilation data
+     * @param {ivm.ExternalCopy} [cachedData] - V8 cached compilation data handle
      * @returns {ivm.Script}
      */
     compileScript(isolate, code, cachedData) {
-        const opts = cachedData ? { cachedData } : {};
+        const opts = cachedData ? { cachedData } : { produceCachedData: true };
         return isolate.compileScriptSync(code, opts);
     }
 
     /**
-     * Extract cached compilation data from a compiled script.
+     * Read the cached compilation data produced by a compileScript() call made
+     * without a `cachedData` argument. Under isolated-vm 5.x the produced handle
+     * is attached as `script.cachedData` (an ExternalCopy<ArrayBuffer>); there is
+     * no `Script.createCachedData()` method in this API line (the earlier code
+     * called it, so every read threw and the cache silently never populated: the
+     * harness and per-block contract compiles re-parsed on every execution).
      * @param {ivm.Script} script
-     * @returns {Buffer}
+     * @returns {ivm.ExternalCopy|null}
      */
     getCachedData(script) {
-        return script.createCachedData();
+        return (script && script.cachedData) || null;
     }
 
     /**

@@ -142,7 +142,7 @@ function binaryDepth(node) {
 // Harness-injected helpers (src/index.js) that meter syntax-level allocators.
 // The pass below rewrites operators/syntax into calls to these; they must never
 // be wrapped as ordinary call sites, and contract source may not reference them.
-const ALLOC_HELPERS = ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread', '__objspreadmeter'];
+const ALLOC_HELPERS = ['__concat', '__setconcat', '__setconcatL', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread', '__objspreadmeter'];
 // Deterministic call-depth metering helpers (src/index.js harness). Phase 4 below
 // wraps every contract function body in __depth_enter()/finally __depth_exit() so
 // intra-contract recursion is bounded by a fixed, platform-independent depth (not
@@ -161,6 +161,14 @@ function _call(name, args) {
 }
 function _clone(node) { return JSON.parse(JSON.stringify(node)); }
 function _void0() { return { type: 'UnaryExpression', operator: 'void', prefix: true, argument: _lit(0) }; }
+// A zero-arg arrow that returns `expr` unevaluated: () => expr. Used by the
+// spec-correct obj[k] += rhs rewrite to DEFER the rhs so the helper can read
+// obj[k] first. An arrow (not a function) keeps `this`/`arguments`/`new.target`
+// lexical, so deferring never changes what the rhs would compute inline.
+function _arrowThunk(expr) {
+    return { type: 'ArrowFunctionExpression', id: null, params: [],
+        body: expr, async: false, generator: false, expression: true };
+}
 // The property key of a member expression, as an expression evaluated once:
 // the raw key for computed `o[k]`, or a string literal for `o.k` / `o['k']`.
 function _memberKey(member) {
@@ -180,7 +188,7 @@ function _memberKey(member) {
  * the copy is charged without altering getter/method semantics. Call spread f(...x)
  * is left unmetered, bounded by V8's argument-count limit (RangeError).
  */
-function transformAllocators(ast) {
+function transformAllocators(ast, specEvalOrder) {
     // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's
     // quasi must NOT be (the tag receives the raw template strings object); we
     // collect those quasis up front, skip converting them here, and instead rewrite
@@ -205,10 +213,21 @@ function transformAllocators(ast) {
                 };
             }
             // member lhs (computed o[k] or complex a.b.c): evaluate the object and
-            // key EXACTLY ONCE here, then let __setconcat do read/charge/write.
+            // key EXACTLY ONCE here, then let the helper do read/charge/write.
             // Re-reading the lhs in place could double-fire getters / re-evaluate k.
+            //
+            // L-3 consensus gate. Pre-gate: __setconcat(obj, key, rhs) evaluates rhs
+            // as an ordinary argument (BEFORE the helper reads obj[key]), so a rhs
+            // that mutates obj[key] diverges from the spec, which reads the old value
+            // FIRST. Post-gate: __setconcatL(obj, key, () => rhs) passes rhs as a
+            // deferred thunk so the helper reads obj[key] before evaluating rhs,
+            // matching spec order. Gated because flipping the order changes results
+            // for that (rare) pattern; the flag is threaded from the block time in
+            // index.js (isMeteringEvalOrderActive), mirroring the H-5 state-key gate.
             if (node.left.type === 'MemberExpression') {
-                return _call('__setconcat', [node.left.object, _memberKey(node.left), node.right]);
+                return specEvalOrder
+                    ? _call('__setconcatL', [node.left.object, _memberKey(node.left), _arrowThunk(node.right)])
+                    : _call('__setconcat', [node.left.object, _memberKey(node.left), node.right]);
             }
         }
         // tagged template: tag`q0${e0}q1...`  ->  __tmpltag[m](tag/obj[,key], cooked, raw, [e0,...])
@@ -313,9 +332,16 @@ function transformAllocators(ast) {
 /**
  * Transform contract source code by injecting gas metering calls.
  * @param {string} source - Original contract source code
+ * @param {object} [opts]
+ * @param {boolean} [opts.specEvalOrder] - L-3 consensus gate. When true, obj[k] += rhs
+ *   is rewritten to the spec-correct order (read obj[k] before evaluating rhs) via
+ *   __setconcatL; when false/omitted the historical __setconcat form is preserved
+ *   byte-for-byte. index.js resolves this from the block time so pre-gate blocks
+ *   replay identically. Consensus-visible: a divergent value forks the fleet.
  * @returns {string} Transformed source with __gas(1) calls injected
  */
-function meterCode(source) {
+function meterCode(source, opts) {
+    const specEvalOrder = !!(opts && opts.specEvalOrder);
     const ast = acorn.parse(source, {
         ecmaVersion: CONTRACT_ECMA_VERSION,
         sourceType: 'script',
@@ -325,7 +351,7 @@ function meterCode(source) {
     // Phase 0: rewrite syntax-level allocators (string +/+=, template literals,
     // array/object spread) into metered helper calls, on the pristine AST before
     // any __gas() insertion. The helper calls are exempted from Phase 3 below.
-    transformAllocators(ast);
+    transformAllocators(ast, specEvalOrder);
 
     // Track nodes we've already processed to avoid double-injection
     const processed = new WeakSet();

@@ -134,7 +134,11 @@ try {
 
         it('should produce reusable cached data if supported', function() {
             const mgr = new IsolateManager(LIMITS);
-            const code = 'var x = 1 + 2;';
+            // Trailing expression so runSync returns the value (a bare
+            // `var x = 1 + 2;` declaration completes with undefined). This test
+            // used to skip on ivm versions without createCachedData(); now that
+            // the 5.x produce/consume path is live it actually runs the script.
+            const code = 'var x = 1 + 2; x;';
 
             const { isolate: iso1, context: ctx1 } = mgr.createIsolate();
             const script1 = mgr.compileScript(iso1, code);

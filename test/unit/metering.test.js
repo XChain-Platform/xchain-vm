@@ -451,6 +451,28 @@ describe('Metering', function() {
             assert(metered.includes('__setconcat('), 'computed member concat-assign → __setconcat');
         });
 
+        // L-3 gate: default (pre-gate) keeps the legacy __setconcat form; the
+        // spec-correct order (read obj[k] before rhs) is emitted as __setconcatL
+        // with a deferred rhs thunk only when specEvalOrder is set. Default output
+        // must stay byte-stable so historical blocks replay identically.
+        it('default meterCode keeps legacy __setconcat (no __setconcatL) for member +=', function() {
+            const metered = meterCode('obj.prop += "x";');
+            assert(metered.includes('__setconcat('), 'default must emit __setconcat');
+            assert(!/__setconcatL\(/.test(metered), 'default must NOT emit the gated __setconcatL');
+        });
+
+        it('specEvalOrder emits __setconcatL with a thunked rhs for member +=', function() {
+            const metered = meterCode('obj.prop += "x";', { specEvalOrder: true });
+            assert(/__setconcatL\(/.test(metered), 'gated path must emit __setconcatL');
+            assert(/=>/.test(metered), 'gated path must defer rhs behind an arrow thunk');
+        });
+
+        it('specEvalOrder does not disturb bare-identifier += (still __concat)', function() {
+            const metered = meterCode('var s = "a"; s += "b";', { specEvalOrder: true });
+            assert(metered.includes('__concat('), 'identifier += stays __concat under the gate');
+            assert(!/__setconcatL\(/.test(metered), 'identifier += must not route through __setconcatL');
+        });
+
         it('rewrites object spread with a string-literal key', function() {
             // non-computed Literal key → _lit(p.key.value) branch.
             const metered = meterCode('var o = {...base, "strkey": v};');

@@ -606,12 +606,39 @@ const HARNESS_SOURCE = `
     });
 
     // Compound-assign on a member lhs  obj[k] += b / a.b.c += b  ->  __setconcat(obj, k, b)
-    // The metering pass evaluates obj and k once at the call site; this helper does
-    // the read/charge/write so a computed/complex lhs (which can't be safely re-read
-    // in place) is byte-metered like __concat. Get-once -> charge -> set-once matches
-    // native += ordering.
+    // PRE-GATE form (L-3). The metering pass evaluates obj and k once at the call
+    // site; this helper does the read/charge/write so a computed/complex lhs
+    // (which can't be safely re-read in place) is byte-metered like __concat.
+    // Because b is an ordinary argument it is evaluated BEFORE this body reads
+    // obj[key], so when b mutates obj[key] the read observes the post-mutation
+    // value: a divergence from the spec, which reads obj[key] (old value) BEFORE
+    // evaluating the rhs. Preserved verbatim below METERING_EVAL_ORDER_GATE_BLOCK_TIME
+    // so historical results replay byte-identically; the spec-correct order is
+    // __setconcatL, emitted only when the gate is active.
     __lockGlobal('__setconcat', function(obj, key, b) {
         var a = obj[key];
+        var r = a + b;
+        if (typeof r === 'string') {
+            var la = __slen(a), lb = __slen(b);
+            var grew = r.length - (la > lb ? la : lb);
+            if (grew > __GROW_THRESHOLD) __gas(grew);
+        }
+        obj[key] = r;
+        return r;
+    });
+
+    // POST-GATE form (L-3): spec-correct left-object evaluation for obj[k] += rhs.
+    // The metering pass evaluates obj and k once at the call site (arguments 1-2)
+    // and passes the rhs as a THUNK (argument 3, an arrow so this/arguments stay
+    // lexical) so it is NOT evaluated at the call site. This body reads obj[key]
+    // (the OLD value) FIRST, then invokes the thunk to evaluate rhs, matching the
+    // language order: LeftHandSide reference, GetValue(old), then evaluate rhs.
+    // A contract where rhs mutates obj[key] now sees the pre-mutation value, as the
+    // spec requires. Charging is identical to __setconcat. Emitted only when the
+    // gate is active (isMeteringEvalOrderActive); consensus-visible, so gated.
+    __lockGlobal('__setconcatL', function(obj, key, rhsThunk) {
+        var a = obj[key];
+        var b = rhsThunk();
         var r = a + b;
         if (typeof r === 'string') {
             var la = __slen(a), lb = __slen(b);
@@ -909,6 +936,25 @@ function isStateKeyNulRejectActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= STATE_KEY_NUL_GATE_BLOCK_TIME;
 }
 
+// Coordinated activation for spec-correct evaluation order of the compound
+// string-append `obj[k] += rhs` (L-3). The AST metering transform rewrites this
+// to a metered helper call; the legacy rewrite evaluates rhs BEFORE the helper
+// reads obj[k], so a contract whose rhs mutates obj[k] observes the post-mutation
+// value, diverging from JS spec order (read obj[k] old value FIRST, then evaluate
+// rhs). Every node runs the same transform, so this is a shared spec divergence,
+// not a cross-node split; but CORRECTING it changes results for that rare pattern,
+// so the correction is gated. Post-gate the transform emits __setconcatL (thunked
+// rhs, read-first); pre-gate it emits __setconcat verbatim so historical blocks
+// replay byte-identically. Gated like the other 2.0.0 contract-era changes:
+// testnet/regtest from genesis, mainnet at the shared coordinated flag-day. Same
+// coordinated timestamp as STATE_KEY_NUL/BINARY_ALLOC/ASYNC_SURFACE; a value that
+// differs across the fleet is itself a fork.
+const METERING_EVAL_ORDER_GATE_BLOCK_TIME = 1790812800;
+function isMeteringEvalOrderActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= METERING_EVAL_ORDER_GATE_BLOCK_TIME;
+}
+
 class XChainVM {
     /**
      * @param {object} config
@@ -938,7 +984,10 @@ class XChainVM {
         this.isolateManager = new IsolateManager(this.limits);
         this.actionValidator = new ActionValidator();
 
-        // Per-block compilation cache: Map<contractIndex:codeHash, cachedData>
+        // Per-block compilation cache: Map<contractIndex:sha256(fullSource), cachedData>.
+        // Keyed on the FULL compiled source (metered body + method + flags), not just
+        // the contract code, so a same-code/same-index execute under a different method
+        // is a cache MISS rather than a byte-length-collision hit (see execute()).
         this._blockCache = null;
 
         // Pre-compile the harness script source (it's the same every time)
@@ -1220,20 +1269,20 @@ class XChainVM {
             }
             harnessScript.runSync(context);
 
-            // Meter the contract code
+            // Meter the contract code. L-3 gate: resolve spec-correct `obj[k] += rhs`
+            // evaluation order from this execution's block time (isMeteringEvalOrderActive),
+            // the same network-aware route the H-5 state-key gate uses. A missing/garbage
+            // timestamp resolves to NaN, so an un-timestamped caller stays pre-gate on
+            // mainnet (legacy __setconcat order). Below the gate the transform output is
+            // byte-identical to the historical form.
+            const __moBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
+            const __specEvalOrder = isMeteringEvalOrderActive(opts.network, __moBlockTime);
             let meteredCode;
             try {
-                meteredCode = meterCode(opts.code);
+                meteredCode = meterCode(opts.code, { specEvalOrder: __specEvalOrder });
             } catch (e) {
                 return this._errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }
-
-            // Check compilation cache
-            const codeHash = crypto.createHash('sha256').update(opts.code).digest('hex');
-            const cacheKey = (opts.contractIndex != null ? opts.contractIndex : '0') + ':' + codeHash;
-            let cachedData = null;
-            if (this._blockCache && this._blockCache.has(cacheKey))
-                cachedData = this._blockCache.get(cacheKey);
 
             // Compile the contract wrapper with the metered code injected as a string.
             // Wrap in IIFE so __contractCode/__methodName are local, not global.
@@ -1244,6 +1293,22 @@ class XChainVM {
                                'let __isCrossCall = ' + JSON.stringify(Boolean(opts.isCrossCall)) + ';\n' +
                                'let __readManifest = ' + JSON.stringify(Boolean(opts.readManifest)) + ';\n' +
                                CONTRACT_WRAPPER;
+
+            // Per-block compilation cache. The key MUST cover every byte that varies
+            // in the compiled source, not just opts.code. fullSource also bakes in
+            // __methodName and the __isCrossCall/__readManifest flags (and the metered
+            // body, which the L-3 eval-order gate can rewrite), so keying on opts.code
+            // alone collided two executes of the same contract at the same index that
+            // differ only by method: e.g. "increment"/"decrement" (same length) yield
+            // same-length fullSource, and V8 accepted one method's cachedData for the
+            // other, running the wrong method's bytecode. This was inert while the
+            // cache was dead (M-15); keying on sha256(fullSource) makes every cache
+            // hit byte-exact.
+            const fullHash = crypto.createHash('sha256').update(fullSource).digest('hex');
+            const cacheKey = (opts.contractIndex != null ? opts.contractIndex : '0') + ':' + fullHash;
+            let cachedData = null;
+            if (this._blockCache && this._blockCache.has(cacheKey))
+                cachedData = this._blockCache.get(cacheKey);
 
             let script;
             try {
@@ -1653,6 +1718,11 @@ module.exports.ASYNC_SURFACE_GATE_BLOCK_TIME = ASYNC_SURFACE_GATE_BLOCK_TIME;
 // block merkle root). Exposed so the consensus-params freeze guard can pin it;
 // consensus-critical.
 module.exports.STATE_KEY_NUL_GATE_BLOCK_TIME = STATE_KEY_NUL_GATE_BLOCK_TIME;
+// Coordinated flag-day (block time) that activates spec-correct `obj[k] += rhs`
+// evaluation order in the metering transform (L-3: legacy order evaluates rhs
+// before reading obj[k]). Exposed so the consensus-params freeze guard can pin it;
+// consensus-critical.
+module.exports.METERING_EVAL_ORDER_GATE_BLOCK_TIME = METERING_EVAL_ORDER_GATE_BLOCK_TIME;
 // Cross-CHAIN call (XCALL) protocol constants, same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
