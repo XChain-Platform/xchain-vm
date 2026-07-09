@@ -60,6 +60,27 @@ function createVM() {
         assert.strictEqual(res.manifest.maxTakeBpsType, 'number');
     });
 
+    it('surfaces hasInitialize=true when the contract exports a callable constructor', async function () {
+        const code = "module.exports = { initialize: function (a) { xchain.state.set('owner', a); }, run: function(){ return '1'; } };";
+        const res = await vm.readManifest(code);
+        assert.strictEqual(res.success, true);
+        assert.strictEqual(res.manifest.hasInitialize, true);
+    });
+
+    it('surfaces hasInitialize=false when the contract has no initialize export', async function () {
+        const code = "module.exports = { run: function(){ return '1'; } };";
+        const res = await vm.readManifest(code);
+        assert.strictEqual(res.success, true);
+        assert.strictEqual(res.manifest.hasInitialize, false);
+    });
+
+    it('reports hasInitialize=false when initialize is exported as a non-function', async function () {
+        const code = "module.exports = { initialize: 42, run: function(){ return '1'; } };";
+        const res = await vm.readManifest(code);
+        assert.strictEqual(res.success, true);
+        assert.strictEqual(res.manifest.hasInitialize, false);
+    });
+
     it('reports BARE contracts (no manifest exports) as undefined-typed, not as a restriction', async function () {
         const code = "module.exports = { guard: function(){} };";
         const res = await vm.readManifest(code);

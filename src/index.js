@@ -790,7 +790,14 @@ const CONTRACT_WRAPPER = `
             permissions:     Array.isArray(__ce.permissions) ? __ce.permissions : null,
             permissionsType: (__ce.permissions === undefined) ? 'undefined' : (Array.isArray(__ce.permissions) ? 'array' : typeof __ce.permissions),
             maxTakeBps:      (typeof __ce.maxTakeBps === 'number') ? __ce.maxTakeBps : null,
-            maxTakeBpsType:  (__ce.maxTakeBps === undefined) ? 'undefined' : typeof __ce.maxTakeBps
+            maxTakeBpsType:  (__ce.maxTakeBps === undefined) ? 'undefined' : typeof __ce.maxTakeBps,
+            // Whether the contract exports a callable constructor. Runtime-accurate
+            // (matches how execute() dispatches, so it also catches a dynamically
+            // assigned module.exports.initialize). The indexer uses this to reject a
+            // DEPLOY that declares a constructor but supplies no CONSTRUCTOR_PARAMS,
+            // gated on the DEPLOY_INIT_STRICT flag-day. Reported faithfully here;
+            // all verdict logic lives host-side in actions/deploy.js.
+            hasInitialize:   (typeof __ce.initialize === 'function')
         });
     }
 
