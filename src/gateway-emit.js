@@ -430,4 +430,8 @@ const GOLDEN_VECTORS = {
     }
 };
 
-module.exports = { buildEmitAPI, GOLDEN_VECTORS };
+// XCALL_MAX_HOPS is exported as the single in-VM source of truth for the hop
+// cap: this module is the emit-time ENFORCER (crossExecute's hop gate above),
+// and src/index.js re-exports this value for the cross-service parity suite,
+// so the enforced and the parity-tested value can never diverge.
+module.exports = { buildEmitAPI, GOLDEN_VECTORS, XCALL_MAX_HOPS };

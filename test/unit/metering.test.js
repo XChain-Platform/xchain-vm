@@ -478,6 +478,40 @@ describe('Metering', function() {
             const metered = meterCode('var o = {...base, "strkey": v};');
             assert(metered.includes('__objspread('), 'string-literal key handled');
         });
+
+        // #129 gate: call/new/method argument spread is rebuilt through __arrspread
+        // only when meterCallSpread is set. Default (pre-gate) output stays byte-stable
+        // so historical blocks replay identically (legacy flat __gas(1) per call).
+        it('default meterCode leaves call/new argument spread verbatim (no __arrspread)', function() {
+            const call = meterCode('f(...x);');
+            assert(!call.includes('__arrspread('), 'default call spread must NOT route through __arrspread');
+            const nw = meterCode('new C(...x);');
+            assert(!nw.includes('__arrspread('), 'default new spread must NOT route through __arrspread');
+            const push = meterCode('arr.push(a, ...x);');
+            assert(!push.includes('__arrspread('), 'default method spread must NOT route through __arrspread');
+        });
+
+        it('meterCallSpread rewrites f(...x) / new C(...x) / arr.push(a, ...x) through __arrspread', function() {
+            const opt = { meterCallSpread: true };
+            const call = meterCode('f(...x);', opt);
+            assert(call.includes('__arrspread('), 'gated call spread → __arrspread');
+            const nw = meterCode('new C(...x);', opt);
+            assert(nw.includes('__arrspread('), 'gated new spread → __arrspread');
+            assert(nw.includes('new C('), 'constructor call preserved');
+            const push = meterCode('arr.push(a, ...x);', opt);
+            assert(push.includes('__arrspread('), 'gated method spread → __arrspread');
+            assert(/'e'|"e"/.test(push), 'non-spread arg rides as an e segment');
+        });
+
+        it('meterCallSpread does not touch a call with no spread argument', function() {
+            const metered = meterCode('f(a, b);', { meterCallSpread: true });
+            assert(!metered.includes('__arrspread('), 'plain call must not be rewritten');
+        });
+
+        it('meterCallSpread output re-parses under the ES2020 pin', function() {
+            const metered = meterCode('obj.method(a, ...x, b); new C(...y);', { meterCallSpread: true });
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
     });
 
     // ─── Braceless (single-statement) bodies → ensureBlock ────────────────

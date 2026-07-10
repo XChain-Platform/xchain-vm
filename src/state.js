@@ -37,9 +37,29 @@ class StateManager {
         // deterministically instead. Values are safe: they are JSON.stringify'd
         // before storage/hashing, which escapes control characters.
         this.rejectNulKeys = !!(opts && opts.rejectNulKeys);
+        // Consensus-gated (index.js isStateKeyTypeNormalizeActive): legacy key
+        // handling is type-blind - the size/NUL guards test `typeof key ===
+        // 'string'` (non-string keys skip them), and `key in state` string-
+        // coerces while the dirty Map is identity-keyed, so `1` and '1' count
+        // as two live keys that collapse to one row downstream. Post-gate every
+        // key funnels through _normKey below: primitives coerce via String(key)
+        // so every guard applies to the canonical form; non-primitives throw
+        // deterministically (String() would collapse them to '[object Object]').
+        this.normalizeKeys = !!(opts && opts.normalizeKeys);
+    }
+
+    // Single key choke point (see normalizeKeys above). Pre-gate this is the
+    // identity function so legacy behavior replays byte-for-bit.
+    _normKey(key) {
+        if (!this.normalizeKeys) return key;
+        const t = typeof key;
+        if (t === 'string') return key;
+        if (t === 'number' || t === 'boolean') return String(key);
+        throw new Error('state key must be a string, number, or boolean');
     }
 
     get(key) {
+        key = this._normKey(key);
         if (this.dirty.has(key)) {
             const val = this.dirty.get(key);
             return val === null ? null : val;
@@ -49,11 +69,13 @@ class StateManager {
     }
 
     has(key) {
+        key = this._normKey(key);
         if (this.dirty.has(key)) return this.dirty.get(key) !== null;
         return key in this.state;
     }
 
     set(key, value) {
+        key = this._normKey(key);
         // Enforce max key size
         const maxKeySize = this.limits.maxStateKeySize || 1024;
         if (typeof key === 'string' && Buffer.byteLength(key, 'utf8') > maxKeySize)
@@ -89,6 +111,7 @@ class StateManager {
     }
 
     delete(key) {
+        key = this._normKey(key);
         const maxKeySize = this.limits.maxStateKeySize || 1024;
         if (typeof key === 'string' && Buffer.byteLength(key, 'utf8') > maxKeySize)
             throw new Error('state key exceeds max size (' + maxKeySize + ' bytes)');

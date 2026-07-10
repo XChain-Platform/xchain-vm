@@ -148,14 +148,19 @@ describe('[P1] Security Regression', function() {
         });
 
         it('should not affect host process', async function() {
-            await execute(vm, `
+            // Attempt host-affecting operations and PROVE they were neutralized
+            // (same non-vacuous shape as the integration twin): a working host
+            // binding would return that op's marker instead of 'blocked'.
+            const r = await execute(vm, `
                 module.exports = function(xchain) {
-                    try { process.exit(1); } catch(e) {}
-                    try { require('fs').unlinkSync('/tmp/x'); } catch(e) {}
-                    return 'done';
+                    try { process.exit(1); return 'exit-worked'; } catch(e) {}
+                    try { require('fs').unlinkSync('/tmp/x'); return 'unlink-worked'; } catch(e) {}
+                    return 'blocked';
                 };
             `);
-            assert(true, 'host process not affected');
+            assert.strictEqual(r.success, true, 'sandboxed run must complete normally: ' + r.error);
+            assert.strictEqual(JSON.parse(r.returnValue), 'blocked',
+                'both host-affecting attempts must throw inside the sandbox');
         });
     });
 

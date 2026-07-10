@@ -151,6 +151,10 @@ class ProcessExecutor {
             this._pending.delete(msg.id);
             if (entry.timer) clearTimeout(entry.timer);
             entry.resolve(msg.result);
+            // The in-flight slot is free again: dispatch the next queued entry
+            // (single-in-flight invariant; see _flush). Its watchdog starts
+            // NOW, at its own dispatch, never during its queue wait.
+            this._flush();
         }
     }
 
@@ -161,7 +165,21 @@ class ProcessExecutor {
     // worker. Racing a dying worker would resolve it as a host-termination on some
     // nodes and run it on others, producing a divergent result and a fork.
     _flush() {
-        while (this._queue.length && this._child && this._sawReady && this._child.connected) {
+        // AT MOST ONE ENTRY IN FLIGHT (`_pending.size === 0` in the loop guard):
+        // the worker (vm-worker.js) executes strictly sequentially, so if two
+        // entries were dispatched together the 2nd's watchdog would start
+        // counting while the 1st still ran head-of-line. Its effective budget
+        // would become `_watchdogMs - (runtime of the contracts ahead)`, a
+        // per-host wall-clock quantity: a slow validator would fabricate
+        // 'watchdog timeout' (gasUsed = ceiling) for a contract a fast
+        // validator executed normally → divergent status → fork. The sole
+        // production embedder awaits every execute() (depth never exceeds 1),
+        // but that was caller discipline, not an executor invariant; enforcing
+        // it here means the watchdog provably bounds exactly one contract's
+        // execution regardless of caller behavior. The next entry dispatches
+        // when the current one settles (result / watchdog / worker exit).
+        while (this._queue.length && this._pending.size === 0 &&
+               this._child && this._sawReady && this._child.connected) {
             const entry = this._queue[0];
             if (!this._send({ type: 'execute', id: entry.id, opts: entry.opts })) break;
             this._queue.shift();

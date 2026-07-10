@@ -185,10 +185,14 @@ function _memberKey(member) {
  * Arrays with holes mixed with spread are now metered (holes ride as ['h']
  * segments that copy nothing); object spread alongside accessor/method properties
  * keeps its literal verbatim but wraps each spread source in __objspreadmeter so
- * the copy is charged without altering getter/method semantics. Call spread f(...x)
- * is left unmetered, bounded by V8's argument-count limit (RangeError).
+ * the copy is charged without altering getter/method semantics. Call/new/method
+ * argument spread (f(...x), new C(...x), arr.push(...x)) is size-metered at/after
+ * the flag day (meterCallSpread): the argument list is rebuilt through the existing
+ * __arrspread helper, which charges O(n) by element count. The "bounded by V8's
+ * argument-count limit" reasoning held for one oversized call but NOT for a loop of
+ * bounded calls, which copied millions of elements for a flat __gas(1) each.
  */
-function transformAllocators(ast, specEvalOrder) {
+function transformAllocators(ast, specEvalOrder, meterCallSpread) {
     // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's
     // quasi must NOT be (the tag receives the raw template strings object); we
     // collect those quasis up front, skip converting them here, and instead rewrite
@@ -305,6 +309,31 @@ function transformAllocators(ast, specEvalOrder) {
             });
             return _call('__objspread', [_arr(segs)]);
         }
+        // call / new / method argument spread: f(...x), new C(...x), arr.push(a, ...x)
+        //   ->  f(...__arrspread([['s',x]])), new C(...__arrspread([['s',x]])), ...
+        // The whole argument list is rebuilt through __arrspread (the same size-charged
+        // helper array-literal spread uses): it copies every spread element once and
+        // charges O(n) by count, then the native spread hands the flattened array to
+        // the call. `this` (obj.method), evaluation order (segments build left-to-right)
+        // and semantics are all preserved; non-spread args ride as ['e', arg] segments.
+        // Reusing __arrspread (already a reserved harness helper) means no new reserved
+        // identifier and no change to the deploy-time reserved-identifier verdict.
+        // CONSENSUS-GATED: this adds an __arrspread charge that moves gasUsed, so it is
+        // active only at/after the flag day (meterCallSpread, resolved from the block
+        // time in index.js); pre-gate the call is emitted verbatim so historical blocks
+        // replay byte-identically.
+        if (meterCallSpread &&
+            (node.type === 'CallExpression' || node.type === 'NewExpression') &&
+            Array.isArray(node.arguments) &&
+            node.arguments.some(function (a) { return a && a.type === 'SpreadElement'; })) {
+            const segs = node.arguments.map(function (a) {
+                return a.type === 'SpreadElement'
+                    ? _arr([_lit('s'), a.argument])
+                    : _arr([_lit('e'), a]);
+            });
+            node.arguments = [{ type: 'SpreadElement', argument: _call('__arrspread', [_arr(segs)]) }];
+            return node;
+        }
         return node;
     }
 
@@ -338,10 +367,16 @@ function transformAllocators(ast, specEvalOrder) {
  *   __setconcatL; when false/omitted the historical __setconcat form is preserved
  *   byte-for-byte. index.js resolves this from the block time so pre-gate blocks
  *   replay identically. Consensus-visible: a divergent value forks the fleet.
+ * @param {boolean} [opts.meterCallSpread] - consensus gate. When true, call/new/method
+ *   argument spread (f(...x), new C(...x), arr.push(...x)) is rebuilt through the
+ *   size-charged __arrspread helper so the O(n) element copy is metered; when
+ *   false/omitted the call is emitted verbatim (legacy flat __gas(1)). index.js
+ *   resolves this from the block time so pre-gate blocks replay identically.
  * @returns {string} Transformed source with __gas(1) calls injected
  */
 function meterCode(source, opts) {
     const specEvalOrder = !!(opts && opts.specEvalOrder);
+    const meterCallSpread = !!(opts && opts.meterCallSpread);
     const ast = acorn.parse(source, {
         ecmaVersion: CONTRACT_ECMA_VERSION,
         sourceType: 'script',
@@ -349,9 +384,10 @@ function meterCode(source, opts) {
     });
 
     // Phase 0: rewrite syntax-level allocators (string +/+=, template literals,
-    // array/object spread) into metered helper calls, on the pristine AST before
-    // any __gas() insertion. The helper calls are exempted from Phase 3 below.
-    transformAllocators(ast, specEvalOrder);
+    // array/object spread, and gated call/new argument spread) into metered helper
+    // calls, on the pristine AST before any __gas() insertion. The helper calls are
+    // exempted from Phase 3 below.
+    transformAllocators(ast, specEvalOrder, meterCallSpread);
 
     // Track nodes we've already processed to avoid double-injection
     const processed = new WeakSet();

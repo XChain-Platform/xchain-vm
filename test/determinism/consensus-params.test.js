@@ -23,6 +23,8 @@
 const assert = require('assert');
 const cr = require('../../src/consensus-runtime');
 const vm = require('../../src/index');
+const lintCore = require('../../src/lint-core');
+const metering = require('../../src/metering');
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
@@ -62,6 +64,51 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         ];
         assert.deepStrictEqual([...vm.CONSENSUS_RULES].sort(), GOLDEN_CONSENSUS_RULES,
             'deploy CONSENSUS_RULES drifted: a deploy-rule change must bump CONSENSUS_VERSION + regolden in both repos');
+    });
+
+    it('deploy reserved-identifier ban list contents are frozen (matcher content, not just the rule name)', function () {
+        // The CONSENSUS_RULES golden above freezes only the rule NAMES. The set of
+        // host-injected __-prefixed helper names the 'reserved-identifier' rule actually
+        // matches (metering.RESERVED_IDENTIFIERS) is the consensus surface behind that
+        // name: dropping one (e.g. __setconcatL) narrows the deploy validator without
+        // moving CONSENSUS_RULES, so the name-only guard would stay green. Pin the
+        // contents sorted so a narrowing reddens until CONSENSUS_VERSION is bumped in
+        // lockstep. AST-only, so this runs in every CI lane (no isolated-vm needed).
+        const GOLDEN_RESERVED_IDENTIFIERS = [
+            '__arrspread', '__concat', '__depth_enter', '__depth_exit', '__gas',
+            '__objspread', '__objspreadmeter', '__setconcat', '__setconcatL',
+            '__tmpl', '__tmpltag', '__tmpltagm'
+        ];
+        assert.deepStrictEqual([...metering.RESERVED_IDENTIFIERS].sort(), GOLDEN_RESERVED_IDENTIFIERS,
+            'reserved-identifier ban list drifted: a deploy-rule content change must bump CONSENSUS_VERSION + regolden in both repos');
+    });
+
+    it('deploy banned-async matcher flags every async-surface kind (narrowing a visitor reddens here)', function () {
+        // Same class as the reserved-identifier pin: 'banned-async' is one CONSENSUS_RULE
+        // name, but findBannedAsync matches several distinct kinds (async decl/expr/arrow,
+        // await, bare Promise). Removing any single visitor leaves CONSENSUS_RULES
+        // byte-identical, so pin the kind set behaviourally. findBannedAsync is pure acorn
+        // (no isolated-vm), so this runs in every lane, unlike the syntax/security suites.
+        const kinds = (src) => lintCore.findBannedAsync(src).map((h) => h.kind);
+
+        // async function declaration containing an await => both kinds must appear; the
+        // 'await' assertion is what reddens if the AwaitExpression visitor is deleted.
+        const declAwait = kinds('async function f(){ await g() }');
+        assert.ok(declAwait.includes('async'), 'async function declaration must be flagged');
+        assert.ok(declAwait.includes('await'), 'await expression must be flagged (AwaitExpression visitor)');
+
+        // async arrow expression.
+        assert.ok(kinds('var f = async () => 1').includes('async'), 'async arrow must be flagged');
+
+        // Bare reference to the global Promise binding.
+        assert.deepStrictEqual(kinds('var p = Promise'), ['promise'], 'bare Promise reference must be flagged');
+
+        // A member-access property (obj.Promise) and a non-computed object-literal key
+        // ({ Promise: 1 }) are NOT the global binding and must lint clean. This pins the
+        // intent that the parent-position guard in findBannedAsync exists to express, so
+        // the behaviour survives a future refactor of that (structurally dead) guard.
+        assert.deepStrictEqual(kinds('var o = { Promise: 1 }; var x = o.Promise;'), [],
+            'obj.Promise and a { Promise: 1 } key must not be flagged as the global Promise');
     });
 
     it('sandbox PROTOTYPE-METHOD neuters are frozen (regex + locale/ICU strips)', function () {
@@ -206,6 +253,54 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // release-team event, NOT a silent edit. Matches the indexer's other 2.0.0
         // flag-day activations (protocol_changes.js: 1790812800).
         assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1790812800);
+    });
+
+    it('CALL_SPREAD_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // Size-metering of call/new/method argument spread (the __arrspread-wrapped
+        // argument list) activates fleet-wide at this block time on mainnet. It moves
+        // gasUsed (→ contract_hash → fee debit), so two nodes that disagree on the flag
+        // day diverge on the first spread-argument execution after the earlier of the
+        // two. Pin it like any other consensus parameter; batched into the same 2.0.0
+        // flag-day (protocol_changes.js: 1790812800).
+        assert.strictEqual(vm.CALL_SPREAD_METER_GATE_BLOCK_TIME, 1790812800);
+    });
+
+    it('STATE_KEY_NUL_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // Rejecting NUL-byte state keys flips an execution from success to failure
+        // (hashed status + state delta), so two nodes that disagree on the flag day
+        // diverge on the first NUL-key write after the earlier of the two. The
+        // regression suite exercises the gate's BEHAVIOR relative to the export;
+        // this is the hard VALUE pin (a rename/removal makes the export undefined
+        // and fails here too). Same 2.0.0 flag-day (protocol_changes.js: 1790812800).
+        assert.strictEqual(vm.STATE_KEY_NUL_GATE_BLOCK_TIME, 1790812800);
+    });
+
+    it('METERING_EVAL_ORDER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // The spec-correct obj[k] += rhs rewrite (__setconcatL) changes results and
+        // gasUsed for side-effecting RHS patterns, so the activation must flip
+        // fleet-wide at one timestamp. Hard value pin alongside its sibling gates;
+        // batched into the same 2.0.0 flag-day (protocol_changes.js: 1790812800).
+        assert.strictEqual(vm.METERING_EVAL_ORDER_GATE_BLOCK_TIME, 1790812800);
+    });
+
+    it('STATE_KEY_TYPE_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // Canonical string state keys (String(key) for primitives, deterministic
+        // rejection of non-primitive keys) change which writes are valid and how
+        // keys count against maxStateKeys, so the activation must flip fleet-wide
+        // at one timestamp. Batched into the same 2.0.0 flag-day
+        // (protocol_changes.js: 1790812800).
+        assert.strictEqual(vm.STATE_KEY_TYPE_GATE_BLOCK_TIME, 1790812800);
+    });
+
+    it('XCALL_MAX_HOPS is single-sourced from the emit-time enforcer and pinned', function () {
+        // gateway-emit.js declares the hop cap it enforces (crossExecute's hop
+        // gate) and index.js re-exports that same binding for the cross-service
+        // parity suite. Pin both the value and the single-sourcing so a future
+        // bump cannot leave the enforcer and the parity-tested export diverging.
+        const gatewayEmit = require('../../src/gateway-emit.js');
+        assert.strictEqual(vm.XCALL_MAX_HOPS, 2);
+        assert.strictEqual(gatewayEmit.XCALL_MAX_HOPS, vm.XCALL_MAX_HOPS,
+            'gateway-emit enforcer and index.js export must be the same value');
     });
 
     it('STATUS_ERROR_PREFIXES documents every raw prefix the VM can emit', function () {

@@ -167,16 +167,21 @@ function executeCode(vm, code) {
     });
 
     it('should not affect host process', async function() {
-        // Execute a contract that tries to mess with host
-        await executeCode(vm, `
+        // Attempt host-affecting operations and PROVE they were neutralized:
+        // if either call resolved to a working host binding, the contract
+        // returns that op's marker (or the runner dies), so a real fs/exit
+        // escape can no longer pass this test silently.
+        const result = await executeCode(vm, `
             module.exports = function(xchain) {
-                try { process.exit(1); } catch(e) {}
-                try { require('fs').unlinkSync('/tmp/test'); } catch(e) {}
-                return 'done';
+                try { process.exit(1); return 'exit-worked'; } catch(e) {}
+                try { require('fs').unlinkSync('/tmp/test'); return 'unlink-worked'; } catch(e) {}
+                return 'blocked';
             };
         `);
-        // If we reach here, host was not affected
-        assert(true);
+        assert.strictEqual(result.success, true,
+            'sandboxed run must complete normally: ' + result.error);
+        assert.strictEqual(JSON.parse(result.returnValue), 'blocked',
+            'both host-affecting attempts must throw inside the sandbox');
     });
 
     it('should block WeakRef', async function() {
@@ -370,5 +375,52 @@ function executeCode(vm, code) {
         assert.strictEqual(result.success, true);
         const val = JSON.parse(result.returnValue);
         assert(val === 'frozen' || val === 'undefined', 'xchain should be frozen: ' + val);
+    });
+
+    // ---------------------------------------------------------------
+    // Gas/result determinism for the STRIP-PATH programs. The corpus
+    // determinism suites (cache-determinism, golden.determinism) prove
+    // cold/warm/fresh-VM equality only for compute/stateful programs; the
+    // neutered surface (stripped globals, neutered constructors, frozen
+    // SafeMath) was never in those corpora. These cases assert that the
+    // strip path itself costs identical gas and returns identical bytes
+    // warm, repeated, and on a fresh isolate. A failure here is a REAL
+    // strip-path determinism bug, not a test problem; do not weaken it.
+    // ---------------------------------------------------------------
+    describe('strip-path gas/result determinism', function() {
+        const STRIP_PROGRAMS = {
+            'process-access-blocked':
+                'module.exports = function(xchain) { return typeof process; };',
+            'Proxy-neutered':
+                'module.exports = function(xchain) { return typeof Proxy; };',
+            'Math.random-throws': `module.exports = function(xchain) {
+                try { Math.random(); return 'ran'; } catch(e) { return 'blocked'; }
+            };`,
+            'constructor-escape-blocked': `module.exports = function(xchain) {
+                try {
+                    return this.constructor.constructor('return typeof process')();
+                } catch(e) { return 'blocked'; }
+            };`
+        };
+
+        for (const [name, code] of Object.entries(STRIP_PROGRAMS)) {
+            it(name + ': gasUsed + returnValue identical warm, repeated, and on a fresh VM', async function() {
+                const warm1 = await executeCode(vm, code);
+                const warm2 = await executeCode(vm, code);
+                const fresh = await executeCode(createVM(), code);
+                for (const r of [warm1, warm2, fresh]) {
+                    assert.strictEqual(r.success, true, name + ' must execute: ' + r.error);
+                    assert.strictEqual(typeof r.gasUsed, 'number', name + ' must report numeric gasUsed');
+                }
+                assert.strictEqual(warm2.gasUsed, warm1.gasUsed,
+                    name + ': repeated warm run must charge identical gas');
+                assert.strictEqual(fresh.gasUsed, warm1.gasUsed,
+                    name + ': fresh-VM run must charge identical gas');
+                assert.strictEqual(warm2.returnValue, warm1.returnValue,
+                    name + ': repeated warm run must return identical bytes');
+                assert.strictEqual(fresh.returnValue, warm1.returnValue,
+                    name + ': fresh-VM run must return identical bytes');
+            });
+        }
     });
 });

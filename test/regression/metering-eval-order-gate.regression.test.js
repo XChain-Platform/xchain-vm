@@ -37,7 +37,12 @@
 const assert = require('assert');
 const { createVM, XChainVM } = require('../fuzz/harness');
 
-const GATE = (XChainVM && XChainVM.METERING_EVAL_ORDER_GATE_BLOCK_TIME) || 1790812800;
+// Read the export directly with NO numeric fallback: the old `|| 1790812800`
+// silently absorbed a rename/removal of the export (every test still passed
+// against the literal). A missing export now yields undefined, which fails the
+// flag-day pin test below loudly. XChainVM itself may be absent (no isolated-vm
+// build); the describe.skip handles that case.
+const GATE = XChainVM ? XChainVM.METERING_EVAL_ORDER_GATE_BLOCK_TIME : undefined;
 
 const BEFORE = { height: 100, timestamp: GATE - 1, hash: 'pre' };
 const AT     = { height: 100, timestamp: GATE,     hash: 'at'  };

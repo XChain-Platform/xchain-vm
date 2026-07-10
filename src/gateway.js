@@ -98,7 +98,12 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             }
         },
 
-        // Oracle (metered, 100 gas each)
+        // Oracle. getPrice/getPriceAtRound are metered (VM_ORACLE_READ, 100 gas
+        // each). getSnapshotAge is INTENTIONALLY gas-free, like the zero-gas
+        // context accessors: its value is deterministic across all nodes, each
+        // call site is already bounded by control-flow gas, and the gas-free
+        // behavior is pinned by test/unit/gateway.test.js (charging it would be
+        // a consensus gas-schedule change).
         oracle: {
             getPrice: (coinPair) => {
                 gasTracker.charge(gasSchedule.VM_ORACLE_READ);
@@ -110,6 +115,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 if (!readOnlyData.oracleData) return null;
                 return readOnlyData.oracleData.getPriceAtRound(coinPair, roundNumber);
             },
+            // Gas-free by design (see the oracle group comment above).
             getSnapshotAge: () => {
                 if (!readOnlyData.oracleData) return Number.MAX_SAFE_INTEGER;
                 return readOnlyData.oracleData.getSnapshotAge();

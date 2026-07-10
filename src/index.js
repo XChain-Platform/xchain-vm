@@ -118,13 +118,37 @@ const HARNESS_SOURCE = `
     };
     var __allocGas = function(n) { var x = +n; if (x > 1) __gas(x); };
 
+    // Coordinated flag-day gate for the ADDITIVE O(n)-copy metering upgrades below
+    // (iterable Array.from / TypedArray sources that expose .size or nothing, the
+    // flat() flattened-result charge, and the F-NR guard's per-node scan-width
+    // charge). Each of these moves gasUsed, so it must flip fleet-wide at the SAME
+    // block-time flag-day as F3-binary/globals + F-NR; below it (or when no block
+    // time was injected -> __blockTime is 0) the legacy charge replays byte-for-bit,
+    // so a from-genesis replay reproduces the historical gas at every height.
+    var __meterUpgradeOn = (typeof __blockTime === 'number' &&
+        typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
+        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME);
+
     var __fill = Array.prototype.fill;
     if (typeof __fill === 'function') __lockMethod(Array.prototype, 'fill', function() {
         __allocGas(this == null ? 0 : this.length); return __fill.apply(this, arguments);
     });
     var __from = Array.from;
     if (typeof __from === 'function') __lockMethod(Array, 'from', function(src) {
-        if (src && typeof src.length === 'number') __allocGas(src.length);
+        // Array-like with numeric .length: charge before the O(n) copy (legacy path,
+        // active from genesis; unchanged below/above the flag day).
+        if (src && typeof src.length === 'number') { __allocGas(src.length); return __from.apply(this, arguments); }
+        // Iterable sources (Set/Map expose .size, a generator exposes neither) also
+        // materialize an O(n) native copy but carry no .length, so the legacy wrapper
+        // charged nothing. Meter them at/after the flag day: a Set/Map size is known
+        // up front (charge before); an un-sized iterable can only be measured by the
+        // realized array (charge after, mirroring the JSON.stringify post-charge).
+        if (__meterUpgradeOn) {
+            if (src && typeof src.size === 'number') { __allocGas(src.size); return __from.apply(this, arguments); }
+            var __r = __from.apply(this, arguments);
+            if (__r && typeof __r.length === 'number') __allocGas(__r.length);
+            return __r;
+        }
         return __from.apply(this, arguments);
     });
     var __repeat = String.prototype.repeat;
@@ -163,8 +187,21 @@ const HARNESS_SOURCE = `
             // array-like / iterable-with-length copy source is the same size. A view
             // over an existing ArrayBuffer (first arg is the buffer) makes no new
             // backing store, so it is left uncharged.
-            if (typeof a === 'number') __allocGas(a * bpe);
-            else if (isTyped && a && typeof a.length === 'number') __allocGas(a.length * bpe);
+            if (typeof a === 'number') { __allocGas(a * bpe); return new Orig(...arguments); }
+            if (isTyped && a && typeof a.length === 'number') { __allocGas(a.length * bpe); return new Orig(...arguments); }
+            // Iterable copy source without .length (Set/Map expose .size, a generator
+            // exposes neither): the TypedArray constructor still materializes a dense
+            // O(n) backing store, but the length-only probe above charged nothing.
+            // Charge the Set/Map size up front; for an un-sized iterable charge the
+            // realized view length after (mirrors the Array.from post-charge). An
+            // ArrayBuffer view source is NOT iterable, so it stays uncharged here.
+            if (isTyped && a && typeof a.size === 'number') { __allocGas(a.size * bpe); return new Orig(...arguments); }
+            if (isTyped && a && typeof Symbol === 'function' && Symbol.iterator &&
+                typeof a[Symbol.iterator] === 'function') {
+                var __res = new Orig(...arguments);
+                if (__res && typeof __res.length === 'number') __allocGas(__res.length * bpe);
+                return __res;
+            }
             return new Orig(...arguments);
         };
         // Preserve instanceof and the static surface (BYTES_PER_ELEMENT, from, of,
@@ -264,10 +301,7 @@ const HARNESS_SOURCE = `
     // legacy native-recursion behaviour replays unchanged.
     var __hasOwn = Object.prototype.hasOwnProperty;
     var __isArray = Array.isArray;   // captured native (contract cannot repoint the guard)
-    var __nrGuardOn = (typeof __blockTime === 'number' &&
-        typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
-        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME &&
-        __DEPTH_LIMIT > 0);
+    var __nrGuardOn = (__meterUpgradeOn && __DEPTH_LIMIT > 0);
     var __guardNativeDepth = function(root) {
         if (!__nrGuardOn) return;
         if (__stackPoison) throw __stackError();
@@ -277,21 +311,36 @@ const HARNESS_SOURCE = `
         while (stack.length) {
             var v = stack.pop();
             var d = depths.pop();
-            __gasFunc(1);
+            __gasFunc(1);                                       // per-node base (DAG / exponential-reuse bound)
             if (d > __DEPTH_LIMIT) { __stackPoison = true; throw __stackError(); }
-            var i, c;
+            var i, c, w;
+            // The guard SCANS every child of the popped node (O(width)) to find the
+            // object children to recurse into. The flat per-node charge above only
+            // bounded DEPTH and node COUNT, not this per-node WIDTH: a wide primitive
+            // array referenced N times is popped N times and re-scanned in full each
+            // time (no memo), so O(N*width) native scan work ran for O(N) gas -> a
+            // timeout-vs-commit fork. Charge the scan width so the guard's CPU work is
+            // bounded by the gas paid. Deterministic integer math; every node computes
+            // an identical charge.
             if (__isArray(v)) {
-                for (i = 0; i < v.length; i++) {
+                w = v.length;
+                if (w > 1) __gasFunc(w);                        // array width known up front -> charge before the scan
+                for (i = 0; i < w; i++) {
                     c = v[i];
                     if (c !== null && typeof c === 'object') { stack.push(c); depths.push(d + 1); }
                 }
             } else {
+                // Object own-key count is only known by enumerating; count during the
+                // scan and charge after (mirrors the JSON.stringify/G1 post-charge).
+                w = 0;
                 for (var k in v) {
                     if (__hasOwn.call(v, k)) {
+                        w++;
                         c = v[k];
                         if (c !== null && typeof c === 'object') { stack.push(c); depths.push(d + 1); }
                     }
                 }
+                if (w > 1) __gasFunc(w);
             }
         }
     };
@@ -484,9 +533,41 @@ const HARNESS_SOURCE = `
     // full copy). __meterLen no-ops for any absent on the host V8.
     // join/flat are handled by dedicated wrappers below (they recurse into nested
     // arrays in native code, so they additionally get the structural-depth guard).
-    ['indexOf', 'lastIndexOf', 'includes', 'reverse', 'sort',
+    ['indexOf', 'lastIndexOf', 'includes', 'reverse',
      'slice', 'copyWithin', 'splice', 'unshift', 'shift',
-     'toSorted', 'toReversed', 'toSpliced', 'with'].forEach(function(m) { __meterLen(Array.prototype, m); });
+     'toReversed', 'toSpliced', 'with'].forEach(function(m) { __meterLen(Array.prototype, m); });
+    // sort/toSorted with the DEFAULT comparator do O(n log n) native compares, each
+    // ToString-converting its operands, so the real cost is O(n log n * L) while the
+    // flat __meterLen charge above bills O(n) element count only. With a USER
+    // comparator every compare runs metered contract code, so the O(n) charge stays
+    // correct there. At/after the flag day the default-comparator path charges
+    // n*ceil(log2 n) (the compare count) plus one full pass of string-element bytes
+    // (the ToString volume; string lengths are read without coercing, so no contract
+    // toString fires that the sort itself would not). Deterministic integer math,
+    // identical on every node. Below the gate the element-count charge replays
+    // byte-for-bit.
+    var __msort = function(name) {
+        var orig = Array.prototype[name];
+        if (typeof orig !== 'function') return;
+        __lockMethod(Array.prototype, name, function(cmp) {
+            var n = (this == null ? 0 : this.length);
+            if (__meterUpgradeOn && typeof cmp !== 'function' && n > 1) {
+                var lg = 0, m = 1;
+                while (m < n) { m *= 2; lg++; }
+                var bytes = 0;
+                for (var i = 0; i < n; i++) {
+                    var v = this[i];
+                    if (typeof v === 'string') bytes += v.length;
+                }
+                __allocGas(n * lg + bytes);
+            } else {
+                __allocGas(n);
+            }
+            return orig.apply(this, arguments);
+        });
+    };
+    __msort('sort');
+    __msort('toSorted');
     // join recurses into nested-array elements (and backs Array.prototype.toString,
     // String(arr), arr + empty-string, template interpolation); flat recurses to its
     // depth argument. Guard the
@@ -494,12 +575,36 @@ const HARNESS_SOURCE = `
     var __ajoin = Array.prototype.join;
     if (typeof __ajoin === 'function') __lockMethod(Array.prototype, 'join', function() {
         __guardNativeDepth(this);
+        // The legacy charge bills the ELEMENT COUNT, but join's real cost scales
+        // with the total converted output (200 joins of a 2k-element array of 100-char
+        // strings built ~400k chars of output for ~1k gas). join also backs
+        // Array.prototype.toString / String(arr) / arr+'' / template interpolation,
+        // so the undercharge was reachable from every string-coercion path. At/after
+        // the flag day charge the RETURNED STRING's length (mirrors the JSON.stringify
+        // post-charge and the flat() upgrade above): the output is bounded by the gas
+        // paid for it. Below the gate the element-count charge replays byte-for-bit.
+        if (__meterUpgradeOn) {
+            var __r = __ajoin.apply(this, arguments);
+            if (typeof __r === 'string') __allocGas(__r.length);
+            return __r;
+        }
         __allocGas(this == null ? 0 : this.length);
         return __ajoin.apply(this, arguments);
     });
     var __aflat = Array.prototype.flat;
     if (typeof __aflat === 'function') __lockMethod(Array.prototype, 'flat', function() {
         __guardNativeDepth(this);
+        // The legacy charge bills only the OUTER length, so [bigInner].flat() copies
+        // bigInner's elements (the flattened result) for ~0 gas. At/after the flag day
+        // charge the FLATTENED result length (mirrors the JSON.stringify post-charge):
+        // a reuse loop trips out_of_gas after one pass, a single pass is bounded by the
+        // gas already paid to build the source. Below the gate the outer-length charge
+        // replays byte-for-bit.
+        if (__meterUpgradeOn) {
+            var __r = __aflat.apply(this, arguments);
+            if (__r && typeof __r.length === 'number') __allocGas(__r.length);
+            return __r;
+        }
         __allocGas(this == null ? 0 : this.length);
         return __aflat.apply(this, arguments);
     });
@@ -867,7 +972,11 @@ const MAX_STACK_DEPTH = 512;
 // host-side (execute.js processEmission + actions/xcall.js).
 const XCALL_MIN_GAS             = 5000;     // = MIN_CALL_GAS
 const XCALL_MAX_GAS             = 200000;   // target-side ceiling cap (the run is fee-less on the target chain)
-const XCALL_MAX_HOPS            = 2;        // user→remote = 1, remote→back = 2
+// Single in-VM source of truth: gateway-emit.js declares the hop cap it
+// ENFORCES (emit.crossExecute's hop gate) and this module re-exports it, so a
+// future bump cannot leave the enforcer and the exported/parity-tested value
+// disagreeing. (gateway-emit.js has no require-cycle back into this file.)
+const XCALL_MAX_HOPS            = require('./gateway-emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
 const XCALL_MIN_DEADLINE_BLOCKS = 10;
 const XCALL_MAX_DEADLINE_BLOCKS = 4000;
 const XCALL_MAX_RETURN_BYTES    = 1024;
@@ -943,6 +1052,28 @@ function isStateKeyNulRejectActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= STATE_KEY_NUL_GATE_BLOCK_TIME;
 }
 
+// Coordinated activation for canonical string state keys. Legacy StateManager
+// key handling is type-blind: the max-key-size and NUL guards test
+// `typeof key === 'string'` (a non-string key skips both), `key in state`
+// string-coerces while the dirty Map is identity-keyed, so `1` and '1' count
+// as TWO live keys (two keyCount bumps) that collapse to ONE row when the
+// indexer string-coerces the emitted key - an under-count against maxStateKeys
+// and a size/NUL-check bypass. Post-gate every key is normalized at one choke
+// point: string/number/boolean coerce via String(key) (so `1` and '1' are the
+// same key everywhere, and every guard applies to the canonical form);
+// object/array/null/undefined keys throw a deterministic error at the state
+// boundary (String() would collapse them all to '[object Object]'). Consensus-
+// visible (it changes which writes are valid and how keys are counted), so it
+// is gated like the other 2.0.0 contract-era changes: testnet/regtest from
+// genesis, mainnet at the shared coordinated flag-day. Same coordinated
+// timestamp as STATE_KEY_NUL/BINARY_ALLOC/ASYNC_SURFACE; a value that differs
+// across the fleet is itself a fork.
+const STATE_KEY_TYPE_GATE_BLOCK_TIME = 1790812800;
+function isStateKeyTypeNormalizeActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= STATE_KEY_TYPE_GATE_BLOCK_TIME;
+}
+
 // Coordinated activation for spec-correct evaluation order of the compound
 // string-append `obj[k] += rhs` (L-3). The AST metering transform rewrites this
 // to a metered helper call; the legacy rewrite evaluates rhs BEFORE the helper
@@ -960,6 +1091,24 @@ const METERING_EVAL_ORDER_GATE_BLOCK_TIME = 1790812800;
 function isMeteringEvalOrderActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= METERING_EVAL_ORDER_GATE_BLOCK_TIME;
+}
+
+// Coordinated activation for size-metering call/new/method argument spread
+// (f(...x), new C(...x), arr.push(...x)). The AST metering transform rebuilds such
+// argument lists through the size-charged __arrspread helper so the O(n) element
+// copy is billed by count; the legacy transform left the spread unmetered (a flat
+// __gas(1) per call), so a loop of bounded calls copied millions of elements almost
+// free. CORRECTING it changes gasUsed for any contract using argument spread, so the
+// rewrite is gated: post-gate meterCode emits the __arrspread-wrapped argument list,
+// pre-gate it emits the call verbatim so historical blocks replay byte-identically.
+// Gated like the other 2.0.0 contract-era changes: testnet/regtest from genesis,
+// mainnet at the shared coordinated flag-day. Same coordinated timestamp as
+// METERING_EVAL_ORDER/STATE_KEY_NUL/BINARY_ALLOC/ASYNC_SURFACE; a value that differs
+// across the fleet is itself a fork.
+const CALL_SPREAD_METER_GATE_BLOCK_TIME = 1790812800;
+function isCallSpreadMeterActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= CALL_SPREAD_METER_GATE_BLOCK_TIME;
 }
 
 class XChainVM {
@@ -1120,8 +1269,13 @@ class XChainVM {
         // gate; a missing/garbage timestamp resolves to NaN → pre-activation on
         // mainnet.
         const __skBlockTime     = opts.blockContext && Number(opts.blockContext.timestamp);
-        const stateManager      = new StateManager(opts.state || {}, this.limits,
-            { rejectNulKeys: isStateKeyNulRejectActive(opts.network, __skBlockTime) });
+        const stateManager      = new StateManager(opts.state || {}, this.limits, {
+            rejectNulKeys:  isStateKeyNulRejectActive(opts.network, __skBlockTime),
+            // Canonical-string-key gate: post-gate, primitive keys normalize via
+            // String(key) and non-primitive keys throw deterministically, so the
+            // size/NUL/keyCount guards can no longer be skipped by key type.
+            normalizeKeys:  isStateKeyTypeNormalizeActive(opts.network, __skBlockTime)
+        });
         // F-PS gate: recursive prototype-key stripping of emitted params (defense in
         // depth; the shallow top-level strip left nested __proto__/constructor own
         // keys in emissions). It can drop keys from a pathological emitted param, so
@@ -1284,9 +1438,12 @@ class XChainVM {
             // byte-identical to the historical form.
             const __moBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
             const __specEvalOrder = isMeteringEvalOrderActive(opts.network, __moBlockTime);
+            // Same block-time route resolves the call/new argument-spread metering gate
+            // (isCallSpreadMeterActive); below it the spread is emitted verbatim (legacy).
+            const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime);
             let meteredCode;
             try {
-                meteredCode = meterCode(opts.code, { specEvalOrder: __specEvalOrder });
+                meteredCode = meterCode(opts.code, { specEvalOrder: __specEvalOrder, meterCallSpread: __meterCallSpread });
             } catch (e) {
                 return this._errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }
@@ -1730,6 +1887,15 @@ module.exports.STATE_KEY_NUL_GATE_BLOCK_TIME = STATE_KEY_NUL_GATE_BLOCK_TIME;
 // before reading obj[k]). Exposed so the consensus-params freeze guard can pin it;
 // consensus-critical.
 module.exports.METERING_EVAL_ORDER_GATE_BLOCK_TIME = METERING_EVAL_ORDER_GATE_BLOCK_TIME;
+// Coordinated flag-day (block time) that activates size-metering of call/new/method
+// argument spread in the metering transform (legacy left the O(n) copy unmetered).
+// Exposed so the consensus-params freeze guard can pin it; consensus-critical.
+module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_TIME;
+// Coordinated flag-day (block time) that activates canonical string state keys
+// (String(key) normalization for primitives, deterministic rejection of
+// non-primitive keys) so the key-size/NUL/keyCount guards apply to every key.
+// Exposed so the consensus-params freeze guard can pin it; consensus-critical.
+module.exports.STATE_KEY_TYPE_GATE_BLOCK_TIME = STATE_KEY_TYPE_GATE_BLOCK_TIME;
 // Cross-CHAIN call (XCALL) protocol constants, same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
