@@ -41,6 +41,20 @@ function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
+// Required-sibling gate. By default a missing sibling checkout skips its parity
+// assertions (local dev, standalone-repo CI legitimately run without siblings).
+// The job that PROVIDES the siblings must export XCHAIN_REQUIRE_SIBLINGS=1:
+// under that flag a missing sibling is a hard FAILURE, never a silent skip, so
+// the deploy-validator template/vendor-drift seams cannot pass green merely
+// because the sibling directory was absent (green-by-skips).
+const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
+function requireSiblingOrSkip(ctx, present, what) {
+    if (present) return;
+    if (REQUIRE_SIBLINGS)
+        assert.fail('required sibling missing under XCHAIN_REQUIRE_SIBLINGS=1: ' + what);
+    ctx.skip();
+}
+
 // All bad fixtures use syntax V8 accepts, so validateSyntax clears step 1 and the
 // failure must come from a shared (lint-core) rule, making the messages comparable.
 const BAD_FIXTURES = [
@@ -60,7 +74,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
         const haveSDK = fs.existsSync(SDK_VENDOR_DIR);
         for (const f of VENDORED_FILES) {
             it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
-                if (!haveSDK) return this.skip();
+                requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
                 assert.strictEqual(
                     sha256(path.join(SDK_VENDOR_DIR, f)), sha256(path.join(VM_SRC_DIR, f)),
                     'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.'
@@ -141,7 +155,11 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
             : [];
 
         if (!haveTemplates || dirs.length === 0) {
-            it('xchain-contracts templates present', function () { this.skip(); });
+            it('xchain-contracts templates present', function () {
+                // Hard-fails under XCHAIN_REQUIRE_SIBLINGS=1 (the sibling-providing
+                // job); skips otherwise. See requireSiblingOrSkip above.
+                requireSiblingOrSkip(this, false, CONTRACTS_DIR + ' (with template dirs)');
+            });
         } else {
             for (const name of dirs) {
                 it(name + ' is valid under validateSyntax (full V8 + rules)', function () {
