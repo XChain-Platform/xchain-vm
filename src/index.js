@@ -680,6 +680,68 @@ const HARNESS_SOURCE = `
         .forEach(function(n) { __meterObjStatic(n, __lenArr); });
     ['assign', 'getOwnPropertyDescriptors', 'fromEntries']
         .forEach(function(n) { __meterObjStatic(n, __lenObj); });
+
+    // ----- TypedArray prototype O(n) compute metering (G1-TA), flag-gated -----
+    // The G1 wrappers above bind the O(n) Array.prototype/String.prototype methods,
+    // but TypedArrays (Uint8Array, Float64Array, ...) do NOT inherit Array.prototype:
+    // their sort/reverse/copyWithin/indexOf/set/... are the native %TypedArray%.prototype
+    // versions, left uncharged by BOTH G1 (Array/String only) and F3-binary (which meters
+    // the CONSTRUCTORS, i.e. the one-time backing-store allocation, not the methods). So a
+    // contract could do new Uint8Array(n) once (charged once) then loop t.sort() / t.reverse()
+    // / t.copyWithin(0,1) for ~2 gas per O(n)/O(n log n) native pass: the same cheap-gas /
+    // expensive-CPU grind, and the same timeout-vs-commit fork surface across a fleet with
+    // heterogeneous per-node maxCpuTimeMs (not a consensus value), that G1 exists to close.
+    // Meter the shared %TypedArray% prototype with the identical __meterLen / sort cost model.
+    // CONSENSUS GATE: these methods carried NO historical charge, so any charge here moves
+    // gasUsed. Gate on the SAME binary-alloc flag-day as F3-binary (__meterUpgradeOn): below
+    // it (or when no block time was injected) the methods stay unmetered exactly as
+    // pre-activation nodes leave them, so a from-genesis replay reproduces the historical gas
+    // bit-for-bit; at/after it every node charges identically, atomically with the binary
+    // constructor/global charges it rides alongside.
+    if (__meterUpgradeOn && typeof Uint8Array === 'function') {
+        // %TypedArray%.prototype: the single prototype every typed-array kind shares.
+        var __TAProto = Object.getPrototypeOf(Uint8Array.prototype);
+        if (__TAProto && __TAProto !== Object.prototype) {
+            // Native scan / copy / in-place O(n) methods that take no per-element callback
+            // (map/filter/forEach/reduce/... are callback-metered, excluded; set/sort get the
+            // dedicated wrappers below). fill's backing store was charged once at construction,
+            // but an in-place refill is fresh O(n) work, so it is metered here too. subarray is
+            // intentionally OMITTED: it returns an O(1) view over the same buffer (no copy), so
+            // a length charge would over-bill work that never runs.
+            ['indexOf', 'lastIndexOf', 'includes', 'reverse', 'slice', 'copyWithin',
+             'fill', 'join', 'toReversed', 'with'].forEach(function(m) { __meterLen(__TAProto, m); });
+            // set(src[, offset]) copies src.length elements into the receiver's existing backing
+            // store (no allocation, so F3-binary never saw it). Charge the source length, which
+            // is the actual O(n) work.
+            var __taset = __TAProto.set;
+            if (typeof __taset === 'function') __lockMethod(__TAProto, 'set', function(src) {
+                __allocGas(src && typeof src.length === 'number' ? src.length : 0);
+                return __taset.apply(this, arguments);
+            });
+            // sort/toSorted with the DEFAULT comparator do O(n log n) native NUMERIC compares
+            // with no contract callback, so charge the compare count n*ceil(log2 n). Unlike the
+            // Array default-sort upgrade there is no ToString byte volume to add (typed-array
+            // elements are numbers). A USER comparator runs metered contract code per compare,
+            // so the O(n) base charge is correct there, mirroring __msort exactly.
+            var __tasort = function(name) {
+                var orig = __TAProto[name];
+                if (typeof orig !== 'function') return;
+                __lockMethod(__TAProto, name, function(cmp) {
+                    var n = (this == null ? 0 : this.length);
+                    if (typeof cmp !== 'function' && n > 1) {
+                        var lg = 0, m = 1;
+                        while (m < n) { m *= 2; lg++; }
+                        __allocGas(n * lg);
+                    } else {
+                        __allocGas(n);
+                    }
+                    return orig.apply(this, arguments);
+                });
+            };
+            __tasort('sort');
+            __tasort('toSorted');
+        }
+    }
     // ----- end G1 -----
 
     // ----- Syntax-level allocation metering (G4): + / += / template / spread -----
