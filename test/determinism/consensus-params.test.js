@@ -109,6 +109,13 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // the behaviour survives a future refactor of that (structurally dead) guard.
         assert.deepStrictEqual(kinds('var o = { Promise: 1 }; var x = o.Promise;'), [],
             'obj.Promise and a { Promise: 1 } key must not be flagged as the global Promise');
+
+        // globalThis-qualified access is the same global binding under a different
+        // spelling (dotted and both computed forms), and must be flagged too.
+        assert.deepStrictEqual(kinds('globalThis.Promise.resolve()'), ['promise'],
+            'globalThis.Promise must be flagged');
+        assert.deepStrictEqual(kinds("globalThis['Promise']"), ['promise'],
+            "globalThis['Promise'] must be flagged");
     });
 
     it('sandbox PROTOTYPE-METHOD neuters are frozen (regex + locale/ICU strips)', function () {

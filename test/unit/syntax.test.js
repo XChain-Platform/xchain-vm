@@ -122,6 +122,29 @@ try {
             const result = validateSyntax('var x = "Math.pow";');
             assert.strictEqual(result.valid, true);
         });
+
+        it('should reject Math[`pow`] (no-substitution template-literal key)', function() {
+            const result = validateSyntax('var x = Math[`pow`](2, 3);');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('Math.pow'), result.error);
+        });
+
+        it('should reject globalThis.Math.pow (globalThis-qualified dotted form)', function() {
+            const result = validateSyntax('var x = globalThis.Math.pow(2, 3);');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('Math.pow'), result.error);
+        });
+
+        it("should reject globalThis['Math'].sqrt (globalThis-qualified computed form)", function() {
+            const result = validateSyntax("var x = globalThis['Math'].sqrt(4);");
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('Math.sqrt'), result.error);
+        });
+
+        it('should not reject a variable-computed Math[x] access (out of scope, no data-flow analysis)', function() {
+            const result = validateSyntax('var x = "pow"; var y = Math[x](2, 3);');
+            assert.strictEqual(result.valid, true);
+        });
     });
 
     describe('checkFloatWarnings', function() {

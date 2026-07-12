@@ -41,10 +41,41 @@ const { meterCode, findReservedIdentifier, CONTRACT_ECMA_VERSION } = require('./
 // rejecting at deploy time turns that into a clear, early error.
 const BANNED_MATH_MEMBERS = new Set(['sqrt', 'pow', 'log', 'log2', 'log10']);
 
+// True if `node` is a static reference to the global Math object: the bare
+// identifier `Math`, or a globalThis-qualified form (`globalThis.Math` /
+// `globalThis['Math']` / `globalThis[\`Math\`]`, the last via a template
+// literal with no substitutions).
+function isMathObjectRef(node) {
+    if (!node) return false;
+    if (node.type === 'Identifier' && node.name === 'Math') return true;
+    if (node.type === 'MemberExpression' && node.object
+        && node.object.type === 'Identifier' && node.object.name === 'globalThis') {
+        const key = staticComputedKey(node);
+        return key === 'Math' || (!node.computed && node.property && node.property.type === 'Identifier'
+            && node.property.name === 'Math');
+    }
+    return false;
+}
+
+// If `node` is a computed MemberExpression whose property statically resolves
+// to a string (a string Literal, or a TemplateLiteral with no substitution
+// expressions), return that string; otherwise null. Handles `obj['key']` and
+// `obj[\`key\`]` alike; variable-computed access (`obj[x]`) is intentionally
+// left unresolved (out of scope, needs data-flow analysis).
+function staticComputedKey(node) {
+    if (!node.computed || !node.property) return null;
+    const p = node.property;
+    if (p.type === 'Literal' && typeof p.value === 'string') return p.value;
+    if (p.type === 'TemplateLiteral' && p.expressions.length === 0 && p.quasis.length === 1)
+        return p.quasis[0].value.cooked;
+    return null;
+}
+
 /**
  * Scan contract code for references to banned transcendental Math members
- * (Math.sqrt / Math.pow / Math.log / Math.log2 / Math.log10), in both dotted
- * (Math.pow) and computed-string (Math['pow']) forms.
+ * (Math.sqrt / Math.pow / Math.log / Math.log2 / Math.log10), in dotted
+ * (Math.pow), computed-string (Math['pow'] / Math[`pow`]), and
+ * globalThis-qualified (globalThis.Math.pow, globalThis['Math'].pow) forms.
  *
  * @param {string} code - Contract source code
  * @returns {Array<{name: string, line: (number|string)}>}
@@ -64,14 +95,12 @@ function findBannedMathCalls(code) {
     }
     walk.simple(ast, {
         MemberExpression(node) {
-            if (!node.object || node.object.type !== 'Identifier' || node.object.name !== 'Math')
-                return;
+            if (!isMathObjectRef(node.object)) return;
             let member = null;
             if (!node.computed && node.property && node.property.type === 'Identifier') {
                 member = node.property.name;                 // Math.pow
-            } else if (node.computed && node.property && node.property.type === 'Literal'
-                       && typeof node.property.value === 'string') {
-                member = node.property.value;                // Math['pow']
+            } else if (node.computed) {
+                member = staticComputedKey(node);             // Math['pow'] / Math[`pow`]
             }
             if (member && BANNED_MATH_MEMBERS.has(member)) {
                 hits.push({ name: member, line: node.loc ? node.loc.start.line : '?' });
@@ -152,6 +181,16 @@ function findBannedAsync(code) {
                 if (parent.type === 'Property' && parent.key === node && !parent.computed) return;
             }
             hits.push({ kind: 'promise', line: node.loc ? node.loc.start.line : '?' });
+        },
+        MemberExpression(node) {
+            // globalThis.Promise / globalThis['Promise'] / globalThis[`Promise`]
+            if (!node.object || node.object.type !== 'Identifier' || node.object.name !== 'globalThis')
+                return;
+            const key = node.computed
+                ? staticComputedKey(node)
+                : (node.property && node.property.type === 'Identifier' ? node.property.name : null);
+            if (key === 'Promise')
+                hits.push({ kind: 'promise', line: node.loc ? node.loc.start.line : '?' });
         }
     });
     return hits;
