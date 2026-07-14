@@ -38,7 +38,7 @@ class MockLedger {
         this.contractBalances = {};  // { contractAddress: { tick: quantityStr } }
         this.tokenDecimals    = {};  // { tick: decimalsInt } (registered ticks only)
         this.stateHistory     = {};  // { contractAddress: [{ key, value, blockIndex, deleted }] }
-        this.oraclePrices     = {};  // { coinPair: { current: priceStr, rounds: {}, snapshotAge: N } }
+        this.oraclePrices     = {};  // { coinPair: { current: {price,roundNumber,timestamp}, rounds: {}, snapshotAge: N } }
         this.crossChain       = {};  // { "chain:idx": attestation }
         this.pollResults      = {};  // { pollIndex: frozen VOTE poll result }
         this.blockHeight      = 1;
@@ -169,9 +169,14 @@ class MockLedger {
 
     // --- Oracle helpers ---
 
+    // `currentPrice` should be a { price, roundNumber, timestamp } object (the
+    // shape the indexer's getOracleDataForVM feeds through readonly-accessors).
+    // A bare string/number is kept as a string for legacy tests, but contracts
+    // written against the production accessor expect the object.
     seedOracle(coinPair, currentPrice, snapshotAge, rounds) {
         this.oraclePrices[coinPair] = {
-            current: String(currentPrice),
+            current: (currentPrice !== null && typeof currentPrice === 'object')
+                ? currentPrice : String(currentPrice),
             snapshotAge: snapshotAge || 0,
             rounds: rounds || {}
         };
