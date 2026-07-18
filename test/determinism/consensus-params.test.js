@@ -299,6 +299,33 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.STATE_KEY_TYPE_GATE_BLOCK_TIME, 1790812800);
     });
 
+    it('all six 2.0.0 gate constants match the indexer protocol_changes.js CONTROLLER_GUARD literal (cross-repo repin guard)', function () {
+        // The six literal pins above freeze the VM's flag-day value, and the
+        // indexer's own suite freezes its value, but nothing tied the two files
+        // together: a coordinated repin that edits the indexer literal and misses
+        // one VM constant passes BOTH CIs and forks the fleet at activation
+        // ( / SD-2 residual). Read the indexer source directly (monorepo
+        // sibling checkout) and assert every VM gate equals the CONTROLLER_GUARD
+        // activation time. Skips only when the sibling repo is not checked out
+        // (standalone clone); the hard value pins above still guard that case.
+        const path = require('path'), fs = require('fs');
+        const indexerFile = path.resolve(__dirname, '../../../xchain-indexer/src/protocol_changes.js');
+        if (!fs.existsSync(indexerFile)) this.skip();
+        const src = fs.readFileSync(indexerFile, 'utf8');
+        const m = src.match(/addChange\(\s*'CONTROLLER_GUARD'\s*,\s*'2\.0\.0'\s*,\s*(\d+)/);
+        assert.ok(m, "could not find the CONTROLLER_GUARD 2.0.0 addChange literal in the indexer's protocol_changes.js");
+        const indexerFlagDay = Number(m[1]);
+        const gates = [
+            'ASYNC_SURFACE_GATE_BLOCK_TIME', 'BINARY_ALLOC_GATE_BLOCK_TIME',
+            'CALL_SPREAD_METER_GATE_BLOCK_TIME', 'STATE_KEY_NUL_GATE_BLOCK_TIME',
+            'METERING_EVAL_ORDER_GATE_BLOCK_TIME', 'STATE_KEY_TYPE_GATE_BLOCK_TIME'
+        ];
+        for (const g of gates) {
+            assert.strictEqual(vm[g], indexerFlagDay,
+                g + ' diverged from the indexer CONTROLLER_GUARD flag-day: a repin must move all six VM gates and the indexer literal in lockstep');
+        }
+    });
+
     it('XCALL_MAX_HOPS is single-sourced from the emit-time enforcer and pinned', function () {
         // gateway-emit.js declares the hop cap it enforces (crossExecute's hop
         // gate) and index.js re-exports that same binding for the cross-service
