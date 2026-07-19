@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- AI-assisted contract authoring (Tier 3): `src/toolkit/authoring.js` builds English/Solidity authoring prompts from a canonical knowledge base and runs an injected LLM client's reply through the deploy gate with an automatic repair loop, exposed via `xchain-vm/toolkit` and the `xchain-foundry describe|from-solidity|validate` commands.
+- `xchain-foundry` / `create-xchain-contract` developer toolkit: a local contract simulator (in-memory indexer mock), a no-isolate determinism gate + gas profiler, TypeScript type-strip authoring, and a project scaffolder, exposed via `require('xchain-vm/toolkit')` and the two new bins.
 - Confirmed `ASYNC_SURFACE_GATE_BLOCK_TIME` and `BINARY_ALLOC_GATE_BLOCK_TIME` at the armed contract-era flag-day 1790812800 (2026-10-01 00:00 UTC), in lockstep with the indexer.
 
 ### Changed

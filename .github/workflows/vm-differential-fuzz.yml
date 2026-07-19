@@ -1,0 +1,131 @@
+# VM differential-fuzz gate ( / launch checklist item G4).
+#
+# The VM's consensus contract is BIT-IDENTICAL execution on every validator,
+# whatever the arch / Node ABI / libc. The shared CI gate (ci.yml) only runs
+# the suite on one runner, so it can never SEE a cross-build divergence. This
+# workflow closes that gap: it regenerates the identical seeded fuzz corpus on
+# every leg of an arch/build matrix, records each leg's per-case consensus
+# hashes, then diffs every leg against the x86_64/glibc reference. A single
+# hash disagreement means two validator builds would fork, and fails the run.
+#
+# The corpus is a pure function of DIFF_SEED, so each leg samples the SAME
+# inputs independently and only the output hashes are compared (see
+# test/fuzz/differential.js). Bump DIFF_CASES for a deeper sweep on demand.
+name: vm-differential-fuzz
+
+on:
+  # Not on every push (isolated-vm rebuild + subprocess corpus is heavy);
+  # runs on demand and on a weekly cadence so a toolchain/V8 bump that shifts
+  # one build's numerics is caught before it reaches the fleet.
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: "cases per corpus (default 200)"
+        required: false
+        default: "200"
+      seed:
+        description: "corpus seed (default 1480804417)"
+        required: false
+        default: "1480804417"
+  schedule:
+    # Tuesdays 06:00 UTC, offset from the Monday audit cadence.
+    - cron: "0 6 * * 2"
+
+env:
+  DIFF_SEED: ${{ github.event.inputs.seed || '1480804417' }}
+  DIFF_CASES: ${{ github.event.inputs.cases || '200' }}
+
+jobs:
+  # One leg per (arch, build). Each records its own manifest artifact. The
+  # x86_64/glibc leg is the reference every other leg is diffed against.
+  record:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: linux-x64-glibc      # reference
+            runner: ubuntu-latest
+            container: ""
+          - leg: linux-arm64-glibc    # cross-ARCH
+            runner: ubuntu-24.04-arm
+            container: ""
+          - leg: linux-x64-musl       # cross-BUILD (musl libc)
+            runner: ubuntu-latest
+            container: node:22-alpine
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The alpine container ships Node 22 already; the bare runners need it.
+      # isolated-vm has no musl prebuild, so the alpine leg needs build tools.
+      - name: Install build toolchain (musl leg only)
+        if: ${{ matrix.container == 'node:22-alpine' }}
+        run: apk add --no-cache python3 make g++ git
+
+      - name: Use Node.js 22
+        if: ${{ matrix.container == '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Build isolated-vm from source so the native V8 binding matches THIS
+      # leg's arch/libc (a prebuild from another arch would be the very drift
+      # this job exists to detect, or simply fail to load).
+      - name: Install deps (rebuild isolated-vm from source)
+        run: |
+          npm install --ignore-scripts
+          npm rebuild isolated-vm --build-from-source
+
+      - name: Record differential manifest
+        run: |
+          node test/fuzz/differential-run.js record \
+            --seed "$DIFF_SEED" --cases "$DIFF_CASES" \
+            --out "differential.${{ matrix.leg }}.json"
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: differential-${{ matrix.leg }}
+          path: differential.${{ matrix.leg }}.json
+          retention-days: 14
+
+  # Diff every leg against the x86_64/glibc reference. Any per-case consensus
+  # hash divergence exits non-zero here and fails the gate.
+  diff:
+    needs: record
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Download all manifests
+        uses: actions/download-artifact@v4
+        with:
+          path: manifests
+          pattern: differential-*
+          merge-multiple: true
+
+      - name: Diff each build against the x86_64/glibc reference
+        run: |
+          set -e
+          REF="manifests/differential.linux-x64-glibc.json"
+          test -f "$REF" || { echo "reference manifest missing"; exit 1; }
+          status=0
+          for m in manifests/differential.*.json; do
+            [ "$m" = "$REF" ] && continue
+            echo "::group::compare $(basename "$m") vs reference"
+            node test/fuzz/differential-run.js compare "$REF" "$m" || status=1
+            echo "::endgroup::"
+          done
+          if [ "$status" -ne 0 ]; then
+            echo "::error::VM differential fuzz found a cross-build consensus divergence"
+            exit 1
+          fi
+          echo "all builds are consensus-identical over the fuzz corpus"

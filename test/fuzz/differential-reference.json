@@ -1,0 +1,1211 @@
+{
+  "version": 1,
+  "kind": "vm-differential-fuzz-manifest",
+  "seed": 1480804417,
+  "cases": 150,
+  "execution": "in-process",
+  "platform": "linux-arm64-node22-v8_12.4.254.21-node.56-glibc2.39",
+  "node": "22.22.3",
+  "entries": [
+    {
+      "index": 0,
+      "codeHash": "45a49a97b3bc10ff",
+      "resultHash": "3e533f194f9b39334df593d3c3b28a15b927b7c3973be6bb1cfa3bf3e30230b8",
+      "gasUsed": 3,
+      "success": false,
+      "error": "error: Object.defineProperty is not a function"
+    },
+    {
+      "index": 1,
+      "codeHash": "0379cc7d0c95d62e",
+      "resultHash": "5d87a0e5762dce065c4359fae9a07d8b33796838ceff84c45180cc4eff3e3b8d",
+      "gasUsed": 506,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 2,
+      "codeHash": "d237907d10d56857",
+      "resultHash": "a81d553a6ded9661bac864cc1f1d76edcb79e7ab8dc56b3193a8e1e6d3117ef2",
+      "gasUsed": 199,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 3,
+      "codeHash": "3cb740e8ff9b0d57",
+      "resultHash": "aed59a1d4613fe17afaccdb942fe224dbc374ef9f408671ee214eac8ea49a32c",
+      "gasUsed": 5788,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 4,
+      "codeHash": "b1b98f51d058bc5c",
+      "resultHash": "8431f5dde5d794a9623a53b09f2deaa9e2abdd3ec02ad121bad3f09b1eb941e7",
+      "gasUsed": 5,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 5,
+      "codeHash": "19f5daea6ea0c541",
+      "resultHash": "755b16edd72c3097e17ecc1cac9d4007f0ef8410d7bbed6a6b3af338d0361165",
+      "gasUsed": 560,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 6,
+      "codeHash": "ad873010f213e7ea",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 7,
+      "codeHash": "69458ff9c09256ef",
+      "resultHash": "5883a4f496af7b25f500c950e74d5937ef1f1d6d9ad1d4ad89691284256ba816",
+      "gasUsed": 47,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 8,
+      "codeHash": "716bfd46e3190534",
+      "resultHash": "f16c4682f2beb02ab899857a0f60b5bf26915308ef802f640604135c890e117e",
+      "gasUsed": 789,
+      "success": false,
+      "error": "error: contract.slash: pubkey must be a 64-hex string"
+    },
+    {
+      "index": 9,
+      "codeHash": "3cb740e8ff9b0d57",
+      "resultHash": "aed59a1d4613fe17afaccdb942fe224dbc374ef9f408671ee214eac8ea49a32c",
+      "gasUsed": 5788,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 10,
+      "codeHash": "f49927d16a5544e1",
+      "resultHash": "aed59a1d4613fe17afaccdb942fe224dbc374ef9f408671ee214eac8ea49a32c",
+      "gasUsed": 5788,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 11,
+      "codeHash": "96df5c7fa605f418",
+      "resultHash": "dacdd3ff264b5787ee6f26b83e4ff79054bc6ea400da804a4e32a6cb6ecccb23",
+      "gasUsed": 15,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 12,
+      "codeHash": "1104f1dff1507eaa",
+      "resultHash": "e6faedafb39de66f8cca0a6a36e86f7d307449bafad0f303efd49f595b3b1f56",
+      "gasUsed": 9,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 13,
+      "codeHash": "2283a7b213d26b9c",
+      "resultHash": "dadb76ea6adfcc2c2b88d0411666af050fd058274d0250c61353ec8c8010af0f",
+      "gasUsed": 200005,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 14,
+      "codeHash": "182516f02bc0da9b",
+      "resultHash": "1ace8ffad1338ac8789b315075f9f9865a2aca3fa7eaa3395470d682795c08b2",
+      "gasUsed": 243,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 15,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 16,
+      "codeHash": "6b10b472a5de00c4",
+      "resultHash": "675faa73e947ecc6aa1a95e5e24e9cb481be329e3c01a69ed9d947c48404520e",
+      "gasUsed": 623,
+      "success": false,
+      "error": "error: \u0003REVERT:math error: math input exceeds maximum length (256 chars)"
+    },
+    {
+      "index": 17,
+      "codeHash": "45a49a97b3bc10ff",
+      "resultHash": "3e533f194f9b39334df593d3c3b28a15b927b7c3973be6bb1cfa3bf3e30230b8",
+      "gasUsed": 3,
+      "success": false,
+      "error": "error: Object.defineProperty is not a function"
+    },
+    {
+      "index": 18,
+      "codeHash": "ad873010f213e7ea",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 19,
+      "codeHash": "7b61e8f959f63959",
+      "resultHash": "82fa09f5bf200c3aba78444278b6d95768c2c1b164302d3150841441019283b1",
+      "gasUsed": 515,
+      "success": false,
+      "error": "error: \u0003REVERT:math error: math input exceeds maximum length (256 chars)"
+    },
+    {
+      "index": 20,
+      "codeHash": "7239d3a1e0d658c2",
+      "resultHash": "3a0dda224acaa9cc916540203dd5e18aa63471684170f6167a75ac5b757884de",
+      "gasUsed": 25,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 21,
+      "codeHash": "d237907d10d56857",
+      "resultHash": "a81d553a6ded9661bac864cc1f1d76edcb79e7ab8dc56b3193a8e1e6d3117ef2",
+      "gasUsed": 199,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 22,
+      "codeHash": "2b08ab1928d464fc",
+      "resultHash": "be115964b32da9cef6675f93d1627fe5a923eead0d9d06dbee5e90aee04b68e0",
+      "gasUsed": 670,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 23,
+      "codeHash": "d19dfd48b56a698c",
+      "resultHash": "c275b59cb9da08ac1849e86c3a2dc178bb019b59d0f6202a7a074ebf61ced4e0",
+      "gasUsed": 25,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 24,
+      "codeHash": "0b44a987dd86f2e8",
+      "resultHash": "f0b9fb3cf39de450e7e8337f5521f59e0d23412e7249e8d0d5daa4c138ec926f",
+      "gasUsed": 350,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 25,
+      "codeHash": "efafc7c265d9001d",
+      "resultHash": "0675da179f9d8db122755f577b6b224ba02f16ef3e670b703ae6aa0fc67e6e05",
+      "gasUsed": 1055,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 26,
+      "codeHash": "d815dcb221a1ca1c",
+      "resultHash": "013fc3e485dc765e9e9ff935d6030d87c5a764c54eb8ca123159d27e49dec036",
+      "gasUsed": 84,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 27,
+      "codeHash": "5f4ed9021408f2c4",
+      "resultHash": "9fbe54a4902ece3fd4b4a53c1e2cc0277d7a31bed14c757306d3fd4640e001ea",
+      "gasUsed": 747,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 28,
+      "codeHash": "fe44cba9fa1bbcef",
+      "resultHash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
+      "gasUsed": 1000000,
+      "success": false,
+      "error": "out_of_gas: used 1000001 of 1000000"
+    },
+    {
+      "index": 29,
+      "codeHash": "0b44a987dd86f2e8",
+      "resultHash": "f0b9fb3cf39de450e7e8337f5521f59e0d23412e7249e8d0d5daa4c138ec926f",
+      "gasUsed": 350,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 30,
+      "codeHash": "28d8cfa0fdb22289",
+      "resultHash": "e6faedafb39de66f8cca0a6a36e86f7d307449bafad0f303efd49f595b3b1f56",
+      "gasUsed": 9,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 31,
+      "codeHash": "b1d713362add5c60",
+      "resultHash": "a4edcb0b21b43e0b4d7fd1f2b4cc0e5a6843a9bf45ec044bff20b6dcc79c70a6",
+      "gasUsed": 120,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 32,
+      "codeHash": "dfecefd6d55a9087",
+      "resultHash": "a81d553a6ded9661bac864cc1f1d76edcb79e7ab8dc56b3193a8e1e6d3117ef2",
+      "gasUsed": 199,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 33,
+      "codeHash": "c919c1279dae6424",
+      "resultHash": "a085c35e76c60f6868fa43c29e5a57f5360974454fa976107825b67cea0480a3",
+      "gasUsed": 272,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 34,
+      "codeHash": "5fbf12f1455318c7",
+      "resultHash": "013fc3e485dc765e9e9ff935d6030d87c5a764c54eb8ca123159d27e49dec036",
+      "gasUsed": 84,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 35,
+      "codeHash": "ad873010f213e7ea",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 36,
+      "codeHash": "dfecefd6d55a9087",
+      "resultHash": "a81d553a6ded9661bac864cc1f1d76edcb79e7ab8dc56b3193a8e1e6d3117ef2",
+      "gasUsed": 199,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 37,
+      "codeHash": "df1ba229b7cb0695",
+      "resultHash": "755b16edd72c3097e17ecc1cac9d4007f0ef8410d7bbed6a6b3af338d0361165",
+      "gasUsed": 560,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 38,
+      "codeHash": "dd7879b6f3d2876f",
+      "resultHash": "6202df90e90735b46cce13ed2c6664285bc444e40f76e9ad2a6aaba6a2660c33",
+      "gasUsed": 6,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 39,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 40,
+      "codeHash": "127fc79e76dacaa0",
+      "resultHash": "d8ec23106c3d27beda18ca46630352d39cd190e7c515cb8b960c9dc4169f6b9c",
+      "gasUsed": 502,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 41,
+      "codeHash": "769aea9118b47281",
+      "resultHash": "a4edcb0b21b43e0b4d7fd1f2b4cc0e5a6843a9bf45ec044bff20b6dcc79c70a6",
+      "gasUsed": 120,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 42,
+      "codeHash": "221a95c297bada2c",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 43,
+      "codeHash": "d22253560a418ab7",
+      "resultHash": "0b11f8e7af819f0c4d00cc2335633985148499173a1bef225fb13a100ae89209",
+      "gasUsed": 42,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 44,
+      "codeHash": "4e770def6f5f60c1",
+      "resultHash": "68bc1fc5fd0c74ca13c7980948482cf78dc34385b54027676012e093921ddffb",
+      "gasUsed": 6,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 45,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 46,
+      "codeHash": "d815dcb221a1ca1c",
+      "resultHash": "013fc3e485dc765e9e9ff935d6030d87c5a764c54eb8ca123159d27e49dec036",
+      "gasUsed": 84,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 47,
+      "codeHash": "3161574c513669eb",
+      "resultHash": "c600e57a27b2419b13737725f95293ccfa243ef19d9599306a7da8681d948a53",
+      "gasUsed": 102,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 48,
+      "codeHash": "b08f68c31c2831aa",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 49,
+      "codeHash": "93e3fc8d8b50dab8",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 50,
+      "codeHash": "df1ba229b7cb0695",
+      "resultHash": "755b16edd72c3097e17ecc1cac9d4007f0ef8410d7bbed6a6b3af338d0361165",
+      "gasUsed": 560,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 51,
+      "codeHash": "3e82f47397e86b27",
+      "resultHash": "f5e4bee0790969c140ddf1b26b33d9758704aa2d99b770c91dd38e49e6fb8db9",
+      "gasUsed": 2,
+      "success": false,
+      "error": "error: \u0003REVERT:spoofed"
+    },
+    {
+      "index": 52,
+      "codeHash": "a61a99a26988b22b",
+      "resultHash": "56d7e03273b65e9db807c5b9177c6354d16f29bc690e7f2c9866dd514d029a62",
+      "gasUsed": 6287,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 53,
+      "codeHash": "bc50a55292d4de23",
+      "resultHash": "b4e5cc54f9e2ab288a78ddc83daa7460b17031e9cfb55a709f918e020235193c",
+      "gasUsed": 266,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 54,
+      "codeHash": "f106753da07cb4c0",
+      "resultHash": "ea1c5cd7831223da8395b6440e723d98e20316a70e525c838ccac6d9fcbdf21e",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: contract must export a function or object"
+    },
+    {
+      "index": 55,
+      "codeHash": "a7410de1a048edd5",
+      "resultHash": "1e7d18a1cea16a6fc531ed8238e9aeca14f26024b8cdd76adfedc06b9f9936ae",
+      "gasUsed": 614,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 56,
+      "codeHash": "769aea9118b47281",
+      "resultHash": "a4edcb0b21b43e0b4d7fd1f2b4cc0e5a6843a9bf45ec044bff20b6dcc79c70a6",
+      "gasUsed": 120,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 57,
+      "codeHash": "f0451622b250a092",
+      "resultHash": "15fa96970a9d7776fc8ab5bc1dd311e753b3e9f7c1aa9e361b12f2a0401c9446",
+      "gasUsed": 109,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 58,
+      "codeHash": "1104f1dff1507eaa",
+      "resultHash": "e6faedafb39de66f8cca0a6a36e86f7d307449bafad0f303efd49f595b3b1f56",
+      "gasUsed": 9,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 59,
+      "codeHash": "88cc67a991e49687",
+      "resultHash": "b87ad41fa0c54a8173681b4e8d2286f973da24cea9c49d674ff851e656325129",
+      "gasUsed": 522,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 60,
+      "codeHash": "8751a3cf4b4b55e8",
+      "resultHash": "cf002cfc3d484aece4b3e702c2307a8b54fbc72af6417a2d056190617482de7b",
+      "gasUsed": 1307,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 61,
+      "codeHash": "5f6a88edca7012bf",
+      "resultHash": "ad8d80f07bd24419710f430bba3d056f18ac922e6d176254a180b2fb2c37cb31",
+      "gasUsed": 1118,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 62,
+      "codeHash": "fa6666d08339310e",
+      "resultHash": "db42bd14ff265fc340d8c7b6ddfc14c7821d5728c51b21defbabe84ef880b4f2",
+      "gasUsed": 6269,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 63,
+      "codeHash": "6fabd172a948622c",
+      "resultHash": "b87ad41fa0c54a8173681b4e8d2286f973da24cea9c49d674ff851e656325129",
+      "gasUsed": 522,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 64,
+      "codeHash": "1104f1dff1507eaa",
+      "resultHash": "e6faedafb39de66f8cca0a6a36e86f7d307449bafad0f303efd49f595b3b1f56",
+      "gasUsed": 9,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 65,
+      "codeHash": "0b44a987dd86f2e8",
+      "resultHash": "f0b9fb3cf39de450e7e8337f5521f59e0d23412e7249e8d0d5daa4c138ec926f",
+      "gasUsed": 350,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 66,
+      "codeHash": "359a8818bc2cbaa5",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 67,
+      "codeHash": "f676679135674500",
+      "resultHash": "cb8d7efe1d7ebb86c497dcfea3b0d332d89331d1f278093c82eb071f5853dc62",
+      "gasUsed": 521,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 68,
+      "codeHash": "d815dcb221a1ca1c",
+      "resultHash": "013fc3e485dc765e9e9ff935d6030d87c5a764c54eb8ca123159d27e49dec036",
+      "gasUsed": 84,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 69,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 70,
+      "codeHash": "b1d713362add5c60",
+      "resultHash": "a4edcb0b21b43e0b4d7fd1f2b4cc0e5a6843a9bf45ec044bff20b6dcc79c70a6",
+      "gasUsed": 120,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 71,
+      "codeHash": "0ed79078e251bc31",
+      "resultHash": "f0b9fb3cf39de450e7e8337f5521f59e0d23412e7249e8d0d5daa4c138ec926f",
+      "gasUsed": 350,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 72,
+      "codeHash": "cfc36620518f9d95",
+      "resultHash": "a2810a6c8eca34464c3079e9444bdb273f7c265fa79a797b3e943d687cdd15b6",
+      "gasUsed": 113,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 73,
+      "codeHash": "3dd4853fece92a83",
+      "resultHash": "88eace6963ab120855242852794b83f818b7f2adcda9c307994bef5ecdc55acd",
+      "gasUsed": 5789,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 74,
+      "codeHash": "93e3fc8d8b50dab8",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 75,
+      "codeHash": "fe44cba9fa1bbcef",
+      "resultHash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
+      "gasUsed": 1000000,
+      "success": false,
+      "error": "out_of_gas: used 1000001 of 1000000"
+    },
+    {
+      "index": 76,
+      "codeHash": "4435621ae5b6bb74",
+      "resultHash": "e75275178271b2d42feac9229d35d0b25ce61e6a4debe7a084e42615714a718f",
+      "gasUsed": 845,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 77,
+      "codeHash": "359a8818bc2cbaa5",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 78,
+      "codeHash": "744639a937646a09",
+      "resultHash": "dc5b0a16fbca8352ef8da1a1bf4e080ba6fc56ddf9bb375cf2e2464477e6ff27",
+      "gasUsed": 54,
+      "success": false,
+      "error": "error: c is not defined"
+    },
+    {
+      "index": 79,
+      "codeHash": "2b08ab1928d464fc",
+      "resultHash": "be115964b32da9cef6675f93d1627fe5a923eead0d9d06dbee5e90aee04b68e0",
+      "gasUsed": 670,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 80,
+      "codeHash": "99553be729e48600",
+      "resultHash": "26427f8e95ba3e3117c5471f31ec7b54771a6190d79917cd00c9af77469b03fb",
+      "gasUsed": 5769,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 81,
+      "codeHash": "fa6666d08339310e",
+      "resultHash": "db42bd14ff265fc340d8c7b6ddfc14c7821d5728c51b21defbabe84ef880b4f2",
+      "gasUsed": 6269,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 82,
+      "codeHash": "aa6b05f194c0df87",
+      "resultHash": "2130d1f9b6934c1dca4242ec7bc7473ecf20a3c47cc1bba2202acf76fb947bf3",
+      "gasUsed": 3,
+      "success": false,
+      "error": "error: r is not defined"
+    },
+    {
+      "index": 83,
+      "codeHash": "69458ff9c09256ef",
+      "resultHash": "5883a4f496af7b25f500c950e74d5937ef1f1d6d9ad1d4ad89691284256ba816",
+      "gasUsed": 47,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 84,
+      "codeHash": "716bfd46e3190534",
+      "resultHash": "f16c4682f2beb02ab899857a0f60b5bf26915308ef802f640604135c890e117e",
+      "gasUsed": 789,
+      "success": false,
+      "error": "error: contract.slash: pubkey must be a 64-hex string"
+    },
+    {
+      "index": 85,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 86,
+      "codeHash": "cf983da7c8072231",
+      "resultHash": "fbedb3286f3fefed03923f016b774921b5b8274475c7955e7ba2a581163e3095",
+      "gasUsed": 134,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 87,
+      "codeHash": "69f5031f808a7a10",
+      "resultHash": "013fc3e485dc765e9e9ff935d6030d87c5a764c54eb8ca123159d27e49dec036",
+      "gasUsed": 84,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 88,
+      "codeHash": "f29c38cbfcd48bbb",
+      "resultHash": "d407ef73b9e5425d1119b6cdc16a93b348bfe1434b6a7118031dbdecb0e695f3",
+      "gasUsed": 221,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 89,
+      "codeHash": "f95b31bd53ddccea",
+      "resultHash": "1ace8ffad1338ac8789b315075f9f9865a2aca3fa7eaa3395470d682795c08b2",
+      "gasUsed": 243,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 90,
+      "codeHash": "1b4d4348e8063e36",
+      "resultHash": "bfe2ad5653c8aff691573cff8de3136d9516ba5a932a957c1b8656a2ecf054cb",
+      "gasUsed": 615,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 91,
+      "codeHash": "a29334b0cf7b01e7",
+      "resultHash": "0d606d7c4d98a25181257489739860fa3da9949167f2ca963f068a309cb6edb5",
+      "gasUsed": 11,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 92,
+      "codeHash": "42ef00421012e219",
+      "resultHash": "91e09800b07d74cd7380a697e1eb9c7ba9a22000b18b0a04e48a752436e03f26",
+      "gasUsed": 264,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 93,
+      "codeHash": "45a49a97b3bc10ff",
+      "resultHash": "3e533f194f9b39334df593d3c3b28a15b927b7c3973be6bb1cfa3bf3e30230b8",
+      "gasUsed": 3,
+      "success": false,
+      "error": "error: Object.defineProperty is not a function"
+    },
+    {
+      "index": 94,
+      "codeHash": "7a865dea5a116670",
+      "resultHash": "a00b8db834dce458c2d098fd6772e107ca33429bc547a491051a5aafebfc31aa",
+      "gasUsed": 6081,
+      "success": false,
+      "error": "error: attestation.request: providerId must be a non-empty string (max 32 bytes)"
+    },
+    {
+      "index": 95,
+      "codeHash": "7239d3a1e0d658c2",
+      "resultHash": "3a0dda224acaa9cc916540203dd5e18aa63471684170f6167a75ac5b757884de",
+      "gasUsed": 25,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 96,
+      "codeHash": "2b08ab1928d464fc",
+      "resultHash": "be115964b32da9cef6675f93d1627fe5a923eead0d9d06dbee5e90aee04b68e0",
+      "gasUsed": 670,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 97,
+      "codeHash": "b1d713362add5c60",
+      "resultHash": "a4edcb0b21b43e0b4d7fd1f2b4cc0e5a6843a9bf45ec044bff20b6dcc79c70a6",
+      "gasUsed": 120,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 98,
+      "codeHash": "fe44cba9fa1bbcef",
+      "resultHash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
+      "gasUsed": 1000000,
+      "success": false,
+      "error": "out_of_gas: used 1000001 of 1000000"
+    },
+    {
+      "index": 99,
+      "codeHash": "a29334b0cf7b01e7",
+      "resultHash": "0d606d7c4d98a25181257489739860fa3da9949167f2ca963f068a309cb6edb5",
+      "gasUsed": 11,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 100,
+      "codeHash": "df1ba229b7cb0695",
+      "resultHash": "755b16edd72c3097e17ecc1cac9d4007f0ef8410d7bbed6a6b3af338d0361165",
+      "gasUsed": 560,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 101,
+      "codeHash": "637cb3b4e390c8a7",
+      "resultHash": "eea507a8670985202cb3c72522e24a2a5c7071e0b9b00d176df3bf4c332835eb",
+      "gasUsed": 247,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 102,
+      "codeHash": "0379cc7d0c95d62e",
+      "resultHash": "5d87a0e5762dce065c4359fae9a07d8b33796838ceff84c45180cc4eff3e3b8d",
+      "gasUsed": 506,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 103,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 104,
+      "codeHash": "2b08ab1928d464fc",
+      "resultHash": "be115964b32da9cef6675f93d1627fe5a923eead0d9d06dbee5e90aee04b68e0",
+      "gasUsed": 670,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 105,
+      "codeHash": "19136395a9aaa04f",
+      "resultHash": "7317ec7a8b252f5edff8a24837d228322fde4fda74d4b972291690f563d64c00",
+      "gasUsed": 5787,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 106,
+      "codeHash": "93e3fc8d8b50dab8",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 107,
+      "codeHash": "28d8cfa0fdb22289",
+      "resultHash": "e6faedafb39de66f8cca0a6a36e86f7d307449bafad0f303efd49f595b3b1f56",
+      "gasUsed": 9,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 108,
+      "codeHash": "4d874656114d09e7",
+      "resultHash": "5ca3176bfe3bde45e8c83c816e82d56f28626d5b02f5a43752db0230a47b36e9",
+      "gasUsed": 239,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 109,
+      "codeHash": "fe44cba9fa1bbcef",
+      "resultHash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
+      "gasUsed": 1000000,
+      "success": false,
+      "error": "out_of_gas: used 1000001 of 1000000"
+    },
+    {
+      "index": 110,
+      "codeHash": "a29334b0cf7b01e7",
+      "resultHash": "0d606d7c4d98a25181257489739860fa3da9949167f2ca963f068a309cb6edb5",
+      "gasUsed": 11,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 111,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 112,
+      "codeHash": "1104f1dff1507eaa",
+      "resultHash": "e6faedafb39de66f8cca0a6a36e86f7d307449bafad0f303efd49f595b3b1f56",
+      "gasUsed": 9,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 113,
+      "codeHash": "d4abdd6312c04428",
+      "resultHash": "ef1bdd1bd6e5380083c2e824b68c79650005016b43ccad3a5b249ee5dbf5e1ea",
+      "gasUsed": 22,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 114,
+      "codeHash": "2b08ab1928d464fc",
+      "resultHash": "be115964b32da9cef6675f93d1627fe5a923eead0d9d06dbee5e90aee04b68e0",
+      "gasUsed": 670,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 115,
+      "codeHash": "7faf69dc6abc813f",
+      "resultHash": "f89dfdeb06147c4ac98fddee8c095614344ef13dc302e7b869ac0c244a1089e3",
+      "gasUsed": 2,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 116,
+      "codeHash": "88cc67a991e49687",
+      "resultHash": "b87ad41fa0c54a8173681b4e8d2286f973da24cea9c49d674ff851e656325129",
+      "gasUsed": 522,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 117,
+      "codeHash": "17698d633255394f",
+      "resultHash": "bcd1ccf23088c85e76209c3dd6852cd6ce9a7f37fe42d4955b79af7fa4a8719d",
+      "gasUsed": 3,
+      "success": false,
+      "error": "error: count is not defined"
+    },
+    {
+      "index": 118,
+      "codeHash": "d4abdd6312c04428",
+      "resultHash": "ef1bdd1bd6e5380083c2e824b68c79650005016b43ccad3a5b249ee5dbf5e1ea",
+      "gasUsed": 22,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 119,
+      "codeHash": "5c04a69d56c60a99",
+      "resultHash": "5883a4f496af7b25f500c950e74d5937ef1f1d6d9ad1d4ad89691284256ba816",
+      "gasUsed": 47,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 120,
+      "codeHash": "7faf69dc6abc813f",
+      "resultHash": "f89dfdeb06147c4ac98fddee8c095614344ef13dc302e7b869ac0c244a1089e3",
+      "gasUsed": 2,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 121,
+      "codeHash": "8ae7dfe3f364411e",
+      "resultHash": "1c65e0ab7cf9d180962aca0b8a4fb7db5b9c6feb904e932a4d0bcccb2884f3dd",
+      "gasUsed": 542,
+      "success": false,
+      "error": "error: \u0003REVERT:math error: math input exceeds maximum length (256 chars)"
+    },
+    {
+      "index": 122,
+      "codeHash": "2b08ab1928d464fc",
+      "resultHash": "be115964b32da9cef6675f93d1627fe5a923eead0d9d06dbee5e90aee04b68e0",
+      "gasUsed": 670,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 123,
+      "codeHash": "99553be729e48600",
+      "resultHash": "26427f8e95ba3e3117c5471f31ec7b54771a6190d79917cd00c9af77469b03fb",
+      "gasUsed": 5769,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 124,
+      "codeHash": "0b44a987dd86f2e8",
+      "resultHash": "f0b9fb3cf39de450e7e8337f5521f59e0d23412e7249e8d0d5daa4c138ec926f",
+      "gasUsed": 350,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 125,
+      "codeHash": "df1ba229b7cb0695",
+      "resultHash": "755b16edd72c3097e17ecc1cac9d4007f0ef8410d7bbed6a6b3af338d0361165",
+      "gasUsed": 560,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 126,
+      "codeHash": "955511f747642a4d",
+      "resultHash": "4adfaf114435b6a8606c78955a0402d498c7937b1212111672e0b8033d42f0cd",
+      "gasUsed": 394,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 127,
+      "codeHash": "1ad9c5a87c289b3d",
+      "resultHash": "151710ee17a0ec48c670c73c438b98fd5d0ad66cf1ede851bac34930ef47e3ba",
+      "gasUsed": 451,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 128,
+      "codeHash": "d237907d10d56857",
+      "resultHash": "a81d553a6ded9661bac864cc1f1d76edcb79e7ab8dc56b3193a8e1e6d3117ef2",
+      "gasUsed": 199,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 129,
+      "codeHash": "f29c38cbfcd48bbb",
+      "resultHash": "d407ef73b9e5425d1119b6cdc16a93b348bfe1434b6a7118031dbdecb0e695f3",
+      "gasUsed": 221,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 130,
+      "codeHash": "ad873010f213e7ea",
+      "resultHash": "acde50c2ddef2bdf3d6beacfa62b0777eaffc9363e600148423da22475c3201f",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: unknown method: default"
+    },
+    {
+      "index": 131,
+      "codeHash": "f106753da07cb4c0",
+      "resultHash": "ea1c5cd7831223da8395b6440e723d98e20316a70e525c838ccac6d9fcbdf21e",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: contract must export a function or object"
+    },
+    {
+      "index": 132,
+      "codeHash": "bc50a55292d4de23",
+      "resultHash": "b4e5cc54f9e2ab288a78ddc83daa7460b17031e9cfb55a709f918e020235193c",
+      "gasUsed": 266,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 133,
+      "codeHash": "99553be729e48600",
+      "resultHash": "26427f8e95ba3e3117c5471f31ec7b54771a6190d79917cd00c9af77469b03fb",
+      "gasUsed": 5769,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 134,
+      "codeHash": "7faf69dc6abc813f",
+      "resultHash": "f89dfdeb06147c4ac98fddee8c095614344ef13dc302e7b869ac0c244a1089e3",
+      "gasUsed": 2,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 135,
+      "codeHash": "591383e95df03bb0",
+      "resultHash": "ea1c5cd7831223da8395b6440e723d98e20316a70e525c838ccac6d9fcbdf21e",
+      "gasUsed": 1,
+      "success": false,
+      "error": "error: contract must export a function or object"
+    },
+    {
+      "index": 136,
+      "codeHash": "0379cc7d0c95d62e",
+      "resultHash": "5d87a0e5762dce065c4359fae9a07d8b33796838ceff84c45180cc4eff3e3b8d",
+      "gasUsed": 506,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 137,
+      "codeHash": "f95b31bd53ddccea",
+      "resultHash": "1ace8ffad1338ac8789b315075f9f9865a2aca3fa7eaa3395470d682795c08b2",
+      "gasUsed": 243,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 138,
+      "codeHash": "dd7879b6f3d2876f",
+      "resultHash": "6202df90e90735b46cce13ed2c6664285bc444e40f76e9ad2a6aaba6a2660c33",
+      "gasUsed": 6,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 139,
+      "codeHash": "69458ff9c09256ef",
+      "resultHash": "5883a4f496af7b25f500c950e74d5937ef1f1d6d9ad1d4ad89691284256ba816",
+      "gasUsed": 47,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 140,
+      "codeHash": "754040569103e833",
+      "resultHash": "aed59a1d4613fe17afaccdb942fe224dbc374ef9f408671ee214eac8ea49a32c",
+      "gasUsed": 5788,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 141,
+      "codeHash": "45a49a97b3bc10ff",
+      "resultHash": "3e533f194f9b39334df593d3c3b28a15b927b7c3973be6bb1cfa3bf3e30230b8",
+      "gasUsed": 3,
+      "success": false,
+      "error": "error: Object.defineProperty is not a function"
+    },
+    {
+      "index": 142,
+      "codeHash": "2cdfa12596d727a8",
+      "resultHash": "54487603e0a28bb5263e8aa6fa8c17706fe35c5667e414f7928ce8247298ccba",
+      "gasUsed": 1000000,
+      "success": false,
+      "error": "out_of_stack: maximum call depth exceeded"
+    },
+    {
+      "index": 143,
+      "codeHash": "c3ba01a8765436c4",
+      "resultHash": "5883a4f496af7b25f500c950e74d5937ef1f1d6d9ad1d4ad89691284256ba816",
+      "gasUsed": 47,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 144,
+      "codeHash": "10609c53c1ca28e5",
+      "resultHash": "b74e902f41e892aaa9b931f8a9e04217d497bd1cef6656d28f6b50b74377ab1f",
+      "gasUsed": 42,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 145,
+      "codeHash": "bb169a70c19acb98",
+      "resultHash": "22928c5decbb98b3ec1a6fa4fbf52f7799e16c571e70ad9ff9d3075216f824cc",
+      "gasUsed": 808,
+      "success": false,
+      "error": "revert: intentional revert"
+    },
+    {
+      "index": 146,
+      "codeHash": "42ef00421012e219",
+      "resultHash": "b8a977f65f44b380c6c304c3f2b761f7f19ae3cbc09580f38f0dbc70205cd961",
+      "gasUsed": 268,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 147,
+      "codeHash": "a488e164a33f2b50",
+      "resultHash": "045c9b08184a402e130b9900e89dd3e06d0f76ae6a6607f58b5c3c65f4947744",
+      "gasUsed": 347,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 148,
+      "codeHash": "df1ba229b7cb0695",
+      "resultHash": "755b16edd72c3097e17ecc1cac9d4007f0ef8410d7bbed6a6b3af338d0361165",
+      "gasUsed": 560,
+      "success": true,
+      "error": null
+    },
+    {
+      "index": 149,
+      "codeHash": "275323425ae5cc72",
+      "resultHash": "f3a47c42fbb083f778c7868d28f9a8c34bfa969050e4c57609a80bb1e887fa2a",
+      "gasUsed": 542,
+      "success": true,
+      "error": null
+    }
+  ]
+}

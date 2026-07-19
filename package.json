@@ -5,7 +5,9 @@
   "license": "AGPL-3.0-or-later",
   "main": "src/index.js",
   "bin": {
-    "xchain-lint": "bin/lint.js"
+    "xchain-lint": "bin/lint.js",
+    "xchain-foundry": "bin/xchain-foundry.js",
+    "create-xchain-contract": "bin/create-xchain-contract.js"
   },
   "engines": {
     "comment": "Canonical runtime is Node 22 - matches the indexer's node:22-bookworm image and the V8 the validator fleet runs. isolated-vm's native binding is V8-ABI-specific: run `npm rebuild isolated-vm --build-from-source` after switching Node versions. See .nvmrc.",
@@ -36,7 +38,8 @@
     "decimal.js": "10.4.3"
   },
   "scripts": {
-    "test": "mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js'",
+    "test": "mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js' 'test/toolkit/**/*.test.js'",
+    "test:toolkit": "mocha --timeout 30000 'test/toolkit/**/*.test.js'",
     "lint": "node bin/lint.js",
     "coverage": "c8 --reporter=text --reporter=html --include 'src/**/*.js' mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js' --exit",
     "ci": "mocha --timeout 60000 --exit 'test/preflight.test.js' 'test/unit/**/*.test.js' 'test/smoke/**/*.test.js' 'test/security/**/*.test.js' 'test/boundary/**/*.test.js' 'test/determinism/**/*.test.js' 'test/determinism/known-red/*.known-red.js' 'test/regression/p0-smoke.regression.test.js' 'test/regression/p1-security.regression.test.js' 'test/regression/determinism.test.js' 'test/regression/determinism-baseline.test.js'",
@@ -51,7 +54,11 @@
     "test:e2e": "mocha --timeout 60000 'test/preflight.test.js' 'test/e2e/**/*.e2e.test.js'",
     "smoke": "mocha --timeout 10000 'test/preflight.test.js' 'test/smoke/**/*.test.js'",
     "test:fuzz": "mocha --timeout 120000 'test/preflight.test.js' 'test/fuzz/**/*.fuzz.test.js'",
+    "test:fuzz:differential": "mocha --timeout 180000 'test/preflight.test.js' 'test/fuzz/differential.fuzz.test.js'",
     "fuzz": "node test/fuzz/run.js",
+    "fuzz:differential:record": "node test/fuzz/differential-run.js record",
+    "fuzz:differential:verify": "node test/fuzz/differential-run.js verify",
+    "fuzz:differential:compare": "node test/fuzz/differential-run.js compare",
     "bench:quick": "node bench/scenarios/pipeline.js && node bench/scenarios/gateway.js",
     "bench:full": "node bench/scenarios/pipeline.js && node bench/scenarios/gateway.js && node bench/scenarios/throughput.js && node bench/scenarios/cache.js",
     "bench:soak": "node bench/scenarios/soak.js",

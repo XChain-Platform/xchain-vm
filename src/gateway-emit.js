@@ -40,15 +40,18 @@ function validateTypes(params, typeSpec) {
 
 const crypto = require('crypto');
 
-// Cross-CHAIN call (XCALL) protocol constants. Canonical source:
-// xchain-documentation/protocol/constants.js; mirrored in src/index.js exports
-// and re-validated host-side by the indexer.
-const XCALL_MIN_GAS             = 5000;
-const XCALL_MAX_GAS             = 200000;
-const XCALL_MAX_HOPS            = 2;
-const XCALL_MIN_DEADLINE_BLOCKS = 10;
-const XCALL_MAX_DEADLINE_BLOCKS = 4000;
-const XCALL_DEFAULT_DEADLINE    = 400;
+// Cross-CHAIN call (XCALL) protocol constants. Vendored single source of truth:
+// ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
+// constants.js); mirrored in src/index.js exports and re-validated host-side by
+// the indexer. Deriving from the vendored module makes a bare-literal drift
+// impossible by construction.
+const PROTO = require('./protocol/constants.js');
+const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;
+const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;
+const XCALL_MAX_HOPS            = PROTO.XCALL_MAX_HOPS;
+const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
+const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
+const XCALL_DEFAULT_DEADLINE    = 400;   // caller default only; not a protocol bound (absent from canonical)
 
 // VM_XCALL_REQUEST / VM_XCALL_CALLBACK are charged directly from the schedule
 // (like VM_EMISSION). Both are CANONICAL_GAS_KEYS, so GasTracker construction

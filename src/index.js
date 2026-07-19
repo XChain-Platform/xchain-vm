@@ -1000,19 +1000,19 @@ const CONTRACT_WRAPPER = `
 })();
 `;
 
-// Maximum smart-contract code size (64 KiB). Canonical value:
-// xchain-documentation/protocol/constants.js (MAX_CODE_SIZE); kept equal to the
-// SDK and indexer by the cross-service regression suite (exported at the bottom
-// of this module).
-const MAX_CODE_SIZE = 65536;
+// Maximum smart-contract code size (64 KiB). Vendored single source of truth:
+// ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
+// constants.js, MAX_CODE_SIZE); kept equal to the SDK and indexer by the
+// cross-service regression suite (exported at the bottom of this module).
+const PROTO = require('./protocol/constants.js');
+const MAX_CODE_SIZE = PROTO.MAX_CODE_SIZE;
 
-// Cross-contract call protocol constants. Canonical values:
-// xchain-documentation/protocol/constants.js (VM_MAX_CALL_DEPTH /
-// VM_MIN_CALL_GAS); the indexer re-validates both host-side
+// Cross-contract call protocol constants. Vendored from ./protocol/constants.js
+// (VM_MAX_CALL_DEPTH / VM_MIN_CALL_GAS); the indexer re-validates both host-side
 // (xchain-indexer/src/actions/execute.js) so an older bundled VM cannot
 // bypass them. Exported below for the cross-service regression suite.
-const MAX_CALL_DEPTH = 4;
-const MIN_CALL_GAS   = 5000;
+const MAX_CALL_DEPTH = PROTO.VM_MAX_CALL_DEPTH;
+const MIN_CALL_GAS   = PROTO.VM_MIN_CALL_GAS;
 
 // Deterministic intra-contract recursion bound. DISTINCT from MAX_CALL_DEPTH
 // (which bounds cross-contract emit.execute chains): this caps how deep a single
@@ -1032,16 +1032,16 @@ const MAX_STACK_DEPTH = 512;
 // Cross-CHAIN call (XCALL) protocol constants. Canonical values:
 // xchain-documentation/protocol/constants.js; the indexer re-validates
 // host-side (execute.js processEmission + actions/xcall.js).
-const XCALL_MIN_GAS             = 5000;     // = MIN_CALL_GAS
-const XCALL_MAX_GAS             = 200000;   // target-side ceiling cap (the run is fee-less on the target chain)
+const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;     // = MIN_CALL_GAS
+const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;     // target-side ceiling cap (the run is fee-less on the target chain)
 // Single in-VM source of truth: gateway-emit.js declares the hop cap it
 // ENFORCES (emit.crossExecute's hop gate) and this module re-exports it, so a
 // future bump cannot leave the enforcer and the exported/parity-tested value
 // disagreeing. (gateway-emit.js has no require-cycle back into this file.)
 const XCALL_MAX_HOPS            = require('./gateway-emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
-const XCALL_MIN_DEADLINE_BLOCKS = 10;
-const XCALL_MAX_DEADLINE_BLOCKS = 4000;
-const XCALL_MAX_RETURN_BYTES    = 1024;
+const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
+const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
+const XCALL_MAX_RETURN_BYTES    = PROTO.XCALL_MAX_RETURN_BYTES;
 
 // Coordinated activation (block time, unix seconds) for binary-allocation gas
 // metering (the F3-binary ArrayBuffer/TypedArray byte-length charge in the
@@ -1208,6 +1208,22 @@ class XChainVM {
         // is a cache MISS rather than a byte-length-collision hit (see execute()).
         this._blockCache = null;
 
+        // Metered-source cache: Map<sha256(code):evalOrderBit:callSpreadBit, meteredCode>.
+        // meterCode() is a pure AST transform (acorn parse + walk + astring regen over
+        // up to maxCodeSize bytes), the single most expensive step of a warm execute,
+        // and its output depends ONLY on the contract source plus the two consensus
+        // gate flags (specEvalOrder, meterCallSpread), both baked into the key. So a
+        // hit returns byte-identical metered source to a fresh call: no consensus
+        // effect, only a parse-time speedup. Unlike _blockCache (V8 cachedData, which
+        // is per-block and cleared by endBlock), this cache persists ACROSS blocks:
+        // the same contract re-executing block after block re-meters at most once per
+        // (code, gate-flags) combination, not once per execute. Bounded by
+        // maxMeteredCacheSize with FIFO eviction; correctness holds if it is empty.
+        this._meteredCache = new Map();
+        // Default the cache bound when the caller's limits object predates it.
+        if (!Number.isInteger(this.limits.maxMeteredCacheSize))
+            this.limits.maxMeteredCacheSize = this.limits.maxBlockCacheSize || 1000;
+
         // Pre-compile the harness script source (it's the same every time)
         this._harnessSource = HARNESS_SOURCE;
         // Lazily-populated V8 cached data for the harness. The harness source
@@ -1273,6 +1289,47 @@ class XChainVM {
     endBlock() {
         if (this._executor) return this._executor.endBlock();
         this._blockCache = null;
+    }
+
+    /**
+     * Return the gas-metered form of `code`, from the metered-source cache when
+     * possible. meterCode() is a pure AST transform (acorn parse + AST walk +
+     * astring regen over up to maxCodeSize bytes), the single most expensive step
+     * of a warm execute, and its output depends ONLY on `code` and the two
+     * consensus gate flags, all folded into the cache key. A hit therefore returns
+     * byte-identical metered source to a fresh meterCode() call, so the cache is
+     * invisible to consensus (same key -> same transform) and only removes
+     * redundant per-execute parsing.
+     *
+     * The key hashes the source with sha256 so a 64KB body is compared in 32 bytes
+     * and appends the two gate bits (evalOrder, callSpread). The cache persists
+     * across blocks (unlike _blockCache, the V8 cachedData store cleared by
+     * endBlock): a contract re-executing block after block re-meters at most once
+     * per (source, gate-flags) pair. Bounded by maxMeteredCacheSize with FIFO
+     * eviction; correctness holds when it is empty.
+     *
+     * A metering failure (invalid source) is propagated by throwing and is NOT
+     * cached: the miss path stays simple and the cache holds only valid output.
+     * @param {string} code
+     * @param {boolean} specEvalOrder
+     * @param {boolean} meterCallSpread
+     * @returns {string} metered source
+     */
+    _getMeteredCode(code, specEvalOrder, meterCallSpread) {
+        const key = crypto.createHash('sha256').update(code).digest('hex') +
+            ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0');
+        const hit = this._meteredCache.get(key);
+        if (hit !== undefined) return hit;
+        const metered = meterCode(code, { specEvalOrder: specEvalOrder, meterCallSpread: meterCallSpread });
+        // FIFO-evict the oldest entry at capacity (Map preserves insertion order).
+        // This cache never feeds consensus, so the eviction policy is a pure
+        // memory/hit-rate tradeoff, not a determinism concern.
+        if (this._meteredCache.size >= this.limits.maxMeteredCacheSize) {
+            const oldest = this._meteredCache.keys().next().value;
+            if (oldest !== undefined) this._meteredCache.delete(oldest);
+        }
+        this._meteredCache.set(key, metered);
+        return metered;
     }
 
     /**
@@ -1505,7 +1562,7 @@ class XChainVM {
             const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime);
             let meteredCode;
             try {
-                meteredCode = meterCode(opts.code, { specEvalOrder: __specEvalOrder, meterCallSpread: __meterCallSpread });
+                meteredCode = this._getMeteredCode(opts.code || '', __specEvalOrder, __meterCallSpread);
             } catch (e) {
                 return this._errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }

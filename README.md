@@ -131,11 +131,50 @@ const result = await vm.execute({
 // }
 ```
 
+## Developer Toolkit (`xchain-foundry`)
+
+A local on-ramp for authoring XChain contracts: write, lint, gas-profile, and
+unit-test a contract with millisecond feedback and no regtest stack. Ships as
+two bins plus a library at `require('xchain-vm/toolkit')`.
+
+```bash
+# Scaffold a project (contract + simulator test + README); add --ts for TypeScript
+npx create-xchain-contract my-token
+npx create-xchain-contract my-token --ts
+
+# Static determinism gate + gas estimate (runs on ANY OS/CPU; no isolated-vm)
+xchain-foundry lint contracts/my-token.js
+
+# Deploy + run a method in the in-memory simulator (Node 22 / Linux)
+xchain-foundry simulate contracts/my-token.js --constructor 5 --method increment --params 3
+```
+
+Programmatic use:
+
+```js
+const { ContractSimulator, runGate } = require('xchain-vm/toolkit');
+
+runGate(source);                        // { ok, errors, advisories, warnings, gas }
+
+const sim = new ContractSimulator({ coin: 'BTC' });
+sim.setBalance('alice', 'GOLD', '1000');   // seed read-only ledger/oracle state
+const { contractIndex } = await sim.deploy(source, { constructorParams: ['5'] });
+const res = await sim.call(contractIndex, 'increment', ['3']); // state persists across calls
+await sim.close();
+```
+
+The `lint` gate (banned-API / float / async / syntax checks + gas estimate)
+is pure JS and runs anywhere. The simulator executes contracts, so it needs
+the isolated-vm binding (Node 22 / Linux); on a macOS dev box use `lint`
+locally and run the simulator / generated tests on Node-22 Linux (CI). See the
+`src/toolkit/` modules for details.
+
 ## Scripts
 
 | Command | Description |
 |---|---|
 | `npm test` | Unit tests (580 tests, 30s timeout) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) |
 | `npm run test:all` | Unit + E2E tests (644 tests) |
 | `npm run test:e2e` | E2E tests only (64 tests) |
 | `npm run smoke` | Smoke tests (10 tests, < 5s) |
