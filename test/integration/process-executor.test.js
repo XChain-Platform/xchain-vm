@@ -296,6 +296,67 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
             await exec.shutdown();
         }
     });
+
+    // Finding #2716: shutdown() must not fabricate a billed result for a
+    // queued (never-dispatched) execution. Only DISPATCHED work may resolve
+    // into a contract-visible outcome (see _onExit and the broken-latch
+    // path); a queued entry never ran, so shutdown racing it must REJECT
+    // with a local host fault, not resolve out_of_resource + a ceiling fee
+    // for a contract the rest of the fleet ran normally.
+    it('shutdown() REJECTS a never-dispatched queued execution with HostFaultError', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const { HostFaultError } = require('../../src/errors.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        // Hold dispatch closed so the request accepts into _queue and never
+        // reaches the worker, exactly the "never-dispatched" shape.
+        exec._sawReady = false;
+
+        const queued = exec.execute({ ...BASE, code: `module.exports = function(){ return 'never'; };` });
+        assert.strictEqual(exec._queue.length, 1, 'request must be queued, not dispatched');
+
+        await exec.shutdown();
+
+        await assert.rejects(
+            queued,
+            (e) => e instanceof HostFaultError,
+            'a never-dispatched queued execution must reject with HostFaultError on shutdown'
+        );
+        try {
+            const r = await queued;
+            assert.fail('must not resolve, got: ' + JSON.stringify(r));
+        } catch (e) {
+            assert.ok(!(e && typeof e === 'object' && /out_of_resource/.test(e.error || '')),
+                'must not fabricate an out_of_resource result');
+            assert.notStrictEqual(e && e.gasUsed, GAS_CEILING,
+                'must not fabricate a ceiling-billed gasUsed');
+        }
+    });
+
+    // The in-flight half of the same fix must be unchanged: an execution
+    // already DISPATCHED to the worker when shutdown() runs still RESOLVES
+    // with the deterministic host-terminated result (every validator sees
+    // the same poisoned-contract outcome for work that actually started).
+    it('shutdown() still RESOLVES an in-flight (dispatched) execution with the host-terminated result', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        try {
+            await exec.execute({ ...BASE, code: `module.exports = function(){ return 'warm'; };` }); // ensure ready
+
+            const inFlight = exec.execute({ ...BASE, code: `module.exports = function(){ return 'mid'; };` });
+            assert.strictEqual(exec._pending.size, 1, 'request must be dispatched (in-flight)');
+
+            await exec.shutdown();
+
+            const r = await inFlight;
+            assert.strictEqual(r.success, false, 'in-flight execution interrupted by shutdown resolves a failure');
+            assert.match(r.error, /out_of_resource/, 'must be the deterministic host-terminated result');
+            assert.strictEqual(r.gasUsed, GAS_CEILING, 'fabricated result clamps gasUsed to the ceiling');
+        } finally {
+            // shutdown() already ran above; calling again is a harmless no-op.
+        }
+    });
 });
 
 // ===========================================================================

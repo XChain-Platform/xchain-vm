@@ -171,12 +171,17 @@ function optsFor(c) {
             actual[c.name] = hashResult(result);
         }
 
-        if (REGEN || !fs.existsSync(BASELINE_PATH)) {
+        if (REGEN) {
             // Sort keys so the committed file has a stable, reviewable order.
             const ordered = {};
             for (const c of CORPUS) ordered[c.name] = actual[c.name];
             fs.writeFileSync(BASELINE_PATH, JSON.stringify(ordered, null, 2) + '\n');
-            console.log(`[determinism-baseline] wrote baseline (${REGEN ? 'REGEN' : 'file absent'}): ${BASELINE_PATH}`);
+            console.log(`[determinism-baseline] wrote baseline (REGEN): ${BASELINE_PATH}`);
+        } else if (!fs.existsSync(BASELINE_PATH)) {
+            assert.fail(
+                `committed baseline missing at ${BASELINE_PATH}; a lost baseline must not pass tautologically. ` +
+                `Regenerate deliberately with REGEN_DETERMINISM_BASELINE=1 and review the diff before committing it.`
+            );
         }
         baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
     });

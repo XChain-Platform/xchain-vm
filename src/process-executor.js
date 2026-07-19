@@ -320,7 +320,11 @@ class ProcessExecutor {
         this._pending.clear();
         for (const entry of this._queue) {
             if (entry.timer) clearTimeout(entry.timer);
-            entry.resolve(hostTerminatedResult(entry.ceiling, 'shutdown'));
+            // Queued (never-dispatched) requests must not resolve into a billed
+            // contract outcome; they never ran. This is a LOCAL host fault, not
+            // a consensus result, so reject with HostFaultError (same invariant
+            // enforced by _onExit and the broken-latch path above).
+            entry.reject(new HostFaultError('executor shutting down'));
         }
         this._queue = [];
         const child = this._child;
