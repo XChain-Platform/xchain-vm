@@ -33,8 +33,7 @@
   },
   "overrides": {
     "qs": "^6.15.2",
-    "tmp": ">=0.2.3",
-    "serialize-javascript": ">=6.0.4",
+    "serialize-javascript": "^7.0.5",
     "decimal.js": "10.4.3"
   },
   "scripts": {
@@ -42,6 +41,7 @@
     "test:toolkit": "mocha --timeout 30000 'test/toolkit/**/*.test.js'",
     "lint": "node bin/lint.js",
     "coverage": "c8 --reporter=text --reporter=html --include 'src/**/*.js' mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js' --exit",
+    "coverage:subprocess": "c8 --reporter=text --reporter=html --report-dir coverage/subprocess --include 'src/process-executor.js' --include 'src/vm-worker.js' --include 'src/sandbox.js' --include 'src/index.js' mocha --timeout 60000 'test/preflight.test.js' 'test/integration/process-executor.test.js' 'test/integration/subprocess-coverage.test.js' --exit",
     "ci": "mocha --timeout 60000 --exit 'test/preflight.test.js' 'test/unit/**/*.test.js' 'test/smoke/**/*.test.js' 'test/security/**/*.test.js' 'test/boundary/**/*.test.js' 'test/determinism/**/*.test.js' 'test/determinism/known-red/*.known-red.js' 'test/regression/p0-smoke.regression.test.js' 'test/regression/p1-security.regression.test.js' 'test/regression/determinism.test.js' 'test/regression/determinism-baseline.test.js'",
     "test:preflight": "mocha --timeout 30000 'test/preflight.test.js'",
     "test:all": "mocha --timeout 60000 'test/**/*.test.js'",

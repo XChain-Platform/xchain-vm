@@ -28,6 +28,26 @@ const XChainVM = require('./index.js');
 
 let vm = null;
 
+// Coverage-harness support . The isolate-execution code that runs ONLY
+// in this forked child (this worker's message handlers plus sandbox.stripGlobals
+// and the in-isolate paths of index.execute) is invisible to a parent-process
+// coverage run unless the child flushes its V8 coverage to the NODE_V8_COVERAGE
+// directory before the parent tears it down. The parent SIGKILLs the worker on
+// shutdown/respawn (see process-executor.js), and SIGKILL cannot flush, so relying
+// on clean exit alone loses the execute path (it raced the kill). Flushing after
+// each execute writes the accumulated profile to disk deterministically. Guarded
+// on NODE_V8_COVERAGE, so it is completely inert in production (which never sets
+// it): the require and takeCoverage() only ever run under a coverage harness.
+const COVERAGE_ON = !!process.env.NODE_V8_COVERAGE;
+let _v8 = null;
+function flushCoverage() {
+    if (!COVERAGE_ON) return;
+    try {
+        if (!_v8) _v8 = require('v8');
+        _v8.takeCoverage();
+    } catch (e) { /* best-effort: coverage tooling only, never a runtime path */ }
+}
+
 // Sequential message queue: chain handlers so executes never interleave.
 let chain = Promise.resolve();
 function enqueue(fn) {
@@ -62,7 +82,7 @@ process.on('message', (msg) => {
     }
 
     if (msg.type === 'endBlock') {
-        enqueue(() => { if (vm) vm.endBlock(); });
+        enqueue(() => { if (vm) { vm.endBlock(); flushCoverage(); } });
         return;
     }
 
@@ -87,10 +107,14 @@ process.on('message', (msg) => {
                 return;
             }
             send({ type: 'result', id: msg.id, result });
+            // Persist this execution's coverage before the parent can SIGKILL the
+            // worker (inert unless a coverage harness set NODE_V8_COVERAGE).
+            flushCoverage();
         });
         return;
     }
 });
 
-// If the parent disconnects (shutdown / crash), exit cleanly.
-process.on('disconnect', () => process.exit(0));
+// If the parent disconnects (shutdown / crash), flush any pending coverage
+// (best-effort; races the parent's SIGKILL) and exit cleanly.
+process.on('disconnect', () => { flushCoverage(); process.exit(0); });
