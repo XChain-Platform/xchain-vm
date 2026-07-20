@@ -41,6 +41,7 @@ class MockLedger {
         this.oraclePrices     = {};  // { coinPair: { current: {price,roundNumber,timestamp}, rounds: {}, snapshotAge: N } }
         this.crossChain       = {};  // { "chain:idx": attestation }
         this.pollResults      = {};  // { pollIndex: frozen VOTE poll result }
+        this.attestations     = {};  // { requestId: { status, payload, providerId, blockIndex, validatorCount } }
         this.blockHeight      = 1;
         this.blockTimestamp    = 1700000000;
         this.blockHash        = 'e2e_block_hash_1';
@@ -213,6 +214,22 @@ class MockLedger {
                 const att = self.crossChain[chain + ':' + actionIndex];
                 return att ? att.settled === true : false;
             }
+        };
+    }
+
+    // --- Attestation helpers (ATTEST / xchain.attestation.getResponse) ---
+
+    // Seed a settled attestation response, keyed by the deterministic
+    // request_id xchain.attestation.request() returns. Mirrors the shape the
+    // indexer feeds through readOnlyData.attestationData in production.
+    seedAttestation(requestId, response) {
+        this.attestations[requestId] = response;
+    }
+
+    buildAttestationAccessor() {
+        const self = this;
+        return {
+            getResponse: (requestId) => self.attestations[requestId] || null
         };
     }
 
