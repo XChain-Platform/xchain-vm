@@ -135,7 +135,8 @@ class E2EHarness {
             tokenInfo:       this.ledger.buildTokenInfoMap(),
             oracleData:      this.ledger.buildOracleAccessor(),
             crossChainData:  this.ledger.buildCrossChainAccessor(),
-            pollData:        this.ledger.buildPollAccessor()
+            pollData:        this.ledger.buildPollAccessor(),
+            attestationData: this.ledger.buildAttestationAccessor()
         });
 
         // On success, apply state changes and process emitted actions
