@@ -1000,6 +1000,20 @@ const CONTRACT_WRAPPER = `
 })();
 `;
 
+// VM_LINT_HARDENING wrapper variant (5bff4687): identical body, but the four
+// injected control bindings (__contractCode/__methodName/__isCrossCall/
+// __readManifest) arrive as IIFE PARAMETERS instead of script-level `let`s.
+// Script-level lexical bindings live in the context's global lexical scope,
+// where the contract body (evaluated via the saved Function constructor, which
+// compiles in global scope) can read or shadow them to defeat the crossCallable
+// allowlist, manifest introspection, and method dispatch. Closure parameters
+// are invisible to Function-constructed code. Derived mechanically from
+// CONTRACT_WRAPPER so the two bodies can never drift; the legacy constant's
+// bytes are untouched (pre-gate executions must compile byte-identical source).
+const CONTRACT_WRAPPER_HARDENED = CONTRACT_WRAPPER
+    .replace('(function() {', '(function(__contractCode, __methodName, __isCrossCall, __readManifest) {')
+    .replace(/\}\)\(\);\s*$/, '})');
+
 // Maximum smart-contract code size (64 KiB). Vendored single source of truth:
 // ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
 // constants.js, MAX_CODE_SIZE); kept equal to the SDK and indexer by the
@@ -1091,6 +1105,26 @@ function isAsyncSurfaceActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     // mainnet + unknown/empty: active at/after the coordinated flag-day.
     return Number.isFinite(blockTime) && blockTime >= ASYNC_SURFACE_GATE_BLOCK_TIME;
+}
+
+// Coordinated activation (block time, unix seconds) for the VM_LINT_HARDENING
+// consensus package (flag-day Pkg 4): the hardened deploy-linter rule set
+// (exponentiation ban, reserved control bindings, SAFE_MATH complement,
+// dynamic import(), shorthand { Promise }, shadowed-local Promise relaxation
+// in lint-core.js), the CONTRACT_WRAPPER control-binding closure move, and the
+// corroborated error-classifier tightening below. All are consensus-visible
+// (deploy verdicts / execution status / gasUsed), so they flip fleet-wide at
+// the ratified  anchor, the same instant banned-async activates (zero
+// partially-hardened window). Deploy-side gating is resolved by the indexer
+// via protocol_changes.isEnabled('VM_LINT_HARDENING'); execution-side gating
+// uses the network-aware resolver below, mirroring its siblings: testnet/
+// regtest from genesis, mainnet (and unknown networks, conservative) at the
+// flag-day. Same ratified timestamp as the sibling gates (1790812800,
+// 2026-10-01 00:00:00 UTC); a divergent value is itself a fork.
+const VM_LINT_HARDENING_GATE_BLOCK_TIME = 1790812800;
+function isLintHardeningActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= VM_LINT_HARDENING_GATE_BLOCK_TIME;
 }
 
 // Coordinated activation for rejecting raw NUL (0x00) bytes in contract state
@@ -1199,6 +1233,15 @@ class XChainVM {
         // Intra-contract recursion bound (see MAX_STACK_DEPTH). Default the constant
         // when the caller's limits object predates it (additive, non-breaking).
         if (!Number.isInteger(this.limits.maxStackDepth)) this.limits.maxStackDepth = MAX_STACK_DEPTH;
+        // Core size caps (bac14514): a caller passing a PARTIAL limits object
+        // previously got maxCodeSize === undefined, silently disabling the
+        // execute-time code-size cap (and likewise the state caps, where
+        // StateManager would compare against undefined). Back-fill the protocol
+        // defaults exactly like the cross-contract limits above (additive,
+        // behavior-preserving for callers that pass complete limits or none).
+        if (!Number.isInteger(this.limits.maxCodeSize))       this.limits.maxCodeSize       = MAX_CODE_SIZE;
+        if (!Number.isInteger(this.limits.maxStateValueSize)) this.limits.maxStateValueSize = 65536;
+        if (!Number.isInteger(this.limits.maxStateKeys))      this.limits.maxStateKeys      = 10000;
         this.isolateManager = new IsolateManager(this.limits);
         this.actionValidator = new ActionValidator();
 
@@ -1405,6 +1448,11 @@ class XChainVM {
             __psBlockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
         const emissionCollector = new EmissionCollector(this.limits.maxEmissions, emissionDeepStrip);
         const execContext       = { reverted: false };
+        // Host-observed corroboration signals for _classifyError (e9c3a80b):
+        // runStartMs is stamped immediately before runSync so a claimed timeout
+        // can be checked against the real wall clock; the isolate handle lets
+        // the classifier check the real disposed flag. Filled in below.
+        const hostSignals       = { runStartMs: null, getIsolate: () => isolate };
 
         let isolate = null;
 
@@ -1569,13 +1617,25 @@ class XChainVM {
 
             // Compile the contract wrapper with the metered code injected as a string.
             // Wrap in IIFE so __contractCode/__methodName are local, not global.
+            // VM_LINT_HARDENING (gated): pass the control bindings as IIFE
+            // PARAMETERS so they never enter the global lexical scope where the
+            // Function-constructed contract body could read or shadow them
+            // (see CONTRACT_WRAPPER_HARDENED). Pre-gate the legacy script-level
+            // `let` form compiles byte-identical to the historical source.
             const escapedCode = JSON.stringify(meteredCode);
             const escapedMethod = JSON.stringify(opts.method || 'default');
-            const fullSource = 'let __contractCode = ' + escapedCode + ';\n' +
-                               'let __methodName = ' + escapedMethod + ';\n' +
-                               'let __isCrossCall = ' + JSON.stringify(Boolean(opts.isCrossCall)) + ';\n' +
-                               'let __readManifest = ' + JSON.stringify(Boolean(opts.readManifest)) + ';\n' +
-                               CONTRACT_WRAPPER;
+            const __wrapperHardened = isLintHardeningActive(opts.network, __moBlockTime);
+            const fullSource = __wrapperHardened
+                ? CONTRACT_WRAPPER_HARDENED + '(' +
+                      escapedCode + ', ' +
+                      escapedMethod + ', ' +
+                      JSON.stringify(Boolean(opts.isCrossCall)) + ', ' +
+                      JSON.stringify(Boolean(opts.readManifest)) + ');\n'
+                : 'let __contractCode = ' + escapedCode + ';\n' +
+                  'let __methodName = ' + escapedMethod + ';\n' +
+                  'let __isCrossCall = ' + JSON.stringify(Boolean(opts.isCrossCall)) + ';\n' +
+                  'let __readManifest = ' + JSON.stringify(Boolean(opts.readManifest)) + ';\n' +
+                  CONTRACT_WRAPPER;
 
             // Per-block compilation cache. The key MUST cover every byte that varies
             // in the compiled source, not just opts.code. fullSource also bakes in
@@ -1631,6 +1691,7 @@ class XChainVM {
             Error.stackTraceLimit = 0;
             Error.prepareStackTrace = function() { return ''; };
             try {
+                hostSignals.runStartMs = Date.now();
                 const rawReturn = script.runSync(context, { timeout: this.limits.maxCpuTimeMs });
                 // The contract wrapper JSON-serializes non-null return values
                 // with a \x02 prefix inside the isolate
@@ -1651,7 +1712,7 @@ class XChainVM {
                 }
             } catch (execError) {
                 // Classify the error
-                return this._classifyError(execError, gasTracker, emissionCollector, opts, execContext);
+                return this._classifyError(execError, gasTracker, emissionCollector, opts, execContext, hostSignals);
             } finally {
                 // Restore host stack-capture settings (see note above).
                 Error.stackTraceLimit = __hostStackLimit;
@@ -1684,7 +1745,7 @@ class XChainVM {
 
         } catch (outerError) {
             // Catch-all for unexpected errors
-            return this._classifyError(outerError, gasTracker, emissionCollector, opts, execContext);
+            return this._classifyError(outerError, gasTracker, emissionCollector, opts, execContext, hostSignals);
         } finally {
             if (isolate) this.isolateManager.dispose(isolate);
         }
@@ -1824,7 +1885,7 @@ class XChainVM {
      * Changing a prefix is a consensus change; guarded by the consensus-params
      * tests in both repos.
      */
-    _classifyError(error, gasTracker, emissionCollector, opts, execContext) {
+    _classifyError(error, gasTracker, emissionCollector, opts, execContext, hostSignals) {
         if (error instanceof ContractRevertError) {
             return this._errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
         }
@@ -1868,24 +1929,61 @@ class XChainVM {
         // for every non-gas, non-revert resource termination: the contract provably
         // consumed the maximum allowed resources, and the ceiling is identical on
         // every node. This is the deterministic, fork-safe charge.
+        // e9c3a80b (VM_LINT_HARDENING-gated): the three resource branches below
+        // historically matched attacker-authorable MESSAGE SUBSTRINGS and then
+        // clamped gasUsed to the ceiling, so a contract could pick its collapsed
+        // status token (timeout/out_of_memory/out_of_stack) via `throw new
+        // Error('...disposed...')` and force gasUsed=ceiling, unlike the REVERT/
+        // GAS paths which corroborate against host state. Post-gate each branch
+        // additionally requires a HOST-OBSERVED signal (real elapsed wall clock,
+        // the isolate's real disposed flag, or the error's native class/exact
+        // deterministic guard message); an uncorroborated match falls through to
+        // the generic sanitized 'error:' classification with the real gasUsed
+        // (deterministic: the throw itself is deterministic contract behavior).
+        // Pre-gate (and whenever signals are unavailable) the legacy message-only
+        // classification is preserved byte-for-byte, so a from-genesis replay
+        // reproduces historical statuses.
+        const __clsBlockTime = opts && opts.blockContext && Number(opts.blockContext.timestamp);
+        const __corroborate  = isLintHardeningActive(opts && opts.network, __clsBlockTime) && !!hostSignals;
+        const __isolate      = (hostSignals && typeof hostSignals.getIsolate === 'function')
+            ? hostSignals.getIsolate() : null;
+        const __isolateDisposed = !!(__isolate && __isolate.isDisposed);
         if (msg.includes('Script execution timed out') || msg.includes('disposed')) {
-            // Wall-clock timeout (consensus risk). Log at ERROR level.
-            console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +
-                (opts ? 'contract=' + opts.contractAddress + ' method=' + opts.method : ''));
-            return this._errorResult(gasTracker, emissionCollector,
-                'timeout: wall-clock safety net triggered', gasTracker.ceiling);
+            const legit = !__corroborate
+                || __isolateDisposed
+                || (hostSignals.runStartMs != null &&
+                    (Date.now() - hostSignals.runStartMs) >= this.limits.maxCpuTimeMs);
+            if (legit) {
+                // Wall-clock timeout (consensus risk). Log at ERROR level.
+                console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +
+                    (opts ? 'contract=' + opts.contractAddress + ' method=' + opts.method : ''));
+                return this._errorResult(gasTracker, emissionCollector,
+                    'timeout: wall-clock safety net triggered', gasTracker.ceiling);
+            }
         }
-        // Memory limit
-        if (msg.includes('out of memory') || msg.includes('Array buffer allocation failed')) {
-            return this._errorResult(gasTracker, emissionCollector,
-                'out_of_memory: isolate memory limit exceeded', gasTracker.ceiling);
+        // Memory limit. Post-gate, corroborated by the isolate's real disposed
+        // flag (a catastrophic isolate OOM disposes the isolate).
+        else if (msg.includes('out of memory') || msg.includes('Array buffer allocation failed')) {
+            if (!__corroborate || __isolateDisposed) {
+                return this._errorResult(gasTracker, emissionCollector,
+                    'out_of_memory: isolate memory limit exceeded', gasTracker.ceiling);
+            }
         }
         // Native stack overflow (e.g. deep/infinite recursion). The V8 stack-depth
         // limit varies by architecture and V8 build, so gasUsed here is also
         // platform-dependent → clamp to the ceiling with a deterministic message.
-        if (msg.includes('Maximum call stack size exceeded') || msg.includes('call stack')) {
-            return this._errorResult(gasTracker, emissionCollector,
-                'out_of_stack: maximum call depth exceeded', gasTracker.ceiling);
+        // Post-gate, corroborated by the error's native RangeError class (a real
+        // V8 overflow) or the recursion/native-depth guard's exact deterministic
+        // fault message; a plain Error carrying a lookalike substring falls
+        // through to the generic classification.
+        else if (msg.includes('Maximum call stack size exceeded') || msg.includes('call stack')) {
+            const legit = !__corroborate
+                || (error instanceof RangeError) || (error && error.name === 'RangeError')
+                || msg === 'maximum call stack depth exceeded';
+            if (legit) {
+                return this._errorResult(gasTracker, emissionCollector,
+                    'out_of_stack: maximum call depth exceeded', gasTracker.ceiling);
+            }
         }
         // Generic contract error: sanitize to prevent information leakage (RISK-15).
         // Strip stack traces, file paths, and internal details.
@@ -2015,6 +2113,13 @@ module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_
 // non-primitive keys) so the key-size/NUL/keyCount guards apply to every key.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.STATE_KEY_TYPE_GATE_BLOCK_TIME = STATE_KEY_TYPE_GATE_BLOCK_TIME;
+// Coordinated flag-day (block time) that activates the VM_LINT_HARDENING
+// package (hardened deploy-linter rule set, control-binding closure wrapper,
+// corroborated error classifier). Exposed so the consensus-params freeze guard
+// can pin it; consensus-critical. The resolver is exported for the indexer/
+// tests to mirror the network-aware activation.
+module.exports.VM_LINT_HARDENING_GATE_BLOCK_TIME = VM_LINT_HARDENING_GATE_BLOCK_TIME;
+module.exports.isLintHardeningActive = isLintHardeningActive;
 // Cross-CHAIN call (XCALL) protocol constants, same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;

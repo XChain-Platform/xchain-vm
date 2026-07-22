@@ -245,7 +245,15 @@ try {
         });
 
         it('should reject a BigInt literal with a large value', function() {
+            // Re-goldened for VM_LINT_HARDENING : the fixture also uses
+            // `**`, whose hardened banned-operator rule now surfaces first.
             const result = validateSyntax('var y = 5000000n ** 2n;');
+            assert.strictEqual(result.valid, false);
+            assert(result.error.includes('banned operator: **'), result.error);
+        });
+
+        it('should reject a BigInt literal with a large value pre-hardening (legacy verdict)', function() {
+            const result = validateSyntax('var y = 5000000n ** 2n;', { enforceLintHardening: false });
             assert.strictEqual(result.valid, false);
             assert(result.error.includes('banned literal'), result.error);
         });

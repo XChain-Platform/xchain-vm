@@ -41,6 +41,28 @@ const { meterCode, findReservedIdentifier, CONTRACT_ECMA_VERSION } = require('./
 // rejecting at deploy time turns that into a clear, early error.
 const BANNED_MATH_MEMBERS = new Set(['sqrt', 'pow', 'log', 'log2', 'log10']);
 
+// The FROZEN whitelist of Math members the sandbox's deterministic SafeMath
+// subset exposes. MUST stay byte-equal to sandbox.js SAFE_MATH_MEMBERS (a
+// parity test in xchain-vm asserts it); duplicated here (not required) so this
+// file stays dependency-light for the vendored SDK/browser copies. Under the
+// VM_LINT_HARDENING flag-day the banned set is the COMPLEMENT of this list:
+// any statically-resolvable Math member NOT in it (Math.random, Math.atan2,
+// future additions...) is rejected at deploy instead of failing at runtime.
+const SAFE_MATH_MEMBERS = new Set([
+    'floor', 'ceil', 'round', 'abs', 'min', 'max', 'sign', 'trunc', 'PI', 'E'
+]);
+
+// The CONTRACT_WRAPPER's injected control bindings (index.js). Legacy deploys
+// compile them as script-level lexical bindings, visible from contract code
+// (which is evaluated via the saved Function constructor in global scope), so
+// a contract can read or shadow them to defeat crossCallable/manifest/method
+// dispatch. Under VM_LINT_HARDENING the wrapper moves them into the IIFE
+// closure AND the deploy validator rejects any reference to them
+// (rule 'reserved-identifier'), mirroring the metering helper ban.
+const RESERVED_CONTROL_BINDINGS = [
+    '__contractCode', '__methodName', '__isCrossCall', '__readManifest'
+];
+
 // True if `node` is a static reference to the global Math object: the bare
 // identifier `Math`, or a globalThis-qualified form (`globalThis.Math` /
 // `globalThis['Math']` / `globalThis[\`Math\`]`, the last via a template
@@ -77,10 +99,17 @@ function staticComputedKey(node) {
  * (Math.pow), computed-string (Math['pow'] / Math[`pow`]), and
  * globalThis-qualified (globalThis.Math.pow, globalThis['Math'].pow) forms.
  *
+ * Under VM_LINT_HARDENING (`hardened`), the ban derives from the COMPLEMENT of
+ * the sandbox's SAFE_MATH_MEMBERS whitelist: every statically-resolvable Math
+ * member outside it (Math.random included) is rejected at deploy, matching what
+ * the sandbox actually exposes, instead of failing only at runtime.
+ *
  * @param {string} code - Contract source code
- * @returns {Array<{name: string, line: (number|string)}>}
+ * @param {boolean} [hardened=true] - VM_LINT_HARDENING consensus flag
+ * @returns {Array<{name: string, line: (number|string), transcendental: boolean}>}
  */
-function findBannedMathCalls(code) {
+function findBannedMathCalls(code, hardened) {
+    if (hardened === undefined) hardened = true;
     const hits = [];
     let ast;
     try {
@@ -102,12 +131,67 @@ function findBannedMathCalls(code) {
             } else if (node.computed) {
                 member = staticComputedKey(node);             // Math['pow'] / Math[`pow`]
             }
-            if (member && BANNED_MATH_MEMBERS.has(member)) {
-                hits.push({ name: member, line: node.loc ? node.loc.start.line : '?' });
+            if (!member) return;
+            if (BANNED_MATH_MEMBERS.has(member)) {
+                hits.push({ name: member, line: node.loc ? node.loc.start.line : '?', transcendental: true });
+            } else if (hardened && !SAFE_MATH_MEMBERS.has(member)) {
+                hits.push({ name: member, line: node.loc ? node.loc.start.line : '?', transcendental: false });
             }
         }
     });
     return hits;
+}
+
+/**
+ * Scan contract code for the `**` / `**=` exponentiation operator (hardened
+ * rule). Number::exponentiate is the same IEEE 754 transcendental path the
+ * Math.pow ban targets, so `p ** q` was an unguarded consensus-fork hole.
+ * Emitted under rule 'banned-math'; contracts use xchain.math.pow() instead.
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{op: string, line: (number|string)}>}
+ */
+function findBannedExponentiation(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
+    } catch (e) {
+        return hits;
+    }
+    walk.simple(ast, {
+        BinaryExpression(node) {
+            if (node.operator === '**')
+                hits.push({ op: '**', line: node.loc ? node.loc.start.line : '?' });
+        },
+        AssignmentExpression(node) {
+            if (node.operator === '**=')
+                hits.push({ op: '**=', line: node.loc ? node.loc.start.line : '?' });
+        }
+    });
+    return hits;
+}
+
+/**
+ * Scan contract code for references to the CONTRACT_WRAPPER's injected control
+ * bindings (hardened rule; see RESERVED_CONTROL_BINDINGS above). Returns the
+ * first offending name or null, mirroring metering.js findReservedIdentifier.
+ *
+ * @param {string} code - Contract source code
+ * @returns {string|null}
+ */
+function findReservedControlBinding(code) {
+    let found = null;
+    try {
+        const ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script' });
+        walk.full(ast, (node) => {
+            if (!found && node.type === 'Identifier' && RESERVED_CONTROL_BINDINGS.indexOf(node.name) !== -1)
+                found = node.name;
+        });
+    } catch (e) {
+        // Parse failure; lintSource's metering pass reports it as blocking.
+    }
+    return found;
 }
 
 /**
@@ -137,6 +221,55 @@ function findBannedLiterals(code) {
     return hits;
 }
 
+// True if binding pattern `pat` declares `name` (Identifier / default /
+// rest / array / object destructuring, walked without descending into
+// computed keys or default-value expressions).
+function patternDeclares(pat, name) {
+    if (!pat) return false;
+    switch (pat.type) {
+        case 'Identifier':        return pat.name === name;
+        case 'AssignmentPattern': return patternDeclares(pat.left, name);
+        case 'RestElement':       return patternDeclares(pat.argument, name);
+        case 'ArrayPattern':      return (pat.elements || []).some((el) => patternDeclares(el, name));
+        case 'ObjectPattern':     return (pat.properties || []).some((p) =>
+            p.type === 'RestElement' ? patternDeclares(p.argument, name) : patternDeclares(p.value, name));
+        default: return false;
+    }
+}
+
+// True if ancestor node `node` IMMEDIATELY declares `name` in its own scope:
+// function id/params, catch binding, a var/let/const/function/class statement
+// directly in its body, or a for-loop declaration head. Deliberately does not
+// descend into nested scopes (each ancestor is checked separately by the
+// caller), and does not model hoisting order/TDZ: a TDZ read throws a
+// deterministic in-isolate ReferenceError at runtime, which is safe.
+function scopeDeclares(node, name) {
+    if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression'
+        || node.type === 'ArrowFunctionExpression') {
+        if (node.id && node.id.name === name) return true;
+        return (node.params || []).some((p) => patternDeclares(p, name));
+    }
+    if (node.type === 'CatchClause') return patternDeclares(node.param, name);
+    const stmts = (node.type === 'Program' || node.type === 'BlockStatement' || node.type === 'StaticBlock')
+        ? node.body
+        : (node.type === 'SwitchCase') ? node.consequent : null;
+    if (stmts) {
+        for (const s of stmts) {
+            if (s.type === 'VariableDeclaration'
+                && s.declarations.some((d) => patternDeclares(d.id, name))) return true;
+            if ((s.type === 'FunctionDeclaration' || s.type === 'ClassDeclaration')
+                && s.id && s.id.name === name) return true;
+        }
+        return false;
+    }
+    if (node.type === 'ForStatement' && node.init && node.init.type === 'VariableDeclaration')
+        return node.init.declarations.some((d) => patternDeclares(d.id, name));
+    if ((node.type === 'ForInStatement' || node.type === 'ForOfStatement')
+        && node.left && node.left.type === 'VariableDeclaration')
+        return node.left.declarations.some((d) => patternDeclares(d.id, name));
+    return false;
+}
+
 /**
  * Scan contract code for the async surface (async functions, await expressions,
  * and Promise references). The CONTRACT_WRAPPER invokes exports SYNCHRONOUSLY:
@@ -149,10 +282,25 @@ function findBannedLiterals(code) {
  * cleanly; reject it at the syntax layer like BigInt/RegExp literals (the
  * sandbox also strips the Promise global as defense in depth).
  *
+ * Under VM_LINT_HARDENING (`hardened`) three refinements apply:
+ *   - dynamic `import('x')` is rejected (kind 'import'): it parses cleanly under
+ *     the ES2020 pin with no async keyword and no Promise identifier, yet
+ *     evaluates to a Promise, the exact microtask surface this rule excludes;
+ *   - the shorthand property `{ Promise }` is rejected in BOTH modes (acorn
+ *     materializes distinct key/value nodes, so the object-key skip never
+ *     suppressed the value read; locked in by unit tests);
+ *   - a lexically-shadowed LOCAL `Promise` (parameter / var / let / const /
+ *     function / class / catch binding in an enclosing scope) is ACCEPTED:
+ *     it never resolves to the global binding, so the legacy reject was a
+ *     linter-vs-runtime over-reject. The scope scan is a deterministic
+ *     ancestor-scope approximation; a miss fails CLOSED (legacy reject).
+ *
  * @param {string} code - Contract source code
+ * @param {boolean} [hardened=true] - VM_LINT_HARDENING consensus flag
  * @returns {Array<{kind: string, line: (number|string)}>}
  */
-function findBannedAsync(code) {
+function findBannedAsync(code, hardened) {
+    if (hardened === undefined) hardened = true;
     const hits = [];
     let ast;
     try {
@@ -175,12 +323,28 @@ function findBannedAsync(code) {
             // Only the GLOBAL Promise is banned. Skip the property position of a
             // member access (obj.Promise) and a non-computed object-literal key
             // ({ Promise: ... }): those never resolve to the global binding.
+            // Note: the shorthand `{ Promise }` DOES read the global binding and
+            // is caught here in both modes: acorn materializes distinct key and
+            // value nodes for a shorthand property, so the key-skip below never
+            // suppresses the value read (efc8c624, locked in by unit tests).
             const parent = ancestors.length >= 2 ? ancestors[ancestors.length - 2] : null;
             if (parent) {
                 if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
                 if (parent.type === 'Property' && parent.key === node && !parent.computed) return;
             }
+            // Hardened: a Promise that resolves to an in-scope LOCAL declaration
+            // is not the global binding; accept it (see doc comment above).
+            if (hardened) {
+                for (let i = ancestors.length - 2; i >= 0; i--) {
+                    if (scopeDeclares(ancestors[i], 'Promise')) return;
+                }
+            }
             hits.push({ kind: 'promise', line: node.loc ? node.loc.start.line : '?' });
+        },
+        ImportExpression(node) {
+            // Hardened: dynamic import() evaluates to a Promise (kind 'import').
+            if (hardened)
+                hits.push({ kind: 'import', line: node.loc ? node.loc.start.line : '?' });
         },
         MemberExpression(node) {
             // globalThis.Promise / globalThis['Promise'] / globalThis[`Promise`]
@@ -478,9 +642,18 @@ function analyzeContract(code) {
  * appended after and never affect the deploy verdict.
  *
  * @param {string} code - Contract source code
+ * @param {object} [opts]
+ * @param {boolean} [opts.hardened=true] - apply the VM_LINT_HARDENING rule set
+ *        (exponentiation ban, reserved control bindings, SAFE_MATH complement,
+ *        dynamic import(), shorthand { Promise }, shadowed-local Promise
+ *        relaxation). CONSENSUS-GATED on the deploy path: the indexer resolves
+ *        protocol_changes.isEnabled('VM_LINT_HARDENING') per block so a
+ *        from-genesis replay reproduces the historical verdicts. Defaults to
+ *        true for author-facing callers (SDK linter, CLI, unit tests).
  * @returns {{ errors: Array<{rule,message,line,severity}>, warnings: Array<{rule,message,line,severity}> }}
  */
-function lintSource(code) {
+function lintSource(code, opts) {
+    const hardened = !opts || opts.hardened !== false;
     if (typeof code !== 'string') {
         return {
             errors: [{ rule: 'invalid-type', message: 'Contract source must be a string', line: null, severity: 'error' }],
@@ -512,17 +685,44 @@ function lintSource(code) {
     if (reserved)
         errors.push({ rule: 'reserved-identifier', message: 'reserved identifier: ' + reserved, line: null, severity: 'error' });
 
-    // 4. Banned transcendental Math.* check
-    const banned = findBannedMathCalls(code);
+    // 3b. (hardened) CONTRACT_WRAPPER control bindings are reserved too.
+    if (hardened) {
+        const control = findReservedControlBinding(code);
+        if (control)
+            errors.push({ rule: 'reserved-identifier', message: 'reserved identifier: ' + control, line: null, severity: 'error' });
+    }
+
+    // 4. Banned Math.* check (transcendentals always; hardened: the full
+    //    complement of the sandbox SAFE_MATH_MEMBERS whitelist).
+    const banned = findBannedMathCalls(code, hardened);
     for (const hit of banned) {
         errors.push({
             rule: 'banned-math',
-            message: 'banned API: Math.' + hit.name + ' at line ' + hit.line +
-                     '; IEEE 754 floating-point transcendentals are non-deterministic ' +
-                     'across CPU architectures. Use xchain.math.' + hit.name + '() instead',
+            message: hit.transcendental
+                ? 'banned API: Math.' + hit.name + ' at line ' + hit.line +
+                  '; IEEE 754 floating-point transcendentals are non-deterministic ' +
+                  'across CPU architectures. Use xchain.math.' + hit.name + '() instead'
+                : 'banned API: Math.' + hit.name + ' at line ' + hit.line +
+                  '; not part of the deterministic sandbox Math subset ' +
+                  '(floor/ceil/round/abs/min/max/sign/trunc/PI/E). Use those members or xchain.math instead',
             line: typeof hit.line === 'number' ? hit.line : null,
             severity: 'error'
         });
+    }
+
+    // 4b. (hardened) Banned exponentiation operator. `**` / `**=` invoke the
+    //     same Number::exponentiate transcendental the Math.pow ban targets.
+    if (hardened) {
+        for (const hit of findBannedExponentiation(code)) {
+            errors.push({
+                rule: 'banned-math',
+                message: 'banned operator: ' + hit.op + ' at line ' + hit.line +
+                         '; exponentiation is IEEE 754 floating-point (non-deterministic ' +
+                         'across CPU architectures). Use xchain.math.pow() instead',
+                line: typeof hit.line === 'number' ? hit.line : null,
+                severity: 'error'
+            });
+        }
     }
 
     // 5. Banned native-DoS literals (BigInt + RegExp). The AST gas meter charges
@@ -548,11 +748,13 @@ function lintSource(code) {
     //    version-dependent microtask-drain timing, which is outside the
     //    consensus-runtime pin: two validators can diverge (success vs timeout,
     //    or differing post-await state). Rejected at deploy like BigInt/RegExp.
-    const asyncs = findBannedAsync(code);
+    const asyncs = findBannedAsync(code, hardened);
     for (const hit of asyncs) {
         const advice = hit.kind === 'promise'
             ? 'Promise schedules microtasks whose drain timing is isolated-vm version-dependent and unpinned'
-            : hit.kind === 'await'
+            : hit.kind === 'import'
+                ? 'dynamic import() evaluates to a Promise; the microtask surface it schedules is nondeterministic across validators'
+                : hit.kind === 'await'
                 ? 'await resumes after the synchronous contract invocation returns; post-await state writes are nondeterministic across validators'
                 : 'async functions return a pending Promise the synchronous CONTRACT_WRAPPER cannot await; their post-await effects are nondeterministic across validators';
         errors.push({
@@ -582,7 +784,11 @@ module.exports = {
     findBannedMathCalls,
     findBannedLiterals,
     findBannedAsync,
+    findBannedExponentiation,
+    findReservedControlBinding,
     findFloatWarnings,
     CONSENSUS_RULES,
-    CONTRACT_ECMA_VERSION
+    CONTRACT_ECMA_VERSION,
+    SAFE_MATH_MEMBERS,
+    RESERVED_CONTROL_BINDINGS
 };

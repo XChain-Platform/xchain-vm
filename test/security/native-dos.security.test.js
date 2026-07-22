@@ -83,9 +83,16 @@ describe('Native-op DoS: banned literals (deploy-time)', function () {
     before(function () { if (!XChainVM) this.skip(); vm = createVM(); });
 
     it('rejects a BigInt literal', function () {
+        // Re-goldened for VM_LINT_HARDENING : the fixture also uses
+        // `**`, whose hardened banned-operator rule now surfaces first; the
+        // bigint verdict is asserted via the pre-hardening flag below.
         const r = vm.validateSyntax(fn('return (2n ** 5000000n).toString();'));
         assert.strictEqual(r.valid, false);
-        assert.match(r.error, /bigint/i);
+        assert.match(r.error, /banned operator: \*\*/);
+        const legacy = vm.validateSyntax(fn('return (2n ** 5000000n).toString();'),
+            { enforceLintHardening: false });
+        assert.strictEqual(legacy.valid, false);
+        assert.match(legacy.error, /bigint/i);
     });
 
     it('rejects a BigInt literal anywhere in the source', function () {

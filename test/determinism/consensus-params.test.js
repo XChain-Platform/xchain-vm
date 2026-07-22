@@ -171,6 +171,22 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.ASYNC_SURFACE_GATE_BLOCK_TIME, 1790812800);
     });
 
+    it('VM_LINT_HARDENING_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // Flag-day Pkg 4 : the hardened deploy-linter rule set, the
+        // wrapper control-binding closure move, and the corroborated error
+        // classifier all flip at this block time on mainnet. Deploy verdicts and
+        // execution status/gasUsed are hashed, so two nodes that disagree on the
+        // flag day diverge on the first hardened DEPLOY/EXECUTE. Armed at the
+        // ratified  anchor, the same instant VM_BANNED_ASYNC activates
+        // (indexer protocol_changes.js: 1790812800).
+        assert.strictEqual(vm.VM_LINT_HARDENING_GATE_BLOCK_TIME, 1790812800);
+        assert.strictEqual(vm.isLintHardeningActive('regtest', 0), true);
+        assert.strictEqual(vm.isLintHardeningActive('testnet', 0), true);
+        assert.strictEqual(vm.isLintHardeningActive('mainnet', 1790812799), false);
+        assert.strictEqual(vm.isLintHardeningActive('mainnet', 1790812800), true);
+        assert.strictEqual(vm.isLintHardeningActive(undefined, NaN), false);
+    });
+
     it('PINNED runtime equals the golden (re-pinning is a consensus event)', function () {
         assert.deepStrictEqual(cr.PINNED, {
             v8:      '12.4.254.21-node.56',

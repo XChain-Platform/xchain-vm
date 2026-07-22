@@ -40,10 +40,18 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        exactly as it did pre-activation (accepted), and a from-genesis replay
  *        reproduces the historical verdict. Defaults to true so author-facing
  *        callers (the SDK/CLI linter, unit tests) always see the rule.
+ * @param {boolean} [opts.enforceLintHardening=true] - whether the
+ *        VM_LINT_HARDENING rule set (exponentiation ban, reserved control
+ *        bindings, SAFE_MATH complement, dynamic import(), shorthand
+ *        { Promise }, shadowed-local Promise relaxation) applies. CONSENSUS-
+ *        GATED identically to enforceBannedAsync: the indexer passes the
+ *        resolved VM_LINT_HARDENING activation (deploy.js) so a from-genesis
+ *        replay reproduces historical verdicts. Defaults to true.
  * @returns {{ valid: boolean, error?: string }}
  */
 function validateSyntax(code, opts) {
-    const enforceBannedAsync = !opts || opts.enforceBannedAsync !== false;
+    const enforceBannedAsync    = !opts || opts.enforceBannedAsync !== false;
+    const enforceLintHardening  = !opts || opts.enforceLintHardening !== false;
 
     // 1. V8 syntax check (the only step that requires isolated-vm)
     let testIsolate;
@@ -60,7 +68,7 @@ function validateSyntax(code, opts) {
     // lintSource also returns Move-2 advisory findings, which must never change
     // the on-chain verdict. When banned-async is not yet flag-day-active, drop
     // that rule from the blocking set (pre-activation parity).
-    const blocking = lintSource(code).errors.filter((e) => {
+    const blocking = lintSource(code, { hardened: enforceLintHardening }).errors.filter((e) => {
         if (e.rule === 'banned-async' && !enforceBannedAsync) return false;
         return CONSENSUS_RULES.has(e.rule);
     });
