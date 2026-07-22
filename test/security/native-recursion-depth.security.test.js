@@ -115,4 +115,71 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
         assert.strictEqual(over.success, false);
         assert.match(over.error, /^out_of_stack:/, over.error);
     });
+
+    // ---- Deserialization half of the same fork class: JSON.parse (2715) ----
+    //
+    // The parse sink recurses natively in the REVIVER walk
+    // (InternalizeJSONProperty), whose overflow point is the host thread stack:
+    // measured on Node 22, JSON.parse(deep, fn) throws a catchable RangeError
+    // past depth ~290 on a 128KB stack, ~1200 on 512KB, ~4800 on 2MB. The guard
+    // bounds the NESTING of the input text before the native parser sees it, so
+    // the outcome is the same un-swallowable out_of_stack on every host.
+    const DEEP_TEXT = `var t='['.repeat(50000)+']'.repeat(50000);`;
+
+    it('below the gate, a deep JSON.parse reviver walk is still a CATCHABLE RangeError (replay preserved)', async function () {
+        const r = await run(DEEP_TEXT + `try{JSON.parse(t,function(k,v){return v;});return 'no-throw';}catch(e){return 'CAUGHT:'+e.name;}`, BELOW);
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(JSON.parse(r.returnValue), 'CAUGHT:RangeError');
+    });
+
+    const parseSinks = {
+        'JSON.parse (no reviver)':      DEEP_TEXT + `try{JSON.parse(t);return 'no-throw';}catch(e){return 'SWALLOWED';}`,
+        'JSON.parse (reviver walk)':    DEEP_TEXT + `try{JSON.parse(t,function(k,v){return v;});return 'no-throw';}catch(e){return 'SWALLOWED';}`,
+        'JSON.parse (deep objects)':    `var t='{"a":'.repeat(50000)+'1'+'}'.repeat(50000);try{JSON.parse(t);return 'no-throw';}catch(e){return 'SWALLOWED';}`,
+        'JSON.parse (ToString coerce)': DEEP_TEXT + `var o={toString:function(){return t;}};try{JSON.parse(o);return 'no-throw';}catch(e){return 'SWALLOWED';}`,
+    };
+    for (const [name, body] of Object.entries(parseSinks)) {
+        it(`above the gate, ${name} is an uncatchable deterministic out_of_stack`, async function () {
+            const r = await run(body, ABOVE);
+            assert.strictEqual(r.success, false, 'must fail: ' + JSON.stringify(r.returnValue));
+            assert.match(r.error, /^out_of_stack:/, r.error);
+            assert.strictEqual(r.returnValue, null, 'catch block must not be reachable (poison re-throws at __gas)');
+            assert.strictEqual(r.gasUsed, CEILING, 'resource-fault gasUsed clamps to the ceiling (fee-bounded, hashed)');
+        });
+    }
+
+    it('above the gate, brackets INSIDE a JSON string literal are data, not nesting (no false poison)', async function () {
+        const r = await run(`var t='"'+'['.repeat(50000)+'"';return JSON.parse(t).length;`, ABOVE);
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(JSON.parse(r.returnValue), 50000);
+    });
+
+    it('above the gate, an escaped quote does not close the literal early (no false poison)', async function () {
+        // ["a\"[[[...[", 1] where the escaped quote is data, so the brackets
+        // after it are still inside the literal and real nesting is 1.
+        const r = await run(String.raw`var t='["a\\"'+'['.repeat(50000)+'",1]';var v=JSON.parse(t);return v.length+':'+v[1];`, ABOVE);
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(JSON.parse(r.returnValue), '2:1');
+    });
+
+    it('above the gate, the parse boundary sits at the platform-independent limit', async function () {
+        const under = await run(`var t='['.repeat(400)+']'.repeat(400);return JSON.parse(t).length===1?'ok':'bad';`, ABOVE);
+        assert.strictEqual(under.success, true, under.error);
+        assert.strictEqual(JSON.parse(under.returnValue), 'ok');
+
+        const over = await run(`var t='['.repeat(600)+']'.repeat(600);try{JSON.parse(t);return 'no-throw';}catch(e){return 'SWALLOWED';}`, ABOVE);
+        assert.strictEqual(over.success, false);
+        assert.match(over.error, /^out_of_stack:/, over.error);
+    });
+
+    it('the guard adds no gas: an in-bounds parse costs exactly the same above and below the gate', async function () {
+        const body = `var v=JSON.parse('{"a":[1,2,3],"b":{"c":"x"}}');return v.b.c;`;
+        const below = await run(body, BELOW);
+        const above = await run(body, ABOVE);
+        assert.strictEqual(below.success, true, below.error);
+        assert.strictEqual(above.success, true, above.error);
+        assert.strictEqual(JSON.parse(above.returnValue), 'x');
+        assert.strictEqual(above.gasUsed, below.gasUsed,
+            'in-bounds parse must stay gas-identical across the flag day: ' + below.gasUsed + ' vs ' + above.gasUsed);
+    });
 });

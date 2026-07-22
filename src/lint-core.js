@@ -63,6 +63,35 @@ const RESERVED_CONTROL_BINDINGS = [
     '__contractCode', '__methodName', '__isCrossCall', '__readManifest'
 ];
 
+// The deploy code-size cap, in UTF-8 BYTES. Inlined (not required from
+// index.js or protocol/constants.js) for the same reason SAFE_MATH_MEMBERS is
+// duplicated above: this file must be BYTE-IDENTICAL to the SDK's vendored copy
+// at xchain-sdk/src/contract/lint-core.js, and constants.js sits at a different
+// relative depth in each tree, so no single require() line resolves in both.
+// It MUST stay equal to src/protocol/constants.js MAX_CODE_SIZE (and therefore
+// to the indexer's deploy.js cap); a parity test asserts it.
+const MAX_CODE_SIZE = 65536;
+
+// The sandbox's hard-neutered prototype METHODS (sandbox.js
+// STRIPPED_PROTO_METHODS). Duplicated here for the dependency-light reason
+// above; a parity test asserts this list stays equal to sandbox.js.
+// Two hazard classes, both consensus-relevant: the regex-coercing methods
+// (match/matchAll/search) route a ReDoS through %RegExp% for ~1 gas even after
+// the RegExp global is deleted, and the locale/ICU methods return host-ICU-
+// version-dependent bytes. Calling any of them throws TypeError at runtime, so
+// the linter's job here is to turn a first-execution failure into a deploy-time
+// diagnostic. Matching is by METHOD NAME on a statically-resolvable call site,
+// which cannot tell `someString.search(x)` from a contract's own
+// `myIndex.search(x)`, so these are WARNINGS: never deploy-blocking, never in
+// CONSENSUS_RULES, and never a false red on the CLI (bin/lint.js fails a file
+// on error-severity findings only).
+const STRIPPED_PROTO_METHOD_NAMES = [
+    'match', 'matchAll', 'search',
+    'normalize', 'localeCompare',
+    'toLocaleLowerCase', 'toLocaleUpperCase', 'toLocaleString'
+];
+const REGEX_COERCING_METHODS = new Set(['match', 'matchAll', 'search']);
+
 // True if `node` is a static reference to the global Math object: the bare
 // identifier `Math`, or a globalThis-qualified form (`globalThis.Math` /
 // `globalThis['Math']` / `globalThis[\`Math\`]`, the last via a template
@@ -137,6 +166,62 @@ function findBannedMathCalls(code, hardened) {
             } else if (hardened && !SAFE_MATH_MEMBERS.has(member)) {
                 hits.push({ name: member, line: node.loc ? node.loc.start.line : '?', transcendental: false });
             }
+        }
+    });
+    return hits;
+}
+
+/**
+ * UTF-8 byte length of the contract source, the unit the deploy cap is measured
+ * in. TextEncoder (not Buffer) so the vendored SDK copy stays browser-safe;
+ * the two agree byte for byte on every input, unpaired surrogates included
+ * (both emit the 3-byte U+FFFD replacement), which is what makes this
+ * measurement byte-identical to the on-chain
+ * `Buffer.byteLength(code, 'utf8')` at xchain-indexer/src/actions/deploy.js.
+ *
+ * @param {string} code - Contract source code
+ * @returns {number} UTF-8 byte length
+ */
+function codeSizeBytes(code) {
+    return new TextEncoder().encode(code).length;
+}
+
+/**
+ * Scan contract code for calls to a prototype method the sandbox hard-neuters
+ * (String.match/matchAll/search, String.normalize/localeCompare, the
+ * toLocale* family). Statically-resolvable call sites only: `x.match(...)` and
+ * `x['match'](...)`; dynamic dispatch is out of reach, the same limitation
+ * staticComputedKey already accepts elsewhere.
+ *
+ * Advisory by construction: a name-only match cannot distinguish a String
+ * receiver from a contract's own object, so every hit is emitted as a WARNING
+ * and 'banned-proto-method' is deliberately absent from CONSENSUS_RULES.
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{name: string, line: (number|string), regex: boolean}>}
+ */
+function findBannedProtoMethods(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
+    } catch (e) {
+        // Parse failure; lintSource's metering pass reports it as blocking.
+        return hits;
+    }
+    walk.simple(ast, {
+        CallExpression(node) {
+            const c = node.callee;
+            if (!c || c.type !== 'MemberExpression') return;
+            let name = null;
+            if (!c.computed && c.property && c.property.type === 'Identifier') name = c.property.name;
+            else if (c.computed) name = staticComputedKey(c);
+            if (!name || STRIPPED_PROTO_METHOD_NAMES.indexOf(name) === -1) return;
+            hits.push({
+                name,
+                line: node.loc ? node.loc.start.line : '?',
+                regex: REGEX_COERCING_METHODS.has(name)
+            });
         }
     });
     return hits;
@@ -663,6 +748,26 @@ function lintSource(code, opts) {
 
     const errors = [];
 
+    // 1b. Deploy code-size cap. Lives HERE, not only in bin/lint.js, because
+    //     this file is the shared source of truth every linting surface goes
+    //     through (the SDK's pre-flight and any third-party direct caller), and
+    //     a CLI-only copy left those surfaces reporting clean on a contract the
+    //     indexer rejects with `invalid: CODE_ENCODING (exceeds max size)`.
+    //     Emitted FIRST because the chain checks size BEFORE the syntax gate.
+    //     Deliberately NOT a CONSENSUS_RULE: the on-chain verdict for size is
+    //     enforced by the indexer/VM ahead of validateSyntax, so adding it to
+    //     the blocking set would change nothing on chain and everything about
+    //     what error validateSyntax surfaces. Keeping it advisory-to-the-deploy
+    //     -path preserves the Move-1 parity invariant byte for byte.
+    if (codeSizeBytes(code) > MAX_CODE_SIZE) {
+        errors.push({
+            rule: 'code-size',
+            message: 'code size exceeds limit (' + MAX_CODE_SIZE + ' bytes)',
+            line: null,
+            severity: 'error'
+        });
+    }
+
     // 2. Acorn metering pass. If acorn can't parse it (or it uses post-ES2020
     //    syntax), reject. This also doubles as the blocking parse check.
     try {
@@ -678,9 +783,14 @@ function lintSource(code, opts) {
         return { errors, warnings: [] };
     }
 
-    // 3. Reserved identifier check (__gas + the allocator metering helpers
-    //    __concat/__tmpl/__arrspread/__objspread). Referencing them could
-    //    bypass or forge size metering.
+    // 3. Reserved identifier check. The authoritative ban list is
+    //    metering.RESERVED_IDENTIFIERS (frozen against narrowing by
+    //    test/determinism/consensus-params.test.js); do not re-enumerate it
+    //    here, it has grown and any inline copy drifts. It covers TWO hazard
+    //    classes: the allocator metering helpers (ALLOC_HELPERS), where a
+    //    reference could bypass or forge SIZE metering, and the call-depth
+    //    helpers (DEPTH_HELPERS), where a reference could bypass the
+    //    platform-independent recursion bound. Plus __gas itself.
     const reserved = findReservedIdentifier(code);
     if (reserved)
         errors.push({ rule: 'reserved-identifier', message: 'reserved identifier: ' + reserved, line: null, severity: 'error' });
@@ -767,6 +877,28 @@ function lintSource(code, opts) {
 
     const warnings = findFloatWarnings(code);
 
+    // 7. Sandbox-neutered prototype methods. sandbox.js replaces these with an
+    //    undefined, non-writable, non-configurable property, so a call fails
+    //    closed with a TypeError on FIRST EXECUTION rather than at deploy. The
+    //    linter already blocks RegExp LITERALS (rule 'banned-literal') for the
+    //    ReDoS half of this ban; the regex-COERCING methods that survive the
+    //    RegExp-global delete are the other half, and only the runtime half
+    //    shipped. WARNING severity, never a CONSENSUS_RULE: see the
+    //    STRIPPED_PROTO_METHOD_NAMES comment for why a name-only match must
+    //    not be allowed to red-line a contract's own .search()/.match().
+    for (const hit of findBannedProtoMethods(code)) {
+        const advice = hit.regex
+            ? 'coerces its argument to a RegExp through the %RegExp% intrinsic, so catastrophic backtracking still runs for ~1 gas'
+            : 'its output depends on the host ICU data/version, which varies across validator builds';
+        warnings.push({
+            rule: 'banned-proto-method',
+            message: 'neutered method: .' + hit.name + '() at line ' + hit.line + '; ' + advice +
+                     '. The sandbox removes it, so this throws TypeError at runtime',
+            line: typeof hit.line === 'number' ? hit.line : null,
+            severity: 'warning'
+        });
+    }
+
     // Move 2: logic-level advisories (crossCallable integrity, gas/footgun heuristics).
     // These run AFTER the consensus checks above and NEVER affect the deploy verdict.
     // validateSyntax blocks only on CONSENSUS_RULES. analyzeContract is fully wrapped so
@@ -785,7 +917,11 @@ module.exports = {
     findBannedLiterals,
     findBannedAsync,
     findBannedExponentiation,
+    findBannedProtoMethods,
     findReservedControlBinding,
+    codeSizeBytes,
+    MAX_CODE_SIZE,
+    STRIPPED_PROTO_METHOD_NAMES,
     findFloatWarnings,
     CONSENSUS_RULES,
     CONTRACT_ECMA_VERSION,

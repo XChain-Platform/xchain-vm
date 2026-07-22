@@ -11,10 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AI-assisted contract authoring (Tier 3): `src/toolkit/authoring.js` builds English/Solidity authoring prompts from a canonical knowledge base and runs an injected LLM client's reply through the deploy gate with an automatic repair loop, exposed via `xchain-vm/toolkit` and the `xchain-foundry describe|from-solidity|validate` commands.
 - `xchain-foundry` / `create-xchain-contract` developer toolkit: a local contract simulator (in-memory indexer mock), a no-isolate determinism gate + gas profiler, TypeScript type-strip authoring, and a project scaffolder, exposed via `require('xchain-vm/toolkit')` and the two new bins.
 - Confirmed `ASYNC_SURFACE_GATE_BLOCK_TIME` and `BINARY_ALLOC_GATE_BLOCK_TIME` at the armed contract-era flag-day 1790812800 (2026-10-01 00:00 UTC), in lockstep with the indexer.
+- `lintSource` now enforces the 65536-byte code-size cap and flags sandbox-neutered prototype methods, so the SDK's vendored linter matches the CLI ().
 
 ### Changed
 - Export `ActionValidator.ALLOWED_ACTIONS` and bind the validator unit test to it, so the suite exercises every production-allowed emission (previously a hand-copy that had drifted, omitting `XCALL`) and a removal from the allow-list can no longer pass green.
 - `test/e2e/helpers/`: the E2E harness now models per-tick decimals (`getTokenInfo` plus half-even normalization of emitted amounts, mirroring the indexer), so contract templates can be tested against real ledger-write precision (opt-in per tick via `setTokenDecimals`; unregistered ticks behave as before).
+
+### Fixed
+- Guard `JSON.parse` against reviver-walk recursion depth, closing a host-stack-dependent RangeError that contracts could observe and branch on ().
+- Charge non-finite `__gas` units at MAX_SAFE_INTEGER instead of 1, closing a metering bypass where an Infinity length billed one gas and burned the wall-clock net ().
+- Reserved-identifier and ALLOC_HELPERS comments now point at their source lists instead of hand-copied name subsets that had drifted ().
 
 ## [1.11.14] - 2026-07-16
 

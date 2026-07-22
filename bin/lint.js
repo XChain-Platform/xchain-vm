@@ -33,11 +33,10 @@ const path = require('path');
 
 const { validateSyntax } = require('../src/syntax.js');
 const { lintSource, CONSENSUS_RULES } = require('../src/lint-core.js');
-// The 64 KiB deploy cap (65536). The indexer rejects oversized code BEFORE its
-// syntax gate (actions/deploy.js → CODE_ENCODING) and the VM enforces the same
-// cap at execute time, so the deploy-parity promise above requires this CLI to
-// enforce it too; a 64KiB-to-parse-ceiling contract must not lint ✓ clean.
-const { MAX_CODE_SIZE } = require('../src/index.js');
+// The 64 KiB deploy cap used to be re-implemented here. It now lives in
+// lint-core's `code-size` rule, emitted FIRST and with the same message, so
+// every linting surface (this CLI, the SDK pre-flight, any third-party
+// lintSource caller) enforces it rather than only the one that remembered to.
 
 function usage(msg) {
     if (msg) process.stderr.write('xchain-lint: ' + msg + '\n');
@@ -73,11 +72,6 @@ function lintFile(file) {
     // lint-core's errors. Surface validateSyntax's message in that case.
     if (!verdict.valid && !errors.some((e) => CONSENSUS_RULES.has(e.rule)))
         errors.unshift({ rule: 'syntax', message: verdict.error, line: null, severity: 'error' });
-    // Deploy-gate parity: the indexer rejects code over MAX_CODE_SIZE before it
-    // ever reaches the syntax gate, so surface the size failure FIRST (CLI-side
-    // rule; the on-chain verdict is enforced by the indexer/VM, not lint-core).
-    if (Buffer.byteLength(code, 'utf8') > MAX_CODE_SIZE)
-        errors.unshift({ rule: 'code-size', message: 'code size exceeds limit (' + MAX_CODE_SIZE + ' bytes)', line: null, severity: 'error' });
 
     // The CLI is the author-facing gate: any error-severity finding fails the
     // file (exit 1), including the non-deploy-blocking crossCallable-not-array.

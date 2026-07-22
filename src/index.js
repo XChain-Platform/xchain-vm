@@ -344,6 +344,56 @@ const HARNESS_SOURCE = `
             }
         }
     };
+
+    // F-NR, deserialization half (JSON.parse). The value guard above cannot be
+    // used here: at call time the only thing that exists is the input TEXT, and
+    // the recursion happens while (or just after) the native parser builds the
+    // value. Two distinct native walks hang off this one sink, and both bottom
+    // out on the same HOST-THREAD stack the comment above describes:
+    //   - the parser itself, whose recursion depth (V8 versions differ; the
+    //     current one carries an explicit continuation stack, older ones recurse)
+    //     is not a property this engine may depend on across upgrades, and
+    //   - the REVIVER walk (InternalizeJSONProperty), which IS plainly recursive
+    //     on every V8 we support: measured on Node 22, JSON.parse(deep, fn)
+    //     throws a CATCHABLE RangeError past depth ~290 on a 128KB stack, ~1200
+    //     on 512KB and ~4800 on 2MB, i.e. the fault point is the validator's OS
+    //     and thread-stack size, not a consensus input. A contract can build the
+    //     text with a metered loop, catch, and branch: same fork class, opposite
+    //     direction.
+    // So bound the NESTING the parser is asked to build, deterministically,
+    // before it is asked to build it. The scan is a flat integer walk over the
+    // text (never recurses) and is string-literal aware: a bracket inside a JSON
+    // string is data, not structure, so '"[[[["' must still parse. Backslash
+    // escapes are honoured so an escaped quote does not close the literal early
+    // (and a bracket after it is still treated as data). Over-depth
+    // input routes into the SAME un-swallowable __stackPoison as every other
+    // F-NR sink, so the outcome is an identical out_of_stack on every host.
+    // Gas: the caller already charges __allocGas(text.length) BEFORE this runs,
+    // and the scan is O(text.length), so the guard's CPU is bounded by gas
+    // already paid and adds no charge of its own. That keeps gasUsed byte-equal
+    // to the legacy path for every input that is not over-depth; the only
+    // consensus-visible move is the deterministic fault itself, which is why
+    // this rides the same __nrGuardOn flag-day as the value guard.
+    var __guardParseDepth = function(text) {
+        if (!__nrGuardOn) return;
+        if (__stackPoison) throw __stackError();
+        var n = text.length, i = 0, depth = 0, ch;
+        while (i < n) {
+            ch = text.charCodeAt(i++);
+            if (ch === 34) {                       // '"' opens a string literal
+                while (i < n) {
+                    ch = text.charCodeAt(i++);
+                    if (ch === 92) i++;            // backslash escapes the next unit
+                    else if (ch === 34) break;     // closing quote
+                }
+            } else if (ch === 91 || ch === 123) {  // '[' or '{'
+                depth++;
+                if (depth > __DEPTH_LIMIT) { __stackPoison = true; throw __stackError(); }
+            } else if (ch === 93 || ch === 125) {  // ']' or '}'
+                if (depth > 0) depth--;
+            }
+        }
+    };
     // ----- end F-NR -----
 
     // Clean up __defineProperty (no longer needed)
@@ -651,8 +701,29 @@ const HARNESS_SOURCE = `
             return r;
         });
         var __jparse = JSON.parse;
+        // Captured before contract code runs, so repointing globalThis.String
+        // cannot redirect the coercion the guard below depends on.
+        var __String = String;
         if (typeof __jparse === 'function') __lockMethod(JSON, 'parse', function(text) {
-            if (typeof text === 'string') __allocGas(text.length);
+            if (typeof text === 'string') {
+                __allocGas(text.length);
+                __guardParseDepth(text);         // native recursion sink (F-NR)
+                return __jparse.apply(this, arguments);
+            }
+            // JSON.parse applies ToString to a non-string argument, so an object
+            // with a toString() returning a deep spine reaches the native parser
+            // with the string-typed guard above never firing. Coerce ONCE here
+            // (String() is ToString with the same string hint, for everything
+            // except a symbol, which is left alone so the native call still
+            // throws its own TypeError), then guard and parse the coerced text.
+            // Only primitives that cannot contain a bracket skip the coercion.
+            if (__nrGuardOn && text !== null
+                && (typeof text === 'object' || typeof text === 'function')) {
+                var s = __String(text);
+                __allocGas(s.length);
+                __guardParseDepth(s);
+                return __jparse.call(this, s, arguments[1]);
+            }
             return __jparse.apply(this, arguments);
         });
     }
@@ -1554,9 +1625,36 @@ class XChainVM {
             // allocation size, so a bulk allocation trips the gas ceiling BEFORE V8
             // services it. Sanitize to a positive integer (default 1); a huge units
             // deterministically throws GasExhaustedError at the ceiling.
+            //
+            // NON-FINITE gate (2437). The legacy sanitizer collapsed Infinity/NaN to
+            // n=1, which broke that invariant exactly where it matters most: a
+            // wrapper that computes a non-finite size is one that could NOT bound the
+            // allocation, so it is the case that most needs to fail closed. It is
+            // reachable and it is not free. Array.prototype.fill.call({length:
+            // Infinity}, 1) reaches the wrapper as __allocGas(Infinity), bills a
+            // single gas unit, and V8 then services ToLength(Infinity) = 2^53-1
+            // iterations, burning the whole wall-clock net (measured ~30s) for ~0
+            // gas. The same call with a FINITE length of 2^53-1 charges 2^53-1 and
+            // is a deterministic out_of_gas in ~10ms. So charge the identical
+            // maximal amount for a non-finite size: Number.MAX_SAFE_INTEGER, a fixed
+            // constant (not ceiling-derived) so the resulting `used` value, and
+            // therefore the hashed out_of_gas message, does not vary with the
+            // caller-supplied ceiling and matches the finite 2^53-1 path exactly.
+            // A NON-number `units` still resolves to 1: that is the AST meter's own
+            // default, not a failed size computation.
+            // CONSENSUS GATE: this turns a 1-gas timeout into a ceiling-clamped
+            // out_of_gas, which moves the hashed status and gasUsed, so it rides the
+            // same already-armed block-time flag-day as F3-binary/globals + F-NR +
+            // F-MO + F-PS. Below the gate the legacy collapse-to-1 replays unchanged.
+            const __gasBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
+            const nonFiniteFailClosed = Number.isFinite(__gasBlockTime) &&
+                __gasBlockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
             const gasRef = new ivm.Reference(function(units) {
                 try {
-                    const n = (typeof units === 'number' && isFinite(units) && units >= 1) ? Math.floor(units) : 1;
+                    const nonFinite = (typeof units === 'number' && !isFinite(units));
+                    const n = nonFinite && nonFiniteFailClosed
+                        ? Number.MAX_SAFE_INTEGER
+                        : ((typeof units === 'number' && isFinite(units) && units >= 1) ? Math.floor(units) : 1);
                     gasTracker.charge(gasTracker.schedule.VM_COMPUTATION * n);
                 } catch (e) {
                     if (e instanceof GasExhaustedError) {
