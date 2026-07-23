@@ -66,8 +66,22 @@ const STRIPPED_GLOBAL_NAMES = Object.freeze([
     'SharedArrayBuffer', 'Atomics',
     'queueMicrotask', 'Promise',
     'BigInt',
+    'WebAssembly',
     'Intl', 'Temporal', 'structuredClone', 'performance'
 ]);
+//   - WebAssembly (flag-day Pkg 3, 75190596): a core V8 global reachable from
+//     contract code. A wasm body carries NO __gas instrumentation (the AST meter
+//     only touches the JS source), so WebAssembly.instantiate/compile/Module/
+//     Instance runs unmetered native code under the memory limit -- the same
+//     unmetered-CPU DoS class as BigInt, plus a consensus-fork surface (a wasm
+//     trap / float result observed and routed into hashed state can diverge across
+//     builds). Stripping the global closes it deterministically. GATED on the
+//     per-coin Pkg 3 bundle height flag-day (index.js isPkg3SandboxActive, threaded
+//     as stripGlobals opts.stripWasm), exactly like Promise: below the flag day
+//     WebAssembly is LEFT IN PLACE so a from-genesis replay reproduces the historical
+//     execution; at/after it the global is absent fleet-wide. (The companion
+//     deploy-lint ban is gated indexer-side via validateSyntax enforce-flags and is
+//     tracked separately; this runtime strip is the load-bearing consensus fix.)
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
@@ -323,12 +337,21 @@ const buildStripScript = (names) => `
  *        IN PLACE, exactly as pre-activation nodes leave it, so a from-genesis
  *        replay reproduces the historical execution; at/after it Promise is
  *        stripped fleet-wide. queueMicrotask is always stripped (unchanged).
+ * @param {boolean} [opts.stripWasm=false] - delete the global `WebAssembly`.
+ *        CONSENSUS-GATED on the per-coin Pkg 3 bundle HEIGHT flag-day (index.js
+ *        isPkg3SandboxActive): below it WebAssembly is LEFT IN PLACE (historical
+ *        replay), at/after it the global is absent fleet-wide. Same gated-entry
+ *        pattern as Promise.
  */
 function stripGlobals(isolate, context, opts) {
     const stripPromise = !!(opts && opts.stripPromise);
-    const names = stripPromise
-        ? STRIPPED_GLOBAL_NAMES
-        : STRIPPED_GLOBAL_NAMES.filter((n) => n !== 'Promise');
+    const stripWasm    = !!(opts && opts.stripWasm);
+    // Gated entries stay in the applied list only once their own flag-day is active,
+    // exactly as a pre-activation node leaves them in place. Promise: block-time
+    // async-surface gate. WebAssembly: per-coin Pkg 3 height gate. Every other entry
+    // is stripped unconditionally from genesis.
+    const names = STRIPPED_GLOBAL_NAMES.filter((n) =>
+        (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm));
     const script = isolate.compileScriptSync(buildStripScript(names));
     script.runSync(context);
 }

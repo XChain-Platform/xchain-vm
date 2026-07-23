@@ -446,6 +446,113 @@ function findBannedAsync(code, hardened) {
 }
 
 /**
+ * Scan contract code for generator functions (function*, generator methods, and
+ * yield at any depth). A suspended generator frame is entered via __depth_enter
+ * but its matching __depth_exit never runs until the generator is drained, so
+ * many opened-but-undrained generators accumulate __stackDepth toward the 512
+ * MAX_STACK_DEPTH cap and trip a spurious deterministic out_of_stack (29912bd8).
+ * The verdict is identical on every validator (not a fork) but a robustness
+ * quirk the deploy validator should reject up front rather than surface as a
+ * confusing runtime out_of_stack.
+ *
+ * A generator FunctionDeclaration/FunctionExpression is marked `node.generator`;
+ * an object/class generator METHOD is a FunctionExpression value with the same
+ * flag, so walking the two function-node types covers `*gen(){}` shorthand and
+ * class generator methods alike. YieldExpression is flagged directly too so the
+ * ban reads as "no yield at any depth"; a bare identifier named `yield` (legal
+ * in sloppy-mode script, never a YieldExpression) is intentionally NOT matched.
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{kind: string, line: (number|string)}>}
+ */
+function findBannedGenerator(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
+    } catch (e) {
+        return hits;
+    }
+    const markGen = (node) => {
+        if (node.generator) hits.push({ kind: 'generator', line: node.loc ? node.loc.start.line : '?' });
+    };
+    walk.simple(ast, {
+        FunctionDeclaration: markGen,
+        FunctionExpression: markGen,
+        YieldExpression(node) {
+            hits.push({ kind: 'yield', line: node.loc ? node.loc.start.line : '?' });
+        }
+    });
+    return hits;
+}
+
+/**
+ * Scan contract code for references to the global `WebAssembly` binding. wasm
+ * bodies execute native code that carries no __gas metering (unmetered native
+ * execution) and are a consensus-fork surface, so the sandbox strips the global
+ * at the Pkg 3 height flag-day (75190596); this is the deploy-lint half.
+ *
+ * Matching is by IDENTIFIER, so the false-positive hazard the seq-2669 proto-
+ * method rule accepts (a name-only call site cannot tell `s.search(x)` from a
+ * contract's own `myIndex.search(x)`, forcing WARNING severity) does NOT apply
+ * here: this rule matches ONLY a reference that resolves to the global binding.
+ * A member-access property (`obj.WebAssembly`), a non-computed object-literal
+ * KEY (`{ WebAssembly: ... }`), and a lexically-shadowed local (parameter / var
+ * / let / const / function / class / catch binding named WebAssembly) are all
+ * excluded because none reads the global; the shorthand `{ WebAssembly }` value
+ * IS the global read and is flagged, and `globalThis.WebAssembly` /
+ * `globalThis['WebAssembly']` are the same binding under another spelling. That
+ * precision (identical in construction to the global-Promise handling in
+ * findBannedAsync) is what lets this be an error-severity CONSENSUS_RULE rather
+ * than a name-only advisory.
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{line: (number|string)}>}
+ */
+function findBannedWasm(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
+    } catch (e) {
+        return hits;
+    }
+    walk.ancestor(ast, {
+        Identifier(node, state, ancestors) {
+            if (node.name !== 'WebAssembly') return;
+            // Skip the property position of a member access (obj.WebAssembly) and a
+            // non-computed object-literal key ({ WebAssembly: ... }): neither reads
+            // the global. The shorthand { WebAssembly } materializes a distinct value
+            // node whose parent.value (not parent.key) is this node, so it falls
+            // through and IS flagged (mirrors the { Promise } handling).
+            const parent = ancestors.length >= 2 ? ancestors[ancestors.length - 2] : null;
+            if (parent) {
+                if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
+                if (parent.type === 'Property' && parent.key === node && !parent.computed) return;
+            }
+            // A WebAssembly that resolves to an in-scope LOCAL declaration is not the
+            // global binding; accept it. Deterministic ancestor-scope approximation,
+            // failing CLOSED (flag) on a miss, exactly as findBannedAsync does for Promise.
+            for (let i = ancestors.length - 2; i >= 0; i--) {
+                if (scopeDeclares(ancestors[i], 'WebAssembly')) return;
+            }
+            hits.push({ line: node.loc ? node.loc.start.line : '?' });
+        },
+        MemberExpression(node) {
+            // globalThis.WebAssembly / globalThis['WebAssembly'] / globalThis[`WebAssembly`]
+            if (!node.object || node.object.type !== 'Identifier' || node.object.name !== 'globalThis')
+                return;
+            const key = node.computed
+                ? staticComputedKey(node)
+                : (node.property && node.property.type === 'Identifier' ? node.property.name : null);
+            if (key === 'WebAssembly')
+                hits.push({ line: node.loc ? node.loc.start.line : '?' });
+        }
+    });
+    return hits;
+}
+
+/**
  * Scan contract code for non-integer (decimal) number literals (a non-blocking
  * warning that native float arithmetic is being used). Returns structured rules;
  * checkFloatWarnings flattens these to their message strings.
@@ -496,7 +603,15 @@ const CONSENSUS_RULES = new Set([
     'reserved-identifier',
     'banned-math',
     'banned-literal',
-    'banned-async'
+    'banned-async',
+    // Pkg 3 VM-sandbox bundle (CONSENSUS_VERSION 3, per-coin height flag-day). The
+    // generator ban (29912bd8) and the WebAssembly deploy-lint ban (75190596, the
+    // deploy half of the runtime global strip) ship in the same unshipped v3 epoch;
+    // both are error-severity and precisely identify their target, so they belong in
+    // the deploy-blocking set (their on-chain activation is the indexer's per-coin
+    // gate, threaded through validateSyntax as enforceBannedGenerator/enforceBannedWasm).
+    'banned-generator',
+    'banned-wasm'
 ]);
 
 const TYPED_ARRAY_CTORS = new Set([
@@ -722,9 +837,10 @@ function analyzeContract(code) {
  * (step 1) is NOT here; it needs isolated-vm and stays in syntax.js.
  *
  * Consensus errors are returned in deploy-check order (metering -> reserved ->
- * banned-math -> banned-literal) FIRST, so errors[0] (filtered to CONSENSUS_RULES)
- * is exactly the failure validateSyntax surfaces. Move-2 findings (advisory) are
- * appended after and never affect the deploy verdict.
+ * banned-math -> banned-literal -> banned-async -> banned-generator -> banned-wasm)
+ * FIRST, so errors[0] (filtered to CONSENSUS_RULES) is exactly the failure
+ * validateSyntax surfaces. Move-2 findings (advisory) are appended after and never
+ * affect the deploy verdict.
  *
  * @param {string} code - Contract source code
  * @param {object} [opts]
@@ -875,6 +991,40 @@ function lintSource(code, opts) {
         });
     }
 
+    // 6b. Banned generator surface (function*, generator methods, yield). A
+    //     suspended generator frame enters the depth guard but its matching exit
+    //     runs only on drain, so undrained generators leak __stackDepth to the 512
+    //     cap and trip a spurious deterministic out_of_stack (29912bd8). Rejected
+    //     at deploy like the async surface. Pkg 3 bundle (CONSENSUS_VERSION 3).
+    for (const hit of findBannedGenerator(code)) {
+        const advice = hit.kind === 'yield'
+            ? 'yield suspends a generator frame without unwinding the call-depth guard; rewrite without generators'
+            : 'a suspended generator frame is not unwound until drained, so undrained generators leak __stackDepth toward the 512 cap and throw a spurious deterministic out_of_stack; use a plain function';
+        errors.push({
+            rule: 'banned-generator',
+            message: 'banned generator surface: ' + hit.kind + ' at line ' + hit.line + ' (' + advice + ')',
+            line: typeof hit.line === 'number' ? hit.line : null,
+            severity: 'error'
+        });
+    }
+
+    // 6c. Banned WebAssembly global reference. wasm bodies run native code with no
+    //     __gas metering (unmetered native execution) and are a consensus-fork
+    //     surface; the sandbox strips the global at the Pkg 3 height flag-day
+    //     (75190596). This is the deploy-lint half. Identifier-precise (member
+    //     property / object key / shadowed local excluded), so error severity is
+    //     sound, unlike the name-only banned-proto-method warnings. Pkg 3 bundle.
+    for (const hit of findBannedWasm(code)) {
+        errors.push({
+            rule: 'banned-wasm',
+            message: 'banned global: WebAssembly at line ' + hit.line +
+                     '; WebAssembly executes native code that carries no __gas metering (unmetered native execution) ' +
+                     'and is a consensus-fork surface. The sandbox removes it, so this is unreachable at runtime',
+            line: typeof hit.line === 'number' ? hit.line : null,
+            severity: 'error'
+        });
+    }
+
     const warnings = findFloatWarnings(code);
 
     // 7. Sandbox-neutered prototype methods. sandbox.js replaces these with an
@@ -916,6 +1066,8 @@ module.exports = {
     findBannedMathCalls,
     findBannedLiterals,
     findBannedAsync,
+    findBannedGenerator,
+    findBannedWasm,
     findBannedExponentiation,
     findBannedProtoMethods,
     findReservedControlBinding,

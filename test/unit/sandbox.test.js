@@ -60,6 +60,7 @@ const EXPECTED_GLOBAL_NAMES = [
     'SharedArrayBuffer', 'Atomics',
     'queueMicrotask', 'Promise',
     'BigInt',
+    'WebAssembly',
     'Intl', 'Temporal', 'structuredClone', 'performance'
 ];
 
@@ -246,14 +247,35 @@ const FORBIDDEN_SAFE_MATH = [
         assert(captureToDelete({ stripPromise: true }).includes('queueMicrotask'));
     });
 
-    it('default list is the full frozen set minus Promise', function() {
+    // WebAssembly is a second gated entry (flag-day Pkg 3, ): left in place
+    // by default, stripped only when stripWasm is true, exactly like Promise.
+    it('omits WebAssembly from the deletion list by default (pre-flag-day replay)', function() {
+        assert(!captureToDelete(undefined).includes('WebAssembly'),
+            'WebAssembly must be LEFT IN PLACE when stripWasm is not set');
+        assert(!captureToDelete({}).includes('WebAssembly'));
+        assert(!captureToDelete({ stripWasm: false }).includes('WebAssembly'));
+    });
+
+    it('includes WebAssembly only when stripWasm is true (at/after the Pkg 3 flag-day)', function() {
+        assert(captureToDelete({ stripWasm: true }).includes('WebAssembly'),
+            'WebAssembly must be stripped when stripWasm is true');
+    });
+
+    it('the two gated entries are independent (Promise and WebAssembly gate separately)', function() {
+        assert(!captureToDelete({ stripPromise: true }).includes('WebAssembly'),
+            'stripPromise must not strip WebAssembly');
+        assert(!captureToDelete({ stripWasm: true }).includes('Promise'),
+            'stripWasm must not strip Promise');
+    });
+
+    it('default list is the full frozen set minus the gated entries (Promise, WebAssembly)', function() {
         const list = captureToDelete(undefined);
-        const expected = EXPECTED_GLOBAL_NAMES.filter((n) => n !== 'Promise');
+        const expected = EXPECTED_GLOBAL_NAMES.filter((n) => n !== 'Promise' && n !== 'WebAssembly');
         assert.deepStrictEqual(list.sort(), expected.sort());
     });
 
-    it('stripPromise:true list is exactly the full frozen set', function() {
-        const list = captureToDelete({ stripPromise: true });
+    it('both gates on -> list is exactly the full frozen set', function() {
+        const list = captureToDelete({ stripPromise: true, stripWasm: true });
         assert.deepStrictEqual(list.sort(), [...EXPECTED_GLOBAL_NAMES].sort());
     });
 });
@@ -279,12 +301,18 @@ const FORBIDDEN_SAFE_MATH = [
         }
     }
 
-    it('removes every non-Promise global in the strip list', function() {
-        const names = EXPECTED_GLOBAL_NAMES.filter((n) => n !== 'Promise');
+    it('removes every ungated global in the strip list (Promise + WebAssembly are gated)', function() {
+        const names = EXPECTED_GLOBAL_NAMES.filter((n) => n !== 'Promise' && n !== 'WebAssembly');
         const leftover = evalStripped(
             JSON.stringify(names) +
             '.filter(function(n){return typeof globalThis[n] !== "undefined";}).join(",")');
         assert.strictEqual(leftover, '', 'still-reachable globals: ' + leftover);
+    });
+
+    it('leaves WebAssembly in place by default but strips it when gated', function() {
+        assert.strictEqual(evalStripped('typeof globalThis.WebAssembly'), 'object');
+        assert.strictEqual(
+            evalStripped('typeof globalThis.WebAssembly', { stripWasm: true }), 'undefined');
     });
 
     it('leaves Promise in place by default but strips it when gated', function() {

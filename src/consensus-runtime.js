@@ -109,12 +109,21 @@ const REFERENCE_NODE = 'v22.22.3';
 // strip set and CONSENSUS_RULES against THIS version, so a change to either
 // surface cannot ship without bumping this epoch in lockstep.
 //
-// Epoch '2' (this bump) froze the async/Promise contract surface: the sandbox
-// now strips the Promise global and the deploy validator rejects async/await/
-// Promise (CONSENSUS_RULES 'banned-async'). Both are gated on a coordinated
-// block-time flag-day (mainnet) so a from-genesis replay reproduces the
-// historical accept-below/reject-above verdict.
-const CONSENSUS_VERSION = '2';
+// Epoch '2' froze the async/Promise contract surface: the sandbox strips the
+// Promise global and the deploy validator rejects async/await/Promise
+// (CONSENSUS_RULES 'banned-async'), both gated on a coordinated block-time
+// flag-day (mainnet) so a from-genesis replay reproduces the historical
+// accept-below/reject-above verdict.
+//
+// Epoch '3' (this bump, flag-day Package 3, ) adds the WebAssembly global
+// to the sandbox strip set (STRIPPED_GLOBAL_NAMES) to close the unmetered
+// native-execution / consensus-fork surface a wasm body (no __gas) re-opens.
+// UNLIKE the epoch-2 gates, the Package 3 bundle is gated on a PER-COIN block-
+// HEIGHT flag-day (index.js isPkg3SandboxActive / PKG3_SANDBOX_ACTIVATION),
+// riding the ~961000 Cohort-B window, so below each coin's height WebAssembly is
+// left in place and a from-genesis replay is byte-identical. The musl-safe
+// recursion bound  rides the same per-coin gate.
+const CONSENSUS_VERSION = '3';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash

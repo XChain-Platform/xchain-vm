@@ -23,7 +23,7 @@
 // @ts-nocheck
 
 const ivm = require('isolated-vm');
-const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, CONSENSUS_RULES } = require('./lint-core.js');
+const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, CONSENSUS_RULES } = require('./lint-core.js');
 
 /**
  * Validate contract code syntax before deployment. Runs a V8 syntax check
@@ -47,11 +47,26 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        GATED identically to enforceBannedAsync: the indexer passes the
  *        resolved VM_LINT_HARDENING activation (deploy.js) so a from-genesis
  *        replay reproduces historical verdicts. Defaults to true.
+ * @param {boolean} [opts.enforceBannedGenerator=true] - whether the
+ *        'banned-generator' rule (function*, generator methods, yield) is
+ *        deploy-blocking. CONSENSUS-GATED identically to enforceBannedAsync, but
+ *        on the Pkg 3 per-coin block-HEIGHT flag-day (not a block-time gate): the
+ *        indexer passes the resolved activation (deploy.js) so BELOW the height a
+ *        generator DEPLOY resolves exactly as it did pre-activation (accepted)
+ *        and a from-genesis replay reproduces the historical verdict. Defaults to
+ *        true so author-facing callers (SDK/CLI linter, unit tests) always see it.
+ * @param {boolean} [opts.enforceBannedWasm=true] - whether the 'banned-wasm' rule
+ *        (a reference to the global WebAssembly) is deploy-blocking. The deploy
+ *        half of the Pkg 3 WebAssembly strip, CONSENSUS-GATED identically to
+ *        enforceBannedGenerator on the same per-coin height flag-day. Defaults to
+ *        true.
  * @returns {{ valid: boolean, error?: string }}
  */
 function validateSyntax(code, opts) {
-    const enforceBannedAsync    = !opts || opts.enforceBannedAsync !== false;
-    const enforceLintHardening  = !opts || opts.enforceLintHardening !== false;
+    const enforceBannedAsync     = !opts || opts.enforceBannedAsync !== false;
+    const enforceLintHardening   = !opts || opts.enforceLintHardening !== false;
+    const enforceBannedGenerator = !opts || opts.enforceBannedGenerator !== false;
+    const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
 
     // 1. V8 syntax check (the only step that requires isolated-vm)
     let testIsolate;
@@ -66,10 +81,13 @@ function validateSyntax(code, opts) {
 
     // 2-5. Acorn-coverable consensus rules. Block ONLY on consensus rules;
     // lintSource also returns Move-2 advisory findings, which must never change
-    // the on-chain verdict. When banned-async is not yet flag-day-active, drop
-    // that rule from the blocking set (pre-activation parity).
+    // the on-chain verdict. When a flag-day rule is not yet active, drop it from
+    // the blocking set (pre-activation parity): banned-async on the block-time
+    // async gate, banned-generator/banned-wasm on the Pkg 3 per-coin height gate.
     const blocking = lintSource(code, { hardened: enforceLintHardening }).errors.filter((e) => {
         if (e.rule === 'banned-async' && !enforceBannedAsync) return false;
+        if (e.rule === 'banned-generator' && !enforceBannedGenerator) return false;
+        if (e.rule === 'banned-wasm' && !enforceBannedWasm) return false;
         return CONSENSUS_RULES.has(e.rule);
     });
     if (blocking.length > 0)
@@ -91,4 +109,4 @@ function checkFloatWarnings(code) {
 
 // findBannedMathCalls / findBannedLiterals moved to lint-core.js; re-exported
 // here so existing callers of syntax.js keep working unchanged.
-module.exports = { validateSyntax, checkFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync };
+module.exports = { validateSyntax, checkFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm };

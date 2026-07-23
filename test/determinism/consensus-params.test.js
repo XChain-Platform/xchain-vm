@@ -29,8 +29,8 @@ const metering = require('../../src/metering');
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '2');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '2', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '3');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '3', 're-export must match');
     });
 
     it('sandbox strip set is frozen (any change is a consensus event → bump CONSENSUS_VERSION)', function () {
@@ -39,14 +39,16 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // can observe and therefore what bytes can enter hashed state. Freeze it as a
         // sorted golden so an edit to sandbox.js STRIPPED_GLOBAL_NAMES reddens here
         // until CONSENSUS_VERSION is bumped + this golden regenerated in lockstep.
-        // (Promise stays in the SET; its DELETION is flag-day gated at runtime; the
-        // membership is frozen, the activation is the separate gate pinned below.)
+        // (Promise and WebAssembly stay in the SET; their DELETION is flag-day gated
+        // at runtime -- Promise on the block-time async-surface gate, WebAssembly on
+        // the per-coin Pkg 3 height gate; membership is frozen, activation is the
+        // separate gate pinned below. Epoch 3 added WebAssembly, .)
         const GOLDEN_STRIPPED_GLOBAL_NAMES = [
             'Atomics', 'BigInt', 'Date', 'FinalizationRegistry', 'Intl',
             'Promise', 'Proxy', 'Reflect', 'SharedArrayBuffer', 'Temporal',
-            'WeakRef', 'WebSocket', 'XMLHttpRequest', 'clearImmediate', 'clearInterval',
-            'clearTimeout', 'fetch', 'performance', 'queueMicrotask', 'setImmediate',
-            'setInterval', 'setTimeout', 'structuredClone'
+            'WeakRef', 'WebAssembly', 'WebSocket', 'XMLHttpRequest', 'clearImmediate',
+            'clearInterval', 'clearTimeout', 'fetch', 'performance', 'queueMicrotask',
+            'setImmediate', 'setInterval', 'setTimeout', 'structuredClone'
         ];
         assert.ok(Object.isFrozen(vm.STRIPPED_GLOBAL_NAMES), 'strip set must be frozen');
         assert.deepStrictEqual([...vm.STRIPPED_GLOBAL_NAMES].sort(), GOLDEN_STRIPPED_GLOBAL_NAMES,
@@ -59,8 +61,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // contracts the chain accepts (a hashed deploy verdict). Freeze it sorted so
         // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
         const GOLDEN_CONSENSUS_RULES = [
-            'banned-async', 'banned-literal', 'banned-math',
-            'invalid-type', 'reserved-identifier', 'unsupported-syntax'
+            'banned-async', 'banned-generator', 'banned-literal', 'banned-math',
+            'banned-wasm', 'invalid-type', 'reserved-identifier', 'unsupported-syntax'
         ];
         assert.deepStrictEqual([...vm.CONSENSUS_RULES].sort(), GOLDEN_CONSENSUS_RULES,
             'deploy CONSENSUS_RULES drifted: a deploy-rule change must bump CONSENSUS_VERSION + regolden in both repos');
@@ -286,6 +288,47 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // two. Pin it like any other consensus parameter; batched into the same 2.0.0
         // flag-day (protocol_changes.js: 1790812800).
         assert.strictEqual(vm.CALL_SPREAD_METER_GATE_BLOCK_TIME, 1790812800);
+    });
+
+    it('Package 3 VM-sandbox bundle gate: per-coin activation heights + depth bounds are frozen ', function () {
+        // The whole flag-day Package 3 VM-sandbox bundle flips on ONE per-coin
+        // block-HEIGHT gate (the musl-safe recursion bound  folded in, the
+        // WebAssembly strip, the generator-fn ban). The activation heights and the
+        // depth bounds are hashed-behaviour-affecting (they move which executions
+        // out_of_stack / which globals strip), so pin them like any other consensus
+        // parameter; a divergent height or predicate forks the fleet. Unlike the six
+        // 2.0.0 gates this keys on block HEIGHT, PER COIN, riding the ~961000 window.
+        assert.strictEqual(vm.MAX_STACK_DEPTH, 512, 'pre-activation bound is the legacy 512');
+        assert.strictEqual(vm.MAX_STACK_DEPTH_MUSL, 256, 'post-activation musl-safe bound');
+        // Per-coin activation-height map (LTC/DOGE mainnet PROPOSED, awaiting operator
+        // ratification at train sign-off). A bare BTC 961000 would be active-on-deploy
+        // on LTC/DOGE (tips already far past it); each coin gets its calendar-equiv height.
+        assert.strictEqual(vm.PKG3_SANDBOX_ACTIVATION['BTC:mainnet'], 961000);
+        assert.strictEqual(vm.PKG3_SANDBOX_ACTIVATION['LTC:mainnet'], 3154250);
+        assert.strictEqual(vm.PKG3_SANDBOX_ACTIVATION['DOGE:mainnet'], 6319000);
+        // coin derivation from the C:<COIN>:<idx> contract address.
+        assert.strictEqual(vm.pkg3CoinFromAddress('C:BTC:1'), 'BTC');
+        assert.strictEqual(vm.pkg3CoinFromAddress('C:DOGE:42'), 'DOGE');
+        assert.strictEqual(vm.pkg3CoinFromAddress('garbage'), null);
+        assert.strictEqual(vm.pkg3CoinFromAddress(undefined), null);
+        // Per-coin/network resolver: testnet/regtest from genesis; each mainnet coin at
+        // its own height; unresolvable coin or non-finite height -> pre-activation.
+        assert.strictEqual(vm.isPkg3SandboxActive('regtest', 'BTC', 0), true);
+        assert.strictEqual(vm.isPkg3SandboxActive('testnet', 'BTC', 0), true);
+        assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'BTC', 960999), false);
+        assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'BTC', 961000), true);
+        // The per-coin fix: LTC/DOGE mainnet stay pre-activation at a bare BTC 961000.
+        assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'LTC', 961000), false);
+        assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'LTC', 3154250), true);
+        assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'DOGE', 961000), false);
+        assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'DOGE', 6319000), true);
+        // undefined network with a resolvable coin behaves as mainnet (the musl-gate
+        // boundary the behavioural suite exercises via the default C:BTC:1 address).
+        assert.strictEqual(vm.isPkg3SandboxActive(undefined, 'BTC', 961000), true);
+        assert.strictEqual(vm.isPkg3SandboxActive(undefined, 'BTC', 100), false);
+        assert.strictEqual(vm.isPkg3SandboxActive(undefined, 'BTC', NaN), false);
+        // unresolvable coin -> inactive (safe legacy default) even at a high height.
+        assert.strictEqual(vm.isPkg3SandboxActive('mainnet', null, 10000000), false);
     });
 
     it('STATE_KEY_NUL_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {

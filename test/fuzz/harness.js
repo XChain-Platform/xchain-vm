@@ -100,6 +100,10 @@ async function execute(vm, code, extraOpts) {
         params:          extraOpts?.params || [],
         caller:          extraOpts?.caller || 'test_addr',
         contractAddress: extraOpts?.contractAddress || 'C:BTC:1',
+        // Optional network passthrough (undefined = mainnet-conservative, the prior
+        // behaviour for every caller that omits it). Lets a test exercise the
+        // network-aware execution gates (async-surface, musl stack depth, ...).
+        network:         extraOpts?.network,
         blockContext:    extraOpts?.blockContext || DEFAULT_BLOCK_CONTEXT,
         balances:        extraOpts?.balances,
         tokenInfo:       extraOpts?.tokenInfo,

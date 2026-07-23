@@ -271,6 +271,55 @@ const HARNESS_SOURCE = `
     }
     // ----- end F3-binary / F3-globals -----
 
+    // ----- Allocation-size gas metering for collection constructors (Pkg 3, 07669055) -----
+    // Set/Map/WeakSet/WeakMap constructors are never wrapped by F3-binary above: the
+    // metering code treats them only as measured SOURCES (.size), never as charged
+    // SINKS. new Set(bigArr) / new Map(bigEntries) materializes an O(n) native hash
+    // table for the flat __gas(1) of the call site (the source array was charged once
+    // at build and can be reused indefinitely), so a loop of new Set(arr100k) runs
+    // ~100k native inserts per ~3 gas -- the same cheap-gas / expensive-CPU grind, and
+    // the heterogeneous per-node maxCpuTimeMs wall-clock fork surface, the F3/G1
+    // wrappers exist to close. Charge the source length (array) / size (Set/Map) up
+    // front, or the realized .size after for an un-sized iterable, mirroring
+    // __meterBinaryCtor; instanceof + species preserved via the prototype alias.
+    // CONSENSUS GATE: this moves gasUsed, so it rides the per-coin Pkg 3 bundle HEIGHT
+    // flag-day (__PKG3_SANDBOX_ON, host-injected via isPkg3SandboxActive). Below the
+    // gate the ctors stay unmetered exactly as pre-activation nodes leave them, so a
+    // from-genesis replay reproduces the historical gas bit-for-bit. (Sibling to
+    // F3-binary, which rides the block-TIME BINARY_ALLOC gate; this leg rides the
+    // Pkg 3 HEIGHT gate per the coordinated bundle, so the two arm on different
+    // flag-days -- flagged for the release team.)
+    var __meterCollectionCtor = function(nm) {
+        var Orig = globalThis[nm];
+        if (typeof Orig !== 'function') return;
+        var Wrapped = function(a) {
+            // First arg is the iterable initializer (values for Set/WeakSet, [k,v]
+            // pairs for Map/WeakMap). A sized source (array .length, or a Set/Map
+            // .size) is charged up front; an un-sized iterable is charged by the
+            // realized .size after (Set/Map results expose .size; Weak* results do
+            // not, so an un-sized iterable into a Weak collection is left uncharged --
+            // the source iterable is itself already O(n)-charged to have been built).
+            if (a && typeof a.length === 'number') { __allocGas(a.length); return new Orig(...arguments); }
+            if (a && typeof a.size === 'number') { __allocGas(a.size); return new Orig(...arguments); }
+            if (a && typeof Symbol === 'function' && Symbol.iterator &&
+                typeof a[Symbol.iterator] === 'function') {
+                var __res = new Orig(...arguments);
+                if (__res && typeof __res.size === 'number') __allocGas(__res.size);
+                return __res;
+            }
+            return new Orig(...arguments);
+        };
+        Wrapped.prototype = Orig.prototype;
+        try { if (typeof __setProto === 'function') __setProto(Wrapped, Orig); } catch(e) {}
+        __lockMethod(Orig.prototype, 'constructor', Wrapped);
+        __lockMethod(globalThis, nm, Wrapped);
+    };
+    if (__PKG3_SANDBOX_ON === true) {
+        var __collCtors = ['Set', 'Map', 'WeakSet', 'WeakMap'];
+        for (var __cci = 0; __cci < __collCtors.length; __cci++) __meterCollectionCtor(__collCtors[__cci]);
+    }
+    // ----- end collection-constructor metering -----
+
     // ----- Deterministic structural-depth guard for native-recursive builtins (F-NR) -----
     // JSON.stringify and Array.prototype.join/flat (join also backs toString,
     // String(arr), arr+empty-string, and template interpolation of an array)
@@ -1114,6 +1163,18 @@ const MIN_CALL_GAS   = PROTO.VM_MIN_CALL_GAS;
 // via the pinned consensus runtime version.
 const MAX_STACK_DEPTH = 512;
 
+// Musl-safe recursion bound . On a musl/Alpine 128KB pthread stack the
+// native JSON.parse reviver walk and Array.prototype.join recurse in C++ to the
+// value's nesting depth and overflow BELOW 512 (measured near ~292 reviver / ~379
+// join), so a musl-built validator could fork from a glibc/macOS one on a value
+// nested between the musl overflow onset and 512. The Package 3 bundle gate below
+// (isPkg3SandboxActive) swaps the injected __DEPTH_LIMIT from MAX_STACK_DEPTH to
+// this lower bound at/after the coordinated deploy window; 256 sits below the
+// tightest musl onset with margin while leaving ample headroom for any plausible
+// contract nesting. Both the intra-contract recursion guard and the F-NR native-
+// depth guard read the single injected __DEPTH_LIMIT, so lowering it moves both.
+const MAX_STACK_DEPTH_MUSL = 256;
+
 // Cross-CHAIN call (XCALL) protocol constants. Canonical values:
 // xchain-documentation/protocol/constants.js; the indexer re-validates
 // host-side (execute.js processEmission + actions/xcall.js).
@@ -1276,6 +1337,63 @@ const CALL_SPREAD_METER_GATE_BLOCK_TIME = 1790812800;
 function isCallSpreadMeterActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= CALL_SPREAD_METER_GATE_BLOCK_TIME;
+}
+
+// ----- Package 3 VM-sandbox flag-day: per-coin block-HEIGHT bundle gate  -----
+// ONE coordinated activation for the whole flag-day Package 3 VM-sandbox bundle, so
+// every leg flips fleet-wide together under a single CONSENSUS_VERSION bump (2 -> 3)
+// and re-golden. Legs behind this gate:
+//   - the musl-safe recursion bound , folded in here from its own gate;
+//   - the WebAssembly global strip (75190596);
+//   - the generator-function deploy ban (29912bd8).
+// (Add legs as they land; a single gate keeps the whole bundle calendar-coherent.)
+//
+// Keyed on block HEIGHT, PER COIN, unlike the six 2.0.0 contract-era gates (all
+// block-TIME at the 1790812800 flag-day). It rides the BTC-anchored ~961000 Cohort-B
+// deploy window (the height the stake-weighted-quorum / anchor-reward /
+// equivocation-header activations flip on, protocol/constants.js). A single bare
+// mainnet 961000 is a BTC height; LTC (~3.1M tip) and DOGE (~6.3M tip) mainnet are
+// already far past it, so a bare 961000 would be active-on-deploy on those chains
+// and violate byte-identical-below there. Follow the STATE_COMMITMENT_ACTIVATION
+// per-coin map template (xchain-indexer/src/state_commitment_activation.js):
+// '<COIN>:mainnet' key, each coin's height the calendar equivalent of BTC 961000
+// (~2026-08-04). testnet/regtest activate from genesis (no pre-activation history to
+// preserve); an unknown network/coin or non-finite height resolves to pre-activation
+// (legacy behaviour), the byte-identical-replay-safe default. Real callers always
+// supply network + a resolvable C:<COIN>:<idx> contract address, so the fallback
+// only ever affects malformed/test contexts.
+//
+// !! PROPOSED LTC/DOGE heights below AWAIT OPERATOR RATIFICATION at train sign-off.
+// Arithmetic (tips measured 2026-07-22; BTC target 961000 = tip 959175 + 1825 blocks
+// x 10 min = 18250 min ~= 12.67 days ~= 2026-08-04):
+//   LTC:  tip 3146964 + (18250 min / 2.5 min-per-block = 7300 blocks)  = 3154264 -> 3154250
+//   DOGE: tip 6300766 + (18250 min / 1.0 min-per-block = 18250 blocks) = 6319016 -> 6319000
+const PKG3_SANDBOX_ACTIVATION = Object.freeze({
+    'BTC:mainnet':  961000,     // the Cohort-B anchor (unchanged from )
+    'LTC:mainnet':  3154250,    // PROPOSED - awaiting operator ratification
+    'DOGE:mainnet': 6319000,    // PROPOSED - awaiting operator ratification
+});
+
+// Derive the COIN from a 'C:<COIN>:<action_index>' contract address (the indexer
+// builds it as 'C:' + config.CHAIN + ':' + CONTRACT_ACTION_INDEX). The per-coin gate
+// needs the coin, which the indexer does NOT pass as a discrete opt; deriving it here
+// keeps the whole gate inside the VM (no indexer-side opts change). Returns null for
+// an absent/malformed address -> unresolvable coin -> pre-activation (safe default).
+function pkg3CoinFromAddress(contractAddress) {
+    if (typeof contractAddress !== 'string') return null;
+    const parts = contractAddress.split(':');
+    return (parts.length >= 3 && parts[0] === 'C' && parts[1]) ? parts[1] : null;
+}
+
+// Whether the Package 3 VM-sandbox bundle is active for (network, coin) at
+// blockHeight. testnet/regtest: genesis. mainnet/unknown: per-coin height threshold;
+// unresolvable coin or non-finite height -> inactive (legacy, byte-identical below).
+function isPkg3SandboxActive(network, coin, blockHeight) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    const b = Number(blockHeight);
+    if (!Number.isFinite(b)) return false;
+    const threshold = (coin != null) ? PKG3_SANDBOX_ACTIVATION[coin + ':mainnet'] : undefined;
+    return (threshold !== undefined) && b >= threshold;
 }
 
 class XChainVM {
@@ -1548,7 +1666,17 @@ class XChainVM {
             // pre-activation (Promise left in place) for any non-pre-launch network.
             const __asyncBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
             const stripPromise = isAsyncSurfaceActive(opts.network, __asyncBlockTime);
-            stripGlobals(isolate, context, { stripPromise });
+            // Package 3 VM-sandbox bundle activation, computed ONCE per execution and
+            // reused for every leg (WebAssembly strip, Set/Map metering, musl depth
+            // bound) so an execution can never partially activate the bundle. Gated
+            // per-coin on the ~961000 height flag-day: coin derived from the
+            // C:<COIN>:<idx> address so LTC/DOGE mainnet (tips already past a bare BTC
+            // 961000) stay pre-activation until their own calendar height; below the
+            // gate every leg is byte-identical to today.
+            const __pkg3Coin   = pkg3CoinFromAddress(opts.contractAddress);
+            const __pkg3Height = opts.blockContext && Number(opts.blockContext.height);
+            const __pkg3SandboxOn = isPkg3SandboxActive(opts.network, __pkg3Coin, __pkg3Height);
+            stripGlobals(isolate, context, { stripPromise, stripWasm: __pkg3SandboxOn });
 
             // Resolve read-only data into synchronous accessor objects. Accepts
             // either plain serializable snapshots (the canonical form, required by
@@ -1668,8 +1796,25 @@ class XChainVM {
             // Inject the deterministic recursion bound. The harness captures this
             // into a closure and enforces it on the metering-injected depth hooks,
             // so a contract that catches a stack fault cannot observe a
-            // platform-dependent native depth (see MAX_STACK_DEPTH).
-            context.global.setSync('__DEPTH_LIMIT', this.limits.maxStackDepth);
+            // platform-dependent native depth (see MAX_STACK_DEPTH).  / Pkg 3:
+            // at/after the per-coin ~961000 height window (isPkg3SandboxActive) the
+            // bound drops to MAX_STACK_DEPTH_MUSL, so a musl validator's native
+            // reviver/join walk cannot overflow below the bound; below the window the
+            // injected value is this.limits.maxStackDepth (the 512 default),
+            // byte-identical to today. The one injected __DEPTH_LIMIT is read by BOTH
+            // the intra-contract recursion guard and the F-NR native-depth guard, so
+            // gating it here moves both consistently. The coin is derived from the
+            // C:<COIN>:<idx> contract address so LTC/DOGE mainnet (tips already past a
+            // bare BTC 961000) stay pre-activation until their own calendar height.
+            const __effectiveDepthLimit = __pkg3SandboxOn
+                ? MAX_STACK_DEPTH_MUSL
+                : this.limits.maxStackDepth;
+            context.global.setSync('__DEPTH_LIMIT', __effectiveDepthLimit);
+            // Package 3 bundle activation flag for the in-isolate harness (Set/Map
+            // collection-constructor metering). Captured into the harness closure
+            // before the __-prefixed globals are stripped; false below the gate so the
+            // collection ctors stay unmetered exactly as pre-activation nodes leave them.
+            context.global.setSync('__PKG3_SANDBOX_ON', __pkg3SandboxOn);
 
             // Inject this execution's block time + the binary-alloc metering
             // flag-day so the harness can gate the F3-binary byte-length charge on
@@ -2184,6 +2329,15 @@ module.exports.MAX_CALL_DEPTH = MAX_CALL_DEPTH;
 module.exports.MIN_CALL_GAS   = MIN_CALL_GAS;
 // Intra-contract recursion bound (deterministic in-isolate stack-depth limit).
 module.exports.MAX_STACK_DEPTH = MAX_STACK_DEPTH;
+// Musl-safe recursion bound applied at/after the coordinated height window.
+module.exports.MAX_STACK_DEPTH_MUSL = MAX_STACK_DEPTH_MUSL;
+// Package 3 VM-sandbox flag-day: the per-coin activation-height map + resolver + the
+// coin-from-address helper. Exposed so the consensus-params freeze guard can pin them
+// (a divergent height or predicate forks the fleet) and tests can mirror the
+// per-coin/network activation. See PKG3_SANDBOX_ACTIVATION / isPkg3SandboxActive.
+module.exports.PKG3_SANDBOX_ACTIVATION = PKG3_SANDBOX_ACTIVATION;
+module.exports.isPkg3SandboxActive = isPkg3SandboxActive;
+module.exports.pkg3CoinFromAddress = pkg3CoinFromAddress;
 // Coordinated flag-day (block time) that activates the F3-binary allocation gas
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).
