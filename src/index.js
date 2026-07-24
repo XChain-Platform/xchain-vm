@@ -1638,10 +1638,13 @@ class XChainVM {
         const emissionCollector = new EmissionCollector(this.limits.maxEmissions, emissionDeepStrip);
         const execContext       = { reverted: false };
         // Host-observed corroboration signals for _classifyError (e9c3a80b):
-        // runStartMs is stamped immediately before runSync so a claimed timeout
-        // can be checked against the real wall clock; the isolate handle lets
-        // the classifier check the real disposed flag. Filled in below.
-        const hostSignals       = { runStartMs: null, getIsolate: () => isolate };
+        // runStartNs is stamped (monotonic process.hrtime.bigint, NOT Date.now)
+        // immediately before runSync so a claimed timeout is checked against
+        // real elapsed time; a wall-clock/NTP step backward cannot make the
+        // delta undercount and skip the gasUsed=ceiling clamp. The isolate
+        // handle lets the classifier check the real disposed flag. Filled in
+        // below.
+        const hostSignals       = { runStartNs: null, getIsolate: () => isolate };
 
         let isolate = null;
 
@@ -1934,7 +1937,7 @@ class XChainVM {
             Error.stackTraceLimit = 0;
             Error.prepareStackTrace = function() { return ''; };
             try {
-                hostSignals.runStartMs = Date.now();
+                hostSignals.runStartNs = process.hrtime.bigint();
                 const rawReturn = script.runSync(context, { timeout: this.limits.maxCpuTimeMs });
                 // The contract wrapper JSON-serializes non-null return values
                 // with a \x02 prefix inside the isolate
@@ -2194,8 +2197,8 @@ class XChainVM {
         if (msg.includes('Script execution timed out') || msg.includes('disposed')) {
             const legit = !__corroborate
                 || __isolateDisposed
-                || (hostSignals.runStartMs != null &&
-                    (Date.now() - hostSignals.runStartMs) >= this.limits.maxCpuTimeMs);
+                || (hostSignals.runStartNs != null &&
+                    (process.hrtime.bigint() - hostSignals.runStartNs) >= BigInt(this.limits.maxCpuTimeMs) * 1000000n);
             if (legit) {
                 // Wall-clock timeout (consensus risk). Log at ERROR level.
                 console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +

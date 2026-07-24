@@ -49,7 +49,7 @@ const GAS_SCHEDULE = {
 
     function signals(over) {
         return Object.assign({
-            runStartMs: Date.now(),
+            runStartNs: process.hrtime.bigint(),
             getIsolate: () => ({ isDisposed: false })
         }, over);
     }
@@ -67,7 +67,7 @@ const GAS_SCHEDULE = {
         });
         it('accepts a real timeout (elapsed >= maxCpuTimeMs) -> timeout, clamped', function () {
             const r = classify(new Error('Script execution timed out.'), HARDENED,
-                signals({ runStartMs: Date.now() - vm.limits.maxCpuTimeMs - 5 }));
+                signals({ runStartNs: process.hrtime.bigint() - BigInt(vm.limits.maxCpuTimeMs + 5) * 1000000n }));
             assert.ok(r.error.startsWith('timeout:'), r.error);
             assert.strictEqual(r.gasUsed, CEILING);
         });

@@ -47,6 +47,7 @@
 
 const XChainVM = require('../index.js');
 const { toContractJs } = require('./transpile.js');
+const { MAX_CODE_SIZE } = require('../lint-core.js');
 
 // Canonical VM gas schedule (matches the component-doc Gas Schedule table and
 // the indexer's VM fee rows). Every CANONICAL_GAS_KEYS entry the VM charges is
@@ -70,7 +71,7 @@ const DEFAULT_LIMITS = Object.freeze({
     maxEmissions: 50,
     maxStateKeys: 10000,
     maxStateValueSize: 65536,
-    maxCodeSize: 65536,
+    maxCodeSize: MAX_CODE_SIZE,
     maxCallDepth: 4,
     minCallGas: 5000
 });

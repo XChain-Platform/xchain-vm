@@ -82,10 +82,15 @@ function runGate(code) {
     const lint = lintSource(code);
     const allErrors = lint.errors || [];
 
-    // Deploy parity: the on-chain validator blocks ONLY on CONSENSUS_RULES
-    // (see syntax.js validateSyntax). analyzeContract's findings are advisories.
-    const errors = allErrors.filter((e) => CONSENSUS_RULES.has(e.rule));
-    const advisories = allErrors.filter((e) => !CONSENSUS_RULES.has(e.rule));
+    // Deploy parity: the on-chain validator blocks on CONSENSUS_RULES (see
+    // syntax.js validateSyntax) PLUS the code-size cap, which the indexer
+    // enforces by byte length BEFORE validateSyntax (deploy.js), so it is not
+    // itself a consensus rule but is still deploy-blocking. analyzeContract's
+    // other findings (e.g. crossCallable-not-array, a runtime not a deploy
+    // failure) remain non-blocking advisories.
+    const DEPLOY_BLOCKING = new Set([...CONSENSUS_RULES, 'code-size']);
+    const errors = allErrors.filter((e) => DEPLOY_BLOCKING.has(e.rule));
+    const advisories = allErrors.filter((e) => !DEPLOY_BLOCKING.has(e.rule));
 
     const warnings = Array.isArray(lint.warnings) ? lint.warnings.slice() : [];
     // Defensive: if a future lint-core stops folding float warnings in, keep them.

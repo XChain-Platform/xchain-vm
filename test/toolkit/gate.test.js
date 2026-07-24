@@ -20,6 +20,17 @@ const assert = require('assert');
 // Require the module DIRECTLY (not the toolkit index) so this stays runnable
 // on a host where isolated-vm cannot dlopen. gate.js pulls in only acorn.
 const { runGate, estimateGas } = require('../../src/toolkit/gate.js');
+// lint-core (not index.js) so this suite still runs where isolated-vm cannot
+// dlopen; mirrors the boundary fixtures in test/unit/lint-cli.test.js.
+const { MAX_CODE_SIZE } = require('../../src/lint-core.js');
+
+// Pad a clean contract to exactly `bytes` UTF-8 bytes with a trailing line
+// comment, so the padded source stays otherwise lint-clean.
+function padTo(bytes) {
+    const base = 'module.exports = function(xchain) { return xchain.state.get("a"); };\n';
+    const need = bytes - Buffer.byteLength(base, 'utf8');
+    return base + '//' + 'x'.repeat(Math.max(0, need - 2));
+}
 
 describe('Toolkit gate: determinism + gas', function() {
 
@@ -28,6 +39,22 @@ describe('Toolkit gate: determinism + gas', function() {
         assert.strictEqual(g.ok, true);
         assert.strictEqual(g.errors.length, 0);
         assert(g.gas.suggested > 0);
+    });
+
+    // Deploy parity: code over MAX_CODE_SIZE is rejected on chain BEFORE the
+    // syntax gate (deploy.js Buffer.byteLength check), so the gate must FAIL
+    // it too even though `code-size` is deliberately not a CONSENSUS_RULE.
+    it('blocks a contract one byte over MAX_CODE_SIZE (deploy parity)', function() {
+        const g = runGate(padTo(MAX_CODE_SIZE + 1));
+        assert.strictEqual(g.ok, false);
+        assert(g.errors.some(e => e.rule === 'code-size'), 'code-size must be a blocking error');
+        assert(!g.advisories.some(e => e.rule === 'code-size'), 'code-size must not be demoted to an advisory');
+    });
+
+    it('passes a contract at exactly MAX_CODE_SIZE (boundary parity)', function() {
+        const g = runGate(padTo(MAX_CODE_SIZE));
+        assert.strictEqual(g.ok, true);
+        assert(!g.errors.some(e => e.rule === 'code-size'));
     });
 
     it('blocks a banned transcendental Math.* call (deploy parity)', function() {

@@ -26,7 +26,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **External attestation**: `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
 - **Deterministic math**: `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point; native `Math.sqrt/pow/log/log2/log10` rejected at deploy time
 - **Contract state management**: key-value state with dirty tracking, key count limits, and value size limits
-- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, float usage warnings
+- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly checks (see `CONSENSUS_RULES` in `src/lint-core.js`), float usage warnings
 - **Per-block compilation cache**: V8 cached compilation data eliminates redundant parsing for hot contracts
 - **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap, wall-clock timeout
 - **Multi-method contracts**: contracts export a function (single entry) or an object with named methods
