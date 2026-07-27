@@ -33,9 +33,13 @@
     "mocha": "^11.7.5"
   },
   "overrides": {
+    "brace-expansion": "^5.0.8",
+    "minimatch": "^10.2.5",
+    "fast-uri": "^3.1.4",
     "qs": "^6.15.2",
     "serialize-javascript": "^7.0.5",
-    "decimal.js": "10.4.3"
+    "decimal.js": "10.4.3",
+    "js-yaml": "^4.3.0"
   },
   "scripts": {
     "test": "mocha --timeout 30000 'test/preflight.test.js' 'test/unit/**/*.test.js' 'test/toolkit/**/*.test.js'",
