@@ -459,7 +459,7 @@ module.exports = {
 
     const POST_GATE_CTX = {
         height: 999,
-        timestamp: (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1790812800,
+        timestamp: (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800,
         hash: 'post_gate_hash'
     };
 

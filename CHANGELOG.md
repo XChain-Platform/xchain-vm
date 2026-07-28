@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - AI-assisted contract authoring (Tier 3): `src/toolkit/authoring.js` builds English/Solidity authoring prompts from a canonical knowledge base and runs an injected LLM client's reply through the deploy gate with an automatic repair loop, exposed via `xchain-vm/toolkit` and the `xchain-foundry describe|from-solidity|validate` commands.
 - `xchain-foundry` / `create-xchain-contract` developer toolkit: a local contract simulator (in-memory indexer mock), a no-isolate determinism gate + gas profiler, TypeScript type-strip authoring, and a project scaffolder, exposed via `require('xchain-vm/toolkit')` and the two new bins.
-- Confirmed `ASYNC_SURFACE_GATE_BLOCK_TIME` and `BINARY_ALLOC_GATE_BLOCK_TIME` at the armed contract-era flag-day 1790812800 (2026-10-01 00:00 UTC), in lockstep with the indexer.
+- Confirmed `ASYNC_SURFACE_GATE_BLOCK_TIME` and `BINARY_ALLOC_GATE_BLOCK_TIME` at the armed contract-era flag-day 1786924800 (2026-08-17 00:00 UTC), in lockstep with the indexer.
 - `lintSource` now enforces the 65536-byte code-size cap and flags sandbox-neutered prototype methods, so the SDK's vendored linter matches the CLI ().
 
 ### Changed
@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/index.js`: extract the `maxCodeSize` 64 KiB inline literal into an exported `MAX_CODE_SIZE` constant so cross-service regression suites can assert it matches the protocol canonical value.
 
 ### Fixed
-- `src/index.js`: gate the binary-allocation gas charge (`ArrayBuffer`/`TypedArray` byte-length metering) behind `BINARY_ALLOC_GATE_BLOCK_TIME` (since armed at the coordinated 2.0.0 flag-day `1790812800`) so the whole fleet flips the rule atomically at one timestamp.
+- `src/index.js`: gate the binary-allocation gas charge (`ArrayBuffer`/`TypedArray` byte-length metering) behind `BINARY_ALLOC_GATE_BLOCK_TIME` (since armed at the coordinated 2.0.0 flag-day `1786924800`) so the whole fleet flips the rule atomically at one timestamp.
 - `src/index.js`, `src/metering.js`: bound intra-contract recursion with a deterministic in-isolate `MAX_STACK_DEPTH` (512) depth limit via `__depth_enter`/`__depth_exit` hooks injected by the metering pass, making the limit platform-independent and un-swallowable.
 - `src/index.js`: throw `XChainVM: unknown execution mode ...` at construct time for unrecognized `execution` values, and warn once per process when `execution` is omitted (in-process default has no SIGABRT containment).
 - `src/process-executor.js`: start the subprocess watchdog when a request is DISPATCHED to the worker, not when `execute()` accepts it, so queue wait can never trigger the deterministic `out_of_resource` clamp.

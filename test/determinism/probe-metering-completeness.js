@@ -53,7 +53,7 @@ const GSTR = `var s=('5').repeat(${K});`;
 // The F3-globals metering (like F3-binary) is flag-day-gated on block time, so
 // these vectors must run AT/ABOVE the gate to exercise the ACTIVATED ruleset;
 // below it they are intentionally un-metered (historical replay behaviour).
-const POST_GATE_BLOCK = { height: 100, timestamp: 1790812800, hash: 'gate' };  // = BINARY_ALLOC_GATE_BLOCK_TIME (the armed 2.0.0 flag-day; pinned in consensus-params.test.js)
+const POST_GATE_BLOCK = { height: 100, timestamp: 1786924800, hash: 'gate' };  // = BINARY_ALLOC_GATE_BLOCK_TIME (the armed 2.0.0 flag-day; pinned in consensus-params.test.js)
 
 const VECTORS = [
     // --- Array methods G1 should already cover (regression) ---

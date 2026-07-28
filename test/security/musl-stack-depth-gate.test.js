@@ -43,7 +43,7 @@ const { createVM, execute, XChainVM } = require('../fuzz/harness');
 
 const CEILING = 3000000;
 
-// Block time >= BINARY_ALLOC_GATE_BLOCK_TIME (1790812800): F-NR native guard ON.
+// Block time >= BINARY_ALLOC_GATE_BLOCK_TIME (1786924800): F-NR native guard ON.
 const T_FNR_ON  = 1900000000;
 // Block time < the F-NR gate: native guard OFF, but the intra-contract recursion
 // guard (ungated) still enforces __DEPTH_LIMIT, so the HEIGHT gate is observable

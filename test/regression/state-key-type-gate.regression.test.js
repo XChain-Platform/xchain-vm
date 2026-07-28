@@ -75,7 +75,7 @@ const CLEAN_KEY_CODE = `module.exports = function(){
         : execute(vm, code, { method: 'default', blockContext });
 
     it('the flag day is the pinned coordinated activation timestamp', function () {
-        assert.strictEqual(GATE, 1790812800);
+        assert.strictEqual(GATE, 1786924800);
     });
 
     it('mainnet below the flag day: legacy type-blind behavior replays (1 and \'1\' are two keys)', async function () {

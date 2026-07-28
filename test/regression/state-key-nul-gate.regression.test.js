@@ -34,7 +34,7 @@
 const assert = require('assert');
 const { createVM, execute, XChainVM } = require('../fuzz/harness');
 
-// Read the export directly with NO numeric fallback: the old `|| 1790812800`
+// Read the export directly with NO numeric fallback: the old `|| 1786924800`
 // silently absorbed a rename/removal of the export (every test still passed
 // against the literal). A missing export now yields undefined, which fails the
 // flag-day pin test below loudly. XChainVM itself may be absent (no isolated-vm
@@ -71,7 +71,7 @@ const CLEAN_KEY_CODE = `module.exports = function(){
         : execute(vm, code, { method: 'default', blockContext });
 
     it('the flag day is the pinned coordinated activation timestamp', function () {
-        assert.strictEqual(GATE, 1790812800);
+        assert.strictEqual(GATE, 1786924800);
     });
 
     it('mainnet below the flag day: the NUL key write still SUCCEEDS (historical behavior preserved)', async function () {

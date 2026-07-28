@@ -33,7 +33,7 @@ const assert = require('assert');
 const { createVM, execute, XChainVM } = require('../fuzz/harness');
 
 const CEILING = 1000000;
-const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1790812800;
+const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800;
 
 // One second on either side of the flag day isolates the gate boundary itself.
 const BEFORE = { height: 100, timestamp: GATE - 1, hash: 'pre' };
@@ -49,7 +49,7 @@ const AT     = { height: 100, timestamp: GATE,     hash: 'at'  };
     const run = (code, blockContext) => execute(vm, code, { method: 'default', blockContext });
 
     it('the flag day is the pinned coordinated activation timestamp', function () {
-        assert.strictEqual(GATE, 1790812800);
+        assert.strictEqual(GATE, 1786924800);
     });
 
     it('(a) the same binary allocation produces a DIFFERENT gasUsed below vs at the flag day', async function () {
