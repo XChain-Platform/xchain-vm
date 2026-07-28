@@ -61,13 +61,13 @@ const PEEK = 'module.exports = { peek: function(x) { return String(typeof __meth
     });
 
     it('post-gate (mainnet at the flag-day): bindings are starved there too', async function () {
-        const res = await run(vm, 'mainnet', 1790812800);
+        const res = await run(vm, 'mainnet', 1786924800);
         assert.strictEqual(res.success, true, res.error);
         assert.strictEqual(JSON.parse(res.returnValue), 'undefined:undefined');
     });
 
     it('pre-gate (mainnet below the flag-day): legacy visibility preserved for replay parity', async function () {
-        const res = await run(vm, 'mainnet', 1790812799);
+        const res = await run(vm, 'mainnet', 1786924799);
         assert.strictEqual(res.success, true, res.error);
         assert.strictEqual(JSON.parse(res.returnValue), 'string:boolean');
     });

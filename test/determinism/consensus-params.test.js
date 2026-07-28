@@ -169,8 +169,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // hashed deploy verdict and a hashed execution result, so two nodes that
         // disagree on the flag day diverge on the first such DEPLOY/EXECUTE. Pin it
         // like any other consensus parameter. Matches the indexer's VM_BANNED_ASYNC /
-        // other 2.0.0 flag-day activations (protocol_changes.js: 1790812800).
-        assert.strictEqual(vm.ASYNC_SURFACE_GATE_BLOCK_TIME, 1790812800);
+        // other 2.0.0 flag-day activations (protocol_changes.js: 1786924800).
+        assert.strictEqual(vm.ASYNC_SURFACE_GATE_BLOCK_TIME, 1786924800);
     });
 
     it('VM_LINT_HARDENING_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
@@ -180,12 +180,12 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // execution status/gasUsed are hashed, so two nodes that disagree on the
         // flag day diverge on the first hardened DEPLOY/EXECUTE. Armed at the
         // ratified  anchor, the same instant VM_BANNED_ASYNC activates
-        // (indexer protocol_changes.js: 1790812800).
-        assert.strictEqual(vm.VM_LINT_HARDENING_GATE_BLOCK_TIME, 1790812800);
+        // (indexer protocol_changes.js: 1786924800).
+        assert.strictEqual(vm.VM_LINT_HARDENING_GATE_BLOCK_TIME, 1786924800);
         assert.strictEqual(vm.isLintHardeningActive('regtest', 0), true);
         assert.strictEqual(vm.isLintHardeningActive('testnet', 0), true);
-        assert.strictEqual(vm.isLintHardeningActive('mainnet', 1790812799), false);
-        assert.strictEqual(vm.isLintHardeningActive('mainnet', 1790812800), true);
+        assert.strictEqual(vm.isLintHardeningActive('mainnet', 1786924799), false);
+        assert.strictEqual(vm.isLintHardeningActive('mainnet', 1786924800), true);
         assert.strictEqual(vm.isLintHardeningActive(undefined, NaN), false);
     });
 
@@ -276,8 +276,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // on the first binary-allocating execution after the earlier of the two.
         // Pin it like any other consensus parameter; changing it is a coordinated
         // release-team event, NOT a silent edit. Matches the indexer's other 2.0.0
-        // flag-day activations (protocol_changes.js: 1790812800).
-        assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1790812800);
+        // flag-day activations (protocol_changes.js: 1786924800).
+        assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1786924800);
     });
 
     it('CALL_SPREAD_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
@@ -286,8 +286,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // gasUsed (→ contract_hash → fee debit), so two nodes that disagree on the flag
         // day diverge on the first spread-argument execution after the earlier of the
         // two. Pin it like any other consensus parameter; batched into the same 2.0.0
-        // flag-day (protocol_changes.js: 1790812800).
-        assert.strictEqual(vm.CALL_SPREAD_METER_GATE_BLOCK_TIME, 1790812800);
+        // flag-day (protocol_changes.js: 1786924800).
+        assert.strictEqual(vm.CALL_SPREAD_METER_GATE_BLOCK_TIME, 1786924800);
     });
 
     it('Package 3 VM-sandbox bundle gate: per-coin activation heights + depth bounds are frozen ', function () {
@@ -337,16 +337,16 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // diverge on the first NUL-key write after the earlier of the two. The
         // regression suite exercises the gate's BEHAVIOR relative to the export;
         // this is the hard VALUE pin (a rename/removal makes the export undefined
-        // and fails here too). Same 2.0.0 flag-day (protocol_changes.js: 1790812800).
-        assert.strictEqual(vm.STATE_KEY_NUL_GATE_BLOCK_TIME, 1790812800);
+        // and fails here too). Same 2.0.0 flag-day (protocol_changes.js: 1786924800).
+        assert.strictEqual(vm.STATE_KEY_NUL_GATE_BLOCK_TIME, 1786924800);
     });
 
     it('METERING_EVAL_ORDER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // The spec-correct obj[k] += rhs rewrite (__setconcatL) changes results and
         // gasUsed for side-effecting RHS patterns, so the activation must flip
         // fleet-wide at one timestamp. Hard value pin alongside its sibling gates;
-        // batched into the same 2.0.0 flag-day (protocol_changes.js: 1790812800).
-        assert.strictEqual(vm.METERING_EVAL_ORDER_GATE_BLOCK_TIME, 1790812800);
+        // batched into the same 2.0.0 flag-day (protocol_changes.js: 1786924800).
+        assert.strictEqual(vm.METERING_EVAL_ORDER_GATE_BLOCK_TIME, 1786924800);
     });
 
     it('STATE_KEY_TYPE_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
@@ -354,8 +354,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // rejection of non-primitive keys) change which writes are valid and how
         // keys count against maxStateKeys, so the activation must flip fleet-wide
         // at one timestamp. Batched into the same 2.0.0 flag-day
-        // (protocol_changes.js: 1790812800).
-        assert.strictEqual(vm.STATE_KEY_TYPE_GATE_BLOCK_TIME, 1790812800);
+        // (protocol_changes.js: 1786924800).
+        assert.strictEqual(vm.STATE_KEY_TYPE_GATE_BLOCK_TIME, 1786924800);
     });
 
     it('all six 2.0.0 gate constants match the indexer protocol_changes.js CONTROLLER_GUARD literal (cross-repo repin guard)', function () {
