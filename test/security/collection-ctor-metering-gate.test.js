@@ -74,10 +74,37 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
             'the charge is exactly the 500-element source length');
     });
 
-    it('below the gate: a heavy construction loop SUCCEEDS (unmetered, byte-identical to today)', async function () {
+    // CHANGED by  / , and the change is deliberate.
+    //
+    // This asserted that below the Pkg 3 gate a heavy .add() loop SUCCEEDS, because
+    // mutation was unmetered and a from-genesis replay had to reproduce historical
+    // gas bit-for-bit. #3184 charges Set.add / Map.set UNGATED: construction metering
+    // stays behind this per-coin height gate, but GROWTH is charged from genesis,
+    // because charging construction while leaving the equivalent loop free left the
+    // unbounded-allocation hole wide open on exactly the path an attacker would use.
+    //
+    // Ungated is only sound inside the  batch, whose mandatory fleet-wide
+    // wipe-and-replay recomputes all history under the new rules, so there is no
+    // historical gas left to preserve. Some already-deployed operator contracts will
+    // re-execute more expensively and may now fail; per spec §2 those are findings to
+    // adjudicate in the deploy report, not casualties.
+    it('below the gate: a heavy .add() loop is ALSO out_of_gas (mutation metering is ungated, #3184)', async function () {
         const r = await runAt(setLoop, 960999, 'mainnet', 'BTC', 500000);
-        assert.strictEqual(r.success, true, r.error);
-        assert.strictEqual(JSON.parse(r.returnValue), 'done');
+        assert.strictEqual(r.success, false,
+            'growth is charged from genesis now: ' + JSON.stringify(r.returnValue));
+        assert.match(r.error, /^out_of_gas:|^out_of_resource:/, r.error);
+    });
+
+    // The construction gate must NOT have moved. If the mutation charge had leaked
+    // into the constructor path, the sibling "charge is exactly the 500-element source
+    // length" assertion above would drift, so this pins the separation directly: below
+    // the gate a single ctor call is still free.
+    it('below the gate: the CONSTRUCTOR is still unmetered (#3184 did not widen the ctor gate)', async function () {
+        const below = await runAt(oneSet, 960999, 'mainnet', 'BTC');
+        const at    = await runAt(oneSet, 961000, 'mainnet', 'BTC');
+        assert.strictEqual(at.gasUsed - below.gasUsed, 500,
+            'the ctor charge must still be exactly the source length, unchanged by the ' +
+            'mutation metering, or the two gates have been conflated');
     });
 
     it('at the gate: the same loop is a deterministic out_of_gas (metering binds)', async function () {

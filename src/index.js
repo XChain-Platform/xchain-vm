@@ -320,6 +320,50 @@ const HARNESS_SOURCE = `
     }
     // ----- end collection-constructor metering -----
 
+    // ----- collection MUTATOR metering () -----
+    // The Pkg 3 G1 work metered collection CONSTRUCTION and iterable-copy sizing
+    // above, and stopped there. Growing a collection afterwards was free:
+    //
+    //     const s = new Set();          // charged 0 (empty)
+    //     while (...) s.add(x);         // charged 0 per element
+    //
+    // so a contract could allocate without bound one element at a time and pay
+    // nothing, which is the exact hole the constructor metering was added to close.
+    // 'new Set(bigArray)' was charged and the equivalent loop was not.
+    //
+    // One unit per call, matching the constructor's __allocGas(size) = 1 per
+    // element, so the two routes to an N-element collection cost the same.
+    // Deliberately __gas(1) and NOT __allocGas(1): __allocGas filters 'x > 1', so
+    // routing a per-element charge through it would charge exactly nothing and
+    // reinstate the hole while looking like a fix.
+    //
+    // Charged per CALL rather than only on growth. A re-add of an existing member
+    // does not grow the collection but still performs the hash/lookup, and probing
+    // .has() first to decide would both do more work and depend on another wrapped
+    // method. Per-call is the deterministic and cheaper choice.
+    //
+    // UNGATED, departing from the flag-day discipline every other gas-moving change
+    // in this file follows (__PKG3_SANDBOX_ON, __meterUpgradeOn). Those gates exist
+    // so a from-genesis replay reproduces historical gas bit-for-bit; the 
+    // batch replaces that guarantee with one mandatory fleet-wide wipe-and-replay,
+    // under which every node re-executes all history under these rules and no old
+    // prefix survives to be reproduced. Do NOT copy this ungated pattern for a
+    // post-launch change: it is correct only inside that rebase.
+    var __meterCollectionMutator = function(nm, method) {
+        var Ctor = globalThis[nm];
+        if (typeof Ctor !== 'function' || !Ctor.prototype) return;
+        var Orig = Ctor.prototype[method];
+        if (typeof Orig !== 'function') return;
+        __lockMethod(Ctor.prototype, method, function() {
+            __gas(1);
+            return Orig.apply(this, arguments);
+        });
+    };
+    var __collMutators = [['Set', 'add'], ['Map', 'set'], ['WeakSet', 'add'], ['WeakMap', 'set']];
+    for (var __cmi = 0; __cmi < __collMutators.length; __cmi++)
+        __meterCollectionMutator(__collMutators[__cmi][0], __collMutators[__cmi][1]);
+    // ----- end collection-mutator metering -----
+
     // ----- Deterministic structural-depth guard for native-recursive builtins (F-NR) -----
     // JSON.stringify and Array.prototype.join/flat (join also backs toString,
     // String(arr), arr+empty-string, and template interpolation of an array)
@@ -2332,8 +2376,29 @@ class XChainVM {
      * @param {string} code
      * @returns {Promise<{ success: boolean, manifest: object|null, error: string|null }>}
      */
-    async readManifest(code) {
-        const result = await this.execute({ code, method: '__manifest__', readManifest: true });
+    // : the manifest read must resolve activation gates at the DEPLOY'S OWN
+    // block, because its outcome is hashed into deploy status.
+    //
+    // This used to call execute() with no block context at all, so `opts.network` was
+    // undefined, `opts.blockContext` was undefined (making __pkg3Height NaN and
+    // isPkg3SandboxActive false), and __blockTime defaulted to 0. Every gate therefore
+    // resolved PRE-ACTIVATION no matter which block the deploy was in: the manifest was
+    // read under one sandbox rule set while every later execute() of the same contract
+    // ran under another. Any module-level code whose outcome differs across a gate (a
+    // guard that only arms post-activation, or metering that only then charges toward
+    // the gas ceiling) produced a manifest, and therefore a DEPLOY VERDICT, computed
+    // under rules that were not in force at that height.
+    //
+    // Callers pass the deploy's own context; omitting it preserves the old
+    // pre-activation resolution for non-consensus callers (tooling, tests).
+    async readManifest(code, opts) {
+        opts = opts || {};
+        const result = await this.execute({
+            code, method: '__manifest__', readManifest: true,
+            network:         opts.network,
+            blockContext:    opts.blockContext,
+            contractAddress: opts.contractAddress
+        });
         if (!result.success)
             return { success: false, manifest: null, error: result.error };
         let manifest = null;
