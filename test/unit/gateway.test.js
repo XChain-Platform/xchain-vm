@@ -346,6 +346,36 @@ describe('Gateway (host-function surface)', function () {
             assert.throws(() => gw.contract.slash(PUB, 'TOK', '1.123456789'), /amount must be a positive decimal/);
             assert.throws(() => gw.contract.slash(PUB, 'TOK', 'abc'), /amount must be a positive decimal/);
         });
+
+        // . The '|' guard is consensus-visible (a call that used to emit now
+        // throws), so the host gates it; both sides of the gate are pinned here.
+        it('rejects a token carrying the wire delimiter when the gate is on', function () {
+            const { gw, collector } = build({ slashTokenDelimGuardOn: true });
+            assert.throws(() => gw.contract.slash(PUB, 'TO|K', '1'), /token must not contain "\|"/);
+            assert.throws(() => gw.contract.slash(PUB, '|', '1'), /token must not contain "\|"/);
+            assert.throws(() => gw.contract.slash(PUB, 'TOK|', '1'), /token must not contain "\|"/);
+            assert.strictEqual(collector.actions.length, 0, 'a rejected slash must emit nothing');
+            // A delimiter-free token is unaffected by the gate.
+            gw.contract.slash(PUB, 'TOK', '1');
+            assert.strictEqual(collector.actions.length, 1);
+            assert.strictEqual(collector.actions[0].params.token, 'TOK');
+        });
+
+        it('emits a delimiter-bearing token unchanged below the gate (replay parity)', function () {
+            const { gw, collector } = build({ slashTokenDelimGuardOn: false });
+            gw.contract.slash(PUB, 'TO|K', '1');
+            assert.deepStrictEqual(collector.actions[0], {
+                action: 'SLASH',
+                params: { contractIndex: 7, pubkey: PUB, token: 'TO|K', amount: '1' },
+            });
+        });
+
+        it('charges the emission before the delimiter check (anti-spam ordering)', function () {
+            const { gw, gas } = build({ slashTokenDelimGuardOn: true });
+            assert.throws(() => gw.contract.slash(PUB, 'TO|K', '1'), /must not contain/);
+            assert.ok(gas.charges.includes(SCHEDULE.VM_EMISSION),
+                'a rejected slash still costs the emission charge, like the other validators');
+        });
     });
 
     describe('control flow', function () {

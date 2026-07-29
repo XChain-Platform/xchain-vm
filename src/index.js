@@ -1339,6 +1339,22 @@ function isCallSpreadMeterActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= CALL_SPREAD_METER_GATE_BLOCK_TIME;
 }
 
+// Activation for the contract.slash `token` wire-delimiter guard . Every
+// other emit validator rejects a '|' in a field the indexer may pipe-join;
+// contract.slash never had that check. It is inert against today's consumer (SLASH
+// is internal-only and _processSlashEmission reads the params by named field), but
+// a contract that slashes a '|'-bearing token currently SUCCEEDS and post-gate
+// THROWS, which is consensus-visible, so the guard is gated like the other 2.0.0
+// contract-era changes: testnet/regtest from genesis, mainnet at the shared
+// coordinated flag-day. Deliberately rides the existing BINARY_ALLOC flag-day
+// rather than minting a seventh constant (same choice as the F-MO math-output and
+// F-PS proto-strip gateway gates), so the frozen six-gate consensus pin and its
+// cross-repo CONTROLLER_GUARD check are untouched.
+function isSlashTokenDelimGuardActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
+}
+
 // ----- Package 3 VM-sandbox flag-day: per-coin block-HEIGHT bundle gate  -----
 // ONE coordinated activation for the whole flag-day Package 3 VM-sandbox bundle, so
 // every leg flips fleet-wide together under a single CONSENSUS_VERSION bump (2 -> 3)
@@ -1694,10 +1710,14 @@ class XChainVM {
             const mathBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
             const mathOutputMeterOn = Number.isFinite(mathBlockTime) &&
                 mathBlockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
+            //  gate: reject a '|' in contract.slash's token field (see
+            // isSlashTokenDelimGuardActive). Network-aware like the state-key gates.
+            const slashTokenDelimGuardOn = isSlashTokenDelimGuardActive(opts.network, mathBlockTime);
             const gateway = buildGateway(
                 gasTracker, stateManager, emissionCollector,
                 {
                     mathOutputMeterOn,
+                    slashTokenDelimGuardOn,
                     caller:          opts.caller,
                     contractAddress: opts.contractAddress,
                     contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
@@ -2375,6 +2395,10 @@ module.exports.STATE_KEY_TYPE_GATE_BLOCK_TIME = STATE_KEY_TYPE_GATE_BLOCK_TIME;
 // tests to mirror the network-aware activation.
 module.exports.VM_LINT_HARDENING_GATE_BLOCK_TIME = VM_LINT_HARDENING_GATE_BLOCK_TIME;
 module.exports.isLintHardeningActive = isLintHardeningActive;
+// Resolver for the contract.slash token wire-delimiter guard . No new
+// flag-day constant: it rides BINARY_ALLOC_GATE_BLOCK_TIME. Exported so tests and
+// the indexer can mirror the network-aware activation.
+module.exports.isSlashTokenDelimGuardActive = isSlashTokenDelimGuardActive;
 // Cross-CHAIN call (XCALL) protocol constants, same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;

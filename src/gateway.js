@@ -304,6 +304,16 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     throw new Error('contract.slash: pubkey must be a 64-hex string');
                 if (typeof token !== 'string' || token.length === 0)
                     throw new Error('contract.slash: token must be a non-empty string');
+                // : keep the wire delimiter out of the token field, matching
+                // emit.execute / attestation.request. Inert against today's consumer
+                // (SLASH is internal-only and the indexer's _processSlashEmission reads
+                // {contractIndex, pubkey, token, amount} by NAMED field, never pipe-
+                // splitting), so this is defense-in-depth for the day SLASH is joined
+                // on-wire like EXECUTE's METHOD_PARAMS. Gated (host sets
+                // readOnlyData.slashTokenDelimGuardOn) because rejecting a call that
+                // used to emit successfully changes replay for historical blocks.
+                if (readOnlyData.slashTokenDelimGuardOn && token.indexOf('|') !== -1)
+                    throw new Error('contract.slash: token must not contain "|"');
                 if (typeof amount !== 'string' || !/^[0-9]+(\.[0-9]{1,8})?$/.test(amount))
                     throw new Error('contract.slash: amount must be a positive decimal string');
                 let contractIndex = readOnlyData.contractIndex;
