@@ -4,8 +4,8 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.11.13-blue" alt="Version">
-  <img src="https://img.shields.io/badge/tests-974%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/version-1.11.14-blue" alt="Version">
+  <img src="https://img.shields.io/badge/tests-1653%2B%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
 </p>
@@ -37,15 +37,15 @@ Full VM architecture and protocol details are available in the [xchain-documenta
 
 | Document | Description |
 |---|---|
-| [Smart Contracts](https://github.com/XChain-Platform/xchain-documentation/blob/master/concepts/SMART_CONTRACTS.md) | VM architecture, contract model, bounded execution, use cases |
-| [Block Hashes](https://github.com/XChain-Platform/xchain-documentation/blob/master/concepts/BLOCK_HASHES.md) | Ledger, actions, and contract hashes: how contract state is verified |
-| [Ledger](https://github.com/XChain-Platform/xchain-documentation/blob/master/concepts/LEDGER.md) | Double-entry ledger: how contract derived addresses participate |
-| [DEPLOY](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/DEPLOY.md) | DEPLOY action spec: code encoding, api_version, gas costs |
-| [EXECUTE](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/EXECUTE.md) | EXECUTE action spec: method calls, params, gas metering |
-| [DEPOSIT](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/DEPOSIT.md) | DEPOSIT action spec: transferring tokens into contract custody |
-| [WITHDRAW](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/WITHDRAW.md) | WITHDRAW action spec: owner-initiated withdrawal from contract |
-| [Indexer Database](https://github.com/XChain-Platform/xchain-documentation/blob/master/components/indexer/DATABASE.md) | Schema reference: contracts, contract_state, executions, emissions tables |
-| [Fee Schedule](https://github.com/XChain-Platform/xchain-documentation/blob/master/components/indexer/CONFIGURATION.md) | Unified gas schedule: VM gas costs, GAS_PRICE, fee conversion |
+| [Smart Contracts](https://github.com/XChain-Platform/xchain-documentation/blob/master/concepts/smart-contracts.md) | VM architecture, contract model, bounded execution, use cases |
+| [Block Hashes](https://github.com/XChain-Platform/xchain-documentation/blob/master/concepts/block-hashes.md) | Ledger, actions, and contract hashes: how contract state is verified |
+| [Ledger](https://github.com/XChain-Platform/xchain-documentation/blob/master/concepts/ledger.md) | Double-entry ledger: how contract derived addresses participate |
+| [DEPLOY](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/deploy.md) | DEPLOY action spec: code encoding, api_version, gas costs |
+| [EXECUTE](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/execute.md) | EXECUTE action spec: method calls, params, gas metering |
+| [DEPOSIT](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/deposit.md) | DEPOSIT action spec: transferring tokens into contract custody |
+| [WITHDRAW](https://github.com/XChain-Platform/xchain-documentation/blob/master/protocol/actions/withdraw.md) | WITHDRAW action spec: owner-initiated withdrawal from contract |
+| [Indexer Database](https://github.com/XChain-Platform/xchain-documentation/blob/master/components/indexer/database.md) | Schema reference: contracts, contract_state, executions, emissions tables |
+| [Fee Schedule](https://github.com/XChain-Platform/xchain-documentation/blob/master/components/indexer/configuration.md) | Unified gas schedule: VM gas costs, GAS_PRICE, fee conversion |
 
 ## Quick Start
 
@@ -147,6 +147,14 @@ xchain-foundry lint contracts/my-token.js
 
 # Deploy + run a method in the in-memory simulator (Node 22 / Linux)
 xchain-foundry simulate contracts/my-token.js --constructor 5 --method increment --params 3
+
+# AI-assisted authoring (Tier 3): print a ready-to-use prompt, no network call or key
+xchain-foundry describe "an escrow that releases on a signed delivery attestation"
+xchain-foundry from-solidity MyContract.sol
+
+# Close the loop: run a model's reply through the deploy gate, printing a repair
+# prompt on failure (use `-` for stdin)
+xchain-foundry validate model-response.txt
 ```
 
 Programmatic use:
@@ -173,16 +181,21 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 
 | Command | Description |
 |---|---|
-| `npm test` | Unit tests (580 tests, 30s timeout) |
-| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) |
-| `npm run test:all` | Unit + E2E tests (644 tests) |
+| `npm test` | Unit tests (669 tests, 30s timeout) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (52 tests) |
+| `npm run test:integration` | Integration tests (164 tests) |
+| `npm run test:security` | Security tests (201 tests) |
+| `npm run test:boundary` | Boundary condition tests (115 tests) |
+| `npm run test:determinism` | Determinism tests (79 tests) |
+| `npm run test:performance` | Performance benchmarks-as-tests (5 tests) |
+| `npm run test:all` | Every `*.test.js` under `test/` (1,653+ tests) |
 | `npm run test:e2e` | E2E tests only (64 tests) |
 | `npm run smoke` | Smoke tests (10 tests, < 5s) |
-| `npm run test:fuzz` | Fuzz / property-based tests (86 tests) |
-| `npm run test:chaos` | Chaos engineering tests (92 tests) |
+| `npm run test:fuzz` | Fuzz / property-based tests (57 tests) |
+| `npm run test:chaos` | Chaos engineering tests (76 tests) |
 | `npm run test:regression:smoke` | P0 regression (11 tests, < 50ms) |
-| `npm run test:regression:core` | P0+P1 regression (45 tests, < 200ms) |
-| `npm run test:regression:full` | P0-P3 regression (152 tests, < 1s) |
+| `npm run test:regression:core` | P0+P1 regression (31 tests, < 200ms) |
+| `npm run test:regression:full` | P0-P3 + gate/pin regression (128 tests, < 1s) |
 | `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 |
 | `npm run test:regression:release` | All tests + mutation testing |
 | `npm run mutation` | Mutation testing (Stryker, full suite) |
@@ -191,67 +204,93 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 
 ## Test Suite
 
-### Unit Tests (580)
+### Unit Tests (669)
 
 | Category | Tests | Description |
 |---|---|---|
-| Metering | 40 | AST injection points, edge cases (arrow bodies, directive prologue, nested ternary, optional chaining, deep binary expressions) |
-| Gas | 15 | Ceiling enforcement, boundary conditions, cumulative charges, negative/float/non-number rejection |
-| Math | 28 | Precision (0.1+0.2=0.3), large numbers, comparisons, division by zero, string I/O, input length limits |
-| State | 34 | CRUD, delete-then-set cycles, key/value/key-size limits, NaN/Infinity rejection, UTF-8 handling, insertion order |
-| Collector | 15 | Emission cap, log truncation (byte-aware), param copy isolation, multi-byte truncation |
-| Compilation | 3 | Metering benchmark, worst-case 64KB contract compilation time |
-| Sandbox | 26 | 18 blocked globals, constructor escapes, prototype chain, eval/Function, Math freeze, xchain freeze |
-| Gateway | 20 | State ops, emit queuing, math, revert/require, logging, method routing, oracle stubs |
-| Gateway-Emit | 49 | All 16 emit types, required field validation, gas charging, params copy/rejection |
-| Validator | 30 | Action allowlist, unknown action rejection, params type validation |
-| Limits | 9 | Infinite loop (gas), memory bomb (OOM), emission flood, state flood, value size, code size boundaries |
-| Determinism | 8 | Same input produces identical results across runs (SHA-256 hash comparison), fixture contracts |
-| Syntax | 21 | Valid/invalid code, ES2020 support, `__gas` rejection, float warnings, edge cases |
-| Errors | 12 | ContractRevertError, GasExhaustedError construction and instanceof checks |
-| Isolate | 10 | Isolate creation, compilation, disposal, cached data |
-| Index (Integration) | 72 | Full pipeline: result structure, atomicity, return values, method routing, error classification, context, all 16 emit types |
-| Security | 72 | Sandbox escape vectors (RISK-01-03), error spoofing (RISK-04), gas bypass (RISK-05-06), prototype pollution (RISK-10-11), math abuse (RISK-12), info leakage (RISK-15) |
-| Boundary | 106 | 15 sections: gas ceiling, timeout, memory, code size, state management, emissions, logs, return values, math, metering, sandbox, gateway, emit fields, compound interactions, determinism |
-| Smoke | 10 | VM instantiation, sandbox creation, basic execution, method dispatch, gateway, math, syntax, revert |
+| Metering | 69 | AST injection points, edge cases (arrow bodies, directive prologue, nested ternary, optional chaining, deep binary expressions) |
+| Gas | 23 | Ceiling enforcement, boundary conditions, cumulative charges, negative/float/non-number rejection |
+| Math | 48 | Precision (0.1+0.2=0.3), large numbers, comparisons, division by zero, string I/O, input length limits |
+| State | 38 | CRUD, delete-then-set cycles, key/value/key-size limits, NaN/Infinity rejection, UTF-8 handling, insertion order |
+| Collector | 16 | Emission cap, log truncation (byte-aware), param copy isolation, multi-byte truncation |
+| Compilation | 2 | Metering benchmark, worst-case 64KB contract compilation time |
+| Sandbox | 37 | 18 blocked globals, constructor escapes, prototype chain, eval/Function, Math freeze, xchain freeze |
+| Gateway | 39 | State ops, emit queuing, math, revert/require, logging, method routing, oracle stubs |
+| Gateway-Emit | 67 | All 19 emit types, required field validation, gas charging, params copy/rejection |
+| Validator | 15 | Action allowlist, unknown action rejection, params type validation |
+| Syntax | 44 | Valid/invalid code, ES2020 support, `__gas` rejection, float warnings, edge cases |
+| Errors | 18 | ContractRevertError, GasExhaustedError construction and instanceof checks |
+| Isolate | 14 | Isolate creation, compilation, disposal, cached data |
+| Newer coverage (~20 files added since this table was last authored) | 239 | Contract-language-version guards, execution-mode dispatch, gateway `.d.ts` parity + guard-mode, cross-contract `emit.execute` / cross-chain `emit.crossExecute` call-path derivation, lint CLI/generator/hardening/parity/shared-rules, metered compilation cache, protocol constants, capability-manifest reading, read-only accessors, xcall bounds parity, limits backfill, dependency-advisory scan, mutation-report scripting, error-classification corroboration, consensus-runtime gating. Row total is exact (669 minus the 13 rows above); the file-to-topic grouping is a best-effort summary and **needs operator review**, not a verified per-row breakdown |
 
 ### E2E Tests (64)
 
 | Category | Tests | Description |
 |---|---|---|
-| Deploy & Execute | 5 | Contract lifecycle, invalid syntax rejection, code size limits |
-| Deposit & Withdraw | 4 | Token custody transfers, balance tracking |
+| Deploy & Execute | 8 | Contract lifecycle, invalid syntax rejection, code size limits |
+| Deposit & Withdraw | 5 | Token custody transfers, balance tracking |
 | Error Handling | 6 | Revert recovery, gas exhaustion, runtime errors |
-| State Persistence | 5 | Cross-execution state, multi-contract isolation |
-| Security | 5 | Sandbox enforcement in full pipeline |
-| Resource Limits | 7 | Gas, OOM, timeout, emission/state floods |
+| State Persistence | 6 | Cross-execution state, multi-contract isolation |
+| Security | 9 | Sandbox enforcement in full pipeline |
+| Resource Limits | 9 | Gas, OOM, timeout, emission/state floods |
 | Determinism | 3 | 10-run consistency, block replay |
-| Complex Workflows | 5 | AMM swap, vesting, multi-action, sequential counter |
-| Gas Fees | 4 | Fee accounting, gas charging on failure |
-| Oracle & Cross-chain | 3 | Oracle price reads, cross-chain attestation |
+| Complex Workflows | 7 | AMM swap, vesting, multi-action, sequential counter |
+| Gas Fees | 5 | Fee accounting, gas charging on failure |
+| Oracle & Cross-chain | 6 | Oracle price reads, cross-chain attestation |
 
-### Fuzz Tests (86)
+### Integration Tests (164)
 
-Property-based and adversarial input testing across 8 categories: code mutation, argument injection, emission payloads, state operations, math properties, sandbox escapes, determinism verification, resource exhaustion.
+Full-pipeline coverage promoted out of the old embedded "Index (Integration)" unit category into its own `test/integration/` suite: result structure, atomicity, return values, method routing, error classification, context, and all 19 emit types.
 
-### Chaos Engineering Tests (92)
+### Security Tests (201)
 
-3-phase resilience testing: Phase 1 (critical failures), Phase 2 (load and concurrency), Phase 3 (parser divergence and precision boundaries).
+Sandbox escape vectors, error spoofing, gas-bypass attempts, prototype pollution, math abuse, and information-leakage probes, now in a dedicated `test/security/` suite (grown well past the RISK-01 through RISK-15 set the table used to enumerate; see the suite for the current catalog).
 
-### Regression Tests (152)
+### Boundary Tests (115)
+
+Gas ceiling, timeout, memory, code size, state management, emissions, logs, return values, math, metering, sandbox, gateway, emit-field, and compound-interaction edge cases in `test/boundary/`.
+
+### Smoke Tests (10)
+
+VM instantiation, sandbox creation, basic execution, method dispatch, gateway, math, syntax, and revert, unchanged from the original set.
+
+### Determinism Tests (79)
+
+Cross-run and cross-process determinism guarantees in `test/determinism/`: golden-hash fixtures, consensus-parameter and consensus-runtime gates, cross-repo call-id byte-matching, cache/subprocess/stack-depth/timeout-fee determinism, plus a `known-red` probe subset (`npm run test:known-red`) that intentionally documents non-determinism failure modes rather than passing.
+
+### Performance Tests (5)
+
+Latency/throughput assertions in `test/performance/` (`npm run test:performance`), distinct from the `bench/` scenario scripts below.
+
+### Toolkit Tests (52)
+
+`xchain-foundry` / `create-xchain-contract` developer-toolkit coverage: gate, scaffold, and TypeScript-strip logic run on any OS; simulator-backed cases need the isolated-vm binding (Node 22 / Linux).
+
+### Regression Tests (128 via `test:regression:full`; +31 determinism-tagged tests live alongside them in `test/regression/` but run under `test:determinism`)
 
 | Tier | Tests | Target Time | Scope |
 |---|---|---|---|
 | P0 Smoke | 11 | < 50ms | VM boot, sandbox, basic execution, emit, revert |
-| P1 Security | 34 | < 200ms | 15 blocked globals, escape vectors, gas bypass, atomicity, determinism |
-| P2 Functional | 73 | < 300ms | Metering injection, state ops, all 16 emit types, math, validation |
-| P3 Integration | 34 | < 350ms | Resource limits, full pipeline, cache, E2E lifecycle, state isolation |
+| P1 Security | 20 | < 200ms | Blocked globals, escape vectors, gas bypass, atomicity, determinism |
+| P2 Functional | 41 | < 300ms | Metering injection, state ops, all 19 emit types, math, validation |
+| P3 Integration | 24 | < 350ms | Resource limits, full pipeline, cache, E2E lifecycle, state isolation |
+| Gate / pin regressions | 32 | < 1s | `binary-alloc-gate`, `compilation-cache-live`, `math-golden`, `metering-eval-order-gate`, `slash-token-delimiter-gate`, `state-key-nul-gate`, `state-key-type-gate`: single-issue pinned regressions, one file each |
+
+### Fuzz Tests (57)
+
+Property-based and adversarial input testing: code mutation, argument injection, emission payloads, state operations, math properties, sandbox escapes, determinism verification, resource exhaustion.
+
+### Chaos Engineering Tests (76)
+
+3-phase resilience testing: Phase 1 (critical failures), Phase 2 (load and concurrency), Phase 3 (parser divergence and precision boundaries).
 
 ### Mutation Tests
 
-Stryker 8.7.1 with Mocha runner + 5 custom VM-specific operators. 1,136 built-in mutants across 13 source modules.
+Stryker with Mocha runner plus custom VM-specific operators. Mutant/module counts come from a live Stryker run, not a static scan, so they are **not re-verified here**; treat the previously published "1,136 mutants across 13 modules" as unverified pending a fresh `npm run mutation` pass.
 
-### **Total: 974 tests**
+### **Total: 1,653+ tests**
+
+Static `it()`/`test()` occurrence count across every file under `test/` (all categories above, including toolkit and the determinism-tagged files inside `test/regression/`). This is a source-line count, not a suite-run count: property-based fuzz cases and looped fixtures can execute more assertions per matched line than this number shows, so treat it as a floor, not an exact total.
 
 ### Test Contracts
 
@@ -307,7 +346,7 @@ xchain-vm/
 |   |-- index.js          (XChainVM class, main entry point)
 |   |-- isolate.js        (V8 isolate management: create, compile, dispose)
 |   |-- gateway.js        (builds the xchain gateway object)
-|   |-- gateway-emit.js   (emit API: 18 action types, incl. cross-contract emit.execute and cross-chain emit.crossExecute)
+|   |-- gateway-emit.js   (emit API: 19 action types, incl. cross-contract emit.execute and cross-chain emit.crossExecute)
 |   |-- gas.js            (gas tracking and ceiling enforcement)
 |   |-- sandbox.js        (strips non-deterministic APIs)
 |   |-- metering.js       (AST-based gas injection)
@@ -318,12 +357,19 @@ xchain-vm/
 |   |-- collector.js      (emission and log collection)
 |   +-- errors.js         (ContractRevertError, GasExhaustedError)
 |-- test/
-|   |-- *.test.js         (19 unit test files, 580 tests)
+|   |-- *.test.js         (36 unit test files, 669 tests)
 |   |-- contracts/        (13 test fixture contracts)
+|   |-- integration/      (164 tests: full pipeline, all 19 emit types)
+|   |-- security/         (201 tests: sandbox escapes, gas bypass, info leakage)
+|   |-- boundary/         (115 tests: gas/timeout/memory/code-size/state edges)
+|   |-- smoke/            (10 tests)
+|   |-- determinism/      (79 tests, incl. a known-red probe subset)
+|   |-- performance/      (5 tests, distinct from bench/ below)
+|   |-- toolkit/          (52 tests: xchain-foundry gate/scaffold/simulate)
 |   |-- e2e/              (10 E2E test files, 64 tests + helpers + contracts)
-|   |-- fuzz/             (8 fuzz test files, 86 tests + harness + generators)
-|   |-- chaos/            (3-phase chaos tests, 92 tests + helpers + contracts)
-|   +-- regression/       (4-tier regression suite, 152 tests + helpers)
+|   |-- fuzz/             (9 fuzz test files, 57 tests + harness + generators)
+|   |-- chaos/            (3-phase chaos tests, 76 tests + helpers + contracts)
+|   +-- regression/       (4-tier + gate/pin regression suite, 159 tests + helpers)
 |-- bench/                (5 benchmark scenarios + harness + contracts)
 |-- reports/              (9 test plan reports)
 +-- stryker-xchain-vm-mutator/  (custom mutation testing operators)
