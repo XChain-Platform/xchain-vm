@@ -371,7 +371,7 @@ xchain-vm/
 |   |-- chaos/            (3-phase chaos tests, 76 tests + helpers + contracts)
 |   +-- regression/       (4-tier + gate/pin regression suite, 159 tests + helpers)
 |-- bench/                (5 benchmark scenarios + harness + contracts)
-|-- reports/              (9 test plan reports)
+|-- reports/              (mutation results)
 +-- stryker-xchain-vm-mutator/  (custom mutation testing operators)
 ```
 
