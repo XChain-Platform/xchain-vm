@@ -1430,8 +1430,8 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
 //   DOGE: tip 6300766 + (18250 min / 1.0 min-per-block = 18250 blocks) = 6319016 -> 6319000
 const PKG3_SANDBOX_ACTIVATION = Object.freeze({
     'BTC:mainnet':  961000,     // the Cohort-B anchor (unchanged from )
-    'LTC:mainnet':  3154250,    // PROPOSED - awaiting operator ratification
-    'DOGE:mainnet': 6319000,    // PROPOSED - awaiting operator ratification
+    'LTC:mainnet':  3154250,    // RATIFIED 2026-07-22 (pre-961000 train manifest)
+    'DOGE:mainnet': 6319000,    // RATIFIED 2026-07-22 (pre-961000 train manifest)
 });
 
 // Derive the COIN from a 'C:<COIN>:<action_index>' contract address (the indexer
