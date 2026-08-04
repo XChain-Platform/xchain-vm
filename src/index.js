@@ -1245,9 +1245,9 @@ const XCALL_MAX_RETURN_BYTES    = PROTO.XCALL_MAX_RETURN_BYTES;
 // Below the flag day the constructors are UNMETERED (the pre-activation
 // behavior); at/after it the byte-length charge applies on every node alike.
 // Same coordinated timestamp as the indexer's other 2.0.0 flag-day activations
-// (protocol_changes.js). CONFIRMED 2026-07-07 (2026-08-17 00:00:00 UTC); a value
+// (protocol_changes.js). CONFIRMED 2026-07-07 (2026-08-07 00:00:00 UTC); a value
 // that differs across the fleet is itself a fork.
-const BINARY_ALLOC_GATE_BLOCK_TIME = 1786924800;
+const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 
 // Coordinated activation (block time, unix seconds) for the async/Promise
 // contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
@@ -1267,10 +1267,10 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1786924800;
 // so keeping it on from block 0 preserves their current behaviour). An unknown /
 // empty network is treated like mainnet (conservative: requires the flag-day).
 // Same coordinated timestamp value as the indexer's other 2.0.0 flag-days and
-// BINARY_ALLOC_GATE_BLOCK_TIME (protocol_changes.js: 1786924800). CONFIRMED
-// 2026-07-07 (2026-08-17 00:00:00 UTC); a value that differs across the fleet
+// BINARY_ALLOC_GATE_BLOCK_TIME (protocol_changes.js: 1786060800). CONFIRMED
+// 2026-07-07 (2026-08-07 00:00:00 UTC); a value that differs across the fleet
 // is itself a fork.
-const ASYNC_SURFACE_GATE_BLOCK_TIME = 1786924800;
+const ASYNC_SURFACE_GATE_BLOCK_TIME = 1786060800;
 
 // Resolve whether the async/Promise surface change is active for a given network
 // at a given block time. Used to gate the execution-side Promise strip; the
@@ -1295,9 +1295,9 @@ function isAsyncSurfaceActive(network, blockTime) {
 // via protocol_changes.isEnabled('VM_LINT_HARDENING'); execution-side gating
 // uses the network-aware resolver below, mirroring its siblings: testnet/
 // regtest from genesis, mainnet (and unknown networks, conservative) at the
-// flag-day. Same ratified timestamp as the sibling gates (1786924800,
-// 2026-08-17 00:00:00 UTC); a divergent value is itself a fork.
-const VM_LINT_HARDENING_GATE_BLOCK_TIME = 1786924800;
+// flag-day. Same ratified timestamp as the sibling gates (1786060800,
+// 2026-08-07 00:00:00 UTC); a divergent value is itself a fork.
+const VM_LINT_HARDENING_GATE_BLOCK_TIME = 1786060800;
 function isLintHardeningActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= VM_LINT_HARDENING_GATE_BLOCK_TIME;
@@ -1318,7 +1318,7 @@ function isLintHardeningActive(network, blockTime) {
 // they are JSON.stringify'd before storage/hashing, which escapes control
 // characters. Same coordinated timestamp as BINARY_ALLOC/ASYNC_SURFACE; a
 // value that differs across the fleet is itself a fork.
-const STATE_KEY_NUL_GATE_BLOCK_TIME = 1786924800;
+const STATE_KEY_NUL_GATE_BLOCK_TIME = 1786060800;
 function isStateKeyNulRejectActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= STATE_KEY_NUL_GATE_BLOCK_TIME;
@@ -1340,7 +1340,7 @@ function isStateKeyNulRejectActive(network, blockTime) {
 // genesis, mainnet at the shared coordinated flag-day. Same coordinated
 // timestamp as STATE_KEY_NUL/BINARY_ALLOC/ASYNC_SURFACE; a value that differs
 // across the fleet is itself a fork.
-const STATE_KEY_TYPE_GATE_BLOCK_TIME = 1786924800;
+const STATE_KEY_TYPE_GATE_BLOCK_TIME = 1786060800;
 function isStateKeyTypeNormalizeActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= STATE_KEY_TYPE_GATE_BLOCK_TIME;
@@ -1359,7 +1359,7 @@ function isStateKeyTypeNormalizeActive(network, blockTime) {
 // testnet/regtest from genesis, mainnet at the shared coordinated flag-day. Same
 // coordinated timestamp as STATE_KEY_NUL/BINARY_ALLOC/ASYNC_SURFACE; a value that
 // differs across the fleet is itself a fork.
-const METERING_EVAL_ORDER_GATE_BLOCK_TIME = 1786924800;
+const METERING_EVAL_ORDER_GATE_BLOCK_TIME = 1786060800;
 function isMeteringEvalOrderActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= METERING_EVAL_ORDER_GATE_BLOCK_TIME;
@@ -1377,7 +1377,7 @@ function isMeteringEvalOrderActive(network, blockTime) {
 // mainnet at the shared coordinated flag-day. Same coordinated timestamp as
 // METERING_EVAL_ORDER/STATE_KEY_NUL/BINARY_ALLOC/ASYNC_SURFACE; a value that differs
 // across the fleet is itself a fork.
-const CALL_SPREAD_METER_GATE_BLOCK_TIME = 1786924800;
+const CALL_SPREAD_METER_GATE_BLOCK_TIME = 1786060800;
 function isCallSpreadMeterActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= CALL_SPREAD_METER_GATE_BLOCK_TIME;
@@ -1409,7 +1409,7 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
 // (Add legs as they land; a single gate keeps the whole bundle calendar-coherent.)
 //
 // Keyed on block HEIGHT, PER COIN, unlike the six 2.0.0 contract-era gates (all
-// block-TIME at the 1786924800 flag-day). It rides the BTC-anchored ~961000 Cohort-B
+// block-TIME at the 1786060800 flag-day). It rides the BTC-anchored ~961000 Cohort-B
 // deploy window (the height the stake-weighted-quorum / anchor-reward /
 // equivocation-header activations flip on, protocol/constants.js). A single bare
 // mainnet 961000 is a BTC height; LTC (~3.1M tip) and DOGE (~6.3M tip) mainnet are

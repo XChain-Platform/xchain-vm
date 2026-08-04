@@ -105,7 +105,7 @@ const CEILING = 1000000;
     // mixed-version fleet cannot fork on a historical block). These tests assert
     // the POST-activation charge, so they must run at/after the flag day. The
     // pre/post split itself is locked by the binary-alloc-gate regression test.
-    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800;
+    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
     const ACTIVE_CONTEXT = { height: 100, timestamp: GATE, hash: 'abc123' };
     const run = (code) => execute(vm, code, { method: 'default', blockContext: ACTIVE_CONTEXT });
 
@@ -197,7 +197,7 @@ const CEILING = 1000000;
     beforeEach(function () { vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: 30000 }); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
-    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800;
+    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
     const ACTIVE = { height: 100, timestamp: GATE, hash: 'abc123' };
     const LEGACY = { height: 100, timestamp: GATE - 1, hash: 'abc123' };
     const above = (code) => execute(vm, code, { method: 'default', blockContext: ACTIVE });
@@ -276,7 +276,7 @@ const CEILING = 1000000;
     beforeEach(function () { vm = createVM(); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
-    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800;
+    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
     const ACTIVE = { height: 100, timestamp: GATE, hash: 'abc123' };
     const LEGACY = { height: 100, timestamp: GATE - 1, hash: 'abc123' };
     const above = (code) => execute(vm, code, { method: 'default', blockContext: ACTIVE });
@@ -434,7 +434,7 @@ const CEILING = 1000000;
     beforeEach(function () { vm = createVM(); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
-    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800;
+    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
     const ACTIVE = { height: 100, timestamp: GATE, hash: 'abc123' };
     const LEGACY = { height: 100, timestamp: GATE - 1, hash: 'abc123' };
     const above = (code) => execute(vm, code, { method: 'default', blockContext: ACTIVE });
@@ -573,7 +573,7 @@ const CEILING = 1000000;
     beforeEach(function () { vm = createVM(); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
-    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800;
+    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
     const ACTIVE = { height: 100, timestamp: GATE, hash: 'abc123' };
     const LEGACY = { height: 100, timestamp: GATE - 1, hash: 'abc123' };
     const above = (code) => execute(vm, code, { method: 'default', blockContext: ACTIVE });
@@ -721,7 +721,7 @@ const CEILING = 1000000;
     beforeEach(function () { vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: 30000 }); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
-    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786924800;
+    const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
     const ACTIVE = { height: 100, timestamp: GATE, hash: 'abc123' };
     const LEGACY = { height: 100, timestamp: GATE - 1, hash: 'abc123' };
     const above = (code) => execute(vm, code, { method: 'default', blockContext: ACTIVE });

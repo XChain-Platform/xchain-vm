@@ -102,7 +102,7 @@ const GAS_SCHEDULE = {
             assert.ok(r.error.startsWith('out_of_stack:'), r.error);
         });
         it('activates on mainnet at/after the flag-day block time', function () {
-            const opts = { network: 'mainnet', blockContext: { timestamp: 1786924800 } };
+            const opts = { network: 'mainnet', blockContext: { timestamp: 1786060800 } };
             const r = classify(new Error('Script execution timed out.'), opts, signals());
             assert.ok(r.error.startsWith('error: '), r.error);
         });

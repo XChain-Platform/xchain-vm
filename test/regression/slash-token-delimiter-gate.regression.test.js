@@ -73,7 +73,7 @@ const run = (vm, code, blockContext, network) =>
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     it('the flag day is the pinned coordinated activation timestamp', function () {
-        assert.strictEqual(GATE, 1786924800);
+        assert.strictEqual(GATE, 1786060800);
     });
 
     it('the resolver is network-aware: pre-launch nets from genesis, mainnet at the flag day', function () {
