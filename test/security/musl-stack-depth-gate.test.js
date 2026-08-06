@@ -74,19 +74,40 @@ const fn = (body) => `module.exports = function(xchain){ ${body} };`;
     // Recursion helper: r(n) recurses n frames deep.
     const RECURSE = `function r(n){ if(n<=0){ return 0; } return 1+r(n-1); }`;
 
-    // ---- Native JSON sinks: below the height gate, the 512 bound holds (replay) ----
-    it('below the height gate, a 300-deep JSON.stringify serializes (bound stays 512, byte-identical to today)', async function () {
-        const r = await run(SPINE_300 + `return JSON.stringify(a).length > 0 ? 'ok' : 'bad';`,
+    // ---- Native JSON sinks: an ACTIVE guard is clamped to the musl-safe bound even
+    //      below the height gate, so the two flag-days cannot order into a fork ----
+    // Below the height gate the intra-contract bound is still 512 (proven by the last
+    // case in this block), but the F-NR sinks read the clamped
+    // min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL). Without the clamp, a coin reaching the
+    // block-TIME gate before its per-coin block-HEIGHT gate would hand a 293..512-deep
+    // value to the native parser, which overflows on musl (~292) and succeeds on glibc.
+    it('below the height gate, an active native guard still poisons a 300-deep JSON.stringify (clamped to 256)', async function () {
+        const r = await run(SPINE_300 + `try{JSON.stringify(a);return 'no-throw';}catch(e){return 'SWALLOWED';}`,
+            { height: H_BELOW, timestamp: T_FNR_ON, hash: 'h' });
+        assert.strictEqual(r.success, false, 'must fail: ' + JSON.stringify(r.returnValue));
+        assert.match(r.error, /^out_of_stack:/, r.error);
+        assert.strictEqual(r.returnValue, null, 'poison must be un-swallowable');
+    });
+
+    it('below the height gate, an active native guard still poisons a 300-deep JSON.parse (clamped to 256)', async function () {
+        const r = await run(`var t='['.repeat(300)+']'.repeat(300);try{JSON.parse(t);return 'no-throw';}catch(e){return 'SWALLOWED';}`,
+            { height: H_BELOW, timestamp: T_FNR_ON, hash: 'h' });
+        assert.strictEqual(r.success, false, 'must fail: ' + JSON.stringify(r.returnValue));
+        assert.match(r.error, /^out_of_stack:/, r.error);
+        assert.strictEqual(r.returnValue, null, 'poison must be un-swallowable');
+    });
+
+    it('below the height gate, a 200-deep spine (< 256) still serializes under an active guard', async function () {
+        const r = await run(SPINE_200 + `return JSON.stringify(a).length > 0 ? 'ok' : 'bad';`,
             { height: H_BELOW, timestamp: T_FNR_ON, hash: 'h' });
         assert.strictEqual(r.success, true, r.error);
         assert.strictEqual(JSON.parse(r.returnValue), 'ok');
     });
 
-    it('below the height gate, a 300-deep JSON.parse reviver walk serializes (bound stays 512)', async function () {
-        const r = await run(`var t='['.repeat(300)+']'.repeat(300);return JSON.parse(t).length===1?'ok':'bad';`,
-            { height: H_BELOW, timestamp: T_FNR_ON, hash: 'h' });
+    it('below the height gate, the intra-contract bound stays 512 while the native sinks are clamped', async function () {
+        const r = await run(RECURSE + `return r(300);`, { height: H_BELOW, timestamp: T_FNR_ON, hash: 'h' });
         assert.strictEqual(r.success, true, r.error);
-        assert.strictEqual(JSON.parse(r.returnValue), 'ok');
+        assert.strictEqual(JSON.parse(r.returnValue), 300);
     });
 
     // ---- Native JSON sinks: at/after the height gate, the 256 bound poisons ----

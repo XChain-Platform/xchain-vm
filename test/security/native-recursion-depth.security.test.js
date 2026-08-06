@@ -106,8 +106,10 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
 
     // ---- The poison boundary sits exactly at the platform-independent limit ----
     it('above the gate, a spine just UNDER the depth limit serializes; just OVER faults deterministically', async function () {
-        // MAX_STACK_DEPTH default is 512. depth 400 (< limit) succeeds; 600 (> limit) faults.
-        const under = await run(`var a=1;for(var i=0;i<400;i++){a=[a];} return JSON.stringify(a).length > 0 ? 'ok' : 'bad';`, ABOVE);
+        // The native sinks read min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL), so an active
+        // guard bounds them at 256 whatever the height gate has done to __DEPTH_LIMIT
+        // . depth 200 (< bound) succeeds; 600 (> bound) faults.
+        const under = await run(`var a=1;for(var i=0;i<200;i++){a=[a];} return JSON.stringify(a).length > 0 ? 'ok' : 'bad';`, ABOVE);
         assert.strictEqual(under.success, true, under.error);
         assert.strictEqual(JSON.parse(under.returnValue), 'ok');
 
@@ -163,7 +165,8 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
     });
 
     it('above the gate, the parse boundary sits at the platform-independent limit', async function () {
-        const under = await run(`var t='['.repeat(400)+']'.repeat(400);return JSON.parse(t).length===1?'ok':'bad';`, ABOVE);
+        // Same clamp as the value sink: an active guard bounds parse nesting at 256.
+        const under = await run(`var t='['.repeat(200)+']'.repeat(200);return JSON.parse(t).length===1?'ok':'bad';`, ABOVE);
         assert.strictEqual(under.success, true, under.error);
         assert.strictEqual(JSON.parse(under.returnValue), 'ok');
 

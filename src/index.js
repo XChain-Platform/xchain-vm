@@ -75,6 +75,14 @@ const HARNESS_SOURCE = `
     // architectures, injected by the host (index.js). The counter + flag live in
     // this closure, unreachable from contract code.
     var __DEPTH_LIMIT  = globalThis.__DEPTH_LIMIT;
+    // Bound the F-NR native sinks below the SMALLEST platform native-overflow onset,
+    // independent of how the two flag-days order . __DEPTH_LIMIT rides the
+    // per-coin block-HEIGHT Pkg 3 gate while the native guard's activation rides the
+    // block-TIME binary-alloc gate, so a coin whose height lags its projected
+    // activation could run the guard with the musl-unsafe 512 bound and let a
+    // 293..512-deep value fork a musl validator from a glibc one; the host clamps
+    // this to min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL) so that window cannot open.
+    var __NR_DEPTH_LIMIT = globalThis.__NR_DEPTH_LIMIT;
     var __stackDepth   = 0;
     var __stackPoison  = false;
     // The deterministic stack fault. Its message embeds "call stack" so the host
@@ -394,7 +402,7 @@ const HARNESS_SOURCE = `
     // legacy native-recursion behaviour replays unchanged.
     var __hasOwn = Object.prototype.hasOwnProperty;
     var __isArray = Array.isArray;   // captured native (contract cannot repoint the guard)
-    var __nrGuardOn = (__meterUpgradeOn && __DEPTH_LIMIT > 0);
+    var __nrGuardOn = (__meterUpgradeOn && __NR_DEPTH_LIMIT > 0);
     var __guardNativeDepth = function(root) {
         if (!__nrGuardOn) return;
         if (__stackPoison) throw __stackError();
@@ -405,7 +413,7 @@ const HARNESS_SOURCE = `
             var v = stack.pop();
             var d = depths.pop();
             __gasFunc(1);                                       // per-node base (DAG / exponential-reuse bound)
-            if (d > __DEPTH_LIMIT) { __stackPoison = true; throw __stackError(); }
+            if (d > __NR_DEPTH_LIMIT) { __stackPoison = true; throw __stackError(); }
             var i, c, w;
             // The guard SCANS every child of the popped node (O(width)) to find the
             // object children to recurse into. The flat per-node charge above only
@@ -481,7 +489,7 @@ const HARNESS_SOURCE = `
                 }
             } else if (ch === 91 || ch === 123) {  // '[' or '{'
                 depth++;
-                if (depth > __DEPTH_LIMIT) { __stackPoison = true; throw __stackError(); }
+                if (depth > __NR_DEPTH_LIMIT) { __stackPoison = true; throw __stackError(); }
             } else if (ch === 93 || ch === 125) {  // ']' or '}'
                 if (depth > 0) depth--;
             }
@@ -1877,6 +1885,21 @@ class XChainVM {
                 ? MAX_STACK_DEPTH_MUSL
                 : this.limits.maxStackDepth;
             context.global.setSync('__DEPTH_LIMIT', __effectiveDepthLimit);
+            // Clamp the F-NR native sinks to the musl-safe bound whatever the height
+            // gate says. The native guard's ON/OFF rides the block-TIME binary-alloc
+            // gate while __DEPTH_LIMIT rides the per-coin block-HEIGHT gate, so a coin
+            // that has not yet reached its PKG3_SANDBOX_ACTIVATION height when the
+            // block-time gate arms would otherwise run the guard at 512, above the
+            // measured musl native onset (~292 reviver / ~379 join) and back inside the
+            // heterogeneous-OS fork the guard exists to close. Nothing enforces that
+            // ordering in code, and a chain running behind its projected height is the
+            // ordinary way it breaks. This is a no-op wherever the height gate is
+            // already active (min(256, 256)), and no history exists with the native
+            // guard on, so replay is unaffected. The intra-contract __depth_enter guard
+            // keeps reading the unclamped __DEPTH_LIMIT: it is ungated by time and
+            // already tracks the height gate correctly.
+            context.global.setSync('__NR_DEPTH_LIMIT',
+                Math.min(__effectiveDepthLimit, MAX_STACK_DEPTH_MUSL));
             // Package 3 bundle activation flag for the in-isolate harness (Set/Map
             // collection-constructor metering). Captured into the harness closure
             // before the __-prefixed globals are stripped; false below the gate so the
