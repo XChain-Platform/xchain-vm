@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Lockfile engines.node now carries the manifest ceiling >=22.0.0 <23, so a reinstall cannot resolve on Node 23+ where isolated-vm fails node-gyp.
 - Gate blocks on code-size like the chain, timeout corroboration uses monotonic hrtime, simulator uses shared MAX_CODE_SIZE, license headers on three test files.
 
 ### Added
