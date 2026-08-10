@@ -184,5 +184,23 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
             assert.strictEqual(idx, v.expected,
                 'indexer inline lambda diverged from GOLDEN_VECTORS.callId.expected');
         });
+
+        // : the hex pins catch a field skew only as an opaque hash difference.
+        // Naming the count makes a dropped or added field read as what it is. The
+        // indexer declares the same eight names in xchain-indexer/src/actions/xcall.js
+        // (CALL_ID_PREIMAGE_FIELDS), pinned against this order by
+        // bin/check-preimage-golden-parity.js.
+        it('golden vector: the call_id preimage carries exactly eight fields', function () {
+            const i = GOLDEN_VECTORS.callId.input;
+            // No golden value contains the ':' separator, so the split count is the
+            // structural field count.
+            const preimage = [i.network, i.coin, i.txHash, i.rootActionIndex,
+                              i.contractIndex, i.emitterPath, i.emitterPosition,
+                              i.targetChain].map(String).join(':');
+            assert.strictEqual(preimage.split(':').length, 8,
+                'call_id preimage field count changed; the indexer must change in lockstep');
+            assert.strictEqual(crypto.createHash('sha256').update(preimage).digest('hex'),
+                GOLDEN_VECTORS.callId.expected);
+        });
     });
 });
