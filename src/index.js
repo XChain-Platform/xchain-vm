@@ -761,10 +761,43 @@ const HARNESS_SOURCE = `
     });
     // String: native scan / copy (regex literals are banned at deploy time; the
     // locale-sensitive case methods are neutered in sandbox.js). repeat/padStart/
-    // padEnd are owned by F3.
+    // padEnd are owned by F3. Every method listed here has output bounded BY the
+    // receiver, so the receiver-length charge is the real work; replace/replaceAll
+    // do not and get the dedicated output-aware wrappers below.
     ['indexOf', 'lastIndexOf', 'includes', 'startsWith', 'endsWith', 'slice',
-     'substring', 'substr', 'split', 'replace', 'replaceAll', 'trim',
+     'substring', 'substr', 'split', 'trim',
      'trimStart', 'trimEnd', 'toLowerCase', 'toUpperCase'].forEach(function(m) { __meterLen(String.prototype, m); });
+
+    // replace/replaceAll are the one String pair whose OUTPUT can exceed the
+    // receiver: output = receiver + matches * (replacement - search), and
+    // replaceAll substitutes EVERY match, so a 1k-char receiver with 1k matches and
+    // a 1k-char replacement materializes ~1 MB for the ~1k gas the receiver-length
+    // charge bills. A reuse loop then reaches the per-node wall-clock net (not a
+    // consensus value) before the deterministic gas ceiling, so success-vs-resource-
+    // failure becomes host-dependent: the same divergence the join/flat/stringify
+    // output-aware charges close. At/after the flag day charge
+    // max(receiver, result): the max keeps the receiver SCAN billed when the
+    // replacement shrinks the string, and the result term bounds the expansion by
+    // the gas paid for it. Charged AFTER the native pass, identical to
+    // join/flat/JSON.stringify -- one pass runs before out_of_gas, and that pass is
+    // itself bounded by the gas already paid to build the receiver. Below the gate
+    // the legacy receiver-length charge replays byte-for-bit.
+    var __mreplace = function(name) {
+        var orig = String.prototype[name];
+        if (typeof orig !== 'function') return;
+        __lockMethod(String.prototype, name, function() {
+            var n = (this == null ? 0 : this.length);
+            if (__meterUpgradeOn) {
+                var __r = orig.apply(this, arguments);
+                __allocGas(typeof __r === 'string' && __r.length > n ? __r.length : n);
+                return __r;
+            }
+            __allocGas(n);
+            return orig.apply(this, arguments);
+        });
+    };
+    __mreplace('replace');
+    __mreplace('replaceAll');
 
     // Variadic concat: charge the receiver length plus each argument's length.
     var __aconcat = Array.prototype.concat;
@@ -879,9 +912,26 @@ const HARNESS_SOURCE = `
             // dedicated wrappers below). fill's backing store was charged once at construction,
             // but an in-place refill is fresh O(n) work, so it is metered here too. subarray is
             // intentionally OMITTED: it returns an O(1) view over the same buffer (no copy), so
-            // a length charge would over-bill work that never runs.
+            // a length charge would over-bill work that never runs. join is OMITTED too:
+            // it is the one method here whose output is not bounded by the element count
+            // (each element renders up to ~24 chars, plus a caller-chosen separator per
+            // gap), so it gets the output-aware wrapper below, mirroring Array.join.
             ['indexOf', 'lastIndexOf', 'includes', 'reverse', 'slice', 'copyWithin',
-             'fill', 'join', 'toReversed', 'with'].forEach(function(m) { __meterLen(__TAProto, m); });
+             'fill', 'toReversed', 'with'].forEach(function(m) { __meterLen(__TAProto, m); });
+            // join(sep) builds a string whose length is the rendered element bytes plus
+            // (n-1) separators, so an element-count charge bills O(n) for O(output) native
+            // work: new Uint32Array(n).join('x'.repeat(k)) is ~n*k chars for n gas, the same
+            // cheap-gas/expensive-CPU grind the Array.join upgrade closes. Charge the
+            // RETURNED string's length (never below the element count: every element
+            // renders at least one char). No flag branch: this whole block is already
+            // inside the __meterUpgradeOn gate, so below it join stays unmetered exactly
+            // as pre-activation nodes leave it and replay is byte-identical.
+            var __tajoin = __TAProto.join;
+            if (typeof __tajoin === 'function') __lockMethod(__TAProto, 'join', function() {
+                var __r = __tajoin.apply(this, arguments);
+                if (typeof __r === 'string') __allocGas(__r.length);
+                return __r;
+            });
             // set(src[, offset]) copies src.length elements into the receiver's existing backing
             // store (no allocation, so F3-binary never saw it). Charge the source length, which
             // is the actual O(n) work.
