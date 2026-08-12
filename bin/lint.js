@@ -16,8 +16,13 @@
  *
  * Runs the FULL deploy-time validation: validateSyntax (including the
  * isolated-vm V8 syntax compile) + checkFloatWarnings, over one or more
- * contract source files. This is exact deploy parity: a clean result here
- * means the DEPLOY will pass the indexer's syntax gate.
+ * contract source files. This is a conservative preflight, NOT exact deploy
+ * parity: lintFile below fails a file on every error-severity finding,
+ * including the non-deploy-blocking crossCallable-not-array, and future /
+ * mainnet-gated rules are enforced immediately, so the CLI is a SUPERSET of
+ * the live deploy gate and can refuse source a given chain, network and block
+ * would accept. The strictness runs one way only: use this as a local
+ * pre-commit / CI gate, not as a claim that a CLI failure would fail a deploy.
  *
  *   node bin/lint.js <file...>     lint each file (shell globs expand first)
  *     --json                       machine-readable JSON report on stdout

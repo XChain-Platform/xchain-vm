@@ -27,6 +27,16 @@ const { ContractRevertError } = require('./errors.js');
 const { buildEmitAPI } = require('./gateway-emit.js');
 const { buildMathAPI } = require('./math.js');
 
+// contract.slash amount forms, pre- and post-activation ('s sibling gate).
+// The legacy form caps fractional digits at 8; the widened form allows the token
+// ceiling MAX_TOKEN_DECIMALS (18, xchain-indexer/src/config.js), the precision
+// STAKE v3 already admits and slashContractStake already computes at. Which form
+// applies is decided by readOnlyData.slashAmountPrecisionOn (host-set, see
+// isSlashAmountPrecisionActive in index.js) because ACCEPTING a call that used to
+// throw changes replay for historical blocks exactly as rejecting one does.
+const SLASH_AMOUNT_LEGACY_RE = /^[0-9]+(\.[0-9]{1,8})?$/;
+const SLASH_AMOUNT_WIDE_RE   = /^[0-9]+(\.[0-9]{1,18})?$/;
+
 /**
  * Build the gateway object for contract execution.
  * @param {GasTracker} gasTracker
@@ -314,7 +324,15 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // used to emit successfully changes replay for historical blocks.
                 if (readOnlyData.slashTokenDelimGuardOn && token.indexOf('|') !== -1)
                     throw new Error('contract.slash: token must not contain "|"');
-                if (typeof amount !== 'string' || !/^[0-9]+(\.[0-9]{1,8})?$/.test(amount))
+                //  sibling gate: the 8-dp ceiling contradicted the rest of the seam.
+                // STAKE v3 admits a stake at the token's own DECIMALS (up to
+                // MAX_TOKEN_DECIMALS 18) and slashContractStake does its arithmetic at that
+                // same precision, so an exact partial slash of a 9-18-dp staked token could
+                // never be emitted. Post-activation the ceiling is 18; pre-activation it
+                // stays 8 so historical blocks replay byte-identically.
+                const amountRe = readOnlyData.slashAmountPrecisionOn
+                    ? SLASH_AMOUNT_WIDE_RE : SLASH_AMOUNT_LEGACY_RE;
+                if (typeof amount !== 'string' || !amountRe.test(amount))
                     throw new Error('contract.slash: amount must be a positive decimal string');
                 let contractIndex = readOnlyData.contractIndex;
                 emissionCollector.add('SLASH', {

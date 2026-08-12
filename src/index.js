@@ -1457,6 +1457,26 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
 }
 
+// Token-decimal ceiling a contract.slash amount may carry post-activation. MUST equal
+// the indexer's MAX_TOKEN_DECIMALS (xchain-indexer/src/config.js:122); a divergent
+// value would let the VM emit an amount the slash arithmetic cannot represent.
+const MAX_SLASH_AMOUNT_DECIMALS = 18;
+
+// Activation for widening the contract.slash `amount` precision ceiling from 8 to
+// MAX_SLASH_AMOUNT_DECIMALS. The 8-dp regex contradicted the other side of the same
+// seam: STAKE v3 admits a stake at the token's own DECIMALS (up to 18) and
+// slashContractStake computes the deduction at that precision, so an exact partial
+// slash of a 9-18-dp staked token threw at the gateway and graduated slashing was
+// impossible for exactly the tokens the any-token staking API accepts. RELAXING a
+// check is as consensus-visible as tightening one (a call that threw now emits), so
+// it is gated like its sibling above: testnet/regtest from genesis, mainnet at the
+// shared coordinated flag-day, riding the existing BINARY_ALLOC flag-day rather than
+// minting a new constant, so the frozen six-gate consensus pin is untouched.
+function isSlashAmountPrecisionActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
+}
+
 // ----- Package 3 VM-sandbox flag-day: per-coin block-HEIGHT bundle gate  -----
 // ONE coordinated activation for the whole flag-day Package 3 VM-sandbox bundle, so
 // every leg flips fleet-wide together under a single CONSENSUS_VERSION bump (2 -> 3)
@@ -1815,11 +1835,16 @@ class XChainVM {
             //  gate: reject a '|' in contract.slash's token field (see
             // isSlashTokenDelimGuardActive). Network-aware like the state-key gates.
             const slashTokenDelimGuardOn = isSlashTokenDelimGuardActive(opts.network, mathBlockTime);
+            // Sibling gate: widen contract.slash's amount ceiling from 8 to 18 fractional
+            // digits, matching the token precision the stake side already admits (see
+            // isSlashAmountPrecisionActive). Network-aware, same flag-day.
+            const slashAmountPrecisionOn = isSlashAmountPrecisionActive(opts.network, mathBlockTime);
             const gateway = buildGateway(
                 gasTracker, stateManager, emissionCollector,
                 {
                     mathOutputMeterOn,
                     slashTokenDelimGuardOn,
+                    slashAmountPrecisionOn,
                     caller:          opts.caller,
                     contractAddress: opts.contractAddress,
                     contractIndex:   opts.contractIndex != null ? Number(opts.contractIndex) : null,
@@ -2537,6 +2562,11 @@ module.exports.isLintHardeningActive = isLintHardeningActive;
 // flag-day constant: it rides BINARY_ALLOC_GATE_BLOCK_TIME. Exported so tests and
 // the indexer can mirror the network-aware activation.
 module.exports.isSlashTokenDelimGuardActive = isSlashTokenDelimGuardActive;
+// Resolver + ceiling for the contract.slash amount-precision widening. Also rides
+// BINARY_ALLOC_GATE_BLOCK_TIME rather than minting a constant. The ceiling is
+// exported so a test can pin it against the indexer's MAX_TOKEN_DECIMALS.
+module.exports.isSlashAmountPrecisionActive = isSlashAmountPrecisionActive;
+module.exports.MAX_SLASH_AMOUNT_DECIMALS    = MAX_SLASH_AMOUNT_DECIMALS;
 // Cross-CHAIN call (XCALL) protocol constants, same canonical source.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;

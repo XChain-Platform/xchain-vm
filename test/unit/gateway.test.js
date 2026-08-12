@@ -343,8 +343,35 @@ describe('Gateway (host-function surface)', function () {
             const { gw } = build();
             assert.throws(() => gw.contract.slash('short', 'TOK', '1'), /pubkey must be a 64-hex string/);
             assert.throws(() => gw.contract.slash(PUB, '', '1'), /token must be a non-empty string/);
+            // 9 dp is the PRE-activation ceiling only; the gate-on half is pinned below.
             assert.throws(() => gw.contract.slash(PUB, 'TOK', '1.123456789'), /amount must be a positive decimal/);
             assert.throws(() => gw.contract.slash(PUB, 'TOK', 'abc'), /amount must be a positive decimal/);
+        });
+
+        // . The 8-dp ceiling contradicted the stake side of the seam (STAKE v3
+        // admits a token's own DECIMALS, up to MAX_TOKEN_DECIMALS 18, and
+        // slashContractStake deducts at that precision), so a graduated slash of a
+        // high-precision token could never be emitted. Widening it ACCEPTS a call that
+        // used to throw, which is consensus-visible, so the host gates it; both sides
+        // are pinned here.
+        it('accepts up to 18 fractional digits when the precision gate is on', function () {
+            const { gw, collector } = build({ slashAmountPrecisionOn: true });
+            gw.contract.slash(PUB, 'TOK', '100.123456789012345678');
+            assert.strictEqual(collector.actions.length, 1);
+            assert.strictEqual(collector.actions[0].params.amount, '100.123456789012345678',
+                'the amount must reach the emission byte-identical, never re-rounded');
+            // 19 dp is past the token ceiling and stays rejected on both sides.
+            assert.throws(() => gw.contract.slash(PUB, 'TOK', '1.1234567890123456789'),
+                /amount must be a positive decimal/);
+        });
+
+        it('keeps the 8-dp ceiling below the precision gate (replay parity)', function () {
+            const { gw, collector } = build({ slashAmountPrecisionOn: false });
+            assert.throws(() => gw.contract.slash(PUB, 'TOK', '100.123456789012345678'),
+                /amount must be a positive decimal/);
+            assert.strictEqual(collector.actions.length, 0, 'a rejected slash must emit nothing');
+            gw.contract.slash(PUB, 'TOK', '100.12345678');
+            assert.strictEqual(collector.actions[0].params.amount, '100.12345678');
         });
 
         // . The '|' guard is consensus-visible (a call that used to emit now
