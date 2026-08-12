@@ -331,6 +331,40 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isPkg3SandboxActive('mainnet', null, 10000000), false);
     });
 
+    it('execute-time source-lint gate: per-coin map is UNARMED on mainnet and the gas divisor is frozen ', function () {
+        // Re-linting stored contract code at EXECUTE time flips previously-succeeding
+        // executions into failures and adds a source-length-derived gas charge, so both
+        // the activation heights and the gas divisor are consensus parameters: a node
+        // that armed a different height, or charged on a different divisor, forks on the
+        // first execution of an affected contract.
+        //
+        // The operator ratified the MECHANISM on 2026-08-11 but still owes the per-coin
+        // train heights, so every mainnet entry is the explicit unarmed `null` sentinel.
+        // This assertion is what makes an accidental arming visible: filling a height in
+        // here is a deliberate, reviewed edit that must move the xchain-indexer twin
+        // (src/vm_exec_lint_activation.js) in the SAME change.
+        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['BTC:mainnet'], null);
+        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['LTC:mainnet'], null);
+        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['DOGE:mainnet'], null);
+        assert.strictEqual(vm.EXEC_LINT_GAS_BYTES_PER_UNIT, 256);
+        // Unarmed means inactive at EVERY mainnet height, including absurd ones: mainnet
+        // execution is byte-identical to pre- until the operator arms it.
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 0), false);
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 961000), false);
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'LTC', 10000000), false);
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'DOGE', Number.MAX_SAFE_INTEGER), false);
+        // Unknown network is treated as mainnet (conservative), unknown coin resolves off.
+        assert.strictEqual(vm.isExecLintActive(undefined, 'BTC', 961000), false);
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'XYZ', 961000), false);
+        assert.strictEqual(vm.isExecLintActive('mainnet', null, 961000), false);
+        // Pre-launch nets are genesis-active: they already enforce the identical rule set
+        // at deploy from genesis, so nothing that exists there can fail the execute check.
+        assert.strictEqual(vm.isExecLintActive('regtest', 'BTC', 0), true);
+        assert.strictEqual(vm.isExecLintActive('testnet', 'DOGE', 0), true);
+        // A non-finite height is pre-activation even on a genesis-active-by-height chain.
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', NaN), false);
+    });
+
     it('STATE_KEY_NUL_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // Rejecting NUL-byte state keys flips an execution from success to failure
         // (hashed status + state delta), so two nodes that disagree on the flag day

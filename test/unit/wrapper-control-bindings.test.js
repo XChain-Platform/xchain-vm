@@ -54,12 +54,22 @@ const PEEK = 'module.exports = { peek: function(x) { return String(typeof __meth
     });
     afterEach(function () { vm.endBlock(); });
 
-    it('post-gate (regtest from genesis): the contract cannot see the control bindings', async function () {
+    it('post-gate (regtest from genesis): the execute-time lint rejects the peek before the wrapper starves it', async function () {
+        //  supersession. The wrapper's starvation of the control bindings is the
+        // defence-in-depth layer for a contract that DEPLOYED before the reserved-identifier
+        // rule armed. Where execute-time source-lint enforcement is active (the pre-launch
+        // nets, from genesis), such a contract can no longer run at all: the stored source
+        // is re-linted against the bans live at this block and fails first. The wrapper
+        // starvation itself stays pinned below the exec-lint gate by the mainnet case below.
         const res = await run(vm, 'regtest', 1700000000);
-        assert.strictEqual(res.success, true, res.error);
-        assert.strictEqual(JSON.parse(res.returnValue), 'undefined:undefined');
+        assert.strictEqual(res.success, false);
+        assert.ok(res.error.startsWith('error: banned syntax: '), res.error);
+        assert.ok(res.error.includes('__methodName'), res.error);
     });
 
+    // The wrapper-starvation pin. Mainnet is below the  execute-time lint gate
+    // (unarmed), so the stored source still reaches the wrapper and the closure move is
+    // what has to starve it, exactly as before.
     it('post-gate (mainnet at the flag-day): bindings are starved there too', async function () {
         const res = await run(vm, 'mainnet', 1786060800);
         assert.strictEqual(res.success, true, res.error);

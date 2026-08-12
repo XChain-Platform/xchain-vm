@@ -31,7 +31,9 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const { createVM, execute, XChainVM } = require('../fuzz/harness');
+const { createVM, execute, XChainVM, GAS_SCHEDULE } = require('../fuzz/harness');
+// : the execute-time source lint is metered as gas, on this divisor.
+const { EXEC_LINT_GAS_BYTES_PER_UNIT } = require('../../src/index.js');
 
 const TS = 1700000000; // the collection-ctor gate keys on height, not block time.
 
@@ -147,7 +149,13 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
     it('regtest meters the Set ctor from genesis (height 0)', async function () {
         const belowMain = await runAt(oneSet, 960999, 'mainnet', 'BTC');
         const regtest = await runAt(oneSet, 0, 'regtest', 'BTC');
-        assert.strictEqual(regtest.gasUsed - belowMain.gasUsed, 500,
-            'regtest must charge the source size from genesis');
+        // The pre-launch nets are ALSO genesis-active for the  execute-time source
+        // lint, whose cost is metered as gas, so the regtest run carries one extra charge
+        // the mainnet baseline does not. Derive it from the exported divisor rather than
+        // hard-coding it, so a re-tuned divisor moves this expectation with it.
+        const lintGas = GAS_SCHEDULE.VM_COMPUTATION * Math.max(1, Math.ceil(
+            Buffer.byteLength(oneSet, 'utf8') / EXEC_LINT_GAS_BYTES_PER_UNIT));
+        assert.strictEqual(regtest.gasUsed - belowMain.gasUsed, 500 + lintGas,
+            'regtest must charge the source size from genesis, plus the metered execute-time lint');
     });
 });

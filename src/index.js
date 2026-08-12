@@ -185,6 +185,60 @@ const HARNESS_SOURCE = `
     // reachable. Proxy/Reflect are stripped by sandbox.js, so the F3 closure idiom
     // is used: each global is replaced with a wrapper capturing the native.
     var __setProto = Object.setPrototypeOf;
+    var __getProto = Object.getPrototypeOf;
+    var __getOwnDesc = Object.getOwnPropertyDescriptor;
+    var __ownNames = Object.getOwnPropertyNames;
+    var __ownSyms = Object.getOwnPropertySymbols;
+    // NOT Object.defineProperty: sandbox.js has already replaced that with
+    // undefined by the time this harness runs (getter/setter traps would execute
+    // unmetered code), and handed the harness the saved native as
+    // globalThis.__defineProperty, captured above as __defProp.
+    // Give a metering wrapper the original constructor's STATIC surface without
+    // standing the wrapper behind the original on the prototype chain.
+    //
+    // The wrappers used to do __setProto(Wrapped, Orig), which resolved the
+    // statics by inheriting them from the very object being replaced. That reads
+    // as harmless and is not: it builds a constructor whose [[Prototype]] is a
+    // shape no built-in has (Uint8Array inheriting from Uint8Array rather than
+    // from %TypedArray%, so getPrototypeOf(Uint8Array) !== getPrototypeOf(
+    // Int8Array)), and it leaves the wrapper with ZERO own statics, so
+    // BYTES_PER_ELEMENT / isView / Symbol.species are invisible to
+    // getOwnPropertyNames / getOwnPropertySymbols / hasOwn. Any wrapper that then
+    // fails to reach the original (the setPrototypeOf catch below, or a second
+    // wrapping pass) loses the whole static surface at once.
+    //
+    // Instead: inherit from what the ORIGINAL inherits from, and copy the
+    // original's own statics across by descriptor, so both the chain and the own
+    // surface match the unwrapped built-in. Property READS resolve to the same
+    // values either way, so gasUsed is untouched and no flag day is involved.
+    var __adoptStatics = function(Wrapped, Orig) {
+        var __copyOwn = function(k) {
+            // Wrapped already owns name, length and prototype: the prototype is the
+            // instanceof-preserving alias set by the caller, and all three are
+            // readable from contract code, so copying the original's descriptors
+            // over them would move observable values.
+            if (k === 'name' || k === 'length' || k === 'prototype') return;
+            try {
+                var d = __getOwnDesc(Orig, k);
+                if (d) __defProp(Wrapped, k, d);
+            } catch (e) {}
+        };
+        try {
+            if (typeof __setProto === 'function' && typeof __getProto === 'function') {
+                __setProto(Wrapped, __getProto(Orig));
+            }
+        } catch (e) {}
+        try {
+            var __ns = __ownNames(Orig);
+            for (var __ni = 0; __ni < __ns.length; __ni++) __copyOwn(__ns[__ni]);
+        } catch (e) {}
+        try {
+            if (typeof __ownSyms === 'function') {
+                var __ss = __ownSyms(Orig);
+                for (var __si = 0; __si < __ss.length; __si++) __copyOwn(__ss[__si]);
+            }
+        } catch (e) {}
+    };
     var __meterBinaryCtor = function(nm) {
         var Orig = globalThis[nm];
         if (typeof Orig !== 'function') return;
@@ -212,10 +266,11 @@ const HARNESS_SOURCE = `
             }
             return new Orig(...arguments);
         };
-        // Preserve instanceof and the static surface (BYTES_PER_ELEMENT, from, of,
-        // ArrayBuffer.isView, …) by aliasing the prototype and inheriting statics.
+        // Preserve instanceof via the prototype alias, and the static surface
+        // (BYTES_PER_ELEMENT, from, of, ArrayBuffer.isView, …) by adopting the
+        // original's own statics plus its [[Prototype]].
         Wrapped.prototype = Orig.prototype;
-        try { if (typeof __setProto === 'function') __setProto(Wrapped, Orig); } catch(e) {}
+        __adoptStatics(Wrapped, Orig);
         // Route species / (new X()).constructor back through the metered wrapper
         // so the byte-count charge cannot be sidestepped via the instance. (Unlike
         // Array/String, the TypedArray/ArrayBuffer prototype constructors are not
@@ -318,7 +373,7 @@ const HARNESS_SOURCE = `
             return new Orig(...arguments);
         };
         Wrapped.prototype = Orig.prototype;
-        try { if (typeof __setProto === 'function') __setProto(Wrapped, Orig); } catch(e) {}
+        __adoptStatics(Wrapped, Orig);
         __lockMethod(Orig.prototype, 'constructor', Wrapped);
         __lockMethod(globalThis, nm, Wrapped);
     };
@@ -1534,6 +1589,69 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
     return (threshold !== undefined) && b >= threshold;
 }
 
+// ----- Execute-time consensus source-lint enforcement: per-coin block-HEIGHT gate  -----
+// Every consensus source-lint ban (banned-async, banned-generator, banned-wasm and the
+// VM_LINT_HARDENING rule set) is enforced at DEPLOY time only: the indexer runs
+// validateSyntax over the submitted source and records the verdict, then execute() meters
+// and runs the PERSISTED code with no re-check. So a contract accepted before a ban
+// activates keeps executing banned syntax forever afterwards, which is exactly the case
+// the bans exist to close (a live banned-generator instance can still leak __stackDepth
+// toward the cap; a live WebAssembly reference still has the strip applied under it on
+// one side of the fleet and not the other). .
+//
+// The remedy is to re-run validateSyntax at EXECUTE time against the bans active for THAT
+// block, and fail the execution deterministically when the stored source no longer passes.
+// That flips previously-succeeding executions to failures, so it is consensus-visible in
+// the strongest sense and MUST ride its own activation: the three existing gates cannot be
+// reused (both 1786060800 block-time gates are already open on every network and the Pkg 3
+// heights are in the past, so there would be nothing left to ride, and a from-genesis
+// replay would rewrite settled history).
+//
+// Shape follows PKG3_SANDBOX_ACTIVATION exactly: keyed on block HEIGHT, PER COIN, with the
+// coin derived from the C:<COIN>:<idx> contract address (pkg3CoinFromAddress), so the whole
+// gate stays inside the VM and no indexer-side opts change is needed. testnet/regtest
+// activate from genesis: both are pre-launch, both already enforce the same rule set at
+// deploy from genesis, so every contract that exists there passes the execute-time check
+// and the only observable change is the metered lint gas. An unknown network/coin or a
+// non-finite height resolves to pre-activation (no check, no gas), the byte-identical-
+// replay-safe default.
+//
+// !! MAINNET IS DELIBERATELY UNARMED. The operator ratified the MECHANISM on 2026-08-11
+// (execute-time enforcement, verdict cached by the metering sha256 key, cost metered as
+// gas) but still owes the concrete per-coin heights. `null` is the explicit unarmed
+// sentinel: it resolves to inactive on every mainnet height, so mainnet behaviour is
+// byte-identical to today until the operator fills in the ratified train heights here AND
+// in the xchain-indexer twin (xchain-indexer/src/vm_exec_lint_activation.js), which the
+// consensus-params suites in both repos pin to equality. Arming one side alone forks.
+const EXEC_LINT_ACTIVATION = Object.freeze({
+    'BTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'LTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+});
+
+// Gas granularity for the execute-time lint. validateSyntax spawns an ivm.Isolate for the
+// V8 syntax check and then parses the source with acorn, so its cost scales with the source
+// length; charging VM_COMPUTATION per 256 bytes (minimum one unit) keeps it on the same
+// deterministic, source-derived basis as every other metered step. The charge is levied on
+// EVERY post-activation execution, cache hit or miss, so the verdict cache can never move
+// gasUsed. Changing this divisor changes gasUsed (-> contract_hash -> fee), so it is a
+// coordinated consensus parameter, pinned by the consensus-params suite.
+const EXEC_LINT_GAS_BYTES_PER_UNIT = 256;
+
+// Whether execute-time source-lint enforcement is active for (network, coin) at
+// blockHeight. testnet/regtest: genesis. mainnet/unknown: per-coin height threshold;
+// an unresolvable coin, a non-finite height, or an UNARMED (null) per-coin entry all
+// resolve to inactive (legacy, byte-identical below).
+function isExecLintActive(network, coin, blockHeight) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    const b = Number(blockHeight);
+    if (!Number.isFinite(b)) return false;
+    const threshold = (coin != null) ? EXEC_LINT_ACTIVATION[coin + ':mainnet'] : undefined;
+    // Number.isFinite rejects both the absent key (undefined) and the unarmed sentinel (null).
+    if (!Number.isFinite(threshold)) return false;
+    return b >= threshold;
+}
+
 class XChainVM {
     /**
      * @param {object} config
@@ -1593,6 +1711,19 @@ class XChainVM {
         // Default the cache bound when the caller's limits object predates it.
         if (!Number.isInteger(this.limits.maxMeteredCacheSize))
             this.limits.maxMeteredCacheSize = this.limits.maxBlockCacheSize || 1000;
+
+        // Execute-time lint-verdict cache :
+        //   Map<sha256(code):asyncBit:hardenBit:pkg3Bit, {valid, error?}>.
+        // Shares the metering cache's sha256(code) key material (the digest is computed
+        // ONCE per execution and handed to both lookups) and appends the three consensus
+        // flag bits the verdict depends on. validateSyntax is a pure function of exactly
+        // those four inputs, so a hit returns the identical verdict a fresh call would:
+        // the cache is invisible to consensus and only removes the repeated ivm.Isolate
+        // spawn + acorn parse that the check would otherwise pay on every execute of the
+        // same contract. Its GAS is charged unconditionally (hit or miss), so a cold and
+        // a warm node bill the same. Bounded by maxMeteredCacheSize with FIFO eviction,
+        // exactly like _meteredCache; correctness holds when it is empty.
+        this._lintVerdictCache = new Map();
 
         // Pre-compile the harness script source (it's the same every time)
         this._harnessSource = HARNESS_SOURCE;
@@ -1683,10 +1814,14 @@ class XChainVM {
      * @param {string} code
      * @param {boolean} specEvalOrder
      * @param {boolean} meterCallSpread
+     * @param {string} [codeHash] - precomputed sha256(code) hex. Optional: execute()
+     *        computes the digest once and shares it with the lint-verdict cache
+     *         so a 64KB body is hashed once per execution, not twice.
+     *        Omitting it recomputes the identical digest, so the key is unchanged.
      * @returns {string} metered source
      */
-    _getMeteredCode(code, specEvalOrder, meterCallSpread) {
-        const key = crypto.createHash('sha256').update(code).digest('hex') +
+    _getMeteredCode(code, specEvalOrder, meterCallSpread, codeHash) {
+        const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0');
         const hit = this._meteredCache.get(key);
         if (hit !== undefined) return hit;
@@ -1700,6 +1835,50 @@ class XChainVM {
         }
         this._meteredCache.set(key, metered);
         return metered;
+    }
+
+    /**
+     * Return the execute-time consensus source-lint verdict for `code` under the three
+     * resolved ban flags, from the verdict cache when possible .
+     *
+     * validateSyntax() is a pure function of (code, enforceBannedAsync,
+     * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm), all folded
+     * into the key, so a hit returns the verdict a fresh call would produce. The two
+     * Pkg 3 rules share ONE activation and are therefore threaded as one bit.
+     *
+     * This exists because validateSyntax spawns an ivm.Isolate for its V8 syntax check
+     * and then acorn-parses the source; paying that on every execute of a hot contract
+     * would put an isolate spawn on the execution path. The CALLER charges the lint gas
+     * unconditionally, before consulting this cache, so cache state can never move
+     * gasUsed. Bounded by maxMeteredCacheSize with FIFO eviction (a pure memory/hit-rate
+     * tradeoff, not a determinism concern); correctness holds when it is empty.
+     *
+     * @param {string} code
+     * @param {boolean} enforceBannedAsync
+     * @param {boolean} enforceLintHardening
+     * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
+     * @param {string} [codeHash] - precomputed sha256(code) hex (see _getMeteredCode)
+     * @returns {{valid: boolean, error?: string}}
+     */
+    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, codeHash) {
+        const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
+            ':' + (enforceBannedAsync ? '1' : '0') +
+            (enforceLintHardening ? '1' : '0') +
+            (enforcePkg3Bans ? '1' : '0');
+        const hit = this._lintVerdictCache.get(key);
+        if (hit !== undefined) return hit;
+        const verdict = validateSyntax(code, {
+            enforceBannedAsync:     enforceBannedAsync,
+            enforceLintHardening:   enforceLintHardening,
+            enforceBannedGenerator: enforcePkg3Bans,
+            enforceBannedWasm:      enforcePkg3Bans
+        });
+        if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
+            const oldest = this._lintVerdictCache.keys().next().value;
+            if (oldest !== undefined) this._lintVerdictCache.delete(oldest);
+        }
+        this._lintVerdictCache.set(key, verdict);
+        return verdict;
     }
 
     /**
@@ -1787,9 +1966,66 @@ class XChainVM {
         let isolate = null;
 
         // Enforce max code size before any expensive work
-        if (Buffer.byteLength(opts.code || '', 'utf8') > this.limits.maxCodeSize) {
+        const __codeStr   = opts.code || '';
+        const __codeBytes = Buffer.byteLength(__codeStr, 'utf8');
+        if (__codeBytes > this.limits.maxCodeSize) {
             return this._errorResult(gasTracker, emissionCollector,
                 'error: code size exceeds limit (' + this.limits.maxCodeSize + ' bytes)');
+        }
+        // Hash the source ONCE per execution and share the digest with both source-keyed
+        // caches (metered code + lint verdict), instead of hashing a 64KB body twice.
+        const __codeHash = crypto.createHash('sha256').update(__codeStr).digest('hex');
+
+        // ----- Execute-time consensus source-lint enforcement (, ) -----
+        // Re-run the consensus source lint over the STORED code against the bans active at
+        // THIS block, so a contract accepted before a ban activates stops executing banned
+        // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
+        // under the rule set of the deploy block and its verdict was final.
+        //
+        // The three flags are resolved by the SAME predicates the rest of the VM already
+        // uses, which are the execution-side twins of the flags the indexer threads into
+        // deploy.js validateSyntax, so the execute-time verdict agrees with what a deploy
+        // in this block would have produced:
+        //   banned-async                    -> isAsyncSurfaceActive   (block time)
+        //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
+        //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
+        // The whole check rides its own per-coin height gate (isExecLintActive), which is
+        // UNARMED on mainnet: below it nothing is charged and nothing is checked, so the
+        // pre-activation path is byte-identical, gasUsed included.
+        const __execLintCoin   = pkg3CoinFromAddress(opts.contractAddress);
+        const __execLintHeight = opts.blockContext && Number(opts.blockContext.height);
+        if (isExecLintActive(opts.network, __execLintCoin, __execLintHeight)) {
+            const __lintBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
+            // Charge FIRST and unconditionally (before the verdict cache is consulted), so a
+            // warm node and a cold node bill identical gas for the identical execution and
+            // the cache stays invisible to consensus. Source-length-derived, so it is a
+            // deterministic function of the stored code.
+            const __lintUnits = Math.max(1, Math.ceil(__codeBytes / EXEC_LINT_GAS_BYTES_PER_UNIT));
+            try {
+                gasTracker.charge(this.gasSchedule.VM_COMPUTATION * __lintUnits);
+            } catch (e) {
+                if (e instanceof GasExhaustedError) {
+                    // Same clamp the general out_of_gas path applies: bill at most the
+                    // ceiling so the fee can never exceed the caller's committed budget.
+                    return this._errorResult(gasTracker, emissionCollector,
+                        'out_of_gas: used ' + e.used + ' of ' + e.ceiling, gasTracker.ceiling);
+                }
+                throw e;
+            }
+            const __lintVerdict = this._getLintVerdict(
+                __codeStr,
+                isAsyncSurfaceActive(opts.network, __lintBlockTime),
+                isLintHardeningActive(opts.network, __lintBlockTime),
+                isPkg3SandboxActive(opts.network, __execLintCoin, __execLintHeight),
+                __codeHash
+            );
+            if (!__lintVerdict.valid) {
+                // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus-runtime.js);
+                // the indexer collapses it to the generic failure token. The lint message is
+                // deterministic and path-free, so it is safe to surface verbatim.
+                return this._errorResult(gasTracker, emissionCollector,
+                    'error: banned syntax: ' + __lintVerdict.error);
+            }
         }
 
         try {
@@ -1814,8 +2050,10 @@ class XChainVM {
             // C:<COIN>:<idx> address so LTC/DOGE mainnet (tips already past a bare BTC
             // 961000) stay pre-activation until their own calendar height; below the
             // gate every leg is byte-identical to today.
-            const __pkg3Coin   = pkg3CoinFromAddress(opts.contractAddress);
-            const __pkg3Height = opts.blockContext && Number(opts.blockContext.height);
+            // Coin + height were already derived above for the execute-time lint gate
+            // ; reuse them so the two per-coin height gates cannot drift apart.
+            const __pkg3Coin   = __execLintCoin;
+            const __pkg3Height = __execLintHeight;
             const __pkg3SandboxOn = isPkg3SandboxActive(opts.network, __pkg3Coin, __pkg3Height);
             stripGlobals(isolate, context, { stripPromise, stripWasm: __pkg3SandboxOn });
 
@@ -2018,7 +2256,7 @@ class XChainVM {
             const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime);
             let meteredCode;
             try {
-                meteredCode = this._getMeteredCode(opts.code || '', __specEvalOrder, __meterCallSpread);
+                meteredCode = this._getMeteredCode(__codeStr, __specEvalOrder, __meterCallSpread, __codeHash);
             } catch (e) {
                 return this._errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }
@@ -2524,6 +2762,13 @@ module.exports.MAX_STACK_DEPTH_MUSL = MAX_STACK_DEPTH_MUSL;
 module.exports.PKG3_SANDBOX_ACTIVATION = PKG3_SANDBOX_ACTIVATION;
 module.exports.isPkg3SandboxActive = isPkg3SandboxActive;
 module.exports.pkg3CoinFromAddress = pkg3CoinFromAddress;
+// Execute-time source-lint enforcement : the per-coin activation-height map,
+// its resolver, and the gas granularity. Exposed so the consensus-params freeze guards in
+// THIS repo and in xchain-indexer can pin them to equality across the twinned pair; a
+// height armed on one side only, or a divergent gas divisor, forks the fleet.
+module.exports.EXEC_LINT_ACTIVATION = EXEC_LINT_ACTIVATION;
+module.exports.isExecLintActive = isExecLintActive;
+module.exports.EXEC_LINT_GAS_BYTES_PER_UNIT = EXEC_LINT_GAS_BYTES_PER_UNIT;
 // Coordinated flag-day (block time) that activates the F3-binary allocation gas
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).

@@ -102,12 +102,19 @@ const useWasm = `module.exports = function(xchain){ try { return typeof WebAssem
         assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
     });
 
-    // ---- Pre-launch nets strip from genesis ----
+    // ---- Pre-launch nets: the execute-time lint supersedes the strip  ----
+    // The strip is the defence-in-depth layer for a contract that DEPLOYED before the
+    // banned-wasm rule armed. Where execute-time source-lint enforcement is active (the
+    // pre-launch nets, from genesis) such a contract can no longer execute at all: the
+    // stored source is re-linted against the bans live at this block and rejected before
+    // an isolate is even built, so the WebAssembly global is unreachable a layer earlier.
+    // The strip itself stays pinned above, on mainnet, which is below the exec-lint gate.
     for (const network of ['testnet', 'regtest']) {
-        it(`${network} strips WebAssembly from genesis (height 0)`, async function () {
+        it(`${network} rejects a WebAssembly-referencing contract at execute (lint supersedes the strip)`, async function () {
             const r = await run(typeofWasm, 0, network, 'BTC');
-            assert.strictEqual(r.success, true, r.error);
-            assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
+            assert.strictEqual(r.success, false);
+            assert.ok(r.error.startsWith('error: banned syntax: '), r.error);
+            assert.ok(/WebAssembly/.test(r.error), r.error);
         });
     }
 });
