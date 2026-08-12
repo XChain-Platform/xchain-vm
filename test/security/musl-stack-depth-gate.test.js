@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Musl-safe recursion-bound HEIGHT gate 
+ * Musl-safe recursion-bound HEIGHT gate
  *
  * The injected __DEPTH_LIMIT (read by BOTH the intra-contract recursion guard
  * and the F-NR native-recursion guard) drops from MAX_STACK_DEPTH (512) to
@@ -57,7 +57,7 @@ const H_JUST_BELOW = 960999;
 
 const fn = (body) => `module.exports = function(xchain){ ${body} };`;
 
-(XChainVM ? describe : describe.skip)('musl-safe recursion-bound HEIGHT gate ', function () {
+(XChainVM ? describe : describe.skip)('musl-safe recursion-bound HEIGHT gate', function () {
     this.timeout(30000);
 
     let vm;

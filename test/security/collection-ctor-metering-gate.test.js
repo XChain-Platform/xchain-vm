@@ -12,7 +12,7 @@
  *
  **********************************************************************
  * Set/Map collection-constructor metering: per-coin Pkg 3 height gate
- * (07669055 / )
+ * (07669055)
  *
  * new Set(bigArr) / new Map(bigEntries) builds an O(n) native hash table for the
  * flat __gas(1) of the call site (the source array is charged once at build and
@@ -32,7 +32,7 @@
 
 const assert = require('assert');
 const { createVM, execute, XChainVM, GAS_SCHEDULE } = require('../fuzz/harness');
-// : the execute-time source lint is metered as gas, on this divisor.
+// The execute-time source lint is metered as gas, on this divisor.
 const { EXEC_LINT_GAS_BYTES_PER_UNIT } = require('../../src/index.js');
 
 const TS = 1700000000; // the collection-ctor gate keys on height, not block time.
@@ -44,7 +44,7 @@ const oneSet = `module.exports = function(xchain){ var a=[]; for(var i=0;i<500;i
 // blow the 500k ceiling -> deterministic out_of_gas.
 const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000;i++){a.push(i);} for(var r=0;r<2000;r++){ var s=new Set(a); } return 'done'; };`;
 
-(XChainVM ? describe : describe.skip)('Set/Map ctor metering: per-coin Pkg 3 height gate ', function () {
+(XChainVM ? describe : describe.skip)('Set/Map ctor metering: per-coin Pkg 3 height gate', function () {
     this.timeout(30000);
 
     const runAt = (code, height, network, coin, ceiling) => {
@@ -76,7 +76,7 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
             'the charge is exactly the 500-element source length');
     });
 
-    // CHANGED by  / , and the change is deliberate.
+    // CHANGED, and the change is deliberate.
     //
     // This asserted that below the Pkg 3 gate a heavy .add() loop SUCCEEDS, because
     // mutation was unmetered and a from-genesis replay had to reproduce historical
@@ -85,7 +85,7 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
     // because charging construction while leaving the equivalent loop free left the
     // unbounded-allocation hole wide open on exactly the path an attacker would use.
     //
-    // Ungated is only sound inside the  batch, whose mandatory fleet-wide
+    // Ungated is only sound inside the coordinated wipe-and-replay batch, whose mandatory fleet-wide
     // wipe-and-replay recomputes all history under the new rules, so there is no
     // historical gas left to preserve. Some already-deployed operator contracts will
     // re-execute more expensively and may now fail; per spec §2 those are findings to
@@ -149,7 +149,7 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
     it('regtest meters the Set ctor from genesis (height 0)', async function () {
         const belowMain = await runAt(oneSet, 960999, 'mainnet', 'BTC');
         const regtest = await runAt(oneSet, 0, 'regtest', 'BTC');
-        // The pre-launch nets are ALSO genesis-active for the  execute-time source
+        // The pre-launch nets are ALSO genesis-active for the execute-time source
         // lint, whose cost is metered as gas, so the regtest run carries one extra charge
         // the mainnet baseline does not. Derive it from the exported divisor rather than
         // hard-coding it, so a re-tuned divisor moves this expectation with it.

@@ -17,9 +17,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const fc = require('fast-check');
 
 const MATH_BINARY_OPS = [

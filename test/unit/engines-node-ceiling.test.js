@@ -12,7 +12,7 @@
  *
  *********************************************************************/
 
-// : engines.node must keep an upper bound below Node 23.
+// engines.node must keep an upper bound below Node 23.
 //
 // isolated-vm 5.0.4 carries a native binding that node-gyp cannot build on
 // Node 24: it uses `T::IsStackAllocatedTypeMarker`, a V8 API that major
@@ -67,7 +67,7 @@ function boundedBelow23(range) {
             .some((c) => lte(c, [23, 0, 0])));
 }
 
-describe('packaging: engines.node ceiling ', function () {
+describe('packaging: engines.node ceiling', function () {
     it('still depends on isolated-vm, so the ceiling is still load-bearing', function () {
         // If this ever fails, the constraint moved: re-derive the ceiling from
         // whatever the new native dependency supports, do not just widen it.

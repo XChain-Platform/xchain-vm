@@ -15,8 +15,7 @@
  * the pinned runtime, and the status vocabulary. These are golden literals:
  * any drift reddens here, and a real change must bump CONSENSUS_VERSION + a new
  * golden in BOTH repos (the indexer asserts the bundled VM's version) and, post-
- * launch, a protocol_changes.js block-height activation. See
- * claude/reports/launch/CONSENSUS-ACTIVATION-RUNBOOK.md.
+ * launch, a protocol_changes.js block-height activation.
  ********************************************************************/
 // @ts-nocheck
 
@@ -42,7 +41,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // (Promise and WebAssembly stay in the SET; their DELETION is flag-day gated
         // at runtime -- Promise on the block-time async-surface gate, WebAssembly on
         // the per-coin Pkg 3 height gate; membership is frozen, activation is the
-        // separate gate pinned below. Epoch 3 added WebAssembly, .)
+        // separate gate pinned below. Epoch 3 added WebAssembly.)
         const GOLDEN_STRIPPED_GLOBAL_NAMES = [
             'Atomics', 'BigInt', 'Date', 'FinalizationRegistry', 'Intl',
             'Promise', 'Proxy', 'Reflect', 'SharedArrayBuffer', 'Temporal',
@@ -174,12 +173,12 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     });
 
     it('VM_LINT_HARDENING_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
-        // Flag-day Pkg 4 : the hardened deploy-linter rule set, the
+        // Flag-day Pkg 4: the hardened deploy-linter rule set, the
         // wrapper control-binding closure move, and the corroborated error
         // classifier all flip at this block time on mainnet. Deploy verdicts and
         // execution status/gasUsed are hashed, so two nodes that disagree on the
         // flag day diverge on the first hardened DEPLOY/EXECUTE. Armed at the
-        // ratified  anchor, the same instant VM_BANNED_ASYNC activates
+        // ratified flag-day anchor, the same instant VM_BANNED_ASYNC activates
         // (indexer protocol_changes.js: 1786060800).
         assert.strictEqual(vm.VM_LINT_HARDENING_GATE_BLOCK_TIME, 1786060800);
         assert.strictEqual(vm.isLintHardeningActive('regtest', 0), true);
@@ -290,9 +289,9 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.CALL_SPREAD_METER_GATE_BLOCK_TIME, 1786060800);
     });
 
-    it('Package 3 VM-sandbox bundle gate: per-coin activation heights + depth bounds are frozen ', function () {
+    it('Package 3 VM-sandbox bundle gate: per-coin activation heights + depth bounds are frozen', function () {
         // The whole flag-day Package 3 VM-sandbox bundle flips on ONE per-coin
-        // block-HEIGHT gate (the musl-safe recursion bound  folded in, the
+        // block-HEIGHT gate (the musl-safe recursion bound folded in, the
         // WebAssembly strip, the generator-fn ban). The activation heights and the
         // depth bounds are hashed-behaviour-affecting (they move which executions
         // out_of_stack / which globals strip), so pin them like any other consensus
@@ -331,7 +330,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isPkg3SandboxActive('mainnet', null, 10000000), false);
     });
 
-    it('execute-time source-lint gate: per-coin map is UNARMED on mainnet and the gas divisor is frozen ', function () {
+    it('execute-time source-lint gate: per-coin map is UNARMED on mainnet and the gas divisor is frozen', function () {
         // Re-linting stored contract code at EXECUTE time flips previously-succeeding
         // executions into failures and adds a source-length-derived gas charge, so both
         // the activation heights and the gas divisor are consensus parameters: a node
@@ -348,7 +347,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.EXEC_LINT_ACTIVATION['DOGE:mainnet'], null);
         assert.strictEqual(vm.EXEC_LINT_GAS_BYTES_PER_UNIT, 256);
         // Unarmed means inactive at EVERY mainnet height, including absurd ones: mainnet
-        // execution is byte-identical to pre- until the operator arms it.
+        // execution is byte-identical to pre-gate until the operator arms it.
         assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 0), false);
         assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 961000), false);
         assert.strictEqual(vm.isExecLintActive('mainnet', 'LTC', 10000000), false);
@@ -396,8 +395,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // The six literal pins above freeze the VM's flag-day value, and the
         // indexer's own suite freezes its value, but nothing tied the two files
         // together: a coordinated repin that edits the indexer literal and misses
-        // one VM constant passes BOTH CIs and forks the fleet at activation
-        // ( / SD-2 residual). Read the indexer source directly (monorepo
+        // one VM constant passes BOTH CIs and forks the fleet at activation.
+        // Read the indexer source directly (monorepo
         // sibling checkout) and assert every VM gate equals the CONTROLLER_GUARD
         // activation time. Skips only when the sibling repo is not checked out
         // (standalone clone); the hard value pins above still guard that case.

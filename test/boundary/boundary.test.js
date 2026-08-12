@@ -36,9 +36,6 @@
  */
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const GasTracker = require('../../src/gas.js');
 const StateManager = require('../../src/state.js');
@@ -94,9 +91,7 @@ function executeCode(vm, code, opts) {
     });
 }
 
-// ============================================================
 // Section 1: Gas Ceiling Enforcement (G-1 through G-7)
-// ============================================================
 
 describe('Boundary: Gas Ceiling', function() {
 
@@ -194,9 +189,7 @@ describe('Boundary: Gas Ceiling', function() {
     });
 });
 
-// ============================================================
 // Section 2: Wall-Clock Timeout (T-1 through T-4)
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Wall-Clock Timeout', function() {
 
@@ -240,9 +233,7 @@ describe('Boundary: Gas Ceiling', function() {
     });
 });
 
-// ============================================================
 // Section 3: Memory Limits (M-1 through M-4)
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Memory Limits', function() {
 
@@ -272,9 +263,7 @@ describe('Boundary: Gas Ceiling', function() {
     });
 });
 
-// ============================================================
 // Section 4: Code Size (CS-1 through CS-6)
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Code Size', function() {
 
@@ -346,9 +335,7 @@ describe('Boundary: Code Size (metering)', function() {
     });
 });
 
-// ============================================================
 // Section 5: State Management (S-1 through S-14)
-// ============================================================
 
 describe('Boundary: State Management', function() {
 
@@ -465,9 +452,7 @@ describe('Boundary: State Management', function() {
     });
 });
 
-// ============================================================
 // Section 6: Emission Limits (E-1 through E-7)
-// ============================================================
 
 describe('Boundary: Emission Limits', function() {
 
@@ -566,9 +551,7 @@ describe('Boundary: Emission Limits', function() {
     });
 });
 
-// ============================================================
 // Section 7: Log Limits (L-1 through L-7)
-// ============================================================
 
 describe('Boundary: Log Limits', function() {
 
@@ -637,9 +620,7 @@ describe('Boundary: Log Limits', function() {
     });
 });
 
-// ============================================================
 // Section 8: Return Value Truncation (R-1 through R-5)
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Return Value Truncation', function() {
 
@@ -701,9 +682,7 @@ describe('Boundary: Log Limits', function() {
     });
 });
 
-// ============================================================
 // Section 9: Math Operations (MA-1 through MA-10)
-// ============================================================
 
 describe('Boundary: Math Operations', function() {
 
@@ -776,9 +755,7 @@ describe('Boundary: Math Operations', function() {
     });
 });
 
-// ============================================================
 // Section 10: Metering & AST Injection (ME-1 through ME-7)
-// ============================================================
 
 describe('Boundary: Metering', function() {
 
@@ -868,9 +845,7 @@ describe('Boundary: Metering', function() {
     });
 });
 
-// ============================================================
 // Section 11: Sandbox Escape Boundaries (SB-1 through SB-8)
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Sandbox Escapes', function() {
 
@@ -984,9 +959,7 @@ describe('Boundary: Metering', function() {
     });
 });
 
-// ============================================================
 // Section 12: Gateway Parameter Boundaries (GW-1 through GW-9)
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Gateway Parameters', function() {
 
@@ -1090,9 +1063,7 @@ describe('Boundary: Metering', function() {
     });
 });
 
-// ============================================================
 // Section 13: Emit Action Field Boundaries (EA-1 through EA-8)
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Emit Action Fields', function() {
 
@@ -1178,9 +1149,7 @@ describe('Boundary: Metering', function() {
     });
 });
 
-// ============================================================
 // Section 14: Compound Interaction Boundaries
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Compound Interactions', function() {
 
@@ -1283,9 +1252,7 @@ describe('Boundary: Metering', function() {
     });
 });
 
-// ============================================================
 // Section 15: Determinism at Boundaries
-// ============================================================
 
 (XChainVM ? describe : describe.skip)('Boundary: Determinism', function() {
 

@@ -16,9 +16,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');
 const {
@@ -55,7 +52,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             const returnVal = JSON.parse(result.returnValue);
             assert(Array.isArray(returnVal), 'Expected array of results');
 
-            // Every attempt should report "undefined" or "blocked"
             const dangerous = ['process', 'require', 'eval', 'Function',
                                'Date', 'setTimeout', 'fetch', 'Proxy',
                                'WeakRef', 'SharedArrayBuffer'];
@@ -70,7 +66,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
         });
 
         it('should not leak host state between executions', async function() {
-            // Execute a contract that writes to global-like patterns
             await h.deploy({
                 code: `module.exports = function(xchain) {
                     // Try to leak data via various mechanisms
@@ -85,7 +80,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 params: [], caller: 'user1'
             });
 
-            // Second execution should not see the leaked value
             await h.deploy({
                 code: `module.exports = function(xchain) {
                     try {
@@ -208,7 +202,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
     // --- E2E-034: Cross-contract state interference ---
     describe('E2E-034: Cross-contract state isolation', function() {
         it('should prevent one contract from reading another contract state', async function() {
-            // Deploy Contract A with a secret
             await h.deploy({
                 code: `module.exports = {
                     initialize: function(xchain) { xchain.state.set('secret', 'hunter2'); },
@@ -217,7 +210,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:34A'
             });
 
-            // Deploy Contract B that tries to read A's state
             await h.deploy({
                 code: `module.exports = {
                     initialize: function(xchain) {},
@@ -230,7 +222,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:34B'
             });
 
-            // A should see its secret
             const rA = await h.execute({
                 contractAddress: 'C:BTC:34A', method: 'getSecret',
                 params: [], caller: 'user1'

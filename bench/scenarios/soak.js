@@ -78,7 +78,6 @@ async function main() {
     console.log('Node ' + process.version + ' | Duration: ' + DURATION_S + 's | Block size: ' + BLOCK_SIZE);
     console.log('Mix: 70% light / 20% medium / 10% heavy');
 
-    // Load contracts
     TIER_MIX[0].code = loadContract('light.js');
     TIER_MIX[1].code = loadContract('medium.js');
     TIER_MIX[2].code = loadContract('heavy.js');
@@ -108,7 +107,6 @@ async function main() {
         sampleTimings   = sampleTimings.concat(result.timings);
         allTimings      = allTimings.concat(result.timings);
 
-        // Periodic sample
         const now = performance.now();
         if (now - lastSampleTime >= SAMPLE_INTERVAL_S * 1000) {
             const elapsed   = (now - startTime) / 1000;
@@ -146,7 +144,6 @@ async function main() {
 
     const totalTime = (performance.now() - startTime) / 1000;
 
-    // Final summary
     console.log('\n' + '='.repeat(80));
     console.log('  Soak Test Summary');
     console.log('='.repeat(80));
@@ -162,7 +159,6 @@ async function main() {
     console.log('  Latency P99:       ' + fmt(overallStats.p99));
     console.log('  Latency Mean:      ' + fmt(overallStats.mean));
 
-    // Memory stability
     if (samples.length >= 2) {
         const firstMem = samples[0].rssMb;
         const lastMem  = samples[samples.length - 1].rssMb;
@@ -175,7 +171,6 @@ async function main() {
         const throughputDrift = (((lastOps - firstOps) / firstOps) * 100).toFixed(1);
         console.log('  Throughput drift:  ' + throughputDrift + '%');
 
-        // Pass/fail criteria
         const memPass  = Math.abs(parseFloat(growthPct)) < 10;
         const driftPass = Math.abs(parseFloat(throughputDrift)) < 20;
         console.log('\n  Memory stability:   ' + (memPass ? 'PASS' : 'FAIL') + ' (threshold: <10% growth)');

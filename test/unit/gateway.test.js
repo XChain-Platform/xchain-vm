@@ -348,7 +348,7 @@ describe('Gateway (host-function surface)', function () {
             assert.throws(() => gw.contract.slash(PUB, 'TOK', 'abc'), /amount must be a positive decimal/);
         });
 
-        // . The 8-dp ceiling contradicted the stake side of the seam (STAKE v3
+        // The 8-dp ceiling contradicted the stake side of the seam (STAKE v3
         // admits a token's own DECIMALS, up to MAX_TOKEN_DECIMALS 18, and
         // slashContractStake deducts at that precision), so a graduated slash of a
         // high-precision token could never be emitted. Widening it ACCEPTS a call that
@@ -374,7 +374,7 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(collector.actions[0].params.amount, '100.12345678');
         });
 
-        // . The '|' guard is consensus-visible (a call that used to emit now
+        // The '|' guard is consensus-visible (a call that used to emit now
         // throws), so the host gates it; both sides of the gate are pinned here.
         it('rejects a token carrying the wire delimiter when the gate is on', function () {
             const { gw, collector } = build({ slashTokenDelimGuardOn: true });

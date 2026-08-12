@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { DEFAULT_LIMITS } = require('./harness');
 
@@ -83,7 +80,6 @@ function checkStateLimits(result, limits) {
 }
 
 function checkNoPrototypePollution() {
-    // Object.prototype must be clean
     const ownKeys = Object.getOwnPropertyNames(Object.prototype);
     const expected = [
         'constructor', 'hasOwnProperty', 'isPrototypeOf',
@@ -96,16 +92,13 @@ function checkNoPrototypePollution() {
             'Object.prototype has unexpected property: ' + key);
     }
 
-    // Array.prototype.push must still work
     const arr = [];
     arr.push(1);
     assert.strictEqual(arr.length, 1, 'Array.prototype.push is broken');
 
-    // Function.prototype must be intact
     assert.strictEqual(typeof Function.prototype.call, 'function',
         'Function.prototype.call is broken');
 
-    // Object.prototype.toString must work correctly
     assert.strictEqual(Object.prototype.toString.call({}), '[object Object]',
         'Object.prototype.toString is broken');
 }

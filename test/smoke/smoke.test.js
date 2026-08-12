@@ -21,9 +21,6 @@
  */
 // @ts-nocheck
 
-//
-
-
 const assert = require('assert');
 
 let XChainVM;
@@ -66,7 +63,6 @@ function exec(vm, code, opts) {
 
 (XChainVM ? describe : describe.skip)('Smoke Tests', function() {
 
-    // S1: VM Instantiation
     describe('S1: VM instantiation', function() {
         it('should construct and run beginBlock/endBlock lifecycle', function() {
             const vm = createVM();
@@ -75,7 +71,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S2: Sandbox Environment
     describe('S2: Sandbox environment', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -88,7 +83,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S3: Basic Contract Execution
     describe('S3: Basic contract execution', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -107,7 +101,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S4: Multi-Method Dispatch
     describe('S4: Multi-method dispatch', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -128,7 +121,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S5: Platform Action Gateway - Emit
     describe('S5: Gateway emit', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -149,7 +141,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S6: Platform Action Gateway - Context Accessors
     describe('S6: Gateway context accessors', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -176,7 +167,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S7: Deterministic Math
     describe('S7: Deterministic math', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -189,7 +179,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S8: Syntax Validation
     describe('S8: Syntax validation', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -206,7 +195,6 @@ function exec(vm, code, opts) {
         });
     });
 
-    // S9: Error Classification - Revert
     describe('S9: Revert and atomicity', function() {
         let vm;
         before(function() { vm = createVM(); });

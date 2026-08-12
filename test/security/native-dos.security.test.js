@@ -31,9 +31,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 
 let XChainVM;
@@ -83,7 +80,7 @@ describe('Native-op DoS: banned literals (deploy-time)', function () {
     before(function () { if (!XChainVM) this.skip(); vm = createVM(); });
 
     it('rejects a BigInt literal', function () {
-        // Re-goldened for VM_LINT_HARDENING : the fixture also uses
+        // Re-goldened for VM_LINT_HARDENING: the fixture also uses
         // `**`, whose hardened banned-operator rule now surfaces first; the
         // bigint verdict is asserted via the pre-hardening flag below.
         const r = vm.validateSyntax(fn('return (2n ** 5000000n).toString();'));
@@ -168,7 +165,7 @@ describe('Async surface banned (deploy-time): async/await/Promise', function () 
 
     it('Promise is undefined inside the sandbox at runtime', async function () {
         // Run on mainnet at/after the async-surface flag-day: the Promise strip is live
-        // there, and mainnet is below the  execute-time source-lint gate (unarmed),
+        // there, and mainnet is below the execute-time source-lint gate (unarmed),
         // so a stored contract that predates the banned-async rule still reaches the
         // sandbox and the runtime strip is what has to starve it. On the pre-launch nets
         // the exec-lint rejects the same source a layer earlier (asserted below).
@@ -180,7 +177,7 @@ describe('Async surface banned (deploy-time): async/await/Promise', function () 
         assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
     });
 
-    it('where execute-time lint is active, the same stored source is rejected before the strip ', async function () {
+    it('where execute-time lint is active, the same stored source is rejected before the strip', async function () {
         const r = await execute(vm, fn('return typeof Promise;'));   // harness default: regtest
         assert.strictEqual(r.success, false);
         assert.ok(r.error.startsWith('error: banned syntax: '), r.error);
@@ -229,7 +226,7 @@ describe('Native-op DoS: gas exhaustion cannot be swallowed', function () {
     });
 
     it('the __gas hook cannot be overwritten to bypass metering', async function () {
-        // Run below the  execute-time source-lint gate (mainnet, unarmed) so the
+        // Run below the execute-time source-lint gate (mainnet, unarmed) so the
         // reserved-identifier source actually reaches the isolate: this test is about the
         // RUNTIME containment, which is the only line of defence for a contract that
         // deployed before the reserved-identifier rule armed.
@@ -239,7 +236,7 @@ describe('Native-op DoS: gas exhaustion cannot be swallowed', function () {
         assert.match(r.error, /out_of_gas|timeout/);
     });
 
-    it('where execute-time lint is active, the __gas overwrite never reaches the isolate ', async function () {
+    it('where execute-time lint is active, the __gas overwrite never reaches the isolate', async function () {
         const r = await execute(vm, fn('try { __gas = function(){}; } catch(e){} var x=0; while(true){ x++; }'));
         assert.strictEqual(r.success, false);
         assert.ok(r.error.startsWith('error: banned syntax: '), r.error);

@@ -17,9 +17,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const fc = require('fast-check');
 
 const normalParamsArb = fc.array(fc.string(), { maxLength: 10 });

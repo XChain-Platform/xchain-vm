@@ -16,9 +16,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');
 const {
@@ -32,7 +29,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
 (XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
 
-    let h; // harness
+    let h;
 
     beforeEach(function() {
         h = new E2EHarness(XChainVM);
@@ -50,7 +47,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             });
             assertSuccess(deploy.result);
 
-            // Verify state was initialized
             assertContractState(h.ledger, 'C:BTC:1', 'owner', 'deployer');
             assertContractState(h.ledger, 'C:BTC:1', 'token', 'TEST');
             assertContractState(h.ledger, 'C:BTC:1', 'sends', '0');
@@ -59,7 +55,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             h.seedBalance('C:BTC:1', 'TEST', '0');
             h.ledger.creditContractBalance('C:BTC:1', 'TEST', '1000');
 
-            // Execute send
             const result = await h.execute({
                 contractAddress: 'C:BTC:1', method: 'send',
                 params: ['user1', '50'], caller: 'deployer'
@@ -71,7 +66,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             ]);
             assertLogsContain(result, 'sent 50 to user1');
 
-            // Verify state updated
             assertContractState(h.ledger, 'C:BTC:1', 'sends', '1');
         });
     });
@@ -120,7 +114,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('multi_method.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:5' });
 
-            // Call setValue
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:5', method: 'setValue',
                 params: ['hello'], caller: 'deployer'
@@ -129,7 +122,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertReturnValue(r1, 'hello');
             assertContractState(h.ledger, 'C:BTC:5', 'value', 'hello');
 
-            // Call getValue
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:5', method: 'getValue',
                 params: [], caller: 'user1'
@@ -153,7 +145,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('multi_method.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:5c' });
 
-            // Owner can call onlyOwner
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:5c', method: 'onlyOwner',
                 params: [], caller: 'deployer'
@@ -161,7 +152,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertSuccess(r1);
             assertReturnValue(r1, 'authorized');
 
-            // Non-owner cannot
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:5c', method: 'onlyOwner',
                 params: [], caller: 'user1'

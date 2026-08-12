@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// Execute-time consensus source-lint enforcement (, ).
+// Execute-time consensus source-lint enforcement.
 //
 // The consensus source-lint bans were enforced at DEPLOY time only: execute()
 // metered and ran the PERSISTED code with no re-check, so a contract accepted
@@ -25,7 +25,7 @@
 //     source-length-derived divisor.
 //
 // Isolate-dependent (validateSyntax spawns an ivm.Isolate), so this suite runs
-// on the Linux validator fleet / devhost, not on macOS.
+// on the Linux validator fleet, not on macOS.
 
 const assert = require('assert');
 const XChainVM = require('../../src/index.js');
@@ -68,7 +68,7 @@ function runOpts(extra) {
     }, extra);
 }
 
-describe('execute-time consensus source-lint enforcement  @regression @tier1', function () {
+describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
     this.timeout(30000);
 
     describe('below the activation (mainnet, still unarmed)', function () {

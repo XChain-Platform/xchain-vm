@@ -23,13 +23,11 @@ try {
     console.log('Skipping determinism-baseline tests (isolated-vm not available):', e);
 }
 
-// ---------------------------------------------------------------------------
 // VM construction + result normalization: kept byte-identical to
 // determinism.test.js so a digest pinned here means the same thing there.
 // (determinism.test.js proves same-process run-twice-equal; THIS file pins a
 //  committed baseline so a *semantic* change is caught even when it's still
 //  internally deterministic.)
-// ---------------------------------------------------------------------------
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
     VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000,
@@ -89,11 +87,9 @@ const baseOpts = {
     blockContext: { height: 500, timestamp: 1700000000, hash: 'blockhash123' }
 };
 
-// ---------------------------------------------------------------------------
 // Fixed contract corpus. `name` is the stable key in DETERMINISM_BASELINE.json
 // DO NOT rename without regenerating. File contracts live in test/contracts/;
 // inline cases mirror the proven-good inline contracts in determinism.test.js.
-// ---------------------------------------------------------------------------
 const CORPUS = [
     { name: 'state_counter:increment', file: 'state_counter.js', method: 'increment', state: { counter: '5' } },
     { name: 'simple_send:send', file: 'simple_send.js', method: 'send', params: ['dest_addr', '100'], state: { owner: 'addr1', token: 'TEST' } },

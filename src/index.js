@@ -76,7 +76,7 @@ const HARNESS_SOURCE = `
     // this closure, unreachable from contract code.
     var __DEPTH_LIMIT  = globalThis.__DEPTH_LIMIT;
     // Bound the F-NR native sinks below the SMALLEST platform native-overflow onset,
-    // independent of how the two flag-days order . __DEPTH_LIMIT rides the
+    // independent of how the two flag-days order. __DEPTH_LIMIT rides the
     // per-coin block-HEIGHT Pkg 3 gate while the native guard's activation rides the
     // block-TIME binary-alloc gate, so a coin whose height lags its projected
     // activation could run the guard with the musl-unsafe 512 bound and let a
@@ -383,7 +383,7 @@ const HARNESS_SOURCE = `
     }
     // ----- end collection-constructor metering -----
 
-    // ----- collection MUTATOR metering () -----
+    // ----- collection MUTATOR metering -----
     // The Pkg 3 G1 work metered collection CONSTRUCTION and iterable-copy sizing
     // above, and stopped there. Growing a collection afterwards was free:
     //
@@ -407,11 +407,11 @@ const HARNESS_SOURCE = `
     //
     // UNGATED, departing from the flag-day discipline every other gas-moving change
     // in this file follows (__PKG3_SANDBOX_ON, __meterUpgradeOn). Those gates exist
-    // so a from-genesis replay reproduces historical gas bit-for-bit; the 
-    // batch replaces that guarantee with one mandatory fleet-wide wipe-and-replay,
-    // under which every node re-executes all history under these rules and no old
-    // prefix survives to be reproduced. Do NOT copy this ungated pattern for a
-    // post-launch change: it is correct only inside that rebase.
+    // so a from-genesis replay reproduces historical gas bit-for-bit; a coordinated
+    // fleet-wide wipe-and-replay event replaces that guarantee with one mandatory
+    // rebase, under which every node re-executes all history under these rules and
+    // no old prefix survives to be reproduced. Do NOT copy this ungated pattern for
+    // a post-launch change: it is correct only inside that rebase.
     var __meterCollectionMutator = function(nm, method) {
         var Ctor = globalThis[nm];
         if (typeof Ctor !== 'function' || !Ctor.prototype) return;
@@ -1320,7 +1320,7 @@ const MIN_CALL_GAS   = PROTO.VM_MIN_CALL_GAS;
 // via the pinned consensus runtime version.
 const MAX_STACK_DEPTH = 512;
 
-// Musl-safe recursion bound . On a musl/Alpine 128KB pthread stack the
+// Musl-safe recursion bound. On a musl/Alpine 128KB pthread stack the
 // native JSON.parse reviver walk and Array.prototype.join recurse in C++ to the
 // value's nesting depth and overflow BELOW 512 (measured near ~292 reviver / ~379
 // join), so a musl-built validator could fork from a glibc/macOS one on a value
@@ -1403,7 +1403,7 @@ function isAsyncSurfaceActive(network, blockTime) {
 // in lint-core.js), the CONTRACT_WRAPPER control-binding closure move, and the
 // corroborated error-classifier tightening below. All are consensus-visible
 // (deploy verdicts / execution status / gasUsed), so they flip fleet-wide at
-// the ratified  anchor, the same instant banned-async activates (zero
+// the ratified flag-day anchor, the same instant banned-async activates (zero
 // partially-hardened window). Deploy-side gating is resolved by the indexer
 // via protocol_changes.isEnabled('VM_LINT_HARDENING'); execution-side gating
 // uses the network-aware resolver below, mirroring its siblings: testnet/
@@ -1496,7 +1496,7 @@ function isCallSpreadMeterActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= CALL_SPREAD_METER_GATE_BLOCK_TIME;
 }
 
-// Activation for the contract.slash `token` wire-delimiter guard . Every
+// Activation for the contract.slash `token` wire-delimiter guard. Every
 // other emit validator rejects a '|' in a field the indexer may pipe-join;
 // contract.slash never had that check. It is inert against today's consumer (SLASH
 // is internal-only and _processSlashEmission reads the params by named field), but
@@ -1532,11 +1532,11 @@ function isSlashAmountPrecisionActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
 }
 
-// ----- Package 3 VM-sandbox flag-day: per-coin block-HEIGHT bundle gate  -----
+// ----- Package 3 VM-sandbox flag-day: per-coin block-HEIGHT bundle gate -----
 // ONE coordinated activation for the whole flag-day Package 3 VM-sandbox bundle, so
 // every leg flips fleet-wide together under a single CONSENSUS_VERSION bump (2 -> 3)
 // and re-golden. Legs behind this gate:
-//   - the musl-safe recursion bound , folded in here from its own gate;
+//   - the musl-safe recursion bound, folded in here from its own gate;
 //   - the WebAssembly global strip (75190596);
 //   - the generator-function deploy ban (29912bd8).
 // (Add legs as they land; a single gate keeps the whole bundle calendar-coherent.)
@@ -1562,7 +1562,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 //   LTC:  tip 3146964 + (18250 min / 2.5 min-per-block = 7300 blocks)  = 3154264 -> 3154250
 //   DOGE: tip 6300766 + (18250 min / 1.0 min-per-block = 18250 blocks) = 6319016 -> 6319000
 const PKG3_SANDBOX_ACTIVATION = Object.freeze({
-    'BTC:mainnet':  961000,     // the Cohort-B anchor (unchanged from )
+    'BTC:mainnet':  961000,     // the Cohort-B anchor (unchanged)
     'LTC:mainnet':  3154250,    // RATIFIED 2026-07-22 (pre-961000 train manifest)
     'DOGE:mainnet': 6319000,    // RATIFIED 2026-07-22 (pre-961000 train manifest)
 });
@@ -1589,7 +1589,7 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
     return (threshold !== undefined) && b >= threshold;
 }
 
-// ----- Execute-time consensus source-lint enforcement: per-coin block-HEIGHT gate  -----
+// ----- Execute-time consensus source-lint enforcement: per-coin block-HEIGHT gate -----
 // Every consensus source-lint ban (banned-async, banned-generator, banned-wasm and the
 // VM_LINT_HARDENING rule set) is enforced at DEPLOY time only: the indexer runs
 // validateSyntax over the submitted source and records the verdict, then execute() meters
@@ -1597,7 +1597,7 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
 // activates keeps executing banned syntax forever afterwards, which is exactly the case
 // the bans exist to close (a live banned-generator instance can still leak __stackDepth
 // toward the cap; a live WebAssembly reference still has the strip applied under it on
-// one side of the fleet and not the other). .
+// one side of the fleet and not the other).
 //
 // The remedy is to re-run validateSyntax at EXECUTE time against the bans active for THAT
 // block, and fail the execution deterministically when the stored source no longer passes.
@@ -1712,7 +1712,7 @@ class XChainVM {
         if (!Number.isInteger(this.limits.maxMeteredCacheSize))
             this.limits.maxMeteredCacheSize = this.limits.maxBlockCacheSize || 1000;
 
-        // Execute-time lint-verdict cache :
+        // Execute-time lint-verdict cache:
         //   Map<sha256(code):asyncBit:hardenBit:pkg3Bit, {valid, error?}>.
         // Shares the metering cache's sha256(code) key material (the digest is computed
         // ONCE per execution and handed to both lookups) and appends the three consensus
@@ -1816,7 +1816,7 @@ class XChainVM {
      * @param {boolean} meterCallSpread
      * @param {string} [codeHash] - precomputed sha256(code) hex. Optional: execute()
      *        computes the digest once and shares it with the lint-verdict cache
-     *         so a 64KB body is hashed once per execution, not twice.
+     *        so a 64KB body is hashed once per execution, not twice.
      *        Omitting it recomputes the identical digest, so the key is unchanged.
      * @returns {string} metered source
      */
@@ -1839,7 +1839,7 @@ class XChainVM {
 
     /**
      * Return the execute-time consensus source-lint verdict for `code` under the three
-     * resolved ban flags, from the verdict cache when possible .
+     * resolved ban flags, from the verdict cache when possible.
      *
      * validateSyntax() is a pure function of (code, enforceBannedAsync,
      * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm), all folded
@@ -1976,7 +1976,7 @@ class XChainVM {
         // caches (metered code + lint verdict), instead of hashing a 64KB body twice.
         const __codeHash = crypto.createHash('sha256').update(__codeStr).digest('hex');
 
-        // ----- Execute-time consensus source-lint enforcement (, ) -----
+        // ----- Execute-time consensus source-lint enforcement -----
         // Re-run the consensus source lint over the STORED code against the bans active at
         // THIS block, so a contract accepted before a ban activates stops executing banned
         // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
@@ -2050,8 +2050,8 @@ class XChainVM {
             // C:<COIN>:<idx> address so LTC/DOGE mainnet (tips already past a bare BTC
             // 961000) stay pre-activation until their own calendar height; below the
             // gate every leg is byte-identical to today.
-            // Coin + height were already derived above for the execute-time lint gate
-            // ; reuse them so the two per-coin height gates cannot drift apart.
+            // Coin + height were already derived above for the execute-time lint gate;
+            // reuse them so the two per-coin height gates cannot drift apart.
             const __pkg3Coin   = __execLintCoin;
             const __pkg3Height = __execLintHeight;
             const __pkg3SandboxOn = isPkg3SandboxActive(opts.network, __pkg3Coin, __pkg3Height);
@@ -2070,7 +2070,7 @@ class XChainVM {
             const mathBlockTime = opts.blockContext && Number(opts.blockContext.timestamp);
             const mathOutputMeterOn = Number.isFinite(mathBlockTime) &&
                 mathBlockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
-            //  gate: reject a '|' in contract.slash's token field (see
+            // Reject a '|' in contract.slash's token field (see
             // isSlashTokenDelimGuardActive). Network-aware like the state-key gates.
             const slashTokenDelimGuardOn = isSlashTokenDelimGuardActive(opts.network, mathBlockTime);
             // Sibling gate: widen contract.slash's amount ceiling from 8 to 18 fractional
@@ -2184,7 +2184,7 @@ class XChainVM {
             // Inject the deterministic recursion bound. The harness captures this
             // into a closure and enforces it on the metering-injected depth hooks,
             // so a contract that catches a stack fault cannot observe a
-            // platform-dependent native depth (see MAX_STACK_DEPTH).  / Pkg 3:
+            // platform-dependent native depth (see MAX_STACK_DEPTH). Package 3:
             // at/after the per-coin ~961000 height window (isPkg3SandboxActive) the
             // bound drops to MAX_STACK_DEPTH_MUSL, so a musl validator's native
             // reviver/join walk cannot overflow below the bound; below the window the
@@ -2712,8 +2712,8 @@ class XChainVM {
      * @param {string} code
      * @returns {Promise<{ success: boolean, manifest: object|null, error: string|null }>}
      */
-    // : the manifest read must resolve activation gates at the DEPLOY'S OWN
-    // block, because its outcome is hashed into deploy status.
+    // The manifest read must resolve activation gates at the DEPLOY'S OWN block,
+    // because its outcome is hashed into deploy status.
     //
     // This used to call execute() with no block context at all, so `opts.network` was
     // undefined, `opts.blockContext` was undefined (making __pkg3Height NaN and
@@ -2762,7 +2762,7 @@ module.exports.MAX_STACK_DEPTH_MUSL = MAX_STACK_DEPTH_MUSL;
 module.exports.PKG3_SANDBOX_ACTIVATION = PKG3_SANDBOX_ACTIVATION;
 module.exports.isPkg3SandboxActive = isPkg3SandboxActive;
 module.exports.pkg3CoinFromAddress = pkg3CoinFromAddress;
-// Execute-time source-lint enforcement : the per-coin activation-height map,
+// Execute-time source-lint enforcement: the per-coin activation-height map,
 // its resolver, and the gas granularity. Exposed so the consensus-params freeze guards in
 // THIS repo and in xchain-indexer can pin them to equality across the twinned pair; a
 // height armed on one side only, or a divergent gas divisor, forks the fleet.
@@ -2803,7 +2803,7 @@ module.exports.STATE_KEY_TYPE_GATE_BLOCK_TIME = STATE_KEY_TYPE_GATE_BLOCK_TIME;
 // tests to mirror the network-aware activation.
 module.exports.VM_LINT_HARDENING_GATE_BLOCK_TIME = VM_LINT_HARDENING_GATE_BLOCK_TIME;
 module.exports.isLintHardeningActive = isLintHardeningActive;
-// Resolver for the contract.slash token wire-delimiter guard . No new
+// Resolver for the contract.slash token wire-delimiter guard. No new
 // flag-day constant: it rides BINARY_ALLOC_GATE_BLOCK_TIME. Exported so tests and
 // the indexer can mirror the network-aware activation.
 module.exports.isSlashTokenDelimGuardActive = isSlashTokenDelimGuardActive;

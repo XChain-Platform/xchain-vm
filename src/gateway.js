@@ -27,7 +27,7 @@ const { ContractRevertError } = require('./errors.js');
 const { buildEmitAPI } = require('./gateway-emit.js');
 const { buildMathAPI } = require('./math.js');
 
-// contract.slash amount forms, pre- and post-activation ('s sibling gate).
+// contract.slash amount forms, pre- and post-activation.
 // The legacy form caps fractional digits at 8; the widened form allows the token
 // ceiling MAX_TOKEN_DECIMALS (18, xchain-indexer/src/config.js), the precision
 // STAKE v3 already admits and slashContractStake already computes at. Which form
@@ -314,7 +314,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     throw new Error('contract.slash: pubkey must be a 64-hex string');
                 if (typeof token !== 'string' || token.length === 0)
                     throw new Error('contract.slash: token must be a non-empty string');
-                // : keep the wire delimiter out of the token field, matching
+                // Keep the wire delimiter out of the token field, matching
                 // emit.execute / attestation.request. Inert against today's consumer
                 // (SLASH is internal-only and the indexer's _processSlashEmission reads
                 // {contractIndex, pubkey, token, amount} by NAMED field, never pipe-
@@ -324,7 +324,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // used to emit successfully changes replay for historical blocks.
                 if (readOnlyData.slashTokenDelimGuardOn && token.indexOf('|') !== -1)
                     throw new Error('contract.slash: token must not contain "|"');
-                //  sibling gate: the 8-dp ceiling contradicted the rest of the seam.
+                // The 8-dp ceiling contradicted the rest of the seam.
                 // STAKE v3 admits a stake at the token's own DECIMALS (up to
                 // MAX_TOKEN_DECIMALS 18) and slashContractStake does its arithmetic at that
                 // same precision, so an exact partial slash of a 9-18-dp staked token could

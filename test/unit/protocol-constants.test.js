@@ -12,7 +12,7 @@
  *
  *********************************************************************/
 
-//  doctrine test-coverage program: unit coverage for src/protocol/constants.js.
+// Unit coverage for src/protocol/constants.js.
 // The VM's copy of the protocol size/gas/XCALL limits bounds what a contract
 // execution and cross-contract call may do; it is a consensus surface kept
 // byte-equal with the decoder/indexer copies. This pins the exported constants

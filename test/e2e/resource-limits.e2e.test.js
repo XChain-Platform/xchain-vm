@@ -16,9 +16,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');
 const {
@@ -63,7 +60,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             });
             assertOutOfGas(result);
             assert(result.gasUsed > 0, 'Should have used some gas');
-            // State should not have been persisted
             assertContractState(hLow.ledger, 'C:BTC:40', 'val', '0');
         });
 
@@ -80,13 +76,11 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:40b'
             });
 
-            // Gas exhaust
             await hLow.execute({
                 contractAddress: 'C:BTC:40b', method: 'loop',
                 params: [], caller: 'deployer'
             });
 
-            // System should still work
             const r2 = await hLow.execute({
                 contractAddress: 'C:BTC:40b', method: 'ok',
                 params: [], caller: 'deployer'
@@ -125,7 +119,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
         });
 
         it('should remain stable after OOM/timeout', async function() {
-            // Deploy two separate contracts
             await h.deploy({
                 code: `module.exports = {
                     initialize: function(xchain) {},
@@ -145,13 +138,11 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:41b'
             });
 
-            // OOM/timeout on first
             await h.execute({
                 contractAddress: 'C:BTC:41a', method: 'oom',
                 params: [], caller: 'user1'
             });
 
-            // Second contract should work fine
             const r = await h.execute({
                 contractAddress: 'C:BTC:41b', method: 'ok',
                 params: [], caller: 'user1'
@@ -164,7 +155,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
     // --- E2E-042: Wall-clock timeout ---
     describe('E2E-042: Wall-clock timeout', function() {
         it('should terminate on timeout', async function() {
-            // Use a very short timeout
             const hShort = new E2EHarness(XChainVM, {
                 gasCeiling: 100000000, // Very high gas so it won't gas-out first
                 limits: { maxCpuTimeMs: 500 }
@@ -288,7 +278,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:46'
             });
 
-            // First execution uses gas but succeeds
             const r1 = await hLow.execute({
                 contractAddress: 'C:BTC:46', method: 'work',
                 params: [], caller: 'deployer'
@@ -296,13 +285,11 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertSuccess(r1);
             const gas1 = r1.gasUsed;
 
-            // Second execution should get a fresh gas budget (not cumulative)
             const r2 = await hLow.execute({
                 contractAddress: 'C:BTC:46', method: 'work',
                 params: [], caller: 'deployer'
             });
             assertSuccess(r2);
-            // Gas should be roughly the same (fresh budget, not accumulated)
             assert(Math.abs(r2.gasUsed - gas1) < gas1 * 0.1,
                 `Gas should reset: first=${gas1}, second=${r2.gasUsed}`);
         });

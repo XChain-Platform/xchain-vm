@@ -14,7 +14,7 @@
  * Toolkit: ContractSimulator end-to-end. Needs the isolated-vm binding, so
  * the require is guarded: on a host where it cannot dlopen (e.g. macOS dev
  * box) the suite SKIPS (mirrors the VM smoke-suite convention) instead of
- * crash-spamming. Runs for real on Node 22 / Linux (CI, devhost).
+ * crash-spamming. Runs for real on Node 22 / Linux (CI).
  ********************************************************************/
 // @ts-nocheck
 

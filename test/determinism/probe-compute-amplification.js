@@ -73,7 +73,7 @@ async function run(code) {
     return { gas: r.gasUsed, ok: r.success, err: r.error, wallMs };
 }
 
-// ── A) CALL-SWEEP VECTORS ───────────────────────────────────────────────
+// A) CALL-SWEEP VECTORS
 // mk(C) builds a contract that allocates ONE working set of fixed size K
 // (constant gas) and then performs C native operations over it. We compare
 // C=LOW vs C=HIGH. Each added call does ~K native element-touches; the gas
@@ -119,7 +119,7 @@ async function main() {
         );
     }
 
-    // ── B) WALL-CLOCK WITNESS ───────────────────────────────────────────
+    // B) WALL-CLOCK WITNESS
     process.stdout.write(`\nB) WALL-CLOCK WITNESS: string-'+' build + split, gas spent vs CPU spent\n`);
     process.stdout.write(`${'-'.repeat(82)}\n`);
     const witness = wrap(`var s='7';for(var i=0;i<21;i++)s=s+','+s;var t=0;for(var i=0;i<200;i++)t+=s.split(',').length;return t;`);

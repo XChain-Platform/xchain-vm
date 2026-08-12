@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// bac14514 (flag-day Pkg 4 / ): the constructor back-fills the core
+// Flag-day Pkg 4: the constructor back-fills the core
 // size caps (maxCodeSize / maxStateValueSize / maxStateKeys) like the
 // cross-contract limits, so a caller passing a PARTIAL limits object can no
 // longer silently disable the execute-time code-size cap (or the state caps).

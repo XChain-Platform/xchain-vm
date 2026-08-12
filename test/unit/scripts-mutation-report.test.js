@@ -12,7 +12,7 @@
  *
  *********************************************************************/
 
-//  doctrine test-coverage program: coverage for the scripts component
+// Coverage for the scripts component
 // (scripts/mutation-report.js). The report generator self-executes on load
 // (it reads Stryker/custom JSON and writes reports/mutation/MUTATION_SUMMARY.md),
 // so running it here would mutate the repo. This pins its structural contract

@@ -14,7 +14,7 @@
 
 'use strict';
 
-// ─── Performance: VM sandbox-INDEPENDENT hot paths ────────────────────────────
+// Performance: VM sandbox-INDEPENDENT hot paths
 //
 // The VM charges gas on every operation and runs every contract arithmetic op
 // through the deterministic mathjs-bignumber API. Both are pure modules (no

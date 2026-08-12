@@ -20,9 +20,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { XChainVM, createVM, execute, chaosAssertions } = require('../helpers/harness');
 const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require('../../fuzz/invariants');
@@ -82,7 +79,6 @@ function buildDeepObject(depth) {
         checkResultShape(result);
         checkNoPrototypePollution();
 
-        // Verify host Object.prototype is not polluted
         assert.strictEqual(({}).isAdmin, undefined, 'Object.prototype should not be polluted');
     });
 

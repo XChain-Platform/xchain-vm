@@ -25,9 +25,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { XChainVM, createVM, execute } = require('../helpers/harness');
 const { checkResultShape, checkAtomicity, checkGasCeiling } = require('../../fuzz/invariants');

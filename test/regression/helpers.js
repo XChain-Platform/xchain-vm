@@ -19,12 +19,9 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 
-// ── Fail-loud isolated-vm check ─────────────────────────────────
+// Fail-loud isolated-vm check
 // Regression tests must never silently skip. If isolated-vm is not
 // compiled, the whole suite must fail with a clear message.
 let XChainVM;
@@ -38,7 +35,7 @@ try {
     );
 }
 
-// ── Standard gas schedule (mirrors platform defaults) ───────────
+// Standard gas schedule (mirrors platform defaults)
 const GAS_SCHEDULE = {
     VM_COMPUTATION:     1,
     VM_STATE_READ:      100,
@@ -54,7 +51,7 @@ const GAS_SCHEDULE = {
     VM_XCALL_CALLBACK:  20000
 };
 
-// ── Standard limits ─────────────────────────────────────────────
+// Standard limits
 const DEFAULT_LIMITS = {
     maxCpuTimeMs:      5000,
     maxMemory:         8,

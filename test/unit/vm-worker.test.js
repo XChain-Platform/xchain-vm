@@ -12,7 +12,7 @@
  *
  *********************************************************************/
 
-//  doctrine test-coverage program: coverage for src/vm-worker.js. The
+// Coverage for src/vm-worker.js. The
 // worker is the child side of process-executor: it holds one XChainVM and runs
 // executions sequentially. Loading it here would pull in isolated-vm (native,
 // Linux-only in this repo), so this pins the worker's determinism-critical

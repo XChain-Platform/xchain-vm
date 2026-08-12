@@ -359,7 +359,6 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     });
 });
 
-// ===========================================================================
 // Single-in-flight dispatch invariant. The per-entry watchdog starts at
 // DISPATCH and must bound exactly ONE contract's execution; the worker runs
 // strictly sequentially, so if the executor dispatched the whole queue at
@@ -368,7 +367,6 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 // fast validator ran normally (a fork). The production embedder awaits every
 // execute(), but the executor itself now ENFORCES at-most-one in flight so a
 // future non-awaiting caller cannot silently re-open the divergence.
-// ===========================================================================
 (HAVE_IVM ? describe : describe.skip)('process-executor: single-in-flight dispatch invariant', function () {
     this.timeout(60000);
 

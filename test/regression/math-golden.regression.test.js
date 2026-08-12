@@ -41,9 +41,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { buildMathAPI } = require('../../src/math.js');
 

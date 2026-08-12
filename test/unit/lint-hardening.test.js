@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * VM_LINT_HARDENING rule set (flag-day Pkg 4 / ), two-way:
+ * VM_LINT_HARDENING rule set (flag-day Pkg 4), two-way:
  * every hardened rule must fire with hardened=true (the default) AND
  * reproduce the legacy verdict with hardened=false (pre-gate replay
  * parity). Acorn-only (lint-core), so this suite runs anywhere.
@@ -38,7 +38,7 @@ function firstError(code, opts) {
     return blocking.length ? blocking[0] : null;
 }
 
-describe('VM_LINT_HARDENING lint rules ', function () {
+describe('VM_LINT_HARDENING lint rules', function () {
 
     describe("66602d21: `**` / `**=` exponentiation ban", function () {
         const pow    = 'module.exports = function(x) { return 2 ** 10; };';

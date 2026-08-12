@@ -34,9 +34,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 
 describe('Preflight: sandbox engine must load', function() {

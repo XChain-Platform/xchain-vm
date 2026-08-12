@@ -41,7 +41,7 @@
  * Runtime: execution needs the isolated-vm binding, which loads on Node 22 /
  * Linux (the whole platform's runtime). On a macOS dev box the binding cannot
  * dlopen; use `xchain-foundry lint` (static gate, no isolate) locally and run
- * `simulate` / the generated tests on Node-22 Linux (devhost / CI).
+ * `simulate` / the generated tests on Node-22 Linux (CI).
  ********************************************************************/
 // @ts-nocheck
 

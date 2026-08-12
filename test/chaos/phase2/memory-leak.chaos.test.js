@@ -22,9 +22,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { XChainVM, createVM, execute, MemoryTracker } = require('../helpers/harness');
 const { checkResultShape } = require('../../fuzz/invariants');
@@ -64,7 +61,6 @@ const { checkResultShape } = require('../../fuzz/invariants');
         if (global.gc) global.gc();
         tracker.snapshot('end');
 
-        // Check for stability
         const growthMB = tracker.getHeapGrowth() / (1024 * 1024);
         const tolerance = global.gc ? 10 : 20; // Tighter tolerance with deterministic GC
 

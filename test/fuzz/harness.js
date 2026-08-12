@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const crypto = require('crypto');
 
 const GAS_SCHEDULE = {

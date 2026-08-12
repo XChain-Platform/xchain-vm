@@ -45,12 +45,10 @@
 const { runGate } = require('./gate.js');
 const { isTypeScript, toContractJs } = require('./transpile.js');
 
-// ---------------------------------------------------------------------------
 // Canonical knowledge base. Sourced from developer-guide/Solidity_To_XChain.md
 // (itself verified against src/gateway.js / gateway-emit.js). Kept as structured
 // data so it drives the prompt AND is assertable in tests; a drift here is a
 // drift the authoring prompt would teach the model, so it is worth pinning.
-// ---------------------------------------------------------------------------
 
 // The three model shifts an EVM author must internalize.
 const MODEL_SHIFTS = [
@@ -150,9 +148,7 @@ const KNOWLEDGE = {
     contractShape: CONTRACT_SHAPE
 };
 
-// ---------------------------------------------------------------------------
 // Prompt construction
-// ---------------------------------------------------------------------------
 
 function renderConceptMap() {
     return CONCEPT_MAP
@@ -291,9 +287,7 @@ function buildRepairPrompt(previousCode, gateResult) {
     ].join('\n');
 }
 
-// ---------------------------------------------------------------------------
 // Response parsing
-// ---------------------------------------------------------------------------
 
 // Pull the FIRST fenced code block. Accepts ```js / ```javascript / ```ts /
 // ```typescript / bare ```. Returns null if no fence is present (some models
@@ -332,9 +326,7 @@ function extractContractCode(text) {
     return { code: block.code || null, lang: block.lang, notes, hadFence: true };
 }
 
-// ---------------------------------------------------------------------------
 // The harness
-// ---------------------------------------------------------------------------
 
 // A fence tag like 'ts'/'typescript' means the returned code is TypeScript and
 // must be stripped before the gate (which is JS-only) sees it.

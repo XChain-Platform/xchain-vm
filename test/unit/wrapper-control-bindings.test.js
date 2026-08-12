@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// 5bff4687 (flag-day Pkg 4 / ): post-VM_LINT_HARDENING the CONTRACT
+// 5bff4687 (flag-day Pkg 4): post-VM_LINT_HARDENING the CONTRACT
 // WRAPPER's control bindings (__contractCode/__methodName/__isCrossCall/
 // __readManifest) are IIFE parameters, invisible to the Function-constructed
 // contract body, so a contract can no longer read them to steer dispatch
@@ -55,7 +55,7 @@ const PEEK = 'module.exports = { peek: function(x) { return String(typeof __meth
     afterEach(function () { vm.endBlock(); });
 
     it('post-gate (regtest from genesis): the execute-time lint rejects the peek before the wrapper starves it', async function () {
-        //  supersession. The wrapper's starvation of the control bindings is the
+        // Execute-time lint supersession. The wrapper's starvation of the control bindings is the
         // defence-in-depth layer for a contract that DEPLOYED before the reserved-identifier
         // rule armed. Where execute-time source-lint enforcement is active (the pre-launch
         // nets, from genesis), such a contract can no longer run at all: the stored source
@@ -67,7 +67,7 @@ const PEEK = 'module.exports = { peek: function(x) { return String(typeof __meth
         assert.ok(res.error.includes('__methodName'), res.error);
     });
 
-    // The wrapper-starvation pin. Mainnet is below the  execute-time lint gate
+    // The wrapper-starvation pin. Mainnet is below the execute-time lint gate
     // (unarmed), so the stored source still reaches the wrapper and the closure move is
     // what has to starve it, exactly as before.
     it('post-gate (mainnet at the flag-day): bindings are starved there too', async function () {

@@ -185,7 +185,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                 'indexer inline lambda diverged from GOLDEN_VECTORS.callId.expected');
         });
 
-        // : the hex pins catch a field skew only as an opaque hash difference.
+        // The hex pins catch a field skew only as an opaque hash difference.
         // Naming the count makes a dropped or added field read as what it is. The
         // indexer declares the same eight names in xchain-indexer/src/actions/xcall.js
         // (CALL_ID_PREIMAGE_FIELDS), pinned against this order by

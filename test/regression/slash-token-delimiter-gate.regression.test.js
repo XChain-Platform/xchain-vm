@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * contract.slash token wire-delimiter activation gate ( regression)
+ * contract.slash token wire-delimiter activation gate (regression)
  *
  * Every emit validator that hands the indexer a field it may pipe-join rejects
  * an embedded '|' (emit.execute method/params, emit.crossExecute callbackMethod,
@@ -65,7 +65,7 @@ const CLEAN_CODE = `module.exports = function(){
 const run = (vm, code, blockContext, network) =>
     execute(vm, code, { method: 'default', blockContext, network, contractIndex: 100 });
 
-(XChainVM ? describe : describe.skip)('contract.slash token delimiter activation gate ( regression)', function () {
+(XChainVM ? describe : describe.skip)('contract.slash token delimiter activation gate (regression)', function () {
     this.timeout(30000);
 
     let vm;

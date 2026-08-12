@@ -20,9 +20,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { createVM, execute, assertResultShape } = require('./helpers.js');
 
@@ -31,7 +28,7 @@ describe('[P0] Smoke Regression', function() {
     let vm;
     before(function() { vm = createVM(); });
 
-    // ── VM lifecycle ────────────────────────────────────────────
+    // VM lifecycle
     describe('VM instantiation', function() {
         it('should construct and run block lifecycle', function() {
             const v = createVM();
@@ -40,7 +37,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Sandbox active ──────────────────────────────────────────
+    // Sandbox active
     describe('Sandbox active', function() {
         it('should strip Date', async function() {
             const r = await execute(vm,
@@ -50,7 +47,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Basic execution ─────────────────────────────────────────
+    // Basic execution
     describe('Basic execution', function() {
         it('should execute state read/write and return value', async function() {
             const r = await execute(vm, `
@@ -72,7 +69,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Method dispatch ─────────────────────────────────────────
+    // Method dispatch
     describe('Method dispatch', function() {
         it('should invoke named method on object export', async function() {
             const r = await execute(vm, `
@@ -86,7 +83,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Emit pipeline ───────────────────────────────────────────
+    // Emit pipeline
     describe('Emit pipeline', function() {
         it('should emit a SEND action', async function() {
             const r = await execute(vm, `
@@ -101,7 +98,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Context accessors ───────────────────────────────────────
+    // Context accessors
     describe('Context accessors', function() {
         it('should return block height and caller', async function() {
             const r = await execute(vm, `
@@ -119,7 +116,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Deterministic math ──────────────────────────────────────
+    // Deterministic math
     describe('Deterministic math', function() {
         it('should add via xchain.math.add', async function() {
             const r = await execute(vm,
@@ -129,7 +126,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Syntax validation ───────────────────────────────────────
+    // Syntax validation
     describe('Syntax validation', function() {
         it('should accept valid code', function() {
             assert.strictEqual(vm.validateSyntax('var x = 1;').valid, true);
@@ -140,7 +137,7 @@ describe('[P0] Smoke Regression', function() {
         });
     });
 
-    // ── Revert atomicity ────────────────────────────────────────
+    // Revert atomicity
     describe('Revert atomicity', function() {
         it('should discard state/emissions and preserve logs on revert', async function() {
             const r = await execute(vm, `

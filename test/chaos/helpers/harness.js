@@ -23,9 +23,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require('../../fuzz/invariants');
 

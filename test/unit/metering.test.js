@@ -162,7 +162,6 @@ describe('Metering', function() {
                 }
             `;
             const metered = meterCode(code);
-            // Should parse without error
             require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
         });
 
@@ -254,7 +253,6 @@ describe('Metering', function() {
             const code = 'var result = ' + terms.join(' + ') + ';';
             const metered = meterCode(code);
             assert(metered.includes('__gas'), 'should contain __gas for deep binary');
-            // Should still produce valid JS
             require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
         });
 
@@ -386,7 +384,7 @@ describe('Metering', function() {
         });
     });
 
-    // ─── Allocator transforms (Phase 0) ──────────────────────────────────
+    // Allocator transforms (Phase 0)
     // transformAllocators rewrites syntax-level allocators into metered helper
     // calls before gas injection. Each construct emits a distinct helper marker.
     describe('allocator transforms', function() {
@@ -514,7 +512,7 @@ describe('Metering', function() {
         });
     });
 
-    // ─── Braceless (single-statement) bodies → ensureBlock ────────────────
+    // Braceless (single-statement) bodies → ensureBlock
     describe('ensureBlock (braceless bodies)', function() {
 
         it('wraps a braceless if/else body and injects gas', function() {
@@ -534,7 +532,7 @@ describe('Metering', function() {
         });
     });
 
-    // ─── Deeply nested binary expressions (Phase 2) ───────────────────────
+    // Deeply nested binary expressions (Phase 2)
     // NB: '+' is rewritten to __concat in Phase 0, so a deep '+' chain leaves no
     // BinaryExpression nodes. Use '*' (not an allocator op) to keep them binary.
     describe('deep binary-expression gas injection', function() {
@@ -551,7 +549,7 @@ describe('Metering', function() {
         });
     });
 
-    // ─── Call-as-argument: Phase 3 replaces a node held in a parent array ──
+    // Call-as-argument: Phase 3 replaces a node held in a parent array
     it('wraps a nested call that sits in its parent call\'s argument array', function() {
         // inner() is an element of outer()'s `arguments` array → the array-index
         // replacement branch of the Phase 3 call wrapper.

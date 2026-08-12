@@ -27,8 +27,7 @@
 
 const acorn = require('acorn');
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
+// Helpers
 function locationFromIndex(source, idx) {
     const before = source.slice(0, idx);
     const lines = before.split('\n');
@@ -63,7 +62,7 @@ function walkAST(node, visitor) {
     }
 }
 
-// ─── 1. ArrayElementDeletion ────────────────────────────────────────────────
+// 1. ArrayElementDeletion
 //
 // Removes one element at a time from array literals with 2+ elements.
 // Primary target: sandbox.js toDelete list (lines 15-22). If any single
@@ -92,7 +91,6 @@ function arrayElementDeletion(source, filename) {
                 const commaIdx = afterEl.indexOf(',');
                 if (commaIdx !== -1) {
                     removeEnd = el.end + commaIdx + 1;
-                    // Also consume whitespace after the comma
                     while (removeEnd < node.elements[i + 1].start &&
                            (source[removeEnd] === ' ' || source[removeEnd] === '\n' ||
                             source[removeEnd] === '\r' || source[removeEnd] === '\t')) {
@@ -130,7 +128,7 @@ function arrayElementDeletion(source, filename) {
     return mutants;
 }
 
-// ─── 2. StringPrefixSwap ────────────────────────────────────────────────────
+// 2. StringPrefixSwap
 //
 // Swaps \x01/\x02/\x03 protocol prefix characters used in the VM's
 // cross-isolate communication protocol:
@@ -157,8 +155,7 @@ function stringPrefixSwap(source, filename) {
 
     for (const { re, alts } of patterns) {
         let match;
-        // Reset lastIndex for each pattern
-        re.lastIndex = 0;
+        re.lastIndex = 0; // patterns are reused with /g across iterations
         while ((match = re.exec(source)) !== null) {
             const start = match.index;
             const end = start + match[0].length;
@@ -184,7 +181,7 @@ function stringPrefixSwap(source, filename) {
     return mutants;
 }
 
-// ─── 3. GuardDeletion ───────────────────────────────────────────────────────
+// 3. GuardDeletion
 //
 // Removes throw statements that are the sole body of an if block.
 // Targets the VM's security-critical guard pattern:
@@ -219,7 +216,6 @@ function guardDeletion(source, filename) {
         // Don't mutate if there's an else branch (more complex logic)
         if (node.alternate) return;
 
-        // Replace entire if statement with empty block
         const original = source.slice(node.start, node.end);
         const mutatedSource = source.slice(0, node.start) +
             '{ /* guard removed */ }' +
@@ -242,7 +238,7 @@ function guardDeletion(source, filename) {
     return mutants;
 }
 
-// ─── 4. ObjectFreezeRemoval ─────────────────────────────────────────────────
+// 4. ObjectFreezeRemoval
 //
 // Removes Object.freeze() and Object.defineProperty() calls that establish
 // immutability and non-configurability constraints in the VM sandbox.
@@ -315,7 +311,7 @@ function objectFreezeRemoval(source, filename) {
     return mutants;
 }
 
-// ─── 5. EmbeddedCodeMutation ────────────────────────────────────────────────
+// 5. EmbeddedCodeMutation
 //
 // Handles code embedded inside string literals (template literals or quoted
 // strings assigned to known variable names like STRIP_SCRIPT, HARNESS_SOURCE,
@@ -330,15 +326,12 @@ function objectFreezeRemoval(source, filename) {
 function embeddedCodeMutation(source, filename) {
     const mutants = [];
 
-    // Find template literals and multiline string constants that contain JS code
     // Pattern: variable = `...code...`; or variable = '...code...';
     const embeddedPatterns = [
         // Template literal: const VARNAME = `...`;
         { re: /(?:const|let|var)\s+(\w+)\s*=\s*`([\s\S]*?)`;/g, type: 'template' },
-        // Single-quoted multiline (rare but possible via concatenation)
     ];
 
-    // Inner operators to apply inside embedded code
     const innerOperators = [
         { name: 'ArrayElementDeletion', fn: arrayElementDeletion },
         { name: 'GuardDeletion',        fn: guardDeletion },
@@ -358,13 +351,11 @@ function embeddedCodeMutation(source, filename) {
             for (const op of innerOperators) {
                 const innerMutants = op.fn(embeddedCode, filename + ':' + varName);
                 for (const im of innerMutants) {
-                    // Reconstruct outer source with this mutation applied inside the string
                     const mutatedEmbedded = im.mutatedSource;
                     const mutatedOuter = source.slice(0, codeStartInOuter) +
                         mutatedEmbedded +
                         source.slice(codeStartInOuter + embeddedCode.length);
 
-                    // Adjust location to outer file coordinates
                     const linesBeforeEmbed = source.slice(0, codeStartInOuter).split('\n');
                     const embedStartLine = linesBeforeEmbed.length;
                     const adjustedLine = embedStartLine + im.location.start.line - 1;
@@ -389,8 +380,7 @@ function embeddedCodeMutation(source, filename) {
     return mutants;
 }
 
-// ─── Exports ────────────────────────────────────────────────────────────────
-
+// Exports
 const ALL_OPERATORS = [
     { name: 'ArrayElementDeletion', fn: arrayElementDeletion },
     { name: 'StringPrefixSwap',    fn: stringPrefixSwap },

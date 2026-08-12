@@ -33,8 +33,7 @@ const DEFAULT_TIMEOUT = 30000;
 const DEFAULT_CONCURRENCY = 1;
 const OUTPUT_FILE = path.join(ROOT, 'reports', 'mutation', 'custom-mutant-results.json');
 
-// ─── CLI arg parsing ────────────────────────────────────────────────────────
-
+// CLI arg parsing
 function parseArgs() {
     const args = process.argv.slice(2);
     const opts = {
@@ -58,8 +57,7 @@ function parseArgs() {
     return opts;
 }
 
-// ─── File resolution ────────────────────────────────────────────────────────
-
+// File resolution
 function resolveGlob(pattern) {
     // Simple glob resolution using the shell
     const result = spawnSync('sh', ['-c', `ls ${pattern} 2>/dev/null`], { cwd: ROOT, encoding: 'utf8' });
@@ -67,8 +65,7 @@ function resolveGlob(pattern) {
     return result.stdout.trim().split('\n').map(f => f.trim()).filter(Boolean);
 }
 
-// ─── Test runner ────────────────────────────────────────────────────────────
-
+// Test runner
 function runTests(spec, timeout) {
     const mochaBin = path.join(ROOT, 'node_modules', '.bin', 'mocha');
     const result = spawnSync(mochaBin, [
@@ -88,8 +85,7 @@ function runTests(spec, timeout) {
     };
 }
 
-// ─── Main ───────────────────────────────────────────────────────────────────
-
+// Main
 function main() {
     const opts = parseArgs();
     const files = resolveGlob(opts.mutate);
@@ -106,7 +102,6 @@ function main() {
     console.log('Timeout:         ' + opts.timeout + 'ms');
     console.log('');
 
-    // Generate all mutants across all target files
     const allMutants = [];
     for (const file of files) {
         const absPath = path.join(ROOT, file);
@@ -120,7 +115,6 @@ function main() {
     console.log('Generated ' + allMutants.length + ' custom mutants across ' + files.length + ' file(s)');
     console.log('');
 
-    // Per-operator summary
     const opCounts = {};
     for (const m of allMutants) {
         opCounts[m.mutatorName] = (opCounts[m.mutatorName] || 0) + 1;
@@ -133,7 +127,6 @@ function main() {
     if (opts.dryRun) {
         console.log('[DRY RUN] Would test ' + allMutants.length + ' mutants. Exiting.');
 
-        // Still output the mutant list for inspection
         for (let i = 0; i < allMutants.length; i++) {
             const m = allMutants[i];
             console.log('  #' + (i + 1) + ' ' + m.file + ':' + m.location.start.line +
@@ -144,7 +137,6 @@ function main() {
         process.exit(0);
     }
 
-    // First, verify the unmutated test suite passes
     console.log('Running baseline test suite...');
     const baseline = runTests(opts.spec, opts.timeout);
     if (!baseline.passed) {
@@ -155,7 +147,6 @@ function main() {
     console.log('Baseline: PASSED');
     console.log('');
 
-    // Run each mutant
     const results = [];
     let killed = 0;
     let survived = 0;
@@ -167,7 +158,6 @@ function main() {
         const label = '[' + (i + 1) + '/' + allMutants.length + '] ' +
                       m.file + ':' + m.location.start.line + ' ' + m.mutatorName;
 
-        // Apply mutation
         try {
             fs.writeFileSync(m.absPath, m.mutatedSource, 'utf8');
         } catch (e) {
@@ -177,13 +167,10 @@ function main() {
             continue;
         }
 
-        // Run tests
         const testResult = runTests(opts.spec, opts.timeout);
 
-        // Restore original
         fs.writeFileSync(m.absPath, m.originalSource, 'utf8');
 
-        // Classify result
         let status;
         if (testResult.timedOut) {
             status = 'Timeout';
@@ -211,7 +198,6 @@ function main() {
     console.log('');
     console.log('');
 
-    // Summary
     const total = killed + survived + timedOut + errored;
     const score = total > 0 ? ((killed + timedOut) / total * 100) : 0;
 
@@ -225,7 +211,6 @@ function main() {
     console.log('Score:    ' + score.toFixed(1) + '%');
     console.log('');
 
-    // Print survived mutants
     const survivedMutants = results.filter(r => r.status === 'Survived');
     if (survivedMutants.length > 0) {
         console.log('Survived Mutations (test gaps):');
@@ -236,7 +221,6 @@ function main() {
         console.log('');
     }
 
-    // Write JSON output
     const outDir = path.dirname(OUTPUT_FILE);
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
@@ -248,7 +232,6 @@ function main() {
         files: {}
     };
 
-    // Group results by file
     for (const r of results) {
         if (!output.files[r.fileName]) {
             output.files[r.fileName] = { mutants: [] };

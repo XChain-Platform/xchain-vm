@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// e9c3a80b (flag-day Pkg 4 / ): post-VM_LINT_HARDENING the resource
+// e9c3a80b (flag-day Pkg 4): post-VM_LINT_HARDENING the resource
 // branches of _classifyError (timeout / out_of_memory / out_of_stack) require
 // a corroborating HOST signal before collapsing the status and clamping
 // gasUsed to the ceiling; an attacker-authored message substring alone routes

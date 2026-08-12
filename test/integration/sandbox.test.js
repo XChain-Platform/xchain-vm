@@ -150,7 +150,6 @@ function executeCode(vm, code) {
             };
         `);
         assert.strictEqual(result.success, true);
-        // Either returns 'undefined' or 'blocked: ...'
         const val = JSON.parse(result.returnValue);
         assert(val === 'undefined' || val.startsWith('blocked'), 'should be blocked: ' + val);
     });
@@ -159,7 +158,6 @@ function executeCode(vm, code) {
         const code = fs.readFileSync(path.join(__dirname, '../contracts/sandbox_escape.js'), 'utf8');
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, true);
-        // All escape attempts should report blocked or undefined
         for (const log of result.logs) {
             assert(log.includes('undefined') || log.includes('blocked'),
                 'escape attempt should be blocked: ' + log);
@@ -377,7 +375,6 @@ function executeCode(vm, code) {
         assert(val === 'frozen' || val === 'undefined', 'xchain should be frozen: ' + val);
     });
 
-    // ---------------------------------------------------------------
     // Gas/result determinism for the STRIP-PATH programs. The corpus
     // determinism suites (cache-determinism, golden.determinism) prove
     // cold/warm/fresh-VM equality only for compute/stateful programs; the
@@ -386,7 +383,6 @@ function executeCode(vm, code) {
     // strip path itself costs identical gas and returns identical bytes
     // warm, repeated, and on a fresh isolate. A failure here is a REAL
     // strip-path determinism bug, not a test problem; do not weaken it.
-    // ---------------------------------------------------------------
     describe('strip-path gas/result determinism', function() {
         const STRIP_PROGRAMS = {
             'process-access-blocked':

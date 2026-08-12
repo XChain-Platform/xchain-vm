@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * contract.slash amount-precision activation gate ( regression)
+ * contract.slash amount-precision activation gate (regression)
  *
  * contract.slash validated its `amount` against /^[0-9]+(\.[0-9]{1,8})?$/, an
  * 8-decimal ceiling the rest of the seam does not share: STAKE v3 bounds a stake's
@@ -26,7 +26,7 @@
  * that previously succeeded, so the widening rides an activation gate rather than
  * landing bare: mainnet at the coordinated flag-day, testnet/regtest from genesis.
  * It rides the existing BINARY_ALLOC flag-day rather than minting a new gate
- * constant, the same choice its sibling  token-delimiter guard made, so the
+ * constant, the same choice its sibling token-delimiter guard made, so the
  * frozen six-gate consensus pin is untouched.
  *
  * This fixture pins the flag-day value, the 18-digit ceiling, both sides of the
@@ -69,7 +69,7 @@ const slashCode = (amount) => `module.exports = function(){
 const run = (vm, code, blockContext, network) =>
     execute(vm, code, { method: 'default', blockContext, network, contractIndex: 100 });
 
-(XChainVM ? describe : describe.skip)('contract.slash amount precision activation gate ( regression)', function () {
+(XChainVM ? describe : describe.skip)('contract.slash amount precision activation gate (regression)', function () {
     this.timeout(30000);
 
     let vm;

@@ -186,14 +186,12 @@ async function runTwice(vm, opts) {
         assert(allEqual, 'all 5 runs should produce identical results');
     });
 
-    // -----------------------------------------------------------------------
     // Fix 4016: readManifest (Phase E deploy path) determinism.
     // vm.readManifest(code) is called at every DEPLOY, hashes into accept/reject
     // status, and persists to contract_permissions. A regression in the
     // __readManifest branch, JSON serialization, or type-tagging would shift
     // the deploy outcome. These run-twice checks catch same-process regressions;
     // see determinism-baseline.test.js for the committed cross-arch digest.
-    // -----------------------------------------------------------------------
     it('should produce identical results for readManifest: well-formed manifest', async function() {
         const code = `
 module.exports = {
@@ -242,13 +240,11 @@ module.exports = {
         assert.strictEqual(m.maxTakeBpsType, 'undefined');
     });
 
-    // -----------------------------------------------------------------------
     // Fix 3600: gas-charging gateway methods absent from determinism suites.
     // Each of these methods charges gas and/or serializes data that lands in
     // emittedActions or returnValue; a regression in the gas charge or the
     // ivm-boundary serialization shifts gasUsed/output without CI signal.
     // Deterministic stand-in accessors mirror the production accessor shapes.
-    // -----------------------------------------------------------------------
 
     it('should produce identical results for oracle.getPriceAtRound', async function() {
         const oracleData = {
@@ -383,13 +379,11 @@ module.exports = {
         assert.strictEqual(r1.stateDeletes.length, 2);
     });
 
-    // -----------------------------------------------------------------------
     // Fix 3910: controller-guard execution path (isGuard=true) determinism.
     // runControllerGuard writes a parent contract_executions row; the guard's
     // gasUsed, emission set, and basePosition offset are live consensus inputs
     // that must be identical across runs. isGuard also disables attestation
     // and cross-chain calls; those rejections must be deterministic too.
-    // -----------------------------------------------------------------------
 
     it('should produce identical results for guard: allow with emit.send', async function() {
         // A guard that returns a value (allow) and emits a send (royalty split
@@ -447,7 +441,6 @@ module.exports = {
         assert.strictEqual(r1.success, true);
     });
 
-    // -----------------------------------------------------------------------
     // Fix 4095: binary-alloc metering (F3-binary) determinism fixtures.
     // These run at a post-flag-day blockContext.timestamp so the byte-length
     // charge is active. A regression in __meterBinaryCtor wrapping (including
@@ -455,7 +448,6 @@ module.exports = {
     // shift gasUsed; the run-twice check catches same-process regressions.
     // See binary-alloc-gate.regression.test.js for the gate-boundary check and
     // determinism-baseline.test.js for the committed cross-arch digest.
-    // -----------------------------------------------------------------------
 
     const POST_GATE_CTX = {
         height: 999,

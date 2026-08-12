@@ -98,7 +98,7 @@ const XCALL_MAX_RETURN_BYTES = 1024;
 const XCALL_MAX_CALLS_PER_BLOCK = 25;
 
 // ── ATTEST expiry sweep ─────────────────────────────────────────────────────
-// Deterministic per-block cap on the ATTEST v0 deadline-expiry sweep ().
+// Deterministic per-block cap on the ATTEST v0 deadline-expiry sweep.
 // Each expired request synthesizes an ATTEST v2 action that flips the request to
 // 'expired' and fires its callback, so an unbounded sweep lets a single block
 // inherit an arbitrary backlog: one block's processing time (and its actions
@@ -113,7 +113,7 @@ const XCALL_MAX_CALLS_PER_BLOCK = 25;
 //
 // CONSENSUS-VISIBLE: the cap decides which block an expiry lands in, which moves
 // actions rows, the contract hash and the checkpoint preimage. It ships ungated
-// under the  batch because the fleet-wide replay recomputes all of it.
+// because a coordinated fleet-wide wipe-and-replay recomputes all of it.
 const ATTEST_MAX_EXPIRIES_PER_BLOCK = 25;
 
 // ── Token-gated content (PC-29) ─────────────────────────────────────────────
@@ -240,7 +240,7 @@ const STATE_COMMITMENT_ACTIVATION = {
 // (2026-07-07; BTC anchor ~2026-08-04), not a disabled placeholder.
 const CHECKPOINT_COMMITMENT_ACTIVATION = {
     mainnet: 961000,      // ARMED 2026-07-07: BTC anchor ~2026-08-04; deploy hub + ALL indexers (+ sdk/explorer/sync copies) before this height
-    testnet: 146000,      // ARMED 2026-07-22 ( lead 0e418c8c): first BTC-testnet anchor past all three STATE_COMMITMENT testnet thresholds; was 0, which forced the SPV root suffix from testnet genesis before the indexer computes roots, so the hub refused to sign every testnet checkpoint
+    testnet: 146000,      // ARMED 2026-07-22: first BTC-testnet anchor past all three STATE_COMMITMENT testnet thresholds; was 0, which forced the SPV root suffix from testnet genesis before the indexer computes roots, so the hub refused to sign every testnet checkpoint
     regtest: 0,
 };
 
@@ -267,7 +267,7 @@ const ANCHOR_REWARD_ACTIVATION = {
 // by the hub and re-derived by the indexer (never from the wire). Changing it is itself a flag-day.
 const ANCHOR_REWARD_AMOUNT = '10.00000000';
 
-// ARCHIVE_REWARD_ACTIVATION (archive-reward re-derivation, ): the flag-day at/above which the
+// ARCHIVE_REWARD_ACTIVATION (archive-reward re-derivation): the flag-day at/above which the
 // anchor_archive reward stops riding the key-authenticated `pushvalidatorrewards` rail and is instead
 // DERIVED by every indexer from the on-chain ANCHOR v6 bytes (the v1 archive anchor plus the same
 // PUBLISHER + 2f+1 XANCPUB attestation tail as v4/v5, attested over an 'anchor_archive' canonical
@@ -277,7 +277,7 @@ const ANCHOR_REWARD_AMOUNT = '10.00000000';
 // ANCHOR_REWARD_ACTIVATION; kept byte-identical to the local copies in
 // xchain-{hub,indexer}/src/anchor_reward_activation.js by the cross-service regression suite.
 const ARCHIVE_REWARD_ACTIVATION = {
-    mainnet: 963000,      // ARMED 2026-07-16 , RE-PINNED 2026-08-12  off 969500 onto the  pre-freeze train boundary (tip 959,853 on 07-27 at ~144 blocks/day + 21d); deploy every consumer before this era
+    mainnet: 963000,      // ARMED 2026-07-16, RE-PINNED 2026-08-12 off 969500 onto the pre-freeze train boundary (tip 959,853 on 07-27 at ~144 blocks/day + 21d); deploy every consumer before this era
     testnet: 0,
     regtest: 0,
 };

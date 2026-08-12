@@ -31,14 +31,12 @@ module.exports = {
         );
         var outputAmount = xchain.math.divide(numerator, denominator);
 
-        // Update reserves
         var newReserveA = xchain.math.add(reserveA, inputAmount);
         var newReserveB = xchain.math.subtract(reserveB, outputAmount);
         xchain.state.set('reserveA', newReserveA);
         xchain.state.set('reserveB', newReserveB);
         xchain.state.set('txCount', xchain.math.add(txCount, '1'));
 
-        // Emit transfer actions
         xchain.emit.send({ destination: xchain.getSourceAddress(), tick: 'TOKENB', quantity: outputAmount });
         xchain.emit.send({ destination: xchain.getContractAddress(), tick: 'TOKENA', quantity: inputAmount });
 

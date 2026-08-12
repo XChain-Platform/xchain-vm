@@ -21,9 +21,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { XChainVM, createVM, execute, chaosAssertions } = require('../helpers/harness');
 const { checkResultShape } = require('../../fuzz/invariants');
@@ -110,7 +107,6 @@ const { checkResultShape } = require('../../fuzz/invariants');
 
         vm.beginBlock();
 
-        // Execute same contract 5 times with different params
         for (let i = 0; i < 5; i++) {
             const result = await execute(vm, code, { params: [String(i)] });
             checkResultShape(result);

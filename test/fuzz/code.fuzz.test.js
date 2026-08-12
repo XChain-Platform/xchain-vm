@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const fc = require('fast-check');
 const { XChainVM, createVM, execute, FC_OPTIONS } = require('./harness');
 const { checkResultShape, checkAtomicity, checkGasCeiling, checkNoPrototypePollution, checkAll } = require('./invariants');

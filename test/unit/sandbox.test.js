@@ -26,7 +26,7 @@
 // The isolate-execution block additionally proves the strip actually takes
 // effect inside a real V8 isolate (behavioural defence-in-depth). isolated-vm
 // dlopens fail on macOS, so that block runs only where the native binding
-// loads (devhost / Linux node:22); the require is guarded so a macOS run
+// loads (Linux node:22 CI); the require is guarded so a macOS run
 // skips loudly-but-cleanly instead of crash-spamming.
 
 const assert = require('assert');
@@ -189,7 +189,7 @@ const FORBIDDEN_SAFE_MATH = [
     });
 });
 
-// ─── stripGlobals: host-side name selection (Promise flag-day gate) ──────────
+// stripGlobals: host-side name selection (Promise flag-day gate)
 //
 // stripGlobals decides the deletion list HOST-side, then compiles+runs a strip
 // script. A mock isolate captures that script text without needing the native
@@ -247,7 +247,7 @@ const FORBIDDEN_SAFE_MATH = [
         assert(captureToDelete({ stripPromise: true }).includes('queueMicrotask'));
     });
 
-    // WebAssembly is a second gated entry (flag-day Pkg 3, ): left in place
+    // WebAssembly is a second gated entry (flag-day Pkg 3): left in place
     // by default, stripped only when stripWasm is true, exactly like Promise.
     it('omits WebAssembly from the deletion list by default (pre-flag-day replay)', function() {
         assert(!captureToDelete(undefined).includes('WebAssembly'),
@@ -280,7 +280,7 @@ const FORBIDDEN_SAFE_MATH = [
     });
 });
 
-// ─── Behavioural: strip actually takes effect inside a real isolate ──────────
+// Behavioural: strip actually takes effect inside a real isolate
 //
 // Requires the native binding, so guarded on ivm availability (macOS skips).
 

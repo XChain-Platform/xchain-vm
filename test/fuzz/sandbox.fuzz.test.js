@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const fc = require('fast-check');
 const assert = require('assert');
 const { XChainVM, createVM, execute, FC_OPTIONS } = require('./harness');

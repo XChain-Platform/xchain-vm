@@ -11,7 +11,7 @@
     "create-xchain-contract": "bin/create-xchain-contract.js"
   },
   "engines": {
-    "comment": "Canonical runtime is Node 22 - matches the indexer's node:22-bookworm image and the V8 the validator fleet runs. isolated-vm's native binding is V8-ABI-specific: run `npm rebuild isolated-vm --build-from-source` after switching Node versions. The <23 ceiling is measured, not stylistic : isolated-vm 5.0.4 fails node-gyp on Node 24 on a removed V8 API, so an open-ended range would permit an install right up to the point it cannot compile. See .nvmrc.",
+    "comment": "Canonical runtime is Node 22 - matches the indexer's node:22-bookworm image and the V8 the validator fleet runs. isolated-vm's native binding is V8-ABI-specific: run `npm rebuild isolated-vm --build-from-source` after switching Node versions. The <23 ceiling is measured, not stylistic: isolated-vm 5.0.4 fails node-gyp on Node 24 on a removed V8 API, so an open-ended range would permit an install right up to the point it cannot compile. See .nvmrc.",
     "node": ">=22.0.0 <23"
   },
   "repository": {

@@ -16,9 +16,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');
 const {
@@ -45,7 +42,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('counter.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:60' });
 
-            // Block N: increment to 1
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:60', method: 'increment',
                 params: [], caller: 'user1'
@@ -53,10 +49,8 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertSuccess(r1);
             assertReturnValue(r1, '1');
 
-            // Advance block
             h.mineBlock();
 
-            // Block N+1: increment to 2 (reads persisted state)
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:60', method: 'increment',
                 params: [], caller: 'user1'
@@ -94,7 +88,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:61A' });
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:61B' });
 
-            // Increment A 10 times
             for (let i = 0; i < 10; i++) {
                 await h.execute({
                     contractAddress: 'C:BTC:61A', method: 'increment',
@@ -102,7 +95,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
                 });
             }
 
-            // Increment B 3 times
             for (let i = 0; i < 3; i++) {
                 await h.execute({
                     contractAddress: 'C:BTC:61B', method: 'increment',
@@ -110,11 +102,9 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
                 });
             }
 
-            // A should be 10, B should be 3
             assertContractState(h.ledger, 'C:BTC:61A', 'counter', '10');
             assertContractState(h.ledger, 'C:BTC:61B', 'counter', '3');
 
-            // Read from each to verify
             const rA = await h.execute({
                 contractAddress: 'C:BTC:61A', method: 'getCount',
                 params: [], caller: 'user1'
@@ -134,14 +124,12 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('counter.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:62' });
 
-            // Block 1: increment to 1
             await h.execute({
                 contractAddress: 'C:BTC:62', method: 'increment',
                 params: [], caller: 'user1'
             });
-            h.mineBlock(); // now at block 2
+            h.mineBlock();
 
-            // Block 2: increment to 2
             await h.execute({
                 contractAddress: 'C:BTC:62', method: 'increment',
                 params: [], caller: 'user1'
@@ -150,9 +138,8 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
             const reorgBlock = h.ledger.blockHeight; // block 2
 
-            h.mineBlock(); // block 3
+            h.mineBlock();
 
-            // Block 3: increment to 3
             await h.execute({
                 contractAddress: 'C:BTC:62', method: 'increment',
                 params: [], caller: 'user1'
@@ -187,7 +174,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:63'
             });
 
-            // Step 1: set x = '1'
             await h.execute({
                 contractAddress: 'C:BTC:63', method: 'setKey',
                 params: ['1'], caller: 'user1'
@@ -195,7 +181,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:63', 'x', '1');
             h.mineBlock();
 
-            // Step 2: delete x
             await h.execute({
                 contractAddress: 'C:BTC:63', method: 'deleteKey',
                 params: [], caller: 'user1'
@@ -203,21 +188,18 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractStateDeleted(h.ledger, 'C:BTC:63', 'x');
             h.mineBlock();
 
-            // Step 3: set x = '2'
             await h.execute({
                 contractAddress: 'C:BTC:63', method: 'setKey',
                 params: ['2'], caller: 'user1'
             });
             assertContractState(h.ledger, 'C:BTC:63', 'x', '2');
 
-            // Verify via contract read
             const r = await h.execute({
                 contractAddress: 'C:BTC:63', method: 'getKey',
                 params: [], caller: 'user1'
             });
             assertReturnValue(r, '2');
 
-            // Verify history has all three operations
             const history = h.ledger.stateHistory['C:BTC:63'];
             const xHistory = history.filter(e => e.key === 'x');
             assert.strictEqual(xHistory.length, 3, 'Expected 3 history entries for key x');

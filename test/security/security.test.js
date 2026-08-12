@@ -23,9 +23,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 
 let XChainVM;
@@ -71,9 +68,7 @@ function executeCode(vm, code, opts) {
     });
 }
 
-// ===================================================================
 // SANDBOX ESCAPE VECTORS (RISK-01, RISK-02, RISK-03)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Sandbox Escape Vectors', function() {
 
@@ -452,9 +447,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // ERROR TYPE SPOOFING (RISK-04)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Error Type Spoofing', function() {
 
@@ -538,9 +531,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // GAS METERING BYPASS (RISK-05, RISK-06)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Gas Metering Bypass', function() {
 
@@ -641,9 +632,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // PROTOTYPE POLLUTION (RISK-10, RISK-11)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Prototype Pollution', function() {
 
@@ -691,7 +680,6 @@ function executeCode(vm, code, opts) {
         it('initial state with __proto__ key should not pollute prototype', function() {
             // When passing { '__proto__': 'injected' } as a literal, JS interprets
             // __proto__ as the prototype setter, so Object.entries won't see it.
-            // Verify the state store itself is prototype-free (no inherited keys).
             const sm = new StateManager({}, {
                 maxStateKeys: 100, maxStateValueSize: 65536, maxStateKeySize: 1024
             });
@@ -699,7 +687,6 @@ function executeCode(vm, code, opts) {
             sm.set('__proto__', 'injected');
             assert.strictEqual(sm.get('__proto__'), 'injected');
             assert.strictEqual(sm.has('__proto__'), true);
-            // Verify it doesn't affect the state object's actual prototype
             assert.strictEqual(Object.getPrototypeOf(sm.state), null,
                 'state store should have null prototype');
         });
@@ -721,7 +708,6 @@ function executeCode(vm, code, opts) {
             const actions = ec.getActions();
             assert.strictEqual(actions.length, 1);
             assert.strictEqual(actions[0].params.__proto__, undefined);
-            // Verify normal params are preserved
             assert.strictEqual(actions[0].params.destination, 'addr1');
         });
 
@@ -754,9 +740,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // EMIT PARAMETER TYPE VALIDATION (M-13)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Emit Parameter Type Validation', function() {
 
@@ -865,9 +849,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // MATH INPUT ABUSE (RISK-12)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Math Input Limits', function() {
 
@@ -995,9 +977,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // INFORMATION LEAKAGE (RISK-15)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Information Leakage', function() {
 
@@ -1062,9 +1042,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // STATE ISOLATION (RISK-13)
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: State Isolation', function() {
 
@@ -1072,7 +1050,6 @@ function executeCode(vm, code, opts) {
     before(function() { vm = createVM(); });
 
     it('RISK-13a: sequential executions should not share state', async function() {
-        // First execution writes state
         const r1 = await executeCode(vm, `
             module.exports = function(xchain) {
                 xchain.state.set('leaked', 'secret');
@@ -1094,13 +1071,11 @@ function executeCode(vm, code, opts) {
     it('RISK-13b: compilation cache should not leak between contracts', async function() {
         vm.beginBlock();
         try {
-            // Execute contract A
             const r1 = await executeCode(vm, `
                 module.exports = function(xchain) { return 'contract_a'; };
             `, { contractAddress: 'C:BTC:A' });
             assert.strictEqual(r1.success, true);
 
-            // Execute contract B (different code)
             const r2 = await executeCode(vm, `
                 module.exports = function(xchain) { return 'contract_b'; };
             `, { contractAddress: 'C:BTC:B' });
@@ -1130,9 +1105,7 @@ function executeCode(vm, code, opts) {
     });
 });
 
-// ===================================================================
 // COMPREHENSIVE SANDBOX ESCAPE BATTERY
-// ===================================================================
 
 (XChainVM ? describe : describe.skip)('Security: Comprehensive Escape Battery', function() {
     this.timeout(15000);

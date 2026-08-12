@@ -24,9 +24,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const { create, all } = require('mathjs');
 const math = create(all, { number: 'BigNumber', precision: 64 });
 
@@ -189,7 +186,7 @@ class MockLedger {
             getPrice: (coinPair) => self.oraclePrices[coinPair]?.current || null,
             getPriceAtRound: (coinPair, round) => self.oraclePrices[coinPair]?.rounds?.[round] || null,
             getSnapshotAge: () => {
-                // Return the max snapshot age across all pairs (simplified)
+                // Simplified: max snapshot age across all pairs, not per-pair.
                 let maxAge = 0;
                 for (const pair in self.oraclePrices) {
                     if (self.oraclePrices[pair].snapshotAge > maxAge)
@@ -269,9 +266,7 @@ class MockLedger {
 
     rollbackToBlock(targetBlock) {
         for (const addr in this.stateHistory) {
-            // Remove history entries at or after targetBlock
             this.stateHistory[addr] = this.stateHistory[addr].filter(e => e.blockIndex < targetBlock);
-            // Rebuild state from remaining history
             this.contractState[addr] = {};
             for (const entry of this.stateHistory[addr]) {
                 if (entry.deleted) {
@@ -281,7 +276,6 @@ class MockLedger {
                 }
             }
         }
-        // Remove contracts deployed at or after targetBlock
         for (const addr in this.contracts) {
             if (this.contracts[addr].blockIndex >= targetBlock) {
                 delete this.contracts[addr];
@@ -297,7 +291,6 @@ class MockLedger {
     // --- Build balances map for VM execute ---
 
     buildBalancesMap() {
-        // Merge user balances and contract balances into the format the VM expects
         const result = {};
         for (const addr in this.balances) {
             result[addr] = { ...this.balances[addr] };

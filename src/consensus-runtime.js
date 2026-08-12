@@ -115,14 +115,14 @@ const REFERENCE_NODE = 'v22.22.3';
 // flag-day (mainnet) so a from-genesis replay reproduces the historical
 // accept-below/reject-above verdict.
 //
-// Epoch '3' (this bump, flag-day Package 3, ) adds the WebAssembly global
-// to the sandbox strip set (STRIPPED_GLOBAL_NAMES) to close the unmetered
-// native-execution / consensus-fork surface a wasm body (no __gas) re-opens.
-// UNLIKE the epoch-2 gates, the Package 3 bundle is gated on a PER-COIN block-
-// HEIGHT flag-day (index.js isPkg3SandboxActive / PKG3_SANDBOX_ACTIVATION),
-// riding the ~961000 Cohort-B window, so below each coin's height WebAssembly is
-// left in place and a from-genesis replay is byte-identical. The musl-safe
-// recursion bound  rides the same per-coin gate.
+// Epoch '3' (this bump) adds the WebAssembly global to the sandbox strip set
+// (STRIPPED_GLOBAL_NAMES) to close the unmetered native-execution /
+// consensus-fork surface a wasm body (no __gas) re-opens. UNLIKE the epoch-2
+// gates, this bundle is gated on a PER-COIN block-HEIGHT flag-day (index.js
+// isPkg3SandboxActive / PKG3_SANDBOX_ACTIVATION), riding the ~961000 Cohort-B
+// window, so below each coin's height WebAssembly is left in place and a
+// from-genesis replay is byte-identical. The musl-safe recursion bound rides
+// the same per-coin gate.
 const CONSENSUS_VERSION = '3';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the

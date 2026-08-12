@@ -16,9 +16,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { E2EHarness } = require('./helpers/harness.js');
 const {
@@ -145,17 +142,14 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('counter.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:54' });
 
-            // First: decrement on 0 should revert
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:54', method: 'decrement',
                 params: [], caller: 'user1'
             });
             assertReverted(r1, 'counter is zero');
 
-            // Counter should still be 0
             assertContractState(h.ledger, 'C:BTC:54', 'counter', '0');
 
-            // Second: increment should work fine
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:54', method: 'increment',
                 params: [], caller: 'user1'

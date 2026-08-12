@@ -20,13 +20,10 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { createVM, execute, GAS_SCHEDULE } = require('./helpers.js');
 
-// ── Direct module imports for unit-level regression ─────────────
+// Direct module imports for unit-level regression
 const { meterCode, hasGasIdentifier } = require('../../src/metering.js');
 const { buildMathAPI } = require('../../src/math.js');
 const { buildEmitAPI } = require('../../src/gateway-emit.js');
@@ -39,9 +36,7 @@ const { GasExhaustedError, ContractRevertError } = require('../../src/errors.js'
 
 describe('[P2] Functional Regression', function() {
 
-    // ================================================================
     // GAS METERING INJECTION
-    // ================================================================
     describe('Gas metering injection', function() {
 
         const AST_NODES = [
@@ -73,9 +68,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // GAS TRACKER
-    // ================================================================
     describe('GasTracker', function() {
 
         it('should start at 0 and accumulate charges', function() {
@@ -108,9 +101,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // STATE MANAGER
-    // ================================================================
     describe('StateManager', function() {
 
         const LIMITS = { maxStateKeys: 10, maxStateValueSize: 1024, maxStateKeySize: 1024 };
@@ -171,9 +162,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // EMISSION COLLECTOR
-    // ================================================================
     describe('EmissionCollector', function() {
 
         it('should collect and copy params', function() {
@@ -206,9 +195,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // ALL 16 EMIT TYPES
-    // ================================================================
     describe('All 16 emit types', function() {
 
         function createEmit() {
@@ -274,9 +261,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // ACTION VALIDATOR
-    // ================================================================
     describe('ActionValidator', function() {
 
         // Mirrors validator.js#ALLOWED_ACTIONS (16 base + 5 consensus emission actions).
@@ -308,9 +293,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // DETERMINISTIC MATH
-    // ================================================================
     describe('Deterministic math', function() {
 
         const math = buildMathAPI();
@@ -351,9 +334,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // SYNTAX VALIDATION
-    // ================================================================
     describe('Syntax validation', function() {
 
         it('should accept valid ES2020', function() {
@@ -381,9 +362,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // ERROR CLASSES
-    // ================================================================
     describe('Error classes', function() {
 
         it('should construct ContractRevertError with reason', function() {
@@ -402,9 +381,7 @@ describe('[P2] Functional Regression', function() {
         });
     });
 
-    // ================================================================
     // FULL EMIT PIPELINE (integration through VM)
-    // ================================================================
     describe('Full emit pipeline through VM', function() {
 
         let vm;

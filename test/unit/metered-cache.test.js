@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// Metered-source cache . meterCode() is the most expensive step of a
+// Metered-source cache. meterCode() is the most expensive step of a
 // warm execute; its output is a pure function of (code, specEvalOrder,
 // meterCallSpread), so _getMeteredCode() memoizes it keyed on sha256(code) plus
 // the two gate bits. These tests exercise the cache directly (no isolate, so
@@ -38,7 +38,7 @@ function cfg(extra) {
 const CODE_A = 'module.exports = function(xchain){ let s = 0; for (let i=0;i<3;i++){ s += i; } return s; };';
 const CODE_B = 'module.exports = { inc: function(xchain){ return xchain.state.get("n"); } };';
 
-describe('XChainVM metered-source cache ', function () {
+describe('XChainVM metered-source cache', function () {
 
     it('starts empty and populates one entry on first meter', function () {
         const vm = new XChainVM(cfg());

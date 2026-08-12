@@ -28,7 +28,7 @@ const XChainVM = require('./index.js');
 
 let vm = null;
 
-// Coverage-harness support . The isolate-execution code that runs ONLY
+// Coverage-harness support. The isolate-execution code that runs ONLY
 // in this forked child (this worker's message handlers plus sandbox.stripGlobals
 // and the in-isolate paths of index.execute) is invisible to a parent-process
 // coverage run unless the child flushes its V8 coverage to the NODE_V8_COVERAGE

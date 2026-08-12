@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const { performance } = require('perf_hooks');
 const v8   = require('v8');
 const path = require('path');
@@ -28,7 +25,8 @@ const fs   = require('fs');
 
 const XChainVM = require('../src/index.js');
 
-// Default gas schedule matching test suite
+// Matches the gas schedule used across the test suite, so benchmark numbers
+// are comparable to test-observed costs.
 const GAS_SCHEDULE = {
     VM_COMPUTATION:     1,
     VM_STATE_READ:      100,
@@ -99,12 +97,10 @@ function loadContract(name) {
  * @returns {Promise<number[]>} Array of timings in ms
  */
 async function measure(fn, iterations, warmup = 5) {
-    // Warmup
     for (let i = 0; i < warmup; i++) {
         await fn(i);
     }
 
-    // Measured runs
     const timings = new Array(iterations);
     for (let i = 0; i < iterations; i++) {
         const start = performance.now();

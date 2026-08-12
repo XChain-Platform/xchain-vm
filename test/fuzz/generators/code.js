@@ -17,9 +17,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const fc = require('fast-check');
 const acorn = require('acorn');
 const { generate } = require('astring');

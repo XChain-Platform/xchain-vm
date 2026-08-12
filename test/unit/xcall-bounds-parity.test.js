@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// 5db7dc60 (flag-day Pkg 4 / , verify-only): the XCALL gas/deadline
+// 5db7dc60 (flag-day Pkg 4, verify-only): the XCALL gas/deadline
 // bounds exported from index.js and the copies the gateway-emit enforcer
 // compares against must all be single-sourced from protocol/constants.js so
 // the exported/parity-tested values can never drift from the enforced ones.

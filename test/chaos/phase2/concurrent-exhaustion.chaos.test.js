@@ -23,9 +23,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { XChainVM, createVM, execute, chaosAssertions } = require('../helpers/harness');
 const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require('../../fuzz/invariants');
@@ -84,7 +81,6 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
                 assert.strictEqual(results[i].stateChanges.length, 2,
                     'Execution ' + i + ' should have 2 state changes, got ' +
                     results[i].stateChanges.length);
-                // Verify state changes belong to this execution only
                 const ownerChange = results[i].stateChanges.find(c => c.key === 'owner');
                 assert.strictEqual(ownerChange.value, String(i + 1),
                     'State should belong to execution ' + i);
@@ -154,7 +150,6 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
                 'Contract ' + i + ' should succeed: ' + results[i].error);
         }
 
-        // Verify each returned its own value
         const returns = results.map(r => JSON.parse(r.returnValue));
         assert.deepStrictEqual(returns, ['a', 'b', 'c', '3', 'd']);
     });

@@ -37,7 +37,6 @@ module.exports = {
         var elapsed = currentBlock - startBlock;
         xchain.require(elapsed >= cliffBlocks, 'cliff not reached');
 
-        // Calculate vested amount
         var vested;
         if (elapsed >= vestingBlocks) {
             vested = totalAmount;

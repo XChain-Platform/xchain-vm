@@ -79,7 +79,6 @@ const CEILING = 1000000;
     });
 });
 
-// ===========================================================================
 // Allocation-size gas metering: binary buffers (F3-binary)
 //
 // ArrayBuffer + TypedArray constructors allocate a dense backing store at
@@ -90,7 +89,6 @@ const CEILING = 1000000;
 // requested byte length so the gas ceiling binds first (deterministically,
 // before the memory limit is reachable) and the failure is an uncatchable
 // out_of_gas rather than a catchable allocation error.
-// ===========================================================================
 
 (XChainVM ? describe : describe.skip)('allocation-size gas metering: binary buffers (F3-binary)', function () {
     this.timeout(30000);
@@ -174,7 +172,6 @@ const CEILING = 1000000;
     });
 });
 
-// ===========================================================================
 // Compute-size gas metering: O(n) global functions (F3-globals)
 //
 // The G1 block meters the O(n) Array/String/Object/JSON *methods*, but the
@@ -188,7 +185,6 @@ const CEILING = 1000000;
 // throughput DoS + a timeout-vs-commit divergence across a heterogeneous fleet.
 // The harness now charges the argument's string length before delegating.
 // Same flag-day gate as F3-binary (both move gasUsed → must flip atomically).
-// ===========================================================================
 
 (XChainVM ? describe : describe.skip)('compute-size gas metering: global functions (F3-globals)', function () {
     this.timeout(30000);
@@ -256,7 +252,6 @@ const CEILING = 1000000;
     });
 });
 
-// ===========================================================================
 // Additive O(n)-copy metering upgrades, all gated on the same block-time flag-day
 // as F3-binary (XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME). Each closes an O(n)-work-
 // for-O(1)-gas hole in the sandbox that the earlier wrappers missed:
@@ -267,7 +262,6 @@ const CEILING = 1000000;
 // Below the gate every one replays the legacy (under-)charge byte-for-bit; above it
 // the O(n) work is billed so the deterministic gas ceiling binds before the CPU-time
 // wall-clock net can diverge across a heterogeneous validator fleet.
-// ===========================================================================
 
 (XChainVM ? describe : describe.skip)('O(n)-copy metering upgrades (gated)', function () {
     this.timeout(30000);
@@ -412,7 +406,6 @@ const CEILING = 1000000;
     });
 });
 
-// ===========================================================================
 // Output-size metering upgrades for join() and default-comparator sort(), gated
 // on the same block-time flag-day as the O(n)-copy upgrades above
 // (XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME):
@@ -425,7 +418,6 @@ const CEILING = 1000000;
 //         plus one pass of string-element bytes; a USER comparator already runs
 //         metered contract code per compare, so that path is unchanged.
 // Below the gate both replay the legacy element-count charge byte-for-bit.
-// ===========================================================================
 
 (XChainVM ? describe : describe.skip)('output-size metering: join + default sort (gated)', function () {
     this.timeout(30000);
@@ -546,7 +538,6 @@ const CEILING = 1000000;
     });
 });
 
-// ===========================================================================
 // Compute-size gas metering: TypedArray prototype O(n) methods (G1-TA)
 //
 // The G1 block meters the O(n) Array.prototype/String.prototype methods, but
@@ -564,7 +555,6 @@ const CEILING = 1000000;
 // unmetered (pre-activation replay preserved), above it every node charges the
 // O(n)/O(n log n) work so the deterministic gas ceiling binds before the wall-
 // clock net can diverge across a heterogeneous fleet.
-// ===========================================================================
 
 (XChainVM ? describe : describe.skip)('compute-size gas metering: TypedArray prototype (G1-TA)', function () {
     this.timeout(30000);
@@ -701,7 +691,6 @@ const CEILING = 1000000;
     });
 });
 
-// ===========================================================================
 // 2437: the host __gas sanitizer's NON-FINITE fallback.
 // The legacy sanitizer collapsed Infinity/NaN units to a 1-gas charge, which
 // broke its own documented "a huge units deterministically throws
@@ -712,7 +701,6 @@ const CEILING = 1000000;
 // the same call with a FINITE 2^53-1 length is a deterministic out_of_gas in
 // ~10ms. Gated on the same armed flag-day as F3-binary/F-NR/F-MO/F-PS: it turns
 // a 1-gas timeout into a ceiling-clamped out_of_gas, which moves hashed state.
-// ===========================================================================
 
 (XChainVM ? describe : describe.skip)('non-finite gas units fail closed (2437)', function () {
     this.timeout(60000);
@@ -774,8 +762,7 @@ const CEILING = 1000000;
     });
 });
 
-// ===========================================================================
-// Output-amplifying builtins metered by RECEIVER length only ().
+// Output-amplifying builtins metered by RECEIVER length only.
 //
 // The generic __meterLen wrapper charges the receiver and delegates, which is
 // correct for every method whose output is bounded by its receiver. Three were
@@ -789,7 +776,6 @@ const CEILING = 1000000;
 // host-dependent. Same divergence class the join/flat/stringify output-aware
 // charges already close, and gated on the same flag-day so replay below it is
 // byte-identical.
-// ===========================================================================
 
 (XChainVM ? describe : describe.skip)('output-amplifying builtins are charged by output (#4389)', function () {
     this.timeout(60000);

@@ -20,9 +20,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const crypto = require('crypto');
 const { createVM, execute, executeNTimes, assertAtomicFailure } = require('./helpers.js');
@@ -32,9 +29,7 @@ describe('[P1] Security Regression', function() {
     let vm;
     before(function() { vm = createVM(); });
 
-    // ================================================================
     // SANDBOX ESCAPE VECTORS
-    // ================================================================
     describe('Sandbox escape prevention', function() {
 
         const BLOCKED_GLOBALS = [
@@ -164,9 +159,7 @@ describe('[P1] Security Regression', function() {
         });
     });
 
-    // ================================================================
     // GAS METERING BYPASS PREVENTION
-    // ================================================================
     describe('Gas metering bypass prevention', function() {
 
         it('should halt infinite loop via gas ceiling', async function() {
@@ -198,9 +191,7 @@ describe('[P1] Security Regression', function() {
         });
     });
 
-    // ================================================================
     // ERROR ATOMICITY
-    // ================================================================
     describe('Error atomicity', function() {
 
         it('should discard state and emissions on revert', async function() {
@@ -253,9 +244,7 @@ describe('[P1] Security Regression', function() {
         });
     });
 
-    // ================================================================
     // DETERMINISM
-    // ================================================================
     describe('Determinism', function() {
 
         function hashResult(result) {

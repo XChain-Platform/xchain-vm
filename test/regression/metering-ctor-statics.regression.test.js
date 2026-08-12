@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Metering constructor wrappers: static surface and prototype chain 
+ * Metering constructor wrappers: static surface and prototype chain
  *
  * __meterBinaryCtor (ArrayBuffer / the TypedArrays) and __meterCollectionCtor
  * (Set / Map / WeakSet / WeakMap) replace a global constructor with a closure

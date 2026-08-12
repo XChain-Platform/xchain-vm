@@ -107,8 +107,8 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
     // ---- The poison boundary sits exactly at the platform-independent limit ----
     it('above the gate, a spine just UNDER the depth limit serializes; just OVER faults deterministically', async function () {
         // The native sinks read min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL), so an active
-        // guard bounds them at 256 whatever the height gate has done to __DEPTH_LIMIT
-        // . depth 200 (< bound) succeeds; 600 (> bound) faults.
+        // guard bounds them at 256 whatever the height gate has done to __DEPTH_LIMIT.
+        // depth 200 (< bound) succeeds; 600 (> bound) faults.
         const under = await run(`var a=1;for(var i=0;i<200;i++){a=[a];} return JSON.stringify(a).length > 0 ? 'ok' : 'bad';`, ABOVE);
         assert.strictEqual(under.success, true, under.error);
         assert.strictEqual(JSON.parse(under.returnValue), 'ok');

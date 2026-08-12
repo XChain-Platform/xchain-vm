@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const fs   = require('fs');
 const path = require('path');
 const MockLedger  = require('./MockLedger.js');
@@ -74,18 +71,15 @@ class E2EHarness {
     async deploy(opts) {
         const { code, deployer, contractAddress, params } = opts;
 
-        // Validate syntax
         const syntaxResult = this.vm.validateSyntax(code);
         if (!syntaxResult.valid) {
             return { success: false, error: syntaxResult.error };
         }
 
-        // Code size check
         if (Buffer.byteLength(code, 'utf8') > (this.vm.limits.maxCodeSize || 65536)) {
             return { success: false, error: 'code size exceeds limit' };
         }
 
-        // Store contract
         this.ledger.deployContract(contractAddress, code, deployer, this.ledger.blockHeight);
 
         // Run initialize method if the contract exports one
@@ -139,7 +133,6 @@ class E2EHarness {
             attestationData: this.ledger.buildAttestationAccessor()
         });
 
-        // On success, apply state changes and process emitted actions
         if (result.success) {
             this.ledger.applyStateChanges(
                 opts.contractAddress,
@@ -148,7 +141,6 @@ class E2EHarness {
                 blockContext.height
             );
 
-            // Process emitted actions through mock indexer
             // If an action fails (e.g., overdraw), mark execution as failed
             try {
                 this.indexer.processActions(opts.contractAddress, result.emittedActions);
@@ -162,7 +154,6 @@ class E2EHarness {
         // Charge gas fee regardless of success/failure
         this.indexer.chargeGasFee(opts.caller, result.gasUsed);
 
-        // Log execution
         this._executionLog.push({
             contractAddress: opts.contractAddress,
             method: opts.method,

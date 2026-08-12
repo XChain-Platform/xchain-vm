@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM: Subprocess coverage harness .
+ * XChain VM: Subprocess coverage harness.
  *
  * The isolate-execution code that runs ONLY inside the forked worker
  * (src/vm-worker.js message handlers, plus src/sandbox.js stripGlobals and

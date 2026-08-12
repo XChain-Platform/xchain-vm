@@ -12,7 +12,6 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 
-// ---------------------------------------------------------------------------
 // Determinism fixtures for the contract-targeted staking, external
 // attestation, and cross-contract/cross-chain call VM host methods:
 //
@@ -39,7 +38,6 @@
 // accessors return, so a change in gas charging, response serialisation, or
 // __gas injection around these call sites shifts the digest and fails CI
 // instead of surfacing only as an on-chain block-hash divergence.
-// ---------------------------------------------------------------------------
 
 // Two fixed, lowercase 64-hex pubkeys (contract.getStake lowercases its input,
 // so the staker keys are stored lowercase to match).

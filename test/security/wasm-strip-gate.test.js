@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * WebAssembly global strip: per-coin Pkg 3 height gate (75190596 / )
+ * WebAssembly global strip: per-coin Pkg 3 height gate (75190596)
  *
  * WebAssembly is a core V8 global reachable from contract code; a wasm body
  * carries no __gas instrumentation, so it runs unmetered native code (an
@@ -38,7 +38,7 @@ const typeofWasm = `module.exports = function(xchain){ return typeof WebAssembly
 // Above the gate, even reaching for a member must throw (global is absent).
 const useWasm = `module.exports = function(xchain){ try { return typeof WebAssembly.instantiate; } catch (e) { return 'THROWN'; } };`;
 
-(XChainVM ? describe : describe.skip)('WebAssembly strip: per-coin Pkg 3 height gate ', function () {
+(XChainVM ? describe : describe.skip)('WebAssembly strip: per-coin Pkg 3 height gate', function () {
     this.timeout(30000);
 
     let vm;
@@ -102,7 +102,7 @@ const useWasm = `module.exports = function(xchain){ try { return typeof WebAssem
         assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
     });
 
-    // ---- Pre-launch nets: the execute-time lint supersedes the strip  ----
+    // ---- Pre-launch nets: the execute-time lint supersedes the strip ----
     // The strip is the defence-in-depth layer for a contract that DEPLOYED before the
     // banned-wasm rule armed. Where execute-time source-lint enforcement is active (the
     // pre-launch nets, from genesis) such a contract can no longer execute at all: the

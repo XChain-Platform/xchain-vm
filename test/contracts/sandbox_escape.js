@@ -86,7 +86,6 @@ module.exports = function(xchain) {
         results.push('Proxy: blocked');
     }
 
-    // Log results for inspection
     for (var i = 0; i < results.length; i++) {
         xchain.log(results[i]);
     }

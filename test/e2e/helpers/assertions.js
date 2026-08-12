@@ -18,9 +18,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { create, all } = require('mathjs');
 const math = create(all, { number: 'BigNumber', precision: 64 });

@@ -24,9 +24,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 /**
  * ProgrammableOracleProvider: oracle accessor with per-method fault rules.
  *

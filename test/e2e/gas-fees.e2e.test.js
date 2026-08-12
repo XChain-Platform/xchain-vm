@@ -16,9 +16,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { E2EHarness, GAS_SCHEDULE } = require('./helpers/harness.js');
 const {

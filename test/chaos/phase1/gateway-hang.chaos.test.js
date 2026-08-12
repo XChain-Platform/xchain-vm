@@ -27,9 +27,6 @@
  ********************************************************************/
 // @ts-nocheck
 
-// 
-
-
 const assert = require('assert');
 const { XChainVM, createVM, execute, ProgrammableMock, chaosAssertions } = require('../helpers/harness');
 const { checkResultShape, checkAtomicity } = require('../../fuzz/invariants');

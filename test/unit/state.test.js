@@ -229,10 +229,8 @@ describe('StateManager', function() {
         const sm = new StateManager({}, { ...LIMITS, maxStateKeys: 2 });
         sm.set('a', '1');
         sm.set('b', '2');
-        // Delete a, set a again
         sm.delete('a');
         sm.set('a', 'new');
-        // Should still be at 2 keys, not 3
         assert.strictEqual(sm.get('a'), 'new');
         assert.throws(() => sm.set('c', '3'), /max state keys/);
     });

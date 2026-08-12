@@ -1,4 +1,4 @@
-# VM differential-fuzz gate ( / launch checklist item G4).
+# VM differential-fuzz gate.
 #
 # The VM's consensus contract is BIT-IDENTICAL execution on every validator,
 # whatever the arch / Node ABI / libc. The shared CI gate (ci.yml) only runs
