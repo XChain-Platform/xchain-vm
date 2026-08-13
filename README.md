@@ -369,10 +369,9 @@ xchain-vm/
 |   |-- e2e/              (10 E2E test files, 64 tests + helpers + contracts)
 |   |-- fuzz/             (9 fuzz test files, 57 tests + harness + generators)
 |   |-- chaos/            (3-phase chaos tests, 76 tests + helpers + contracts)
-|   +-- regression/       (4-tier + gate/pin regression suite, 159 tests + helpers)
-|-- bench/                (5 benchmark scenarios + harness + contracts)
-|-- reports/              (mutation results)
-+-- stryker-xchain-vm-mutator/  (custom mutation testing operators)
+|   |-- regression/       (4-tier + gate/pin regression suite, 159 tests + helpers)
+|   +-- mutation/         (stryker-xchain-vm-mutator/: custom mutation testing operators)
++-- bench/                (5 benchmark scenarios + harness + contracts)
 ```
 
 ## Integration

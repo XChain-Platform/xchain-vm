@@ -13,8 +13,7 @@
  **********************************************************************
  * XChain VM Toolkit: AI-assisted contract authoring (Tier-3 on-ramp)
  *
- * Src proposal: claude/reports/archive/2026-06-20_evm-solidity-onramp-proposal.md
- * (Tier 3). XChain contracts are plain JS, so an LLM writes them well; the
+ * Tier 3 of the contract-authoring on-ramp. XChain contracts are plain JS, so an LLM writes them well; the
  * differentiated on-ramp is "describe your contract in English -> a typed,
  * linted XChain contract" and "paste your Solidity -> the XChain equivalent
  * with the differences explained." That reframes "we don't run Solidity" into

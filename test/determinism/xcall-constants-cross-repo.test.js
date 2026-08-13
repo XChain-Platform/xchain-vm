@@ -26,7 +26,7 @@
  * (or the reverse), which is a hashed-verdict divergence, and the SDK builds
  * actions the chain will not take.
  *
- * This is the gate that ties the copies together, mirroring the sibling
+ * This is the gate that ties the copies together, mirroring the
  * cross-repo repin guard (consensus-params.test.js, the six CONTROLLER_GUARD
  * gate constants): read every sibling's constants file straight off disk and
  * assert value equality, rather than trusting three independent literal pins to

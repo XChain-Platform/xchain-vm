@@ -152,7 +152,7 @@ const MAX_DEPLOYCHUNK_PART_BYTES = 7800;
 // Consensus-critical activation: at/above this BTC-anchored snapshot_block the
 // federation quorum becomes stake-WEIGHTED (signers' summed source stake must
 // exceed 2/3 of total active snapshot stake) instead of count-based (2f+1 of the
-// pubkey COUNT). Spec: claude/reports/2026-06-14_cross-chain-quorum-security-spec.md.
+// pubkey COUNT). Spec: cross-chain quorum security.
 //
 // Keyed on the BTC `snapshot_block` carried by every settlement/checkpoint
 // canonical (NOT each chain's local processing height) so the hub and the BTC,

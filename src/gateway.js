@@ -154,7 +154,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
         },
 
         // External attestation (Phase 1, metered)
-        // Spec: claude/reports/specs/2026-05-24_external-attestation-framework.md
+        // Spec: external attestation framework.
         attestation: {
             // Emit an attestation request. Returns a deterministic request_id derived
             // from sha256("<tx_hash>:<rootActionIndex>:<callPath>:<contractIndex>:<emissionIndex>") (colon-delimited). The contract
