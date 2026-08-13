@@ -34,6 +34,9 @@ const StateManager      = require('./state.js');
 const EmissionCollector = require('./collector.js');
 const ActionValidator   = require('./validator.js');
 const { buildGateway }  = require('./gateway.js');
+// Canonical coercion for the per-root discriminator threaded into the request_id /
+// call_id preimages (keeps a BATCH subcommand's composite form intact).
+const { normalizeRootDiscriminator } = require('./gateway-emit.js');
 const { stripGlobals }  = require('./sandbox.js');
 const { meterCode }     = require('./metering.js');
 const { validateSyntax, checkFloatWarnings } = require('./syntax.js');
@@ -2095,7 +2098,11 @@ class XChainVM {
                     // is named rootActionIndex for historical reasons; the value is TX_VOUT, not
                     // action_index. MUST byte-match the indexer's ROOT_ACTION_INDEX field, which
                     // is also populated from TX_VOUT (execute.processEmission).
-                    rootActionIndex: opts.rootActionIndex != null ? Number(opts.rootActionIndex) : null,
+                    // Normalized rather than Number()-folded: a BATCH's subcommands are each a
+                    // root action under ONE TX_VOUT, so the host sends the composite
+                    // "<TX_VOUT>.<subcommand position>" for those (flag-day gated indexer-side).
+                    // Number() would fold '3.10' and '3.1' together and re-collide them.
+                    rootActionIndex: opts.rootActionIndex != null ? normalizeRootDiscriminator(opts.rootActionIndex) : null,
                     // Deterministic call-path: the '>'-joined per-execution emission
                     // positions from the root on-chain action down to THIS execution
                     // (root = ''). Replaces the injection-timing-dependent action_index

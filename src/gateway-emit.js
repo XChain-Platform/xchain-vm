@@ -40,6 +40,33 @@ function validateTypes(params, typeSpec) {
 
 const crypto = require('crypto');
 
+// Canonical form of the per-root discriminator that enters the ATTEST request_id
+// and XCALL call_id preimages (the value the host threads as rootActionIndex).
+//
+// Historically the value is always the root action's on-chain output index
+// TX_VOUT, and the VM folded it through Number() so a numeric string and a number
+// hash alike. A BATCH breaks the assumption TX_VOUT was carrying: every one of a
+// BATCH's subcommands is a separate root action under ONE TX_VOUT, so two EXECUTE
+// subcommands on the same contract derived the SAME request_id and the second
+// request was dropped. The host therefore sends a COMPOSITE
+// "<TX_VOUT>.<subcommand position>" for a root that is a BATCH subcommand, gated
+// on BATCH_SUBCOMMAND_ROOT_DISCRIMINATOR (xchain-indexer/src/protocol_changes.js).
+//
+// Number() must not touch the composite form: Number('3.10') === Number('3.1'),
+// which would re-collide exactly the roots the discriminator separates. Every
+// non-composite value keeps its historical Number() coercion, so every id derived
+// before the flag day stays byte-identical. '.' appears in no other preimage
+// field and the field separator is ':', so the composite is one unambiguous token.
+// MUST byte-match the indexer's re-derivation, which stringifies the same value
+// (attest.js / xcall.js ROOT_ACTION_INDEX).
+const ROOT_DISCRIMINATOR_COMPOSITE_RE = /^[0-9]+\.[0-9]+$/;
+function normalizeRootDiscriminator(value) {
+    if (value === undefined || value === null) return '';
+    const text = String(value);
+    if (ROOT_DISCRIMINATOR_COMPOSITE_RE.test(text)) return text;
+    return Number(value);
+}
+
 // Cross-CHAIN call (XCALL) protocol constants. Vendored single source of truth:
 // ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
 // constants.js); mirrored in src/index.js exports and re-validated host-side by
@@ -78,7 +105,9 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     // Per-root discriminator (deterministic root on-chain action_index), pinned at the root
     // and threaded unchanged. Bound into the call_id preimage alongside callPath so two
     // forest roots under one tx_hash cannot collide. MUST byte-match the indexer (xcall.js).
-    const rootActionIndex = ctx.rootActionIndex != null ? Number(ctx.rootActionIndex) : '';
+    // Normalized (not bare Number()) so a BATCH subcommand's composite
+    // "<TX_VOUT>.<position>" survives intact; see normalizeRootDiscriminator.
+    const rootActionIndex = ctx.rootActionIndex != null ? normalizeRootDiscriminator(ctx.rootActionIndex) : '';
     // Controller-guard mode disables the asynchronous cross-chain call path: a
     // guard must return its allow/deny decision synchronously, before the guarded
     // native action settles (the XCALL result would land blocks later).
@@ -437,4 +466,4 @@ const GOLDEN_VECTORS = {
 // cap: this module is the emit-time ENFORCER (crossExecute's hop gate above),
 // and src/index.js re-exports this value for the cross-service parity suite,
 // so the enforced and the parity-tested value can never diverge.
-module.exports = { buildEmitAPI, GOLDEN_VECTORS, XCALL_MAX_HOPS };
+module.exports = { buildEmitAPI, GOLDEN_VECTORS, XCALL_MAX_HOPS, normalizeRootDiscriminator };
