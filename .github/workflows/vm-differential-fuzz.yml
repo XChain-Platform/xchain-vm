@@ -13,6 +13,10 @@
 # test/fuzz/differential.js). Bump DIFF_CASES for a deeper sweep on demand.
 name: vm-differential-fuzz
 
+# Least privilege for the default GITHUB_TOKEN: every job here only reads the repo.
+permissions:
+  contents: read
+
 on:
   # Not on every push (isolated-vm rebuild + subprocess corpus is heavy);
   # runs on demand and on a weekly cadence so a toolchain/V8 bump that shifts
