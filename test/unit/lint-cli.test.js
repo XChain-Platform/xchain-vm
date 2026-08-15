@@ -173,6 +173,35 @@ function padTo(code, bytes) {
             assert.strictEqual(r.status, 2);
         });
 
+        // The gate's contract is 'exit 0 = all clean'. A quoted glob that matches
+        // nothing (a renamed directory in a CI script) used to expand to [] and
+        // disappear, so a run with one surviving argument exited 0 having never
+        // linted the intended files. Every zero-match argument now fails closed on
+        // the exit-2 channel the header reserves for 'no readable input files'.
+        it('a glob matching nothing → exit 2 naming the pattern, even when another argument matched', function () {
+            const p = write('cli-glob-good.js', GOOD_CODE);
+            const r = runCli([p, path.join(dir, 'no-such-dir', '*.js')]);
+            assert.strictEqual(r.status, 2, 'stdout=' + r.stdout + ' stderr=' + r.stderr);
+            assert.ok((r.stderr || '').indexOf('no files matched: ') !== -1, r.stderr);
+            assert.ok((r.stderr || '').indexOf('no-such-dir') !== -1,
+                'the stale pattern must be named: ' + r.stderr);
+            // The surviving file is never reported: the run aborts before linting.
+            assert.strictEqual(r.stdout.indexOf('✓'), -1, r.stdout);
+        });
+
+        it('every zero-match argument is named in one run, not just the first', function () {
+            const r = runCli([path.join(dir, 'gone-a', '*.js'), path.join(dir, 'gone-b', '*.js')]);
+            assert.strictEqual(r.status, 2, 'stdout=' + r.stdout + ' stderr=' + r.stderr);
+            assert.ok((r.stderr || '').indexOf('gone-a') !== -1, r.stderr);
+            assert.ok((r.stderr || '').indexOf('gone-b') !== -1, r.stderr);
+        });
+
+        it('a literal missing path still fails through the read-error path (exit 1), not the glob channel', function () {
+            const r = runCli([path.join(dir, 'definitely-absent.js')]);
+            assert.strictEqual(r.status, 1, 'stdout=' + r.stdout + ' stderr=' + r.stderr);
+            assert.ok((r.stderr || '').indexOf('cannot read') !== -1, r.stderr);
+        });
+
         it('--json emits a machine-readable report matching lintFile()', function () {
             const p = write('cli-json.js', BAD_CODE);
             const r = runCli(['--json', p]);

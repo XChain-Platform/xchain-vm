@@ -146,7 +146,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
         });
     });
 
-    describe('the four shipped templates pass the authoritative validator', function () {
+    describe('every discovered <name>/<name>.js template passes the authoritative validator', function () {
         const haveTemplates = fs.existsSync(CONTRACTS_DIR);
         const dirs = haveTemplates
             ? fs.readdirSync(CONTRACTS_DIR, { withFileTypes: true })

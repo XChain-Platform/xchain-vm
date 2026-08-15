@@ -95,9 +95,23 @@ function main() {
     }
     if (inputs.length === 0) usage('no input files');
 
-    const files = [];
-    for (const arg of inputs) for (const f of expandArg(arg)) files.push(f);
-    if (files.length === 0) usage('no files matched');
+    // Fail CLOSED on any argument that expanded to nothing. A quoted glob whose
+    // directory has since been renamed (or whose globSync threw) expands to [],
+    // and the old whole-run `files.length === 0` guard only fired when EVERY
+    // argument came back empty: with one surviving argument the stale pattern
+    // vanished silently and the run still exited 0, weakening the documented
+    // 'exit 0 = all clean' contract to 'the files that still exist are clean'.
+    // A literal path is unaffected (expandArg returns [arg]) and still reports
+    // through the read-error path at exit 1. Every miss is named, not just the
+    // first, so one run fixes a CI script rather than one pattern per run.
+    const files  = [];
+    const missed = [];
+    for (const arg of inputs) {
+        const expanded = expandArg(arg);
+        if (expanded.length === 0) missed.push(arg);
+        for (const f of expanded) files.push(f);
+    }
+    if (missed.length > 0) usage('no files matched: ' + missed.join(', '));
 
     const results = files.map(lintFile);
 
