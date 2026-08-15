@@ -391,7 +391,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.STATE_KEY_TYPE_GATE_BLOCK_TIME, 1786060800);
     });
 
-    it('all six 2.0.0 gate constants match the indexer protocol_changes.js CONTROLLER_GUARD literal (cross-repo repin guard)', function () {
+    it('all six gate constants match the indexer protocol_changes.js CONTROLLER_GUARD literal (cross-repo repin guard)', function () {
         // The six literal pins above freeze the VM's flag-day value, and the
         // indexer's own suite freezes its value, but nothing tied the two files
         // together: a coordinated repin that edits the indexer literal and misses
@@ -404,8 +404,16 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         const indexerFile = path.resolve(__dirname, '../../../xchain-indexer/src/protocol_changes.js');
         if (!fs.existsSync(indexerFile)) this.skip();
         const src = fs.readFileSync(indexerFile, 'utf8');
-        const m = src.match(/addChange\(\s*'CONTROLLER_GUARD'\s*,\s*'2\.0\.0'\s*,\s*(\d+)/);
-        assert.ok(m, "could not find the CONTROLLER_GUARD 2.0.0 addChange literal in the indexer's protocol_changes.js");
+        // The CONSENSUS_VERSION tier is matched as a wildcard, not pinned. It used
+        // to be '2.0.0' and became '0.2.0' when the registry was shifted ordinally
+        // to follow the package onto the platform version stream, which broke this
+        // guard on a rename that changed nothing it protects. What couples the two
+        // repos is the FLAG-DAY TIMESTAMP, so that is what this asserts; the tier
+        // label is the indexer's own business.
+        const all = [...src.matchAll(/addChange\(\s*'CONTROLLER_GUARD'\s*,\s*'[^']+'\s*,\s*(\d+)/g)];
+        assert.strictEqual(all.length, 1,
+            "expected exactly one CONTROLLER_GUARD addChange in the indexer's protocol_changes.js, found " + all.length);
+        const m = all[0];
         const indexerFlagDay = Number(m[1]);
         const gates = [
             'ASYNC_SURFACE_GATE_BLOCK_TIME', 'BINARY_ALLOC_GATE_BLOCK_TIME',
