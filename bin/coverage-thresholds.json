@@ -1,7 +1,7 @@
 {
-  "comment": "Coverage floors for the CI coverage job (regression floors, ~1-1.5 points below measured on 2026-08-12, not tier targets; raise as coverage climbs). Mirrored into the coverage:check npm script in package.json: keep both in sync. Measured on Linux: isolated-vm cannot dlopen on macOS, so a local mac run reports ~0% functions and must not be used to set these.",
-  "lines": 95.5,
-  "statements": 95.5,
-  "branches": 85.5,
+  "comment": "Coverage floors for the CI coverage job (regression floors, ~1-1.5 points below measured, not tier targets; raise as coverage climbs). Mirrored into the coverage:check npm script in package.json and guarded by test/unit/coverage-thresholds-sync.test.js. Re-measured 2026-08-14 WITH the declared siblings checked out, which is what the coverage job now does: 97.33 lines/statements, 87.35 branches, 93.72 functions over 812 unit tests (795 without siblings), measured on Linux because isolated-vm cannot dlopen on macOS; the functions floor stays at its existing 92.5, already inside the band.",
+  "lines": 95.8,
+  "statements": 95.8,
+  "branches": 85.8,
   "functions": 92.5
 }
