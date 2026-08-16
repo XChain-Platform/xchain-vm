@@ -117,6 +117,21 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
             'globalThis.Promise must be flagged');
         assert.deepStrictEqual(kinds("globalThis['Promise']"), ['promise'],
             "globalThis['Promise'] must be flagged");
+
+        // LINT_GLOBAL_ALIAS spellings (flagged only when the epoch flag is on, which is
+        // the author-facing default this helper uses). Sloppy-mode `this` IS globalThis in
+        // the Function-constructor evaluation the CONTRACT_WRAPPER performs, and the global
+        // object carries its own `globalThis` self-reference, so both read the same binding.
+        assert.deepStrictEqual(kinds('this.Promise'), ['promise'],
+            'sloppy-mode this.Promise must be flagged under the global-alias epoch');
+        assert.deepStrictEqual(kinds('globalThis.globalThis.Promise'), ['promise'],
+            'the globalThis self-reference chain must be flagged under the global-alias epoch');
+        // ...and the SAME sources must lint clean with the epoch flag off, or the gate is
+        // not a gate and every pre-activation deploy verdict silently moves.
+        assert.deepStrictEqual(lintCore.findBannedAsync('this.Promise', true, false), [],
+            'this.Promise must be accepted below the global-alias activation');
+        assert.deepStrictEqual(lintCore.findBannedAsync('globalThis.globalThis.Promise', true, false), [],
+            'the globalThis chain must be accepted below the global-alias activation');
     });
 
     it('sandbox PROTOTYPE-METHOD neuters are frozen (regex + locale/ICU strips)', function () {
@@ -389,6 +404,42 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isExecLintActive('testnet', 'DOGE', 0), true);
         // A non-finite height is pre-activation even on a genesis-active-by-height chain.
         assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', NaN), false);
+    });
+
+    it('lint global-alias gate: per-coin map is UNARMED on mainnet and cannot ride an open gate', function () {
+        // Widening banned-async / banned-wasm to the aliased global reads (sloppy-mode
+        // `this`, the globalThis self-reference chain) changes which contracts the chain
+        // ACCEPTS, so the activation heights are consensus parameters exactly like the
+        // exec-lint ones above: a node that armed a different height rejects a deploy its
+        // peers accept, and a from-genesis replay rewrites settled verdicts.
+        //
+        // Mainnet is the explicit unarmed `null` sentinel pending the operator's ratified
+        // per-coin train heights. Filling one in here is a deliberate, reviewed edit that
+        // must move the xchain-indexer twin (src/vm_lint_global_alias_activation.js) in
+        // the SAME change; that repo's suite pins the pair to equality.
+        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['BTC:mainnet'], null);
+        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['LTC:mainnet'], null);
+        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['DOGE:mainnet'], null);
+        assert.ok(Object.isFrozen(vm.LINT_GLOBAL_ALIAS_ACTIVATION));
+        // Unarmed means inactive at EVERY mainnet height: deploy verdicts on mainnet are
+        // byte-identical to pre-gate until the operator arms it.
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 0), false);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 961000), false);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'DOGE', Number.MAX_SAFE_INTEGER), false);
+        // Unknown network / coin / height resolve pre-activation (safe legacy default).
+        assert.strictEqual(vm.isLintGlobalAliasActive(undefined, 'BTC', 961000), false);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'XYZ', 961000), false);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', null, 961000), false);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', NaN), false);
+        // Pre-launch nets are genesis-active (no accepted history to preserve).
+        assert.strictEqual(vm.isLintGlobalAliasActive('regtest', 'BTC', 0), true);
+        assert.strictEqual(vm.isLintGlobalAliasActive('testnet', 'DOGE', 0), true);
+        // It is a DISTINCT epoch, not a rider on VM_LINT_HARDENING. That block-time gate
+        // is already open on every network, so reusing it would retroactively reject
+        // contracts the chain has already accepted. This pin is what reddens if someone
+        // "simplifies" the new gate away onto the old one.
+        assert.strictEqual(vm.isLintHardeningActive('mainnet', vm.VM_LINT_HARDENING_GATE_BLOCK_TIME), true);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 961000), false);
     });
 
     it('STATE_KEY_NUL_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {

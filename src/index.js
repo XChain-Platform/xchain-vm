@@ -1678,6 +1678,55 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
     'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
 });
 
+// ----- Deploy/execute lint global-alias refinement: per-coin block-HEIGHT gate -----
+// The banned-async and banned-wasm deploy rules are identifier-precise: they flag the bare
+// `Promise` / `WebAssembly` identifier and the single-hop `globalThis.X` spelling. Two other
+// spellings read the SAME global binding and walked straight past both rules:
+//   - sloppy-mode `this`. Contract code is evaluated by the saved Function constructor in
+//     global scope as sloppy-mode script, so top-level `this` IS globalThis and a plain
+//     `f()` call hands a sloppy function body the same receiver; `this.WebAssembly` was
+//     never matched.
+//   - the global object's own `globalThis` self-reference, at any depth:
+//     `globalThis.globalThis.Promise`, `globalThis['globalThis'].WebAssembly`,
+//     `this.globalThis.Promise`. The old check compared node.object.name directly, so one
+//     extra hop defeated it.
+// Closing both moves DEPLOY verdicts on error-severity CONSENSUS_RULES, so it must be
+// height-gated: below the activation the rules resolve exactly as they historically did
+// and a from-genesis replay reproduces the accepted verdict byte for byte.
+//
+// It CANNOT ride VM_LINT_HARDENING. That block-time gate (1786060800) is already open on
+// every network, so reusing it would apply the tightened rules retroactively to contracts
+// the chain has already accepted, rewriting settled history on any replay. It cannot ride
+// PKG3_SANDBOX_ACTIVATION either: those heights are in the past. It needs a NEW epoch, so
+// it gets one, shaped exactly like EXEC_LINT_ACTIVATION above (per-coin block HEIGHT, coin
+// derived from the C:<COIN>:<idx> contract address, testnet/regtest genesis-active because
+// both are pre-launch, unknown network/coin or non-finite height -> pre-activation).
+//
+// !! MAINNET IS DELIBERATELY UNARMED. `null` is the explicit unarmed sentinel: it resolves
+// to inactive at every mainnet height, so mainnet behaviour is byte-identical to today
+// until the operator ratifies concrete per-coin train heights here AND in the xchain-indexer
+// twin (xchain-indexer/src/vm_lint_global_alias_activation.js), which the consensus-params
+// suites in both repos pin to equality. Arming one side alone forks.
+const LINT_GLOBAL_ALIAS_ACTIVATION = Object.freeze({
+    'BTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'LTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+});
+
+// Whether the lint global-alias refinement is active for (network, coin) at blockHeight.
+// testnet/regtest: genesis. mainnet: per-coin height threshold; an unrecognized network, an
+// unresolvable coin, a non-finite height, or an UNARMED (null) per-coin entry all resolve to
+// inactive (legacy, byte-identical below).
+function isLintGlobalAliasActive(network, coin, blockHeight) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    const b = Number(blockHeight);
+    if (!Number.isFinite(b)) return false;
+    const threshold = (coin != null) ? LINT_GLOBAL_ALIAS_ACTIVATION[coin + ':' + network] : undefined;
+    // Number.isFinite rejects both the absent key (undefined) and the unarmed sentinel (null).
+    if (!Number.isFinite(threshold)) return false;
+    return b >= threshold;
+}
+
 // Gas granularity for the execute-time lint. validateSyntax spawns an ivm.Isolate for the
 // V8 syntax check and then parses the source with acorn, so its cost scales with the source
 // length; charging VM_COMPUTATION per 256 bytes (minimum one unit) keeps it on the same
@@ -1897,9 +1946,10 @@ class XChainVM {
      * resolved ban flags, from the verdict cache when possible.
      *
      * validateSyntax() is a pure function of (code, enforceBannedAsync,
-     * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm), all folded
-     * into the key, so a hit returns the verdict a fresh call would produce. The two
-     * Pkg 3 rules share ONE activation and are therefore threaded as one bit.
+     * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm,
+     * enforceLintGlobalAlias), all folded into the key, so a hit returns the verdict a
+     * fresh call would produce. The two Pkg 3 rules share ONE activation and are
+     * therefore threaded as one bit; the global-alias refinement rides its own.
      *
      * This exists because validateSyntax spawns an ivm.Isolate for its V8 syntax check
      * and then acorn-parses the source; paying that on every execute of a hot contract
@@ -1912,21 +1962,24 @@ class XChainVM {
      * @param {boolean} enforceBannedAsync
      * @param {boolean} enforceLintHardening
      * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
+     * @param {boolean} enforceLintGlobalAlias - LINT_GLOBAL_ALIAS refinement (own gate)
      * @param {string} [codeHash] - precomputed sha256(code) hex (see _getMeteredCode)
      * @returns {{valid: boolean, error?: string}}
      */
-    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, codeHash) {
+    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
-            (enforcePkg3Bans ? '1' : '0');
+            (enforcePkg3Bans ? '1' : '0') +
+            (enforceLintGlobalAlias ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
-            enforceBannedAsync:     enforceBannedAsync,
-            enforceLintHardening:   enforceLintHardening,
-            enforceBannedGenerator: enforcePkg3Bans,
-            enforceBannedWasm:      enforcePkg3Bans
+            enforceBannedAsync:      enforceBannedAsync,
+            enforceLintHardening:    enforceLintHardening,
+            enforceBannedGenerator:  enforcePkg3Bans,
+            enforceBannedWasm:       enforcePkg3Bans,
+            enforceLintGlobalAlias:  enforceLintGlobalAlias
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;
@@ -2067,13 +2120,14 @@ class XChainVM {
         // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
         // under the rule set of the deploy block and its verdict was final.
         //
-        // The three flags are resolved by the SAME predicates the rest of the VM already
+        // The four flags are resolved by the SAME predicates the rest of the VM already
         // uses, which are the execution-side twins of the flags the indexer threads into
         // deploy.js validateSyntax, so the execute-time verdict agrees with what a deploy
         // in this block would have produced:
         //   banned-async                    -> isAsyncSurfaceActive   (block time)
         //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
         //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
+        //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
         // The whole check rides its own per-coin height gate (isExecLintActive), which is
         // UNARMED on mainnet: below it nothing is charged and nothing is checked, so the
         // pre-activation path is byte-identical, gasUsed included.
@@ -2102,6 +2156,7 @@ class XChainVM {
                 isAsyncSurfaceActive(opts.network, __lintBlockTime),
                 isLintHardeningActive(opts.network, __lintBlockTime),
                 isPkg3SandboxActive(opts.network, __execLintCoin, __execLintHeight),
+                isLintGlobalAliasActive(opts.network, __execLintCoin, __execLintHeight),
                 __codeHash
             );
             if (!__lintVerdict.valid) {
@@ -2872,6 +2927,13 @@ module.exports.pkg3CoinFromAddress = pkg3CoinFromAddress;
 module.exports.EXEC_LINT_ACTIVATION = EXEC_LINT_ACTIVATION;
 module.exports.isExecLintActive = isExecLintActive;
 module.exports.EXEC_LINT_GAS_BYTES_PER_UNIT = EXEC_LINT_GAS_BYTES_PER_UNIT;
+// Lint global-alias refinement (sloppy-mode `this` + the globalThis self-reference chain
+// counted as global reads by banned-async / banned-wasm): the per-coin activation-height
+// map and its resolver. Twinned with xchain-indexer/src/vm_lint_global_alias_activation.js
+// and pinned to equality by the consensus-params guards in both repos; arming one side
+// alone forks the deploy verdict.
+module.exports.LINT_GLOBAL_ALIAS_ACTIVATION = LINT_GLOBAL_ALIAS_ACTIVATION;
+module.exports.isLintGlobalAliasActive = isLintGlobalAliasActive;
 // Coordinated flag-day (block time) that activates the F3-binary allocation gas
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).
