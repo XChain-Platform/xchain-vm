@@ -64,8 +64,13 @@ const fn = (body) => `module.exports = function(xchain){ ${body} };`;
     beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
+    // network defaults to 'mainnet': every case below that omits it is exercising the
+    // per-coin mainnet HEIGHT boundary (H_BELOW / H_JUST_BELOW / H_AT), and the gate
+    // predicate resolves an unrecognized or absent network to inactive, so the network
+    // has to be named for the height to mean anything. The testnet/regtest cases pass
+    // theirs explicitly.
     const run = (body, block, network) =>
-        execute(vm, fn(body), { method: 'default', blockContext: block, network });
+        execute(vm, fn(body), { method: 'default', blockContext: block, network: network || 'mainnet' });
 
     // Depth 300 sits between MAX_STACK_DEPTH_MUSL (256) and MAX_STACK_DEPTH (512):
     // legal below the height gate, over-depth at/after it.
