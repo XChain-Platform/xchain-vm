@@ -1,5 +1,9 @@
 {
   "comment": "Coverage floors for the CI coverage job (regression floors, ~1-1.5 points below measured, not tier targets; raise as coverage climbs). Mirrored into the coverage:check npm script in package.json and guarded by test/unit/coverage-thresholds-sync.test.js. Re-measured 2026-08-14 WITH the declared siblings checked out, which is what the coverage job now does: 97.33 lines/statements, 87.35 branches, 93.72 functions over 812 unit tests (795 without siblings), measured on Linux because isolated-vm cannot dlopen on macOS; the functions floor stays at its existing 92.5, already inside the band.",
+  "scopeComment": "The unit ratchet measures src/**/*.js MINUS src/process-executor.js. That file's behaviour is forking a child and speaking IPC to it, so a unit test can only construct it and read a knob back; it is measured instead by coverage:subprocess, which drives it from the integration suite. Before 2026-08-16 it stayed out of scope by accident (no unit test required it) and the first unit test that did entered it at 53% and dropped the whole ratchet 1.9 points. Keep this list and the --exclude flags in coverage/coverage:check identical; guarded by test/unit/coverage-thresholds-sync.test.js.",
+  "unitScopeExcludes": [
+    "src/process-executor.js"
+  ],
   "lines": 95.8,
   "statements": 95.8,
   "branches": 85.8,

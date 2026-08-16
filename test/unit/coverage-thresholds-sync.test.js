@@ -41,3 +41,65 @@ describe('coverage ratchet floors', () => {
     assert.match(pkg.scripts['coverage:check'], /--check-coverage/);
   });
 });
+
+// The ratchet also has a SCOPE, and scope drift breaks it as quietly as a floor
+// does. src/process-executor.js forks a child and speaks IPC to it: the unit suite
+// can construct it and read a knob back, nothing more, so it is measured by
+// coverage:subprocess against the integration suite instead. It stayed out of the
+// unit report by accident until a unit test required it, at which point it entered
+// at 53% and dropped the whole ratchet 1.9 points with no coverage actually lost.
+// Excluding it is only honest while it is still measured somewhere, so that is
+// asserted here too, and the excludes on coverage:check and coverage have to agree
+// or the report a human reads describes a different set than the job enforces.
+describe('coverage ratchet scope', () => {
+  const repoRoot = path.join(__dirname, '..', '..');
+  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+  const declared = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, 'bin', 'coverage-thresholds.json'), 'utf8'),
+  );
+
+  const excludesOf = (script) =>
+    [...script.matchAll(/--exclude\s+'([^']+)'/g)].map((m) => m[1]);
+  const includesOf = (script) =>
+    [...script.matchAll(/--include\s+'([^']+)'/g)].map((m) => m[1]);
+
+  it('declares the unit-scope excludes it enforces', () => {
+    assert.ok(
+      Array.isArray(declared.unitScopeExcludes),
+      'thresholds.json must declare unitScopeExcludes, or nothing states what the ratchet leaves out',
+    );
+    assert.deepEqual(
+      excludesOf(pkg.scripts['coverage:check']).sort(),
+      [...declared.unitScopeExcludes].sort(),
+      'thresholds.json and coverage:check disagree about what the unit ratchet measures',
+    );
+  });
+
+  it('measures the same set in the report a human reads', () => {
+    assert.deepEqual(
+      excludesOf(pkg.scripts.coverage).sort(),
+      excludesOf(pkg.scripts['coverage:check']).sort(),
+      'coverage and coverage:check must scope identically or the report cannot explain the gate',
+    );
+    assert.deepEqual(includesOf(pkg.scripts.coverage), includesOf(pkg.scripts['coverage:check']));
+  });
+
+  it('still measures every excluded file under the subprocess ratchet', () => {
+    const subprocessIncludes = includesOf(pkg.scripts['coverage:subprocess']);
+    for (const excluded of declared.unitScopeExcludes) {
+      assert.ok(
+        subprocessIncludes.includes(excluded),
+        `${excluded} is excluded from the unit ratchet and measured by no other one, so it is unmeasured`,
+      );
+    }
+  });
+
+  it('excludes only files that exist, so a rename cannot leave a dead exclude', () => {
+    for (const excluded of declared.unitScopeExcludes) {
+      assert.ok(
+        fs.existsSync(path.join(repoRoot, excluded)),
+        `${excluded} is excluded from the ratchet but no such file exists`,
+      );
+    }
+  });
+});
