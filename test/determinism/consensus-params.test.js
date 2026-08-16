@@ -279,6 +279,27 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1786060800);
     });
 
+    it('CONSENSUS_MAX_WALL_MS is the frozen per-execution wall-clock budget (XC-1491)', function () {
+        // Gas does not bound wall time: shapes exist whose wall-time-per-gas is far
+        // above the schedule's assumption, and for those the wall-clock net is what
+        // terminates the execution. While that net was the per-NODE
+        // limits.maxCpuTimeMs, a validator with a tighter budget recorded
+        // 'timeout:' + gasUsed clamped to the ceiling where a looser one committed
+        // the real state changes and the real gasUsed. Both are consensus-visible,
+        // so the budget is a consensus parameter and is pinned here; a node running
+        // a different value forks the fleet on the first execution that reaches it.
+        // Pinned AT the fleet's documented default so promoting it changed no
+        // default-configured node's outcome; TIGHTENING it is a separate consensus
+        // event (future flag-day + re-goldened baselines + atomic deploy).
+        assert.strictEqual(vm.CONSENSUS_MAX_WALL_MS, 30000);
+        assert.strictEqual(require('../../src/consensus-wall-clock.js').CONSENSUS_MAX_WALL_MS,
+            vm.CONSENSUS_MAX_WALL_MS, 'enforcing module and export must be the same value');
+        // The activation rides the ratified 2.0.0 flag-day, like its siblings.
+        assert.strictEqual(vm.isConsensusWallClockActive('regtest', 0), true);
+        assert.strictEqual(vm.isConsensusWallClockActive('mainnet', vm.BINARY_ALLOC_GATE_BLOCK_TIME), true);
+        assert.strictEqual(vm.isConsensusWallClockActive('mainnet', vm.BINARY_ALLOC_GATE_BLOCK_TIME - 1), false);
+    });
+
     it('CALL_SPREAD_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // Size-metering of call/new/method argument spread (the __arrspread-wrapped
         // argument list) activates fleet-wide at this block time on mainnet. It moves
@@ -321,9 +342,15 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'LTC', 3154250), true);
         assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'DOGE', 961000), false);
         assert.strictEqual(vm.isPkg3SandboxActive('mainnet', 'DOGE', 6319000), true);
-        // undefined network with a resolvable coin behaves as mainnet (the musl-gate
-        // boundary the behavioural suite exercises via the default C:BTC:1 address).
-        assert.strictEqual(vm.isPkg3SandboxActive(undefined, 'BTC', 961000), true);
+        // An unrecognized network resolves INACTIVE, the same direction as the indexer's
+        // deploy-half twin (isVmDeployLintPkg3Active, pinned there for 'stagenet'). The
+        // two halves are one gate: a network on which the runtime strip armed while the
+        // deploy lint stayed off is the "deploys clean, stripped at runtime" window the
+        // shared gate exists to prevent. Only mainnet/testnet/regtest ever reach a real
+        // node, so this fixes the invariant by construction rather than by relying on
+        // the indexer's boot-time network validation.
+        assert.strictEqual(vm.isPkg3SandboxActive(undefined, 'BTC', 961000), false);
+        assert.strictEqual(vm.isPkg3SandboxActive('stagenet', 'BTC', 961000), false);
         assert.strictEqual(vm.isPkg3SandboxActive(undefined, 'BTC', 100), false);
         assert.strictEqual(vm.isPkg3SandboxActive(undefined, 'BTC', NaN), false);
         // unresolvable coin -> inactive (safe legacy default) even at a high height.

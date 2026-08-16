@@ -34,6 +34,7 @@ const path = require('path');
 const { fork } = require('child_process');
 const { HostFaultError } = require('./errors.js');
 const { effectiveCeiling } = require('./gas.js');
+const { CONSENSUS_MAX_WALL_MS } = require('./consensus-wall-clock.js');
 
 const WORKER_PATH = path.join(__dirname, 'vm-worker.js');
 
@@ -74,12 +75,21 @@ class ProcessExecutor {
             limits:      config.limits || null
         };
         this._gasCeiling = this._config.gasCeiling;
-        // Watchdog: belt over the isolate's own maxCpuTimeMs in case the child
-        // hangs (stuck isolate, native deadlock). Generous buffer above the
+        // Watchdog: belt over the isolate's own wall-clock budget in case the
+        // child hangs (stuck isolate, native deadlock). Generous buffer above the
         // in-isolate timeout so the isolate's deterministic timeout wins normally.
         // Started at DISPATCH (see _flush), so it bounds one contract's
         // execution only, never queue wait, which varies per host.
-        const cpu = (config.limits && config.limits.maxCpuTimeMs) || 30000;
+        //
+        // The floor is CONSENSUS_MAX_WALL_MS, not the node's maxCpuTimeMs: a gated
+        // execution runs against the consensus budget whatever the knob says, so a
+        // node configured tighter than the budget would arm its watchdog BELOW the
+        // in-isolate timeout, kill the worker mid-execution and return
+        // 'out_of_resource: execution host terminated' where every other validator
+        // returned the contract's real result. That is the same operator-configurable
+        // fork the consensus bound exists to close, reintroduced one layer up.
+        const cpu = Math.max((config.limits && config.limits.maxCpuTimeMs) || 30000,
+            CONSENSUS_MAX_WALL_MS);
         this._watchdogMs = cpu + 5000;
 
         this._child = null;
