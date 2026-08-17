@@ -10,16 +10,12 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// XC-1491: wall time per execution is a CONSENSUS quantity.
-//
-// Gas does not bound wall time (native shapes exist whose wall-time-per-gas is
-// far above the schedule's assumption), so for those shapes the wall-clock net
-// is what terminates the execution. While that net was the per-NODE
-// limits.maxCpuTimeMs, two validators configured differently returned different
-// statuses AND different gasUsed for the same execution: a fork produced by a
-// config file. These tests pin the replacement: at/after the flag-day every node
-// resolves the same protocol budget, the knob binds ungated executions only, and
-// the subprocess watchdog can never fire before that budget.
+// Wall time per execution is a CONSENSUS quantity: gas alone does not bound
+// it, since native shapes exist whose wall-time-per-gas exceeds the
+// schedule's assumption, and for those the wall-clock net terminates the
+// execution. At/after the flag-day every node enforces the same protocol
+// budget rather than a per-node config value; the knob binds ungated
+// executions only, and the watchdog can never fire before that budget.
 
 'use strict';
 

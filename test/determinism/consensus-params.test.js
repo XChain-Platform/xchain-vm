@@ -294,7 +294,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1786060800);
     });
 
-    it('CONSENSUS_MAX_WALL_MS is the frozen per-execution wall-clock budget (XC-1491)', function () {
+    it('CONSENSUS_MAX_WALL_MS is the frozen per-execution wall-clock budget', function () {
         // Gas does not bound wall time: shapes exist whose wall-time-per-gas is far
         // above the schedule's assumption, and for those the wall-clock net is what
         // terminates the execution. While that net was the per-NODE
