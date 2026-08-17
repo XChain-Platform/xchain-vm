@@ -157,7 +157,17 @@ class MockLedger {
     }
 
     // Normalize an emitted amount to a tick's decimals the way the real indexer does
-    // at ledger write time (util.bcadd(amount,0,decimals) -> mathjs.format half-even).
+    // at ledger write time (util.bcadd(amount,0,decimals) -> mathjs.format).
+    //
+    // That rounding is HALF-UP (away from zero), not half-even. Measured, not
+    // assumed: at 8 decimals '0.000000015' -> '0.00000002' and '0.000000025' ->
+    // '0.00000003' (half-even would give '0.00000002' for the second), and at 0
+    // decimals '2.5' -> '3', '3.5' -> '4', '-2.5' -> '-3'. The distinction is
+    // consensus-relevant, so it is stated here rather than inferred: contracts
+    // that quantise before emitting (floorToDecimals in amm / crowdsale /
+    // treasury / stableVault / priceBet) do so precisely because this re-round
+    // can push a half-unit-off amount UP past a supply cap or past custody.
+    //
     // Returns the amount unchanged when the tick's decimals are unregistered.
     normalizeToTick(tick, amount) {
         const d = this.tokenDecimals[tick];
