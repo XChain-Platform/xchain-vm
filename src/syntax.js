@@ -47,6 +47,14 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        GATED identically to enforceBannedAsync: the indexer passes the
  *        resolved VM_LINT_HARDENING activation (deploy.js) so a from-genesis
  *        replay reproduces historical verdicts. Defaults to true.
+ * @param {boolean} [opts.enforceLintGlobalAlias=true] - whether the
+ *        LINT_GLOBAL_ALIAS refinement applies: sloppy-mode `this` and the
+ *        `globalThis.globalThis...` self-reference chain count as the global
+ *        object for the banned-async and banned-wasm rules. CONSENSUS-GATED on
+ *        its OWN per-coin block-HEIGHT epoch rather than VM_LINT_HARDENING's,
+ *        because that gate is already open on every network and riding it would
+ *        retroactively reject contracts the chain already accepted. The indexer
+ *        passes the resolved activation (deploy.js). Defaults to true.
  * @param {boolean} [opts.enforceBannedGenerator=true] - whether the
  *        'banned-generator' rule (function*, generator methods, yield) is
  *        deploy-blocking. CONSENSUS-GATED identically to enforceBannedAsync, but
@@ -65,6 +73,7 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
 function validateSyntax(code, opts) {
     const enforceBannedAsync     = !opts || opts.enforceBannedAsync !== false;
     const enforceLintHardening   = !opts || opts.enforceLintHardening !== false;
+    const enforceLintGlobalAlias = !opts || opts.enforceLintGlobalAlias !== false;
     const enforceBannedGenerator = !opts || opts.enforceBannedGenerator !== false;
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
 
@@ -84,7 +93,10 @@ function validateSyntax(code, opts) {
     // the on-chain verdict. When a flag-day rule is not yet active, drop it from
     // the blocking set (pre-activation parity): banned-async on the block-time
     // async gate, banned-generator/banned-wasm on the Pkg 3 per-coin height gate.
-    const blocking = lintSource(code, { hardened: enforceLintHardening }).errors.filter((e) => {
+    const blocking = lintSource(code, {
+        hardened: enforceLintHardening,
+        globalAlias: enforceLintGlobalAlias
+    }).errors.filter((e) => {
         if (e.rule === 'banned-async' && !enforceBannedAsync) return false;
         if (e.rule === 'banned-generator' && !enforceBannedGenerator) return false;
         if (e.rule === 'banned-wasm' && !enforceBannedWasm) return false;

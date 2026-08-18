@@ -28,7 +28,8 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **Contract state management**: key-value state with dirty tracking, key count limits, and value size limits
 - **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly checks (see `CONSENSUS_RULES` in `src/lint-core.js`), float usage warnings
 - **Per-block compilation cache**: V8 cached compilation data eliminates redundant parsing for hot contracts
-- **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap, wall-clock timeout
+- **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap
+- **Consensus wall-clock bound**: one execution's wall-clock budget is a protocol constant (`CONSENSUS_MAX_WALL_MS`), not a per-node setting; see below
 - **Multi-method contracts**: contracts export a function (single entry) or an object with named methods
 
 ## Documentation
@@ -130,6 +131,34 @@ const result = await vm.execute({
 //     logs: []
 // }
 ```
+
+### Consensus wall-clock bound (`maxCpuTimeMs` does not bind a chain execution)
+
+Gas is the deterministic meter, but gas does not bound wall time: native shapes
+exist whose wall-time-per-gas is far above what the schedule assumes, and for
+those the wall-clock net is what ends the execution. That net used to be the
+per-node `limits.maxCpuTimeMs`, so two validators configured differently
+returned different statuses **and** different `gasUsed` for the same execution
+(both consensus-visible: `gasUsed` drives the fee debit and the per-block
+contract checkpoint). A config file could fork the fleet.
+
+At/after the coordinated flag-day an execution therefore runs against
+`CONSENSUS_MAX_WALL_MS` (30000 ms, `src/consensus-wall-clock.js`) on every node,
+whatever `limits.maxCpuTimeMs` says. Exceeding it is unchanged and
+deterministic: status `timeout: wall-clock safety net triggered`, `gasUsed`
+clamped to the execution's gas ceiling, no state changes, no emissions.
+
+```js
+const { CONSENSUS_MAX_WALL_MS, isConsensusWallClockActive } = require('xchain-vm');
+isConsensusWallClockActive('regtest', 0);          // true  (pre-launch nets: genesis)
+isConsensusWallClockActive('mainnet', blockTime);  // true at/after the flag-day
+```
+
+`limits.maxCpuTimeMs` keeps its meaning only for **ungated** work: blocks below
+the flag-day (so historical blocks replay byte-identically) and non-consensus
+callers such as benches, fuzzing and the toolkit simulator. Tightening the
+constant is a consensus tightening: it needs its own future flag-day,
+re-goldened determinism baselines, and an atomic fleet deploy.
 
 ## Developer Toolkit (`xchain-foundry`)
 
@@ -327,7 +356,7 @@ Contract Source Code
     |-- sandbox.js (strip non-deterministic globals)
     |-- gateway.js (inject xchain object via ivm.Reference callbacks)
     |-- gas.js (__gas -> chargeComputation on host side)
-    +-- script.runSync() (execute with wall-clock timeout)
+    +-- script.runSync() (execute with the CONSENSUS wall-clock budget)
     |
   Collect results
     |-- state.js -> stateChanges, stateDeletes

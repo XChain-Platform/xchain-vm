@@ -30,6 +30,7 @@
 
 const assert = require('assert');
 const { createVM, execute } = require('../../fuzz/harness');
+const { PINNED, checkConsensusRuntime } = require('../../../src/consensus-runtime.js');
 
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
@@ -46,7 +47,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
 
     // Normal (non-overflow) throws: prepareStackTrace + stackTraceLimit=0 apply,
     // so e.stack is the empty string. (The stack-OVERFLOW path is a separate,
-    // deeper exposure (see the it.skip residuals below) because V8 cannot run
+    // deeper exposure (see the residual case at the end) because V8 cannot run
     // the JS prepareStackTrace hook when the stack is exhausted.)
     const VECTORS = [
         { id: 'TypeError (call undefined)', code: wrap(`try { var f; f(); } catch (e) { return String(e.stack); }`) },
@@ -104,15 +105,40 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
             `out_of_stack fault leaks host paths: ${r.error}`);
     });
 
-    // DOCUMENTED RESIDUAL: not in-VM fixable, mitigated operationally.
+    // DOCUMENTED RESIDUAL: not in-VM fixable, mitigated by a consensus parameter.
     // Native throws set e.message as a V8 own property; it cannot be intercepted
     // by overriding the Error constructor. e.message / e.toString() text is
     // therefore still contract-observable and has changed across V8 versions
     // (e.g. "Cannot read property 'x' of undefined" -> "Cannot read properties
     // of undefined (reading 'x')" at V8 8.4; JSON SyntaxError gained a
-    // "(line N column M)" suffix in recent V8). Mitigation is a consensus
-    // parameter: pin the exact V8/ICU build fleet-wide and enforce it with the
-    // cross-version determinism manifest gate. Contracts must not branch on or
-    // persist raw error text (SDK/docs guidance). Tracked, intentionally pending.
-    it.skip('RESIDUAL: e.message text is V8-version-dependent; mitigate by pinning exact V8 (consensus param), not in-VM', function () {});
+    // "(line N column M)" suffix in recent V8). The mitigation this used to wait
+    // on has SHIPPED: src/consensus-runtime.js pins the exact V8/ICU build the
+    // fleet runs and test/determinism/consensus-runtime-gate.test.js fails any
+    // validator that is not on it, both in `npm run ci`. So the residual is
+    // testable after all, as the pair it actually is: the exposure is still
+    // open (nobody may delete the pin believing this got fixed in-VM) and the
+    // pin that makes the exposed bytes fleet-deterministic is exact and has
+    // teeth. Whether THIS engine matches the pin is the gate file's assertion,
+    // deliberately not repeated here. Contracts must still not branch on or
+    // persist raw error text (SDK/docs guidance).
+    it('RESIDUAL: e.message stays contract-observable, and the exact-V8 consensus pin is what makes it deterministic', async function () {
+        const r = await ret(wrap(`try { return null.x; } catch (e) { return e.message; }`));
+        assert.strictEqual(r.success, true, `expected success, got error=${r.error}`);
+        const message = JSON.parse(r.returnValue);
+        // Unlike e.stack above, this is NOT neutered: the contract reads native
+        // V8 wording and can return or store it, so it lands in hashed state.
+        assert.notStrictEqual(message, '',
+            'e.message is expected to remain contract-observable; if it is now empty the ' +
+            'exposure closed in-VM and the consensus pin can be reconsidered');
+        assert(/undefined|null/.test(message),
+            `expected native V8 error wording, got ${JSON.stringify(message)}`);
+
+        // The mitigation: an EXACT build string (a range would let two validators
+        // run different wording and still pass).
+        assert.match(PINNED.v8, /^\d+\.\d+\.\d+\.\d+-node\.\d+$/,
+            `the V8 consensus pin must be an exact build, got ${JSON.stringify(PINNED.v8)}`);
+        const otherEngine = { ...process.versions, v8: '11.0.000.0-node.0' };
+        assert.strictEqual(checkConsensusRuntime(otherEngine).ok, false,
+            'a validator on a different V8 must be rejected, else the error text above forks the chain');
+    });
 });

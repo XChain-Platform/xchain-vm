@@ -42,6 +42,9 @@ const { meterCode }     = require('./metering.js');
 const { validateSyntax, checkFloatWarnings } = require('./syntax.js');
 const { ContractRevertError, GasExhaustedError } = require('./errors.js');
 const { resolveAccessors } = require('./readonly-accessors.js');
+// Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
+// per-node limits.maxCpuTimeMs binds ungated executions only.
+const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
 
 /**
  * Harness script that runs inside the isolate to assemble the xchain
@@ -1535,6 +1538,38 @@ function isSlashAmountPrecisionActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
 }
 
+// Activation for the CONSENSUS wall-clock budget per execution
+// (CONSENSUS_MAX_WALL_MS, ./consensus-wall-clock.js). Below this gate the
+// wall-clock net is the per-NODE limits.maxCpuTimeMs, which is not a consensus
+// value: two validators configured differently return DIFFERENT statuses and
+// DIFFERENT gasUsed for the same execution (timeout + gasUsed clamped to the
+// ceiling on the tighter node, a committed success with its real gasUsed on the
+// looser one), so an operator's config file could fork the fleet on any shape
+// whose wall time outruns its gas. At/after the gate every node runs the same
+// budget and the knob no longer binds a consensus execution. Gated like its
+// siblings: testnet/regtest from genesis, mainnet (and unknown networks,
+// conservative) at the shared coordinated flag-day, riding the existing
+// BINARY_ALLOC flag-day rather than minting an eighth constant, so the frozen
+// six-gate consensus pin and its cross-repo CONTROLLER_GUARD check are
+// untouched. Pinning the bound AT the fleet's documented default (30000) is
+// what makes riding an already-ratified flag-day safe: no execution on a
+// default-configured node changes outcome, so there is no history to preserve
+// below the gate. TIGHTENING the value later is a different change and needs
+// its own future flag-day (see consensus-wall-clock.js).
+//
+// NOTE for a future reader: three comments inside HARNESS_SOURCE (the F3-globals,
+// Set/Map and TypedArray metering notes) still describe maxCpuTimeMs as "the
+// binding constraint" and "not a consensus value". They are deliberately left
+// byte-identical: HARNESS_SOURCE is concatenated ahead of the contract before
+// compilation, so editing a comment in it shifts every in-isolate line number and
+// with it the positions V8 reports in error text a contract can read. Their
+// cheap-gas/expensive-CPU point still stands; only the "per-node" half of it is
+// superseded here.
+function isConsensusWallClockActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
+}
+
 // ----- Package 3 VM-sandbox flag-day: per-coin block-HEIGHT bundle gate -----
 // ONE coordinated activation for the whole flag-day Package 3 VM-sandbox bundle, so
 // every leg flips fleet-wide together under a single CONSENSUS_VERSION bump (2 -> 3)
@@ -1582,13 +1617,24 @@ function pkg3CoinFromAddress(contractAddress) {
 }
 
 // Whether the Package 3 VM-sandbox bundle is active for (network, coin) at
-// blockHeight. testnet/regtest: genesis. mainnet/unknown: per-coin height threshold;
-// unresolvable coin or non-finite height -> inactive (legacy, byte-identical below).
+// blockHeight. testnet/regtest: genesis. mainnet: per-coin height threshold;
+// an unrecognized NETWORK, an unresolvable coin, or a non-finite height -> inactive
+// (legacy, byte-identical below).
+//
+// Resolve on the network actually passed, not a hardcoded ':mainnet'. The indexer's
+// deploy-half twin (xchain-indexer/src/vm_deploy_lint_pkg3_activation.js) keys on
+// '<COIN>:<network>' and resolves an unrecognized network to OFF, and the two halves
+// are documented as one gate that must never open a window where a wasm-referencing
+// contract deploys clean but has WebAssembly stripped from under it at execution.
+// Keying on ':mainnet' here put the runtime half ON and the deploy half OFF for any
+// network string outside {mainnet,testnet,regtest}. Mainnet resolves the same key as
+// before, so mainnet/testnet/regtest history replays byte-identically; only the
+// unrecognized-network case moves, and the indexer rejects those at boot.
 function isPkg3SandboxActive(network, coin, blockHeight) {
     if (network === 'testnet' || network === 'regtest') return true;
     const b = Number(blockHeight);
     if (!Number.isFinite(b)) return false;
-    const threshold = (coin != null) ? PKG3_SANDBOX_ACTIVATION[coin + ':mainnet'] : undefined;
+    const threshold = (coin != null) ? PKG3_SANDBOX_ACTIVATION[coin + ':' + network] : undefined;
     return (threshold !== undefined) && b >= threshold;
 }
 
@@ -1632,6 +1678,55 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
     'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
 });
 
+// ----- Deploy/execute lint global-alias refinement: per-coin block-HEIGHT gate -----
+// The banned-async and banned-wasm deploy rules are identifier-precise: they flag the bare
+// `Promise` / `WebAssembly` identifier and the single-hop `globalThis.X` spelling. Two other
+// spellings read the SAME global binding and walked straight past both rules:
+//   - sloppy-mode `this`. Contract code is evaluated by the saved Function constructor in
+//     global scope as sloppy-mode script, so top-level `this` IS globalThis and a plain
+//     `f()` call hands a sloppy function body the same receiver; `this.WebAssembly` was
+//     never matched.
+//   - the global object's own `globalThis` self-reference, at any depth:
+//     `globalThis.globalThis.Promise`, `globalThis['globalThis'].WebAssembly`,
+//     `this.globalThis.Promise`. The old check compared node.object.name directly, so one
+//     extra hop defeated it.
+// Closing both moves DEPLOY verdicts on error-severity CONSENSUS_RULES, so it must be
+// height-gated: below the activation the rules resolve exactly as they historically did
+// and a from-genesis replay reproduces the accepted verdict byte for byte.
+//
+// It CANNOT ride VM_LINT_HARDENING. That block-time gate (1786060800) is already open on
+// every network, so reusing it would apply the tightened rules retroactively to contracts
+// the chain has already accepted, rewriting settled history on any replay. It cannot ride
+// PKG3_SANDBOX_ACTIVATION either: those heights are in the past. It needs a NEW epoch, so
+// it gets one, shaped exactly like EXEC_LINT_ACTIVATION above (per-coin block HEIGHT, coin
+// derived from the C:<COIN>:<idx> contract address, testnet/regtest genesis-active because
+// both are pre-launch, unknown network/coin or non-finite height -> pre-activation).
+//
+// !! MAINNET IS DELIBERATELY UNARMED. `null` is the explicit unarmed sentinel: it resolves
+// to inactive at every mainnet height, so mainnet behaviour is byte-identical to today
+// until the operator ratifies concrete per-coin train heights here AND in the xchain-indexer
+// twin (xchain-indexer/src/vm_lint_global_alias_activation.js), which the consensus-params
+// suites in both repos pin to equality. Arming one side alone forks.
+const LINT_GLOBAL_ALIAS_ACTIVATION = Object.freeze({
+    'BTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'LTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+});
+
+// Whether the lint global-alias refinement is active for (network, coin) at blockHeight.
+// testnet/regtest: genesis. mainnet: per-coin height threshold; an unrecognized network, an
+// unresolvable coin, a non-finite height, or an UNARMED (null) per-coin entry all resolve to
+// inactive (legacy, byte-identical below).
+function isLintGlobalAliasActive(network, coin, blockHeight) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    const b = Number(blockHeight);
+    if (!Number.isFinite(b)) return false;
+    const threshold = (coin != null) ? LINT_GLOBAL_ALIAS_ACTIVATION[coin + ':' + network] : undefined;
+    // Number.isFinite rejects both the absent key (undefined) and the unarmed sentinel (null).
+    if (!Number.isFinite(threshold)) return false;
+    return b >= threshold;
+}
+
 // Gas granularity for the execute-time lint. validateSyntax spawns an ivm.Isolate for the
 // V8 syntax check and then parses the source with acorn, so its cost scales with the source
 // length; charging VM_COMPUTATION per 256 bytes (minimum one unit) keeps it on the same
@@ -1642,14 +1737,20 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
 const EXEC_LINT_GAS_BYTES_PER_UNIT = 256;
 
 // Whether execute-time source-lint enforcement is active for (network, coin) at
-// blockHeight. testnet/regtest: genesis. mainnet/unknown: per-coin height threshold;
-// an unresolvable coin, a non-finite height, or an UNARMED (null) per-coin entry all
-// resolve to inactive (legacy, byte-identical below).
+// blockHeight. testnet/regtest: genesis. mainnet: per-coin height threshold; an
+// unrecognized network, an unresolvable coin, a non-finite height, or an UNARMED
+// (null) per-coin entry all resolve to inactive (legacy, byte-identical below).
+//
+// Keyed on the network actually passed, matching the indexer twin
+// (xchain-indexer/src/vm_exec_lint_activation.js) and isPkg3SandboxActive above. Every
+// mainnet entry is still the unarmed null sentinel, so this resolution change is a
+// no-op on every network today; fixing it while the map is unarmed is the window in
+// which it costs nothing.
 function isExecLintActive(network, coin, blockHeight) {
     if (network === 'testnet' || network === 'regtest') return true;
     const b = Number(blockHeight);
     if (!Number.isFinite(b)) return false;
-    const threshold = (coin != null) ? EXEC_LINT_ACTIVATION[coin + ':mainnet'] : undefined;
+    const threshold = (coin != null) ? EXEC_LINT_ACTIVATION[coin + ':' + network] : undefined;
     // Number.isFinite rejects both the absent key (undefined) and the unarmed sentinel (null).
     if (!Number.isFinite(threshold)) return false;
     return b >= threshold;
@@ -1845,9 +1946,10 @@ class XChainVM {
      * resolved ban flags, from the verdict cache when possible.
      *
      * validateSyntax() is a pure function of (code, enforceBannedAsync,
-     * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm), all folded
-     * into the key, so a hit returns the verdict a fresh call would produce. The two
-     * Pkg 3 rules share ONE activation and are therefore threaded as one bit.
+     * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm,
+     * enforceLintGlobalAlias), all folded into the key, so a hit returns the verdict a
+     * fresh call would produce. The two Pkg 3 rules share ONE activation and are
+     * therefore threaded as one bit; the global-alias refinement rides its own.
      *
      * This exists because validateSyntax spawns an ivm.Isolate for its V8 syntax check
      * and then acorn-parses the source; paying that on every execute of a hot contract
@@ -1860,21 +1962,24 @@ class XChainVM {
      * @param {boolean} enforceBannedAsync
      * @param {boolean} enforceLintHardening
      * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
+     * @param {boolean} enforceLintGlobalAlias - LINT_GLOBAL_ALIAS refinement (own gate)
      * @param {string} [codeHash] - precomputed sha256(code) hex (see _getMeteredCode)
      * @returns {{valid: boolean, error?: string}}
      */
-    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, codeHash) {
+    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
-            (enforcePkg3Bans ? '1' : '0');
+            (enforcePkg3Bans ? '1' : '0') +
+            (enforceLintGlobalAlias ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
-            enforceBannedAsync:     enforceBannedAsync,
-            enforceLintHardening:   enforceLintHardening,
-            enforceBannedGenerator: enforcePkg3Bans,
-            enforceBannedWasm:      enforcePkg3Bans
+            enforceBannedAsync:      enforceBannedAsync,
+            enforceLintHardening:    enforceLintHardening,
+            enforceBannedGenerator:  enforcePkg3Bans,
+            enforceBannedWasm:       enforcePkg3Bans,
+            enforceLintGlobalAlias:  enforceLintGlobalAlias
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;
@@ -1890,6 +1995,27 @@ class XChainVM {
      */
     async shutdown() {
         if (this._executor) return this._executor.shutdown();
+    }
+
+    /**
+     * The wall-clock budget THIS execution runs against, in milliseconds.
+     *
+     * Consensus quantity at/after the flag-day: every validator resolves
+     * CONSENSUS_MAX_WALL_MS here regardless of its own limits.maxCpuTimeMs, so
+     * the wall-clock net that terminates a shape whose wall time outruns its gas
+     * fires at the same budget on every node (identical status, identical
+     * ceiling-clamped gasUsed). Below the gate the per-node knob is returned
+     * verbatim, so historical blocks replay exactly as they were indexed and
+     * non-consensus callers (benches, fuzzing, the toolkit simulator) keep their
+     * tight budgets. Used both by execute() (the isolate timeout) and by
+     * _classifyError() (the elapsed-time corroboration threshold), so the two
+     * can never disagree about what "timed out" means.
+     */
+    _wallClockBudgetMs(opts) {
+        const blockTime = opts && opts.blockContext && Number(opts.blockContext.timestamp);
+        return resolveWallClockBudgetMs(
+            isConsensusWallClockActive(opts && opts.network, blockTime),
+            this.limits.maxCpuTimeMs);
     }
 
     /**
@@ -1964,7 +2090,16 @@ class XChainVM {
         // delta undercount and skip the gasUsed=ceiling clamp. The isolate
         // handle lets the classifier check the real disposed flag. Filled in
         // below.
-        const hostSignals       = { runStartNs: null, getIsolate: () => isolate };
+        // wallBudgetMs is resolved ONCE per execution and carried on the signals
+        // so the isolate timeout and the classifier's elapsed-time corroboration
+        // are the same number: a budget resolved twice could differ if opts were
+        // mutated mid-execution, and the classifier would then accept (or reject)
+        // a timeout the isolate did not actually enforce.
+        const hostSignals       = {
+            runStartNs: null,
+            getIsolate: () => isolate,
+            wallBudgetMs: this._wallClockBudgetMs(opts)
+        };
 
         let isolate = null;
 
@@ -1985,13 +2120,14 @@ class XChainVM {
         // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
         // under the rule set of the deploy block and its verdict was final.
         //
-        // The three flags are resolved by the SAME predicates the rest of the VM already
+        // The four flags are resolved by the SAME predicates the rest of the VM already
         // uses, which are the execution-side twins of the flags the indexer threads into
         // deploy.js validateSyntax, so the execute-time verdict agrees with what a deploy
         // in this block would have produced:
         //   banned-async                    -> isAsyncSurfaceActive   (block time)
         //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
         //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
+        //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
         // The whole check rides its own per-coin height gate (isExecLintActive), which is
         // UNARMED on mainnet: below it nothing is charged and nothing is checked, so the
         // pre-activation path is byte-identical, gasUsed included.
@@ -2020,6 +2156,7 @@ class XChainVM {
                 isAsyncSurfaceActive(opts.network, __lintBlockTime),
                 isLintHardeningActive(opts.network, __lintBlockTime),
                 isPkg3SandboxActive(opts.network, __execLintCoin, __execLintHeight),
+                isLintGlobalAliasActive(opts.network, __execLintCoin, __execLintHeight),
                 __codeHash
             );
             if (!__lintVerdict.valid) {
@@ -2345,7 +2482,10 @@ class XChainVM {
             Error.prepareStackTrace = function() { return ''; };
             try {
                 hostSignals.runStartNs = process.hrtime.bigint();
-                const rawReturn = script.runSync(context, { timeout: this.limits.maxCpuTimeMs });
+                // CONSENSUS: the timeout is the per-execution wall-clock budget
+                // resolved above, NOT the node's limits.maxCpuTimeMs (which binds
+                // ungated executions only). See consensus-wall-clock.js.
+                const rawReturn = script.runSync(context, { timeout: hostSignals.wallBudgetMs });
                 // The contract wrapper JSON-serializes non-null return values
                 // with a \x02 prefix inside the isolate
                 if (rawReturn !== undefined && rawReturn !== null) {
@@ -2602,10 +2742,21 @@ class XChainVM {
             ? hostSignals.getIsolate() : null;
         const __isolateDisposed = !!(__isolate && __isolate.isDisposed);
         if (msg.includes('Script execution timed out') || msg.includes('disposed')) {
+            // Corroborate against the CONSENSUS wall-clock budget this execution
+            // actually ran under (carried on hostSignals), not the node's own
+            // maxCpuTimeMs: with the bound active the isolate stops at the
+            // protocol budget, so a node whose knob is looser than the budget
+            // would otherwise refuse to recognise its own timeout and would
+            // classify it as a generic error with an unclamped gasUsed - the very
+            // per-node divergence the bound exists to remove. Falls back to
+            // re-resolving from opts when a caller (a unit test, a direct
+            // _classifyError call) supplied signals without a budget.
+            const __wallBudgetMs = (hostSignals && hostSignals.wallBudgetMs != null)
+                ? hostSignals.wallBudgetMs : this._wallClockBudgetMs(opts);
             const legit = !__corroborate
                 || __isolateDisposed
                 || (hostSignals.runStartNs != null &&
-                    (process.hrtime.bigint() - hostSignals.runStartNs) >= BigInt(this.limits.maxCpuTimeMs) * 1000000n);
+                    (process.hrtime.bigint() - hostSignals.runStartNs) >= BigInt(__wallBudgetMs) * 1000000n);
             if (legit) {
                 // Wall-clock timeout (consensus risk). Log at ERROR level.
                 console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +
@@ -2776,6 +2927,13 @@ module.exports.pkg3CoinFromAddress = pkg3CoinFromAddress;
 module.exports.EXEC_LINT_ACTIVATION = EXEC_LINT_ACTIVATION;
 module.exports.isExecLintActive = isExecLintActive;
 module.exports.EXEC_LINT_GAS_BYTES_PER_UNIT = EXEC_LINT_GAS_BYTES_PER_UNIT;
+// Lint global-alias refinement (sloppy-mode `this` + the globalThis self-reference chain
+// counted as global reads by banned-async / banned-wasm): the per-coin activation-height
+// map and its resolver. Twinned with xchain-indexer/src/vm_lint_global_alias_activation.js
+// and pinned to equality by the consensus-params guards in both repos; arming one side
+// alone forks the deploy verdict.
+module.exports.LINT_GLOBAL_ALIAS_ACTIVATION = LINT_GLOBAL_ALIAS_ACTIVATION;
+module.exports.isLintGlobalAliasActive = isLintGlobalAliasActive;
 // Coordinated flag-day (block time) that activates the F3-binary allocation gas
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).
@@ -2810,6 +2968,13 @@ module.exports.STATE_KEY_TYPE_GATE_BLOCK_TIME = STATE_KEY_TYPE_GATE_BLOCK_TIME;
 // tests to mirror the network-aware activation.
 module.exports.VM_LINT_HARDENING_GATE_BLOCK_TIME = VM_LINT_HARDENING_GATE_BLOCK_TIME;
 module.exports.isLintHardeningActive = isLintHardeningActive;
+// CONSENSUS wall-clock budget per execution, and the resolver that says when it
+// binds. Exposed so the consensus-params freeze guard can pin the value (a node
+// running a different budget forks the fleet on the first execution that reaches
+// it) and so the indexer / a validator host can assert the VM it bundles enforces
+// the same bound it prices batch weights against.
+module.exports.CONSENSUS_MAX_WALL_MS = CONSENSUS_MAX_WALL_MS;
+module.exports.isConsensusWallClockActive = isConsensusWallClockActive;
 // Resolver for the contract.slash token wire-delimiter guard. No new
 // flag-day constant: it rides BINARY_ALLOC_GATE_BLOCK_TIME. Exported so tests and
 // the indexer can mirror the network-aware activation.

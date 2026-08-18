@@ -122,6 +122,52 @@ function staticComputedKey(node) {
     return null;
 }
 
+// The property name a MemberExpression reads, when it resolves statically: the
+// non-computed identifier (`o.k`), or a computed string / no-substitution template
+// (`o['k']`, o[`k`]). null when resolving it would need data-flow analysis (`o[x]`).
+function staticMemberKey(node) {
+    if (!node || node.type !== 'MemberExpression' || !node.property) return null;
+    if (node.computed) return staticComputedKey(node);
+    return node.property.type === 'Identifier' ? node.property.name : null;
+}
+
+// True if `node` statically denotes the GLOBAL OBJECT.
+//
+// Legacy spelling (always recognized): the bare identifier `globalThis`.
+//
+// Under the LINT_GLOBAL_ALIAS activation epoch (`aliased`) two further spellings
+// denote the same object and are recognized as well:
+//   - `this`. Contract code is evaluated by the saved Function constructor in
+//     global scope as SLOPPY-mode script, where top-level `this` IS globalThis,
+//     and a plain `f()` call gives a sloppy function body the same receiver. So
+//     `this.WebAssembly` / `this.Promise` is a global read that the
+//     identifier-precise rules never saw.
+//   - a self-referential alias chain of any depth: `globalThis.globalThis`,
+//     `globalThis['globalThis']`, `this.globalThis`,
+//     `globalThis.globalThis.globalThis`... The global object carries a
+//     `globalThis` self-reference, so every link denotes the global object again,
+//     and the single-hop `node.object.name === 'globalThis'` check walked past
+//     all of them.
+//
+// The `this` leg deliberately fails CLOSED, the same direction the shadowed-local
+// scope scan in findBannedAsync takes: a `this` bound by a METHOD call to a
+// contract's own object is NOT the global object, so
+// `{ Promise: 1, f() { return this.Promise; } }` is rejected too. Accepting that
+// false positive is the safe direction for an error-severity CONSENSUS_RULE
+// guarding an unmetered / nondeterministic surface, and it is exactly why this
+// tightening MUST ride its own activation epoch: it moves DEPLOY verdicts, so it
+// may only apply at or after a height the whole fleet agrees on. Below the
+// activation `aliased` is false and every spelling resolves as it historically did.
+function isGlobalObjectRef(node, aliased) {
+    if (!node) return false;
+    if (node.type === 'Identifier' && node.name === 'globalThis') return true;
+    if (!aliased) return false;
+    if (node.type === 'ThisExpression') return true;
+    if (node.type === 'MemberExpression')
+        return staticMemberKey(node) === 'globalThis' && isGlobalObjectRef(node.object, aliased);
+    return false;
+}
+
 /**
  * Scan contract code for references to banned transcendental Math members
  * (Math.sqrt / Math.pow / Math.log / Math.log2 / Math.log10), in dotted
@@ -380,12 +426,21 @@ function scopeDeclares(node, name) {
  *     linter-vs-runtime over-reject. The scope scan is a deterministic
  *     ancestor-scope approximation; a miss fails CLOSED (legacy reject).
  *
+ * Under the separate LINT_GLOBAL_ALIAS epoch (`aliased`) the global-object half of
+ * the rule stops being single-hop: `this.Promise` (sloppy-mode `this` IS globalThis
+ * in the Function-constructor evaluation the CONTRACT_WRAPPER uses) and any depth of
+ * the `globalThis.globalThis...` self-reference chain resolve to the global Promise
+ * and are flagged. See isGlobalObjectRef for why that leg fails closed and why it
+ * needs an epoch of its own rather than riding VM_LINT_HARDENING (already open).
+ *
  * @param {string} code - Contract source code
  * @param {boolean} [hardened=true] - VM_LINT_HARDENING consensus flag
+ * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
  * @returns {Array<{kind: string, line: (number|string)}>}
  */
-function findBannedAsync(code, hardened) {
+function findBannedAsync(code, hardened, aliased) {
     if (hardened === undefined) hardened = true;
+    if (aliased === undefined) aliased = true;
     const hits = [];
     let ast;
     try {
@@ -432,13 +487,10 @@ function findBannedAsync(code, hardened) {
                 hits.push({ kind: 'import', line: node.loc ? node.loc.start.line : '?' });
         },
         MemberExpression(node) {
-            // globalThis.Promise / globalThis['Promise'] / globalThis[`Promise`]
-            if (!node.object || node.object.type !== 'Identifier' || node.object.name !== 'globalThis')
-                return;
-            const key = node.computed
-                ? staticComputedKey(node)
-                : (node.property && node.property.type === 'Identifier' ? node.property.name : null);
-            if (key === 'Promise')
+            // globalThis.Promise / globalThis['Promise'] / globalThis[`Promise`], and
+            // (aliased) this.Promise / globalThis.globalThis...Promise.
+            if (!isGlobalObjectRef(node.object, aliased)) return;
+            if (staticMemberKey(node) === 'Promise')
                 hits.push({ kind: 'promise', line: node.loc ? node.loc.start.line : '?' });
         }
     });
@@ -506,10 +558,17 @@ function findBannedGenerator(code) {
  * findBannedAsync) is what lets this be an error-severity CONSENSUS_RULE rather
  * than a name-only advisory.
  *
+ * Under the LINT_GLOBAL_ALIAS epoch (`aliased`) the global-object spelling widens
+ * exactly as it does in findBannedAsync: `this.WebAssembly` and any depth of
+ * `globalThis.globalThis...WebAssembly` read the same global binding. See
+ * isGlobalObjectRef.
+ *
  * @param {string} code - Contract source code
+ * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
  * @returns {Array<{line: (number|string)}>}
  */
-function findBannedWasm(code) {
+function findBannedWasm(code, aliased) {
+    if (aliased === undefined) aliased = true;
     const hits = [];
     let ast;
     try {
@@ -539,13 +598,10 @@ function findBannedWasm(code) {
             hits.push({ line: node.loc ? node.loc.start.line : '?' });
         },
         MemberExpression(node) {
-            // globalThis.WebAssembly / globalThis['WebAssembly'] / globalThis[`WebAssembly`]
-            if (!node.object || node.object.type !== 'Identifier' || node.object.name !== 'globalThis')
-                return;
-            const key = node.computed
-                ? staticComputedKey(node)
-                : (node.property && node.property.type === 'Identifier' ? node.property.name : null);
-            if (key === 'WebAssembly')
+            // globalThis.WebAssembly / globalThis['WebAssembly'] / globalThis[`WebAssembly`],
+            // and (aliased) this.WebAssembly / globalThis.globalThis...WebAssembly.
+            if (!isGlobalObjectRef(node.object, aliased)) return;
+            if (staticMemberKey(node) === 'WebAssembly')
                 hits.push({ line: node.loc ? node.loc.start.line : '?' });
         }
     });
@@ -851,10 +907,20 @@ function analyzeContract(code) {
  *        protocol_changes.isEnabled('VM_LINT_HARDENING') per block so a
  *        from-genesis replay reproduces the historical verdicts. Defaults to
  *        true for author-facing callers (SDK linter, CLI, unit tests).
+ * @param {boolean} [opts.globalAlias=true] - apply the LINT_GLOBAL_ALIAS rule
+ *        refinement: sloppy-mode `this` and the `globalThis.globalThis...` self-
+ *        reference chain count as the global object for banned-async and
+ *        banned-wasm. Its OWN activation epoch, not VM_LINT_HARDENING's: that gate
+ *        is already open on every network, so riding it would retroactively reject
+ *        contracts already accepted. Resolved per-coin on block HEIGHT (xchain-vm
+ *        LINT_GLOBAL_ALIAS_ACTIVATION / xchain-indexer
+ *        vm_lint_global_alias_activation.js). Defaults to true for author-facing
+ *        callers (SDK linter, CLI, unit tests).
  * @returns {{ errors: Array<{rule,message,line,severity}>, warnings: Array<{rule,message,line,severity}> }}
  */
 function lintSource(code, opts) {
     const hardened = !opts || opts.hardened !== false;
+    const globalAlias = !opts || opts.globalAlias !== false;
     if (typeof code !== 'string') {
         return {
             errors: [{ rule: 'invalid-type', message: 'Contract source must be a string', line: null, severity: 'error' }],
@@ -974,7 +1040,7 @@ function lintSource(code, opts) {
     //    version-dependent microtask-drain timing, which is outside the
     //    consensus-runtime pin: two validators can diverge (success vs timeout,
     //    or differing post-await state). Rejected at deploy like BigInt/RegExp.
-    const asyncs = findBannedAsync(code, hardened);
+    const asyncs = findBannedAsync(code, hardened, globalAlias);
     for (const hit of asyncs) {
         const advice = hit.kind === 'promise'
             ? 'Promise schedules microtasks whose drain timing is isolated-vm version-dependent and unpinned'
@@ -1014,7 +1080,7 @@ function lintSource(code, opts) {
     //     (75190596). This is the deploy-lint half. Identifier-precise (member
     //     property / object key / shadowed local excluded), so error severity is
     //     sound, unlike the name-only banned-proto-method warnings. Pkg 3 bundle.
-    for (const hit of findBannedWasm(code)) {
+    for (const hit of findBannedWasm(code, globalAlias)) {
         errors.push({
             rule: 'banned-wasm',
             message: 'banned global: WebAssembly at line ' + hit.line +
