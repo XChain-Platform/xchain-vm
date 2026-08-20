@@ -77,6 +77,21 @@ export interface CrossCallResult {
     payload: string;
 }
 
+/**
+ * A fulfilled external-attestation response, as `attestation.getResponse`
+ * returns it. Fields mirror the snapshot the indexer builds for the VM
+ * (`getAttestationDataForVM`): only terminal `ok` responses are ever visible,
+ * `validatorCount` is the number of federation signatures inlined on the
+ * response row, and `blockIndex` is the block the response landed in.
+ */
+export interface AttestationResponse {
+    status: string;
+    payload: string;
+    providerId: string;
+    blockIndex: number;
+    validatorCount: number;
+}
+
 /** Options for `attestation.request`. */
 export interface AttestationRequestOptions {
     /** Number of independent responders: 1, 3, or 5 (default 1). */
@@ -191,7 +206,7 @@ export interface XChainAttestation {
         options?: AttestationRequestOptions
     ): string;
     /** Read a stored response by request_id, or null if unfulfilled. */
-    getResponse(requestId: string): string | null;
+    getResponse(requestId: string): AttestationResponse | null;
 }
 
 /** Contract-targeted staking, scoped to THIS contract. */
