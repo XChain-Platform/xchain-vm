@@ -40,7 +40,7 @@ const { normalizeRootDiscriminator } = require('./gateway-emit.js');
 const { stripGlobals }  = require('./sandbox.js');
 const { meterCode }     = require('./metering.js');
 const { validateSyntax, checkFloatWarnings } = require('./syntax.js');
-const { ContractRevertError, GasExhaustedError } = require('./errors.js');
+const { ContractRevertError, GasExhaustedError, HostFaultError } = require('./errors.js');
 const { resolveAccessors } = require('./readonly-accessors.js');
 // Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
@@ -1679,9 +1679,10 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
 });
 
 // ----- Deploy/execute lint global-alias refinement: per-coin block-HEIGHT gate -----
-// The banned-async and banned-wasm deploy rules are identifier-precise: they flag the bare
-// `Promise` / `WebAssembly` identifier and the single-hop `globalThis.X` spelling. Two other
-// spellings read the SAME global binding and walked straight past both rules:
+// The banned-async, banned-wasm and banned-math deploy rules are identifier-precise: they
+// flag the bare `Promise` / `WebAssembly` / `Math` identifier and the single-hop
+// `globalThis.X` spelling. Two other
+// spellings read the SAME global binding and walked straight past all three rules:
 //   - sloppy-mode `this`. Contract code is evaluated by the saved Function constructor in
 //     global scope as sloppy-mode script, so top-level `this` IS globalThis and a plain
 //     `f()` call hands a sloppy function body the same receiver; `this.WebAssembly` was
@@ -1689,7 +1690,10 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
 //   - the global object's own `globalThis` self-reference, at any depth:
 //     `globalThis.globalThis.Promise`, `globalThis['globalThis'].WebAssembly`,
 //     `this.globalThis.Promise`. The old check compared node.object.name directly, so one
-//     extra hop defeated it.
+//     extra hop defeated it. banned-math read the same global object through its own
+//     single-hop matcher (isMathObjectRef), so `this.Math.pow` and
+//     `globalThis.globalThis.Math.log` evaded it the same way; its object leg now resolves
+//     through isGlobalObjectRef under this same epoch.
 // Closing both moves DEPLOY verdicts on error-severity CONSENSUS_RULES, so it must be
 // height-gated: below the activation the rules resolve exactly as they historically did
 // and a from-genesis replay reproduces the accepted verdict byte for byte.
@@ -2169,8 +2173,24 @@ class XChainVM {
         }
 
         try {
-            // Create isolate and context
-            const env = this.isolateManager.createIsolate();
+            // Create isolate and context.
+            //
+            // A failure to SPAWN the isolate is a fault of THIS host (memory
+            // pressure, thread-creation failure, a native binding that loaded
+            // but cannot create isolates), not a deterministic property of the
+            // contract, so it must never reach _classifyError and become one of
+            // the frozen STATUS_ERROR_PREFIXES the indexer collapses into a
+            // committed consensus status: a healthy peer runs the contract
+            // normally, so committing here forks. Raising the same
+            // HostFaultError the subprocess executor raises for a spawn failure
+            // routes it to the indexer's EXECUTOR_UNAVAILABLE halt-and-retry
+            // path, which writes no verdict at all.
+            let env;
+            try {
+                env = this.isolateManager.createIsolate();
+            } catch (e) {
+                throw new HostFaultError('execution isolate unavailable: ' + e.message);
+            }
             isolate = env.isolate;
             const context = env.context;
 
@@ -2679,6 +2699,15 @@ class XChainVM {
      * tests in both repos.
      */
     _classifyError(error, gasTracker, emissionCollector, opts, execContext, hostSignals) {
+        // A host fault is not a contract outcome and has no classification here:
+        // laundering one into a frozen status prefix commits a validator-local
+        // verdict for an execution every healthy peer completes. Re-throw so the
+        // caller halts and retries (faultGuard.rethrowIfInfraFault). The test is
+        // `instanceof`, never a message or a `code` read off the error, because
+        // an error crossing the isolate boundary arrives as a plain host-side
+        // Error built from contract-controlled text and could otherwise be
+        // spoofed into a halt.
+        if (error instanceof HostFaultError) throw error;
         if (error instanceof ContractRevertError) {
             return this._errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
         }

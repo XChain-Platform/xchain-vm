@@ -68,7 +68,18 @@ function lintFile(file) {
     }
 
     // Authoritative deploy verdict (includes the V8 step-1 compile).
-    const verdict = validateSyntax(code);
+    // validateSyntax throws EXECUTOR_UNAVAILABLE when the V8 isolate cannot be
+    // SPAWNED on this machine. That is a host fault, never a property of the
+    // source, so report it as one instead of crashing the run or letting a
+    // machine problem read as a contract defect.
+    let verdict;
+    try {
+        verdict = validateSyntax(code);
+    } catch (e) {
+        if (e && e.code === 'EXECUTOR_UNAVAILABLE')
+            return { file, ok: false, hostFault: e.message, errors: [], warnings: [] };
+        throw e;
+    }
     // Full structured view: every acorn-coverable rule + Move-2 advisories.
     const lint = lintSource(code);
 
@@ -122,6 +133,11 @@ function main() {
             const rel = path.relative(process.cwd(), r.file) || r.file;
             if (r.readError) {
                 process.stderr.write('✗ ' + rel + ': cannot read (' + r.readError + ')\n');
+                continue;
+            }
+            if (r.hostFault) {
+                process.stderr.write('✗ ' + rel + ': cannot run the syntax check on this machine (' +
+                    r.hostFault + ')\n');
                 continue;
             }
             if (r.ok && r.warnings.length === 0) {

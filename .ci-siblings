@@ -22,5 +22,6 @@ xchain-documentation
 xchain-indexer
 # XCALL constant parity and lint-core parity.
 xchain-sdk
-# Lint parity over the shipped contract templates: escrow, vesting, crowdsale, amm.
+# Lint parity over every shipped <name>/<name>.js contract template (discovered,
+# not enumerated).
 xchain-contracts

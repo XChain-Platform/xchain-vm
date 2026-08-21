@@ -93,18 +93,22 @@ const STRIPPED_PROTO_METHOD_NAMES = [
 const REGEX_COERCING_METHODS = new Set(['match', 'matchAll', 'search']);
 
 // True if `node` is a static reference to the global Math object: the bare
-// identifier `Math`, or a globalThis-qualified form (`globalThis.Math` /
+// identifier `Math`, or a global-object-qualified form (`globalThis.Math` /
 // `globalThis['Math']` / `globalThis[\`Math\`]`, the last via a template
 // literal with no substitutions).
-function isMathObjectRef(node) {
+//
+// The qualifying object leg is resolved by isGlobalObjectRef, so under the
+// LINT_GLOBAL_ALIAS epoch (`aliased`) the widened spellings that rule already
+// recognizes for banned-async and banned-wasm count here too: `this.Math.pow`
+// and `globalThis.globalThis.Math.log` read the same global Math the rule
+// targets. With `aliased` false only the bare `globalThis` identifier qualifies,
+// which is byte-for-byte the pre-epoch behaviour, so a from-genesis replay below
+// the activation reproduces the historical verdict.
+function isMathObjectRef(node, aliased) {
     if (!node) return false;
     if (node.type === 'Identifier' && node.name === 'Math') return true;
-    if (node.type === 'MemberExpression' && node.object
-        && node.object.type === 'Identifier' && node.object.name === 'globalThis') {
-        const key = staticComputedKey(node);
-        return key === 'Math' || (!node.computed && node.property && node.property.type === 'Identifier'
-            && node.property.name === 'Math');
-    }
+    if (node.type === 'MemberExpression' && isGlobalObjectRef(node.object, aliased))
+        return staticMemberKey(node) === 'Math';
     return false;
 }
 
@@ -172,7 +176,9 @@ function isGlobalObjectRef(node, aliased) {
  * Scan contract code for references to banned transcendental Math members
  * (Math.sqrt / Math.pow / Math.log / Math.log2 / Math.log10), in dotted
  * (Math.pow), computed-string (Math['pow'] / Math[`pow`]), and
- * globalThis-qualified (globalThis.Math.pow, globalThis['Math'].pow) forms.
+ * globalThis-qualified (globalThis.Math.pow, globalThis['Math'].pow) forms, plus
+ * (under LINT_GLOBAL_ALIAS, `aliased`) the widened global-object spellings
+ * this.Math.pow and globalThis.globalThis.Math.pow.
  *
  * Under VM_LINT_HARDENING (`hardened`), the ban derives from the COMPLEMENT of
  * the sandbox's SAFE_MATH_MEMBERS whitelist: every statically-resolvable Math
@@ -181,10 +187,16 @@ function isGlobalObjectRef(node, aliased) {
  *
  * @param {string} code - Contract source code
  * @param {boolean} [hardened=true] - VM_LINT_HARDENING consensus flag
+ * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag: also count
+ *        sloppy-mode `this` and the `globalThis.globalThis...` self-reference
+ *        chain as the global object qualifying `Math`, exactly as banned-async
+ *        and banned-wasm already do. Defaults to true for author-facing callers
+ *        (SDK linter, CLI, unit tests), as the sibling scanners do.
  * @returns {Array<{name: string, line: (number|string), transcendental: boolean}>}
  */
-function findBannedMathCalls(code, hardened) {
+function findBannedMathCalls(code, hardened, aliased) {
     if (hardened === undefined) hardened = true;
+    if (aliased === undefined) aliased = true;
     const hits = [];
     let ast;
     try {
@@ -199,7 +211,7 @@ function findBannedMathCalls(code, hardened) {
     }
     walk.simple(ast, {
         MemberExpression(node) {
-            if (!isMathObjectRef(node.object)) return;
+            if (!isMathObjectRef(node.object, aliased)) return;
             let member = null;
             if (!node.computed && node.property && node.property.type === 'Identifier') {
                 member = node.property.name;                 // Math.pow
@@ -909,8 +921,8 @@ function analyzeContract(code) {
  *        true for author-facing callers (SDK linter, CLI, unit tests).
  * @param {boolean} [opts.globalAlias=true] - apply the LINT_GLOBAL_ALIAS rule
  *        refinement: sloppy-mode `this` and the `globalThis.globalThis...` self-
- *        reference chain count as the global object for banned-async and
- *        banned-wasm. Its OWN activation epoch, not VM_LINT_HARDENING's: that gate
+ *        reference chain count as the global object for banned-async,
+ *        banned-wasm and banned-math. Its OWN activation epoch, not VM_LINT_HARDENING's: that gate
  *        is already open on every network, so riding it would retroactively reject
  *        contracts already accepted. Resolved per-coin on block HEIGHT (xchain-vm
  *        LINT_GLOBAL_ALIAS_ACTIVATION / xchain-indexer
@@ -986,7 +998,7 @@ function lintSource(code, opts) {
 
     // 4. Banned Math.* check (transcendentals always; hardened: the full
     //    complement of the sandbox SAFE_MATH_MEMBERS whitelist).
-    const banned = findBannedMathCalls(code, hardened);
+    const banned = findBannedMathCalls(code, hardened, globalAlias);
     for (const hit of banned) {
         errors.push({
             rule: 'banned-math',

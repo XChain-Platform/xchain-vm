@@ -23,6 +23,7 @@
 // @ts-nocheck
 
 const ivm = require('isolated-vm');
+const { HostFaultError } = require('./errors.js');
 const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, CONSENSUS_RULES } = require('./lint-core.js');
 
 /**
@@ -50,7 +51,8 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  * @param {boolean} [opts.enforceLintGlobalAlias=true] - whether the
  *        LINT_GLOBAL_ALIAS refinement applies: sloppy-mode `this` and the
  *        `globalThis.globalThis...` self-reference chain count as the global
- *        object for the banned-async and banned-wasm rules. CONSENSUS-GATED on
+ *        object for the banned-async, banned-wasm and banned-math rules.
+ *        CONSENSUS-GATED on
  *        its OWN per-coin block-HEIGHT epoch rather than VM_LINT_HARDENING's,
  *        because that gate is already open on every network and riding it would
  *        retroactively reject contracts the chain already accepted. The indexer
@@ -69,6 +71,11 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        enforceBannedGenerator on the same per-coin height flag-day. Defaults to
  *        true.
  * @returns {{ valid: boolean, error?: string }}
+ * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
+ *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
+ *         the consensus path must halt and retry rather than record a verdict,
+ *         and author-facing callers must report a machine fault rather than a
+ *         source defect.
  */
 function validateSyntax(code, opts) {
     const enforceBannedAsync     = !opts || opts.enforceBannedAsync !== false;
@@ -77,13 +84,32 @@ function validateSyntax(code, opts) {
     const enforceBannedGenerator = !opts || opts.enforceBannedGenerator !== false;
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
 
-    // 1. V8 syntax check (the only step that requires isolated-vm)
+    // 1. V8 syntax check (the only step that requires isolated-vm).
+    //
+    // Spawn and compile are caught SEPARATELY, and the split is load-bearing.
+    // A compileScriptSync failure is a deterministic property of the source, so
+    // it is a contract verdict. A failure to SPAWN the isolate (host memory
+    // pressure, thread-creation failure, a native binding that loaded but
+    // cannot create isolates) is a property of THIS machine. Reporting the host
+    // fault as 'syntax error: ...' let deploy.js commit
+    // 'invalid: CODE_ENCODING' for a contract every healthy peer accepts: a
+    // validator-local, host-condition-induced ledger divergence, the same class
+    // the deploy.js EXECUTOR_UNAVAILABLE throw exists to close for a VM that
+    // failed to load at all. HostFaultError carries that code, which
+    // faultGuard.rethrowIfInfraFault treats as an infra halt, so the block
+    // rolls back and retries and NO verdict is written.
     let testIsolate;
     try {
-        testIsolate = new ivm.Isolate({ memoryLimit: 8 });
-        testIsolate.compileScriptSync(code);
-    } catch (e) {
-        return { valid: false, error: 'syntax error: ' + e.message };
+        try {
+            testIsolate = new ivm.Isolate({ memoryLimit: 8 });
+        } catch (e) {
+            throw new HostFaultError('syntax validation isolate unavailable: ' + e.message);
+        }
+        try {
+            testIsolate.compileScriptSync(code);
+        } catch (e) {
+            return { valid: false, error: 'syntax error: ' + e.message };
+        }
     } finally {
         try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
     }

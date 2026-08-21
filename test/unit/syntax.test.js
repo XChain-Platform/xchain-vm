@@ -333,4 +333,68 @@ try {
             assert.strictEqual(result.length, 0);
         });
     });
+
+    // An isolate that cannot be SPAWNED is a fault of this machine, not a
+    // property of the source. Reported as 'syntax error: ...' it became a
+    // committed 'invalid: CODE_ENCODING' on the consensus path (deploy.js)
+    // while healthy peers accepted the same contract, so the two failures must
+    // stay distinguishable at the boundary they cross.
+    describe('isolate-spawn host fault is not a syntax verdict', function() {
+        const { HostFaultError } = require('../../src/errors.js');
+        // The real isolated-vm export is frozen and carries Isolate off its
+        // prototype, so the spawn failure is staged through the module cache:
+        // swap the binding, re-require syntax.js against it, restore both.
+        function withSpawnFailure(fn) {
+            const ivmPath    = require.resolve('isolated-vm');
+            const syntaxPath = require.resolve('../../src/syntax.js');
+            const realIvm    = require.cache[ivmPath];
+            const realSyntax = require.cache[syntaxPath];
+            require.cache[ivmPath] = {
+                id: ivmPath, filename: ivmPath, loaded: true, exports: {
+                    Isolate: function() { throw new Error('Isolate spawn failed: cannot create thread'); }
+                }
+            };
+            delete require.cache[syntaxPath];
+            try {
+                return fn(require(syntaxPath));
+            } finally {
+                if (realIvm) require.cache[ivmPath] = realIvm; else delete require.cache[ivmPath];
+                if (realSyntax) require.cache[syntaxPath] = realSyntax; else delete require.cache[syntaxPath];
+            }
+        }
+
+        it('throws EXECUTOR_UNAVAILABLE instead of returning a verdict', function() {
+            withSpawnFailure((syntax) => {
+                assert.throws(
+                    () => syntax.validateSyntax('var x = 1;'),
+                    (e) => e instanceof HostFaultError && e.code === 'EXECUTOR_UNAVAILABLE' &&
+                           !/^syntax error/.test(e.message),
+                    'a spawn failure must surface as a host fault, never as a syntax verdict'
+                );
+            });
+        });
+
+        it('the CLI reports a spawn failure as a machine fault, not a contract defect', function() {
+            withSpawnFailure(() => {
+                const cliPath = require.resolve('../../bin/lint.js');
+                const realCli = require.cache[cliPath];
+                delete require.cache[cliPath];
+                try {
+                    const { lintFile } = require(cliPath);
+                    const r = lintFile(__filename);
+                    assert.strictEqual(r.ok, false);
+                    assert(r.hostFault && /isolate unavailable/.test(r.hostFault), JSON.stringify(r));
+                    assert.strictEqual(r.errors.length, 0, 'no rule may be blamed for a machine fault');
+                } finally {
+                    if (realCli) require.cache[cliPath] = realCli; else delete require.cache[cliPath];
+                }
+            });
+        });
+
+        it('still reports a real compile failure as a syntax error', function() {
+            const result = validateSyntax('function { invalid }');
+            assert.strictEqual(result.valid, false);
+            assert(/^syntax error/.test(result.error), result.error);
+        });
+    });
 });

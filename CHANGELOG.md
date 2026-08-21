@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-08-18
+
+Consensus-affecting changes in this release ship behind per-chain activation
+points; behavior below each activation height is unchanged.
+
+### Changed
+- Per-execution wall time is now a consensus quantity, so every validator enforces the same execution budget (activation-gated).
+
+### Fixed
+- The deploy linter catches global aliases of the banned-async and banned-wasm identifiers (activation-gated).
+- The mock ledger rounds half-up and now documents it.
+- An isolate host fault is reported separately from a syntax verdict, so an infrastructure failure no longer reads as a rejected contract.
+- `attestation.getResponse` returns an object rather than a string.
+- The attestation envelope bounds are pinned against the indexer's provider registry, so the two cannot drift one contract at a time.
+- Code-review round fixes across the executor and support code.
+
+### Security
+- Raised the brace-expansion and js-yaml dependency floors and the advisory guards that pin them.
+
 ## [0.9.0] - 2026-08-14
 
 First release of the XChain Platform release train. Every component in the train
