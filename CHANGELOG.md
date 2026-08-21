@@ -16,6 +16,9 @@ points; behavior below each activation height is unchanged.
 ### Fixed
 - The deploy linter catches global aliases of the banned-async and banned-wasm identifiers (activation-gated).
 - The mock ledger rounds half-up and now documents it.
+- An isolate host fault is reported separately from a syntax verdict, so an infrastructure failure no longer reads as a rejected contract.
+- `attestation.getResponse` returns an object rather than a string.
+- The attestation envelope bounds are pinned against the indexer's provider registry, so the two cannot drift one contract at a time.
 - Code-review round fixes across the executor and support code.
 
 ### Security
