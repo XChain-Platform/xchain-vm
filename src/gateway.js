@@ -171,11 +171,27 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     throw new Error('attestation.request: providerId must be a non-empty string (max 32 bytes)');
                 if (typeof requestPayload !== 'string')
                     throw new Error('attestation.request: requestPayload must be a string');
-                // Platform-wide hard cap. Sized to the largest registered
-                // provider's max_request_bytes (llm = 8192). Per-provider
-                // ceiling is enforced by the indexer; this cap is a safety
-                // net so a contract can't emit a huge payload before
-                // governance has registered a provider that allows it.
+                // Platform-wide hard cap, and a SAFETY NET only: it is sized to
+                // the LARGEST registered provider's max_request_bytes (llm =
+                // 8192), so it says nothing about the named provider's own
+                // envelope. It does not cover a smaller provider, and today that
+                // gap is live: http_get's max_request_bytes is 2048
+                // (xchain-indexer providerRegistry.js), so a 2049..8192-byte
+                // http_get payload passes every check here, is charged
+                // VM_ATTEST_REQUEST gas, lands on-chain, and is rejected
+                // host-side as 'invalid: REQUEST_PAYLOAD (exceeds provider max)'
+                // - terminal at creation, invisible to the pending pool, so the
+                // callback never fires. That is the same silent stranding the
+                // injected providerDeadlines ceiling below exists to prevent for
+                // deadlines. Closing it means injecting the per-provider
+                // envelope the same way, which tightens a consensus-visible VM
+                // outcome and so needs its own mirrored activation pair; it is
+                // deliberately NOT done here, and this comment states the gap
+                // rather than implying a coverage the cap does not have.
+                // The redundancy and deadline literals below have the same
+                // shape but no live gap: [1, 3, 5] equals both registered
+                // providers' allowed_redundancy, and llm's 20-block window is
+                // already enforced through the injected map.
                 if (Buffer.byteLength(requestPayload, 'utf8') > 8192)
                     throw new Error('attestation.request: requestPayload exceeds 8192 bytes');
                 if (typeof callbackMethod !== 'string' || callbackMethod.length === 0 || Buffer.byteLength(callbackMethod, 'utf8') > 64)

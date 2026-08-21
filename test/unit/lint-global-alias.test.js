@@ -11,11 +11,11 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * LINT_GLOBAL_ALIAS epoch: the banned-async / banned-wasm global-object
- * spellings the identifier-precise rules used to walk past.
+ * LINT_GLOBAL_ALIAS epoch: the banned-async / banned-wasm / banned-math
+ * global-object spellings the identifier-precise rules used to walk past.
  *
  * Two spellings read the same global binding as a bare `Promise` /
- * `WebAssembly`:
+ * `WebAssembly` / `Math`:
  *   - sloppy-mode `this` (contract code is evaluated by the saved Function
  *     constructor in global scope, where top-level `this` IS globalThis);
  *   - the global object's own `globalThis` self-reference at any depth
@@ -40,6 +40,7 @@ const {
     lintSource,
     findBannedAsync,
     findBannedWasm,
+    findBannedMathCalls,
     CONSENSUS_RULES
 } = require('../../src/lint-core.js');
 
@@ -80,7 +81,19 @@ const WASM_ALIASES = {
     'this-rooted globalThis chain':       'module.exports = function(){ return this.globalThis.WebAssembly; };'
 };
 
-describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm', function () {
+// banned-math reads the same global object through its own matcher, so both
+// widened spellings evaded it exactly as they evaded the two rules above, until
+// its object leg was routed through isGlobalObjectRef under this same epoch.
+const MATH_ALIASES = {
+    'sloppy-mode this at top level':      'module.exports = function(){ return this.Math.pow(2, 3); };',
+    'sloppy-mode this, computed key':     'module.exports = function(){ return this["Math"].sqrt(4); };',
+    'globalThis self-reference':          'module.exports = function(){ return globalThis.globalThis.Math.log(2); };',
+    'globalThis self-reference, string':  'module.exports = function(){ return globalThis["globalThis"].Math.pow(2, 3); };',
+    'globalThis chain, three deep':       'module.exports = function(){ return globalThis.globalThis.globalThis.Math.pow(2, 3); };',
+    'this-rooted globalThis chain':       'module.exports = function(){ return this.globalThis.Math.pow(2, 3); };'
+};
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('banned-async: alias spellings of the global Promise', function () {
         for (const [label, code] of Object.entries(PROMISE_ALIASES)) {
@@ -117,6 +130,44 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm'
         }
     });
 
+    describe('banned-math: alias spellings of the global Math', function () {
+        for (const [label, code] of Object.entries(MATH_ALIASES)) {
+            it('flags ' + label + ' when the epoch is active', function () {
+                const hits = findBannedMathCalls(code, true, true);
+                assert.strictEqual(hits.length, 1, 'expected exactly one hit for: ' + code);
+                const err = firstConsensusError(code);
+                assert.ok(err, 'lintSource must surface a consensus error for: ' + code);
+                assert.strictEqual(err.rule, 'banned-math');
+            });
+
+            it('accepts ' + label + ' below the activation (byte-identical replay)', function () {
+                assert.deepStrictEqual(findBannedMathCalls(code, true, false), []);
+                assert.strictEqual(firstConsensusError(code, { globalAlias: false }), null);
+            });
+        }
+
+        // The hardened SAFE_MATH-complement leg rides the same matcher, so it
+        // widens with it rather than staying on the pre-epoch spellings.
+        const complementAlias = 'module.exports = function(){ return this.Math.random(); };';
+        it('covers the hardened SAFE_MATH complement through an alias too', function () {
+            const hits = findBannedMathCalls(complementAlias, true, true);
+            assert.strictEqual(hits.length, 1, 'expected a hit for: ' + complementAlias);
+            assert.strictEqual(hits[0].name, 'random');
+            assert.strictEqual(hits[0].transcendental, false);
+        });
+        it('leaves the complement leg pre-epoch below the activation', function () {
+            assert.deepStrictEqual(findBannedMathCalls(complementAlias, true, false), []);
+        });
+
+        // A deterministic member the sandbox does expose stays legal in the
+        // aliased spelling: the epoch widens WHICH receivers count as global
+        // Math, never which members are banned.
+        it('does not flag a whitelisted member through an alias', function () {
+            assert.deepStrictEqual(
+                findBannedMathCalls('module.exports = function(){ return this.Math.floor(1.5); };', true, true), []);
+        });
+    });
+
     describe('pre-epoch spellings are unchanged in BOTH modes', function () {
         // These already blocked before the epoch, so the gate must not accidentally
         // make them conditional: that would UNDO a live consensus rule below the
@@ -126,7 +177,10 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm'
             'single-hop globalThis.Promise':  ['banned-async', 'module.exports = function(){ return globalThis.Promise; };'],
             'globalThis["Promise"]':          ['banned-async', 'module.exports = function(){ return globalThis["Promise"]; };'],
             'bare WebAssembly identifier':    ['banned-wasm',  'module.exports = function(){ return WebAssembly; };'],
-            'single-hop globalThis.WebAssembly': ['banned-wasm', 'module.exports = function(){ return globalThis.WebAssembly; };']
+            'single-hop globalThis.WebAssembly': ['banned-wasm', 'module.exports = function(){ return globalThis.WebAssembly; };'],
+            'bare Math.pow':                  ['banned-math',  'module.exports = function(){ return Math.pow(2, 3); };'],
+            'single-hop globalThis.Math.pow': ['banned-math',  'module.exports = function(){ return globalThis.Math.pow(2, 3); };'],
+            'globalThis["Math"].pow':         ['banned-math',  'module.exports = function(){ return globalThis["Math"].pow(2, 3); };']
         };
         for (const [label, [rule, code]] of Object.entries(alwaysBlocked)) {
             it('still blocks ' + label + ' with the epoch off', function () {
@@ -188,6 +242,14 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm'
             const code = 'module.exports = function(){ return globalThis.globalThis.Promise; };';
             assert.strictEqual(validateSyntax(code, { enforceLintGlobalAlias: false }).valid, true);
             assert.strictEqual(validateSyntax(code, { enforceLintGlobalAlias: true }).valid, false);
+        });
+
+        it('the Math alias is gated the same way', function () {
+            const code = 'module.exports = function(){ return this.Math.pow(2, 3); };';
+            assert.strictEqual(validateSyntax(code, { enforceLintGlobalAlias: false }).valid, true);
+            const on = validateSyntax(code, { enforceLintGlobalAlias: true });
+            assert.strictEqual(on.valid, false);
+            assert.ok(/Math\.pow/.test(on.error), 'unexpected error: ' + on.error);
         });
 
         it('turning the epoch off does not disable the pre-epoch spellings', function () {
