@@ -54,6 +54,11 @@ const GSTR = `var s=('5').repeat(${K});`;
 // these vectors must run AT/ABOVE the gate to exercise the ACTIVATED ruleset;
 // below it they are intentionally un-metered (historical replay behaviour).
 const POST_GATE_BLOCK = { height: 100, timestamp: 1786060800, hash: 'gate' };  // = BINARY_ALLOC_GATE_BLOCK_TIME (the armed 2.0.0 flag-day; pinned in consensus-params.test.js)
+// Destructuring-rest metering rides its OWN, LATER flag-day (REST_PATTERN_METER), so its
+// vectors need their own post-gate block: at POST_GATE_BLOCK they are still legitimately
+// un-metered and would read as a finding. Sourced from the constant, not re-typed, so a
+// repin cannot leave the sweep probing the wrong side of the gate.
+const REST_GATE_BLOCK = { height: 100, timestamp: require('../../src/index.js').REST_PATTERN_METER_GATE_BLOCK_TIME, hash: 'restgate' };
 
 const VECTORS = [
     // --- Array methods G1 should already cover (regression) ---
@@ -76,6 +81,12 @@ const VECTORS = [
     // --- Spread (syntax, like `+`, not a method) ---
     { id: 'spread [...array]',  mk: C => `${ARR}var t=0;for(var i=0;i<${C};i++)t+=[].concat(a).length;return t;` }, // baseline via concat (metered)
     { id: 'spread [...string]', mk: C => `${STR}var t=0;for(var i=0;i<${C};i++)t+=([...s]).length;return t;` },
+    // --- Destructuring REST (a PATTERN carrying a RestElement, not an expression
+    // carrying a SpreadElement). The sweep had spread-EXPRESSION vectors only, so it
+    // was structurally unable to see this class; these two are what make it visible.
+    // Flag-day-gated on REST_PATTERN_METER, so they run at/above THAT gate.
+    { id: 'rest var [...c]=arr',  gateBlock: REST_GATE_BLOCK, mk: C => `${ARR}var t=0;for(var i=0;i<${C};i++){var [...c]=a;t+=c.length;}return t;` },
+    { id: 'rest var {...c}=obj',  gateBlock: REST_GATE_BLOCK, mk: C => `${OBJ}var t=0;for(var i=0;i<${C};i++){var {...c}=o;t+=1;}return t;` },
     // --- O(n) GLOBAL functions, flag-day-gated (F3-globals). Run POST-gate. ---
     { id: 'encodeURIComponent', gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=encodeURIComponent(s).length;return t;` },
     { id: 'decodeURIComponent', gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=decodeURIComponent(s).length;return t;` },
@@ -102,7 +113,7 @@ async function main() {
     process.stdout.write(`${'-'.repeat(80)}\n`);
     const findings = [];
     for (const v of VECTORS) {
-        const bc = v.gated ? POST_GATE_BLOCK : undefined;
+        const bc = v.gateBlock || (v.gated ? POST_GATE_BLOCK : undefined);
         const lo = await run(wrap(v.mk(LOW)), bc);
         const hi = await run(wrap(v.mk(HIGH)), bc);
         let verdict, tpg = '';
