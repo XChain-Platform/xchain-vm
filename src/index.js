@@ -1502,6 +1502,35 @@ function isCallSpreadMeterActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= CALL_SPREAD_METER_GATE_BLOCK_TIME;
 }
 
+// Coordinated activation for size-metering destructuring REST patterns
+// (`var [x, ...c] = a`, `var {k, ...c} = o`, and their assignment-expression forms),
+// plus the deploy rejection of the rest positions metering cannot reach.
+//
+// This is the CALL_SPREAD_METER hole one AST dispatch away. transformAllocators
+// dispatched purely on EXPRESSION node types (ArrayExpression/ObjectExpression carrying
+// a SpreadElement), but a destructuring rest is an ArrayPattern/ObjectPattern carrying a
+// RestElement, so it matched nothing and performed an unbounded native O(n) copy for a
+// flat __gas(1). A loop of `var [...c] = bigArr` therefore copied millions of elements
+// almost free: native CPU decoupled from gas, and a run's success-vs-wall-clock-timeout
+// became CPU-speed dependent across the fleet. Post-gate the transform wraps the rest
+// SOURCE in the size-charged __arrspread / __objspreadmeter helper; pre-gate the
+// destructure is emitted verbatim so historical blocks replay byte-identically.
+//
+// !! IT DOES NOT RIDE THE CONTRACT-ERA FLAG DAY. 1786060800 (2026-08-07) is already in
+// the PAST, so reusing it would retroactively re-price every rest destructure that has
+// already executed and rewrite settled gasUsed on any replay -- the exact retroactivity
+// the LINT_GLOBAL_ALIAS epoch was minted to avoid. It gets its own FUTURE instant, armed
+// alongside the already-scheduled CROSS_CHAIN_ROYALTY flag day (2027-01-01 00:00:00 UTC)
+// so the fleet has one coordination event rather than two. It is therefore deliberately
+// NOT part of the six-gate CONTROLLER_GUARD cross-repo pin; its indexer twin is the
+// REST_PATTERN_METER entry in protocol_changes.js, which the consensus-params suites in
+// both repos pin to equality. A value that differs across the fleet is itself a fork.
+const REST_PATTERN_METER_GATE_BLOCK_TIME = 1798761600;
+function isRestPatternMeterActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= REST_PATTERN_METER_GATE_BLOCK_TIME;
+}
+
 // Activation for the contract.slash `token` wire-delimiter guard. Every
 // other emit validator rejects a '|' in a field the indexer may pipe-join;
 // contract.slash never had that check. It is inert against today's consumer (SLASH
@@ -1804,11 +1833,13 @@ class XChainVM {
         // is a cache MISS rather than a byte-length-collision hit (see execute()).
         this._blockCache = null;
 
-        // Metered-source cache: Map<sha256(code):evalOrderBit:callSpreadBit, meteredCode>.
+        // Metered-source cache:
+        //   Map<sha256(code):evalOrderBit+callSpreadBit+restPatternBit, meteredCode>.
         // meterCode() is a pure AST transform (acorn parse + walk + astring regen over
         // up to maxCodeSize bytes), the single most expensive step of a warm execute,
         // and its output depends ONLY on the contract source plus the two consensus
-        // gate flags (specEvalOrder, meterCallSpread), both baked into the key. So a
+        // gate flags (specEvalOrder, meterCallSpread, meterRestPattern), all baked into
+        // the key. So a
         // hit returns byte-identical metered source to a fresh call: no consensus
         // effect, only a parse-time speedup. Unlike _blockCache (V8 cachedData, which
         // is per-block and cleared by endBlock), this cache persists ACROSS blocks:
@@ -1911,7 +1942,7 @@ class XChainVM {
      * redundant per-execute parsing.
      *
      * The key hashes the source with sha256 so a 64KB body is compared in 32 bytes
-     * and appends the two gate bits (evalOrder, callSpread). The cache persists
+     * and appends the three gate bits (evalOrder, callSpread, restPattern). The cache persists
      * across blocks (unlike _blockCache, the V8 cachedData store cleared by
      * endBlock): a contract re-executing block after block re-meters at most once
      * per (source, gate-flags) pair. Bounded by maxMeteredCacheSize with FIFO
@@ -1922,18 +1953,24 @@ class XChainVM {
      * @param {string} code
      * @param {boolean} specEvalOrder
      * @param {boolean} meterCallSpread
+     * @param {boolean} meterRestPattern
      * @param {string} [codeHash] - precomputed sha256(code) hex. Optional: execute()
      *        computes the digest once and shares it with the lint-verdict cache
      *        so a 64KB body is hashed once per execution, not twice.
      *        Omitting it recomputes the identical digest, so the key is unchanged.
      * @returns {string} metered source
      */
-    _getMeteredCode(code, specEvalOrder, meterCallSpread, codeHash) {
+    _getMeteredCode(code, specEvalOrder, meterCallSpread, meterRestPattern, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
-            ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0');
+            ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0') +
+            (meterRestPattern ? '1' : '0');
         const hit = this._meteredCache.get(key);
         if (hit !== undefined) return hit;
-        const metered = meterCode(code, { specEvalOrder: specEvalOrder, meterCallSpread: meterCallSpread });
+        const metered = meterCode(code, {
+            specEvalOrder: specEvalOrder,
+            meterCallSpread: meterCallSpread,
+            meterRestPattern: meterRestPattern
+        });
         // FIFO-evict the oldest entry at capacity (Map preserves insertion order).
         // This cache never feeds consensus, so the eviction policy is a pure
         // memory/hit-rate tradeoff, not a determinism concern.
@@ -1967,15 +2004,17 @@ class XChainVM {
      * @param {boolean} enforceLintHardening
      * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
      * @param {boolean} enforceLintGlobalAlias - LINT_GLOBAL_ALIAS refinement (own gate)
+     * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
      * @param {string} [codeHash] - precomputed sha256(code) hex (see _getMeteredCode)
      * @returns {{valid: boolean, error?: string}}
      */
-    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, codeHash) {
+    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, enforceBannedRest, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
             (enforcePkg3Bans ? '1' : '0') +
-            (enforceLintGlobalAlias ? '1' : '0');
+            (enforceLintGlobalAlias ? '1' : '0') +
+            (enforceBannedRest ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -1983,7 +2022,8 @@ class XChainVM {
             enforceLintHardening:    enforceLintHardening,
             enforceBannedGenerator:  enforcePkg3Bans,
             enforceBannedWasm:       enforcePkg3Bans,
-            enforceLintGlobalAlias:  enforceLintGlobalAlias
+            enforceLintGlobalAlias:  enforceLintGlobalAlias,
+            enforceBannedRest:       enforceBannedRest
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;
@@ -2124,7 +2164,7 @@ class XChainVM {
         // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
         // under the rule set of the deploy block and its verdict was final.
         //
-        // The four flags are resolved by the SAME predicates the rest of the VM already
+        // The five flags are resolved by the SAME predicates the rest of the VM already
         // uses, which are the execution-side twins of the flags the indexer threads into
         // deploy.js validateSyntax, so the execute-time verdict agrees with what a deploy
         // in this block would have produced:
@@ -2132,6 +2172,7 @@ class XChainVM {
         //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
         //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
         //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
+        //   banned-rest (unmeterable rest)  -> isRestPatternMeterActive (block time)
         // The whole check rides its own per-coin height gate (isExecLintActive), which is
         // UNARMED on mainnet: below it nothing is charged and nothing is checked, so the
         // pre-activation path is byte-identical, gasUsed included.
@@ -2161,6 +2202,7 @@ class XChainVM {
                 isLintHardeningActive(opts.network, __lintBlockTime),
                 isPkg3SandboxActive(opts.network, __execLintCoin, __execLintHeight),
                 isLintGlobalAliasActive(opts.network, __execLintCoin, __execLintHeight),
+                isRestPatternMeterActive(opts.network, __lintBlockTime),
                 __codeHash
             );
             if (!__lintVerdict.valid) {
@@ -2418,9 +2460,15 @@ class XChainVM {
             // Same block-time route resolves the call/new argument-spread metering gate
             // (isCallSpreadMeterActive); below it the spread is emitted verbatim (legacy).
             const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime);
+            // ...and the destructuring-rest metering gate (isRestPatternMeterActive).
+            // Below it a rest destructure is emitted verbatim (legacy flat __gas(1)), so
+            // a pre-gate block replays byte-identically; at/after it the rest SOURCE is
+            // routed through __arrspread/__objspreadmeter and the O(n) copy is billed.
+            const __meterRestPattern = isRestPatternMeterActive(opts.network, __moBlockTime);
             let meteredCode;
             try {
-                meteredCode = this._getMeteredCode(__codeStr, __specEvalOrder, __meterCallSpread, __codeHash);
+                meteredCode = this._getMeteredCode(
+                    __codeStr, __specEvalOrder, __meterCallSpread, __meterRestPattern, __codeHash);
             } catch (e) {
                 return this._errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }
@@ -2985,6 +3033,11 @@ module.exports.METERING_EVAL_ORDER_GATE_BLOCK_TIME = METERING_EVAL_ORDER_GATE_BL
 // argument spread in the metering transform (legacy left the O(n) copy unmetered).
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_TIME;
+// Destructuring-rest metering + the deploy rejection of unmeterable rest positions.
+// Its own FUTURE flag-day (see the constant); consensus-visible, pinned in
+// test/determinism/consensus-params.test.js against the indexer's REST_PATTERN_METER.
+module.exports.REST_PATTERN_METER_GATE_BLOCK_TIME = REST_PATTERN_METER_GATE_BLOCK_TIME;
+module.exports.isRestPatternMeterActive = isRestPatternMeterActive;
 // Coordinated flag-day (block time) that activates canonical string state keys
 // (String(key) normalization for primitives, deterministic rejection of
 // non-primitive keys) so the key-size/NUL/keyCount guards apply to every key.

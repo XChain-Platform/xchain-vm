@@ -193,53 +193,59 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             const vm = newVm();
             const { validateSyntax } = require('../../src/syntax.js');
             for (const code of [CLEAN, GENERATOR, ASYNC]) {
-                const cached = vm._getLintVerdict(code, true, true, true, true);
+                const cached = vm._getLintVerdict(code, true, true, true, true, true);
                 const fresh  = validateSyntax(code, {
                     enforceBannedAsync: true, enforceLintHardening: true,
                     enforceBannedGenerator: true, enforceBannedWasm: true,
-                    enforceLintGlobalAlias: true
+                    enforceLintGlobalAlias: true, enforceBannedRest: true
                 });
                 assert.deepStrictEqual(cached, fresh, 'cached verdict drifted from a fresh one for: ' + code);
             }
         });
 
-        it('partitions on the four consensus flag bits, not just the source', function () {
+        it('partitions on the five consensus flag bits, not just the source', function () {
             const vm = newVm();
-            vm._getLintVerdict(GENERATOR, false, false, false, false);
-            vm._getLintVerdict(GENERATOR, true,  false, false, false);
-            vm._getLintVerdict(GENERATOR, false, true,  false, false);
-            vm._getLintVerdict(GENERATOR, false, false, true,  false);
-            vm._getLintVerdict(GENERATOR, false, false, false, true);
-            assert.strictEqual(vm._lintVerdictCache.size, 5);
+            vm._getLintVerdict(GENERATOR, false, false, false, false, false);
+            vm._getLintVerdict(GENERATOR, true,  false, false, false, false);
+            vm._getLintVerdict(GENERATOR, false, true,  false, false, false);
+            vm._getLintVerdict(GENERATOR, false, false, true,  false, false);
+            vm._getLintVerdict(GENERATOR, false, false, false, true,  false);
+            vm._getLintVerdict(GENERATOR, false, false, false, false, true);
+            assert.strictEqual(vm._lintVerdictCache.size, 6);
             // And the flags actually change the verdict: the Pkg 3 bit is what bans the
             // generator, so the same source is valid with the bit off and invalid with it on.
-            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, false, false).valid, true);
-            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, true, false).valid, false);
+            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, false, false, false).valid, true);
+            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, true, false, false).valid, false);
             // The global-alias bit is a partition of its own: the same source is accepted
             // with it off and rejected with it on, which is what the epoch gate protects.
             const ALIASED = 'module.exports = function(){ return this.WebAssembly; };';
-            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, false).valid, true);
-            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, true).valid, false);
+            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, false, false).valid, true);
+            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, true, false).valid, false);
+            // ...and so is the banned-rest bit (REST_PATTERN_METER): a rest PARAMETER is
+            // accepted below the flag-day and rejected at/above it.
+            const RESTPARAM = 'module.exports = function(){ function s(...n){ return n.length; } return s(1); };';
+            assert.strictEqual(vm._getLintVerdict(RESTPARAM, true, true, true, true, false).valid, true);
+            assert.strictEqual(vm._getLintVerdict(RESTPARAM, true, true, true, true, true).valid, false);
         });
 
         it('accepts the shared sha256 digest and keys identically to computing it itself', function () {
             const crypto = require('crypto');
             const vm = newVm();
             const hash = crypto.createHash('sha256').update(CLEAN).digest('hex');
-            vm._getLintVerdict(CLEAN, true, true, true, true, hash);
-            vm._getLintVerdict(CLEAN, true, true, true, true);
+            vm._getLintVerdict(CLEAN, true, true, true, true, true, hash);
+            vm._getLintVerdict(CLEAN, true, true, true, true, true);
             assert.strictEqual(vm._lintVerdictCache.size, 1,
                 'a shared digest and a self-computed one must produce the same cache key');
         });
 
         it('evicts FIFO at the bound instead of growing without limit', function () {
             const vm = newVm({ limits: { maxMeteredCacheSize: 2 } });
-            vm._getLintVerdict(CLEAN,     true, true, true, true);
-            vm._getLintVerdict(GENERATOR, true, true, true, true);
-            vm._getLintVerdict(ASYNC,     true, true, true, true);
+            vm._getLintVerdict(CLEAN,     true, true, true, true, true);
+            vm._getLintVerdict(GENERATOR, true, true, true, true, true);
+            vm._getLintVerdict(ASYNC,     true, true, true, true, true);
             assert.ok(vm._lintVerdictCache.size <= 2, 'cache must stay within its bound');
             // Correctness survives eviction: the evicted entry recomputes to the same verdict.
-            assert.strictEqual(vm._getLintVerdict(CLEAN, true, true, true, true).valid, true);
+            assert.strictEqual(vm._getLintVerdict(CLEAN, true, true, true, true, true).valid, true);
         });
     });
 

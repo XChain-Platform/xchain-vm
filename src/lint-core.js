@@ -620,6 +620,115 @@ function findBannedWasm(code, aliased) {
     return hits;
 }
 
+// Pattern-internal node types. Walking UP through these from a RestElement reaches the
+// construct that OWNS the destructure, which is what decides whether a source
+// expression exists to meter.
+const PATTERN_NODE_TYPES = new Set([
+    'ArrayPattern', 'ObjectPattern', 'Property', 'AssignmentPattern', 'RestElement'
+]);
+
+/**
+ * Scan contract code for destructuring REST positions the allocator meter cannot reach.
+ *
+ * transformAllocators meters a rest destructure by wrapping its SOURCE EXPRESSION in the
+ * size-charged helper that matches the copy (`__arrspread` for an array rest,
+ * `__objspreadmeter` for an object rest). That only works when a source expression
+ * exists and sits directly under the pattern carrying the rest:
+ *
+ *     var [x, ...c] = a;      // metered: `a` is the declarator init
+ *     ({k, ...c} = o);        // metered: `o` is the assignment rhs
+ *
+ * Four positions have no such expression, so the O(n) copy would stay free:
+ *
+ *   - REST PARAMETER (`function f(...args)`, `(...args) => ...`). The copy is performed
+ *     by the CALLER's argument list, which has no single source node. This is a live
+ *     vector, not a theoretical one: `f.apply(null, bigArr)` in a loop pays no
+ *     argument-spread charge (apply is an ordinary call, not a SpreadElement), and the
+ *     callee's rest parameter then copies O(n) elements for a flat __gas(1).
+ *   - NESTED REST (`var {a: {...c}} = o`, `var [[...c]] = a`). The rest copies an
+ *     INTERMEDIATE value produced by the outer destructure; there is no expression node
+ *     to wrap, and wrapping the outer source charges the wrong quantity.
+ *   - CATCH-CLAUSE REST (`catch ({...e})`). The source is the thrown value, bound by the
+ *     runtime rather than by an expression in the source text.
+ *   - FOR-OF / FOR-IN HEAD (`for (const [...c] of xs)`). The source is a per-iteration
+ *     value produced by the iterator, not an expression the transform can wrap without
+ *     changing iteration semantics.
+ *
+ * Rejecting them at deploy is what makes the metering rewrite CLOSE the class instead of
+ * relocating it. CONSENSUS-GATED on the same REST_PATTERN_METER flag-day the metering
+ * rides (threaded as enforceBannedRest through validateSyntax), so below the gate a
+ * contract using these forms deploys and replays exactly as it historically did.
+ *
+ * @param {string} code - Contract source code
+ * @returns {Array<{kind: string, line: (number|string)}>}
+ */
+function findBannedRest(code) {
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
+    } catch (e) {
+        return hits;
+    }
+    // NOT walk.ancestor. acorn-walk's ObjectPattern base descends straight into a rest
+    // property's ARGUMENT and never visits the RestElement node itself, and CatchClause
+    // inherits that gap through its param, so `var {a: {...c}} = o` and
+    // `catch ({...e})` are INVISIBLE to a RestElement visitor. (ArrayPattern elements
+    // route through the Pattern dispatch and are visited, which is what makes the gap
+    // look like it isn't there.) Walk the raw node keys instead - the same generic
+    // recursion transformAllocators uses, which cannot miss a node type by construction.
+    const stack = [];
+    function classify(node) {
+        // `stack` holds this node's ancestors, outermost first; node is not on it.
+        const parent = stack.length >= 1 ? stack[stack.length - 1] : null;
+        const gp     = stack.length >= 2 ? stack[stack.length - 2] : null;
+        // METERED: the rest sits at the TOP level of a pattern whose source is an
+        // addressable expression. Exactly the two shapes transformAllocators rewrites;
+        // keep the two predicates in lockstep or the ban and the meter disagree.
+        if (parent && (parent.type === 'ArrayPattern' || parent.type === 'ObjectPattern') && gp) {
+            if (gp.type === 'VariableDeclarator' && gp.id === parent && gp.init) return;
+            if (gp.type === 'AssignmentExpression' && gp.operator === '=' && gp.left === parent) return;
+        }
+        // Otherwise classify by the construct that OWNS the destructure.
+        let i = stack.length - 1;
+        while (i >= 0 && PATTERN_NODE_TYPES.has(stack[i].type)) i--;
+        const owner = i >= 0 ? stack[i] : null;
+        let kind = 'nested rest';
+        if (owner) {
+            if (owner.type === 'FunctionDeclaration' || owner.type === 'FunctionExpression'
+                || owner.type === 'ArrowFunctionExpression')
+                kind = 'rest parameter';
+            else if (owner.type === 'CatchClause') kind = 'catch-clause rest';
+            else if (owner.type === 'ForOfStatement' || owner.type === 'ForInStatement')
+                kind = 'for-loop-head rest';
+            // A declarator with NO init is a for-of/for-in head (`for (const [...c] of xs)`);
+            // the metered branch above already returned for every declarator that has one.
+            else if (owner.type === 'VariableDeclarator' && !owner.init)
+                kind = 'for-loop-head rest';
+        }
+        hits.push({ kind, line: node.loc ? node.loc.start.line : '?' });
+    }
+    function visit(node) {
+        if (!node || typeof node.type !== 'string') return;
+        if (node.type === 'RestElement') classify(node);
+        stack.push(node);
+        const keys = Object.keys(node);
+        for (let k = 0; k < keys.length; k++) {
+            const key = keys[k];
+            if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue;
+            const child = node[key];
+            if (Array.isArray(child)) {
+                for (let j = 0; j < child.length; j++) visit(child[j]);
+            } else {
+                visit(child);
+            }
+        }
+        stack.pop();
+    }
+    visit(ast);
+    return hits;
+}
+
 /**
  * Scan contract code for non-integer (decimal) number literals (a non-blocking
  * warning that native float arithmetic is being used). Returns structured rules;
@@ -679,7 +788,16 @@ const CONSENSUS_RULES = new Set([
     // the deploy-blocking set (their on-chain activation is the indexer's per-coin
     // gate, threaded through validateSyntax as enforceBannedGenerator/enforceBannedWasm).
     'banned-generator',
-    'banned-wasm'
+    'banned-wasm',
+    // REST_PATTERN_METER (block-time flag-day, its own FUTURE instant). The rest
+    // positions transformAllocators cannot reach by wrapping a source expression
+    // (parameter lists, nested rest, catch-clause rest, for-of/for-in heads). Rejecting
+    // them is what makes the metering rewrite close the free-O(n)-copy class rather than
+    // relocate it; error-severity and AST-precise, so it belongs in the deploy-blocking
+    // set. Its on-chain activation is threaded through validateSyntax as
+    // enforceBannedRest, so below the flag-day a from-genesis replay reproduces the
+    // historical accepted verdict.
+    'banned-rest'
 ]);
 
 const TYPED_ARRAY_CTORS = new Set([
@@ -1092,6 +1210,28 @@ function lintSource(code, opts) {
     //     (75190596). This is the deploy-lint half. Identifier-precise (member
     //     property / object key / shadowed local excluded), so error severity is
     //     sound, unlike the name-only banned-proto-method warnings. Pkg 3 bundle.
+    // 6d. Banned unmeterable destructuring-rest positions. See findBannedRest: the
+    //     metering transform charges a rest destructure by wrapping its SOURCE
+    //     expression, and these four positions have none, so the O(n) copy would stay
+    //     free. Emitted unconditionally here; validateSyntax drops it from the blocking
+    //     set below the REST_PATTERN_METER flag-day (enforceBannedRest).
+    for (const hit of findBannedRest(code)) {
+        const advice = hit.kind === 'rest parameter'
+            ? 'the copy is performed by the caller\'s argument list, which has no source expression to charge, so f.apply(null, bigArr) in a loop copies O(n) elements for ~1 gas. Read arguments.length / index the parameters instead'
+            : hit.kind === 'catch-clause rest'
+                ? 'the source is the thrown value, bound by the runtime rather than by an expression, so the own-key copy cannot be charged. Destructure the caught binding on a following line instead'
+                : hit.kind === 'for-loop-head rest'
+                    ? 'the source is a per-iteration value produced by the iterator, with no expression to charge. Bind the iteration value and destructure it in the loop body instead'
+                    : 'a nested rest copies an intermediate value produced by the enclosing destructure, with no expression to charge. Destructure in two steps so the rest reads a named binding instead';
+        errors.push({
+            rule: 'banned-rest',
+            message: 'unmeterable rest pattern: ' + hit.kind + ' at line ' + hit.line +
+                     ' (' + advice + ')',
+            line: typeof hit.line === 'number' ? hit.line : null,
+            severity: 'error'
+        });
+    }
+
     for (const hit of findBannedWasm(code, globalAlias)) {
         errors.push({
             rule: 'banned-wasm',
@@ -1146,6 +1286,7 @@ module.exports = {
     findBannedAsync,
     findBannedGenerator,
     findBannedWasm,
+    findBannedRest,
     findBannedExponentiation,
     findBannedProtoMethods,
     findReservedControlBinding,

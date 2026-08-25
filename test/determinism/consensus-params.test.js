@@ -28,8 +28,8 @@ const metering = require('../../src/metering');
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '3');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '3', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '4');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '4', 're-export must match');
     });
 
     it('sandbox strip set is frozen (any change is a consensus event → bump CONSENSUS_VERSION)', function () {
@@ -59,9 +59,11 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // validator (validateSyntax) acts on; adding/removing one changes which
         // contracts the chain accepts (a hashed deploy verdict). Freeze it sorted so
         // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
+        // Epoch 4 added 'banned-rest' (the REST_PATTERN_METER deploy half).
         const GOLDEN_CONSENSUS_RULES = [
             'banned-async', 'banned-generator', 'banned-literal', 'banned-math',
-            'banned-wasm', 'invalid-type', 'reserved-identifier', 'unsupported-syntax'
+            'banned-rest', 'banned-wasm', 'invalid-type', 'reserved-identifier',
+            'unsupported-syntax'
         ];
         assert.deepStrictEqual([...vm.CONSENSUS_RULES].sort(), GOLDEN_CONSENSUS_RULES,
             'deploy CONSENSUS_RULES drifted: a deploy-rule change must bump CONSENSUS_VERSION + regolden in both repos');
@@ -325,6 +327,53 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.CALL_SPREAD_METER_GATE_BLOCK_TIME, 1786060800);
     });
 
+    it('REST_PATTERN_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
+        // Size-metering of destructuring rest (the __arrspread/__objspreadmeter-wrapped
+        // rest SOURCE) and the deploy rejection of the rest positions metering cannot
+        // reach both activate fleet-wide at this block time on mainnet. It moves gasUsed
+        // (→ contract_hash → fee debit) AND a deploy verdict, so two nodes that disagree
+        // on the flag day diverge on the first rest-using execution or deploy after the
+        // earlier of the two. Pin it like any other consensus parameter.
+        //
+        // It does NOT ride the contract-era flag-day, deliberately: 1786060800 is already
+        // in the past, so reusing it would retroactively re-price rest destructures that
+        // have already executed. It takes the next scheduled coordinated instant instead
+        // (2027-01-01 00:00:00 UTC, shared with the indexer's CROSS_CHAIN_ROYALTY).
+        assert.strictEqual(vm.REST_PATTERN_METER_GATE_BLOCK_TIME, 1798761600);
+        // testnet/regtest genesis-active; mainnet strictly at/after the instant.
+        assert.strictEqual(vm.isRestPatternMeterActive('regtest', 0), true);
+        assert.strictEqual(vm.isRestPatternMeterActive('testnet', 0), true);
+        assert.strictEqual(vm.isRestPatternMeterActive('mainnet', vm.REST_PATTERN_METER_GATE_BLOCK_TIME), true);
+        assert.strictEqual(vm.isRestPatternMeterActive('mainnet', vm.REST_PATTERN_METER_GATE_BLOCK_TIME - 1), false);
+        // A missing/garbage timestamp must resolve PRE-gate on mainnet (replay-safe default).
+        assert.strictEqual(vm.isRestPatternMeterActive('mainnet', NaN), false);
+        assert.strictEqual(vm.isRestPatternMeterActive('mainnet', undefined), false);
+        // And it must stay OFF the contract-era instant. If a future repin quietly folds it
+        // into the six-gate batch below, every already-executed rest destructure is re-priced
+        // retroactively -- which is exactly the retroactivity this separate arming exists to
+        // prevent, so assert the separation rather than trusting the comment.
+        assert.notStrictEqual(vm.REST_PATTERN_METER_GATE_BLOCK_TIME, vm.CALL_SPREAD_METER_GATE_BLOCK_TIME,
+            'REST_PATTERN_METER must keep its own FUTURE flag-day; the contract-era instant is in the past');
+    });
+
+    it('REST_PATTERN_METER_GATE_BLOCK_TIME matches the indexer REST_PATTERN_METER literal (cross-repo repin guard)', function () {
+        // The VM constant and the indexer protocol_changes entry are the two halves of one
+        // flag day: the VM gates the metering rewrite on it, the indexer gates the deploy
+        // rejection on it (deploy.js enforceBannedRest). A repin that edits one and misses
+        // the other passes BOTH CIs and forks the fleet at activation. Same construction as
+        // the six-gate CONTROLLER_GUARD guard below; skips only when the sibling repo is
+        // not checked out (standalone clone), where the hard pin above still holds.
+        const path = require('path'), fs = require('fs');
+        const indexerFile = path.resolve(__dirname, '../../../xchain-indexer/src/protocol_changes.js');
+        if (!fs.existsSync(indexerFile)) this.skip();
+        const src = fs.readFileSync(indexerFile, 'utf8');
+        const all = [...src.matchAll(/addChange\(\s*'REST_PATTERN_METER'\s*,\s*'[^']+'\s*,\s*(\d+)/g)];
+        assert.strictEqual(all.length, 1,
+            "expected exactly one REST_PATTERN_METER addChange in the indexer's protocol_changes.js, found " + all.length);
+        assert.strictEqual(vm.REST_PATTERN_METER_GATE_BLOCK_TIME, Number(all[0][1]),
+            'REST_PATTERN_METER diverged between xchain-vm and xchain-indexer: a repin must move both in lockstep');
+    });
+
     it('Package 3 VM-sandbox bundle gate: per-coin activation heights + depth bounds are frozen', function () {
         // The whole flag-day Package 3 VM-sandbox bundle flips on ONE per-coin
         // block-HEIGHT gate (the musl-safe recursion bound folded in, the
@@ -502,6 +551,13 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
             assert.strictEqual(vm[g], indexerFlagDay,
                 g + ' diverged from the indexer CONTROLLER_GUARD flag-day: a repin must move all six VM gates and the indexer literal in lockstep');
         }
+        // REST_PATTERN_METER_GATE_BLOCK_TIME is deliberately NOT in that list: the
+        // contract-era instant is in the PAST, so riding it would retroactively re-price
+        // rest destructures that have already executed. It is armed separately and pinned
+        // to its own indexer twin by the cross-repo guard above.
+        assert.ok(!gates.includes('REST_PATTERN_METER_GATE_BLOCK_TIME'));
+        assert.notStrictEqual(vm.REST_PATTERN_METER_GATE_BLOCK_TIME, indexerFlagDay,
+            'REST_PATTERN_METER must not be folded into the contract-era batch (that instant has passed)');
     });
 
     it('XCALL_MAX_HOPS is single-sourced from the emit-time enforcer and pinned', function () {

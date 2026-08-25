@@ -28,7 +28,10 @@ describe('Consensus runtime pin', function () {
             assert.ok(Object.isFrozen(CONSENSUS_STATUS_TOKENS));
             assert.ok(Object.isFrozen(STATUS_ERROR_PREFIXES));
             assert.deepStrictEqual(CONSENSUS_STATUS_TOKENS, ['reverted', 'out_of_resource', 'failed']);
-            assert.strictEqual(CONSENSUS_VERSION, '3');
+            // Epoch 4: 'banned-rest' joined the deploy validator's CONSENSUS_RULES
+            // (the REST_PATTERN_METER deploy half). Bumped in lockstep with the VM and
+            // indexer consensus-params goldens.
+            assert.strictEqual(CONSENSUS_VERSION, '4');
             assert.strictEqual(REFERENCE_NODE, 'v22.22.3');
         });
     });
