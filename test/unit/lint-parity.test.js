@@ -146,12 +146,23 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
         });
     });
 
-    describe('every discovered <name>/<name>.js template passes the authoritative validator', function () {
+    describe('every shipped contract source (<name>/<name>.js templates AND patterns/*.js) passes the authoritative validator', function () {
         const haveTemplates = fs.existsSync(CONTRACTS_DIR);
         const dirs = haveTemplates
             ? fs.readdirSync(CONTRACTS_DIR, { withFileTypes: true })
                 .filter(d => d.isDirectory() && fs.existsSync(path.join(CONTRACTS_DIR, d.name, d.name + '.js')))
                 .map(d => d.name)
+            : [];
+
+        // The templates predicate above is <name>/<name>.js, and patterns/ holds no
+        // patterns/patterns.js, so every shipped pattern source fell out of this gate.
+        // They are deployable source all the same: bin/xchain-contracts.js lists,
+        // scaffolds and lints them, so a rule tightened HERE has to redden HERE rather
+        // than wait for the next xchain-contracts CI run to notice. Same discovery rule
+        // listAvailable() uses, so a sixth pattern is picked up without an allowlist.
+        const PATTERNS_DIR = path.join(CONTRACTS_DIR, 'patterns');
+        const patterns = fs.existsSync(PATTERNS_DIR)
+            ? fs.readdirSync(PATTERNS_DIR).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort()
             : [];
 
         if (!haveTemplates || dirs.length === 0) {
@@ -166,6 +177,23 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                     const code = fs.readFileSync(path.join(CONTRACTS_DIR, name, name + '.js'), 'utf8');
                     const v = validateSyntax(code);
                     assert.strictEqual(v.valid, true, name + ' rejected: ' + (v.error || ''));
+                });
+            }
+
+            // An empty pattern set would add zero cases and still print green, which is
+            // the same false green the sibling gate above exists to break.
+            it('pattern-source discovery finds the shipped patterns/*.js set', function () {
+                assert.ok(patterns.length > 0,
+                    'no patterns/*.js discovered under ' + PATTERNS_DIR + '; the sibling checkout ' +
+                    'is partial or the predicate has drifted from bin/xchain-contracts.js ' +
+                    'listAvailable(), and the pattern half of this gate is now inert');
+            });
+
+            for (const f of patterns) {
+                it('patterns/' + f + ' is valid under validateSyntax (full V8 + rules)', function () {
+                    const code = fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8');
+                    const v = validateSyntax(code);
+                    assert.strictEqual(v.valid, true, 'patterns/' + f + ' rejected: ' + (v.error || ''));
                 });
             }
         }

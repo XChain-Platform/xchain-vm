@@ -117,7 +117,10 @@ const result = await vm.execute({
     params: [],
     caller: 'source_address',
     contractAddress: 'C:BTC:100',
-    blockContext: { height: 500, timestamp: 1700000000, hash: 'blockhash' }
+    // Gas-metering activations are keyed on block TIME with no network term, so a
+    // timestamp below the 2.0.0 flag-day (1786060800) meters under the
+    // pre-activation rule set and under-reports what a live chain charges.
+    blockContext: { height: 500, timestamp: 1786060800, hash: 'blockhash' }
 });
 
 // result = {

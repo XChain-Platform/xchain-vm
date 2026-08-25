@@ -282,4 +282,102 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                 GOLDEN_VECTORS.callId.expected);
         });
     });
+
+    // ---- per-field normalization domain ------------------------------------
+    //
+    // The two sides agree, but they agree by applying DIFFERENT operations to the
+    // same fields and landing on the same bytes. The VM folds contractIndex through
+    // Number() and rootActionIndex through normalizeRootDiscriminator; the indexer
+    // bare-String()s both (attest.js, where CONTRACT_INDEX has additionally become a
+    // mathjs bignumber via util.setNumberFormats). Agreement therefore rests on an
+    // unstated invariant about what the input domain contains, not on shared code.
+    //
+    // The cases above all sit INSIDE that domain, so they cannot say where its edge
+    // is. These do: the safe half asserts agreement, and the unsafe half MEASURES the
+    // divergence each excluded shape produces. That second half is not a blessing of
+    // the asymmetry - it is the domain boundary written down. Widening a producer to
+    // emit one of these shapes splits request_ids silently (the id is xchain-hub's
+    // cross-chain join key, so the failure mode is stranded legs, not an error), and
+    // the fix is the shared derivation module, which is cross-repo work: it has to
+    // reach xchain-indexer's attest.js / xcall.js and both vendored copies.
+    describe('per-field normalization domain (VM folds, indexer stringifies)', function () {
+        const TXH = 'abc123', POS = 0;
+        const vmPreimage = (root, callPath, contractIndex) =>
+            String(TXH) + ':' +
+            String(root != null ? normalizeRootDiscriminator(root) : '') + ':' +
+            (typeof callPath === 'string' ? callPath : '') + ':' +
+            String(contractIndex != null ? Number(contractIndex) : '') + ':' + POS;
+        const indexerPreimage = (root, callPath, contractIndex) =>
+            String(TXH) + ':' + String(root) + ':' + String(callPath) + ':' +
+            String(contractIndex) + ':' + String(POS);
+
+        // Everything a producer emits today: integer TX_VOUT roots, the numeric-string
+        // form of the same, "<vout>.<position>" BATCH composites, integer contract
+        // indexes. The VM's real derivation is pinned against the formula above so this
+        // matrix cannot drift away from what gateway.js actually does.
+        const IN_DOMAIN = [
+            { name: 'integer root',            root: 100,     contractIndex: 7 },
+            { name: 'numeric-string root',     root: '100',   contractIndex: 7 },
+            { name: 'zero root',               root: 0,       contractIndex: 0 },
+            { name: 'BATCH composite root',    root: '3.10',  contractIndex: 7 },
+            { name: 'BATCH composite root .0', root: '100.0', contractIndex: 7 },
+        ];
+
+        for (const c of IN_DOMAIN) {
+            it('agrees on ' + c.name, function () {
+                assert.strictEqual(vmPreimage(c.root, '', c.contractIndex),
+                                   indexerPreimage(c.root, '', c.contractIndex),
+                                   'in-domain input ' + c.name + ' no longer byte-matches');
+                // And the matrix's VM half is the real one, not a lookalike.
+                assert.strictEqual(
+                    vmRequestId({ txHash: TXH, rootActionIndex: c.root, callPath: '', contractIndex: c.contractIndex }),
+                    crypto.createHash('sha256').update(vmPreimage(c.root, '', c.contractIndex)).digest('hex'),
+                    'the matrix formula drifted from gateway.js for ' + c.name);
+            });
+        }
+
+        // Each entry: a shape no producer emits today, and the exact bytes each side
+        // would hash if one ever did.
+        const OUT_OF_DOMAIN = [
+            { name: 'zero-padded contract index', root: 100, contractIndex: '007',
+              vm: 'abc123:100::7:0',    indexer: 'abc123:100::007:0' },
+            { name: 'zero-padded root',           root: '007', contractIndex: 7,
+              vm: 'abc123:7::7:0',      indexer: 'abc123:007::7:0' },
+            { name: 'three-part discriminator',   root: '100.0.1', contractIndex: 7,
+              vm: 'abc123:NaN::7:0',    indexer: 'abc123:100.0.1::7:0' },
+            { name: 'exponential-notation root',  root: '1e3', contractIndex: 7,
+              vm: 'abc123:1000::7:0',   indexer: 'abc123:1e3::7:0' },
+            { name: 'decimal-string contract index past 2^53', root: 100,
+              contractIndex: '1000000000000000000000',
+              vm: 'abc123:100::1e+21:0', indexer: 'abc123:100::1000000000000000000000:0' },
+            { name: 'signed-zero root',           root: '-0', contractIndex: 7,
+              vm: 'abc123:0::7:0',      indexer: 'abc123:-0::7:0' },
+            { name: 'whitespace-padded root',     root: ' 7 ', contractIndex: 7,
+              vm: 'abc123:7::7:0',      indexer: 'abc123: 7 ::7:0' },
+        ];
+
+        for (const c of OUT_OF_DOMAIN) {
+            it('splits on ' + c.name + ' (excluded from the input domain)', function () {
+                const vm  = vmPreimage(c.root, '', c.contractIndex);
+                const idx = indexerPreimage(c.root, '', c.contractIndex);
+                assert.strictEqual(vm, c.vm,
+                    'the VM half of the ' + c.name + ' case moved; re-derive this row');
+                assert.strictEqual(idx, c.indexer,
+                    'the indexer half of the ' + c.name + ' case moved; re-derive this row');
+                assert.notStrictEqual(vm, idx,
+                    c.name + ' now byte-matches. Either the two sides were unified (delete ' +
+                    'this row and the domain caveat with it) or one side changed and the ' +
+                    'agreement is a new coincidence, not a fix.');
+            });
+        }
+
+        it('the VM applies its folds to exactly two of the five fields', function () {
+            // txHash and callPath ride through as strings on both sides, and the
+            // emission index is a VM-local integer. Naming that keeps the domain
+            // caveat scoped: only rootActionIndex and contractIndex carry the risk.
+            assert.strictEqual(vmPreimage(100, 'a>b', 7), indexerPreimage(100, 'a>b', 7));
+            assert.strictEqual(vmPreimage(100, '007>1e3', 7), indexerPreimage(100, '007>1e3', 7),
+                'callPath must pass through unfolded on both sides');
+        });
+    });
 });

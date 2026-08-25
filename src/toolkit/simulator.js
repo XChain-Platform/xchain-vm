@@ -30,6 +30,10 @@
  *     the same plain-snapshot shapes the indexer threads into execute().
  *   - failure atomicity: on a reverted / out-of-gas / errored call the VM
  *     returns empty stateChanges + emittedActions, so nothing is committed.
+ *   - metering activation: the default block time sits at the VM's newest
+ *     block-time flag-day, so the gas-metering legs every live chain runs today
+ *     are ON and gasUsed is a live-rule-set number. Pin an earlier
+ *     block.timestamp to simulate the pre-activation rules (it warns once).
  *
  * What it does NOT do (out of scope; that is the real indexer + regtest):
  *   - process emitted ACTIONs against the ledger (SEND/ISSUE/... are captured
@@ -48,6 +52,7 @@
 const XChainVM = require('../index.js');
 const { toContractJs } = require('./transpile.js');
 const { MAX_CODE_SIZE } = require('../lint-core.js');
+const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../protocol/constants.js');
 
 // Canonical VM gas schedule (matches the component-doc Gas Schedule table and
 // the indexer's VM fee rows). Every CANONICAL_GAS_KEYS entry the VM charges is
@@ -65,6 +70,28 @@ const DEFAULT_GAS_SCHEDULE = Object.freeze({
     VM_XCALL_CALLBACK: 20000
 });
 
+// Default simulated block time. Every block-TIME-keyed metering activation in
+// the VM -- F3 binary-constructor and F3-globals metering, the O(n)-copy meter
+// upgrades, math-output metering, the emission proto-strip, the non-finite gas
+// clamp -- compares blockContext.timestamp against a *_GATE_BLOCK_TIME constant
+// with NO network term, unlike the network-aware gates (async surface, lint
+// hardening, state-key, Pkg-3 sandbox) that regtest activates from genesis. So
+// `network: 'regtest'` does NOT turn the meters on; only the block time does. A
+// default below the newest flag-day meters under a rule set no live chain runs:
+// measured on Node 22 / Linux, `new Uint8Array(100000)` costs 225 gas at the old
+// 1700000000 default and 100228 gas at the flag-day.
+//
+// Read off the VM's own exported gate constants rather than retyping one, and
+// take the MAX so a later-dated flag day cannot silently strand the simulator
+// below it. Every activation compares with `>=`, so sitting exactly on the
+// newest gate activates all of them. The literal fallback is the ratified 2.0.0
+// flag-day (2026-08-07 00:00:00 UTC) and is reached only if the VM stops
+// exporting the constants at all.
+const GATE_BLOCK_TIMES = Object.keys(XChainVM)
+    .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+    .map((k) => XChainVM[k]);
+const DEFAULT_BLOCK_TIME = GATE_BLOCK_TIMES.length ? Math.max(...GATE_BLOCK_TIMES) : 1786060800;
+
 const DEFAULT_LIMITS = Object.freeze({
     maxCpuTimeMs: 30000,
     maxMemory: 8,
@@ -72,19 +99,30 @@ const DEFAULT_LIMITS = Object.freeze({
     maxStateKeys: 10000,
     maxStateValueSize: 65536,
     maxCodeSize: MAX_CODE_SIZE,
-    maxCallDepth: 4,
-    minCallGas: 5000
+    // Imported, not retyped: index.js back-fills a caller's limits from these
+    // same two constants, so a literal here would be a second copy that can
+    // silently disagree with the VM the simulator is wrapping.
+    maxCallDepth: VM_MAX_CALL_DEPTH,
+    minCallGas: VM_MIN_CALL_GAS
 });
 
 class ContractSimulator {
     /**
      * @param {object} [opts]
      * @param {string} [opts.coin='BTC']     - coin ticker for default C:{COIN}:{i} addresses
-     * @param {string} [opts.network='regtest'] - VM network (regtest = all 2.0.0 gates active)
+     * @param {string} [opts.network='regtest'] - VM network. This selects the
+     *        NETWORK-AWARE gates only (the async/Promise surface, lint
+     *        hardening, the state-key gates, the Package-3 sandbox bundle),
+     *        which regtest/testnet activate from genesis. Gas-METERING
+     *        activation carries no network term at all: it follows
+     *        opts.block.timestamp (see DEFAULT_BLOCK_TIME).
      * @param {number} [opts.gasCeiling=1000000]
      * @param {object} [opts.gasSchedule]    - override the canonical schedule
      * @param {object} [opts.limits]         - override the default resource limits
-     * @param {object} [opts.block]          - initial { height, timestamp, hash }
+     * @param {object} [opts.block]          - initial { height, timestamp, hash }.
+     *        timestamp defaults to the VM's newest *_GATE_BLOCK_TIME, so the
+     *        block-time-keyed meters are ON and gas matches a live chain; a
+     *        lower value simulates the pre-activation rule set and warns once.
      * @param {string} [opts.defaultCaller]  - caller address used when a call omits one
      * @param {string} [opts.execution='in-process'] - VM execution mode. The
      *        simulator defaults to in-process for millisecond author-time
@@ -99,9 +137,11 @@ class ContractSimulator {
         this.defaultCaller = opts.defaultCaller || 'sim_caller';
 
         this.block = Object.assign(
-            { height: 1, timestamp: 1700000000, hash: 'sim_block_0000000000000001' },
+            { height: 1, timestamp: DEFAULT_BLOCK_TIME, hash: 'sim_block_0000000000000001' },
             opts.block || {}
         );
+        // One pre-flag-day warning per instance, not per call (see _warnIfPreGate).
+        this._preGateWarned = false;
 
         // Read-only snapshots the author seeds.
         this.balances = {};        // address -> tick -> amountStr
@@ -173,6 +213,26 @@ class ContractSimulator {
     }
 
     // ---- block control ------------------------------------------------------
+
+    /**
+     * Warn once per simulator when the simulated block time sits below the VM's
+     * newest metering flag-day. Every block-time-keyed meter is OFF down there,
+     * so the gasUsed this run reports is a pre-activation number no live chain
+     * charges. Deliberate below-gate runs are legitimate (the VM's own gated
+     * fixtures do exactly that), so this warns rather than throwing.
+     */
+    _warnIfPreGate() {
+        if (this._preGateWarned) return;
+        if (Number(this.block.timestamp) >= DEFAULT_BLOCK_TIME) return;
+        this._preGateWarned = true;
+        console.warn(
+            '[xchain-vm simulator] block.timestamp ' + this.block.timestamp + ' predates the VM ' +
+            'metering flag-day ' + DEFAULT_BLOCK_TIME + ': the block-time-keyed gas meters are OFF, ' +
+            'so gasUsed UNDER-REPORTS what a live chain charges. Use the default block, ' +
+            'setBlock({ timestamp: ' + DEFAULT_BLOCK_TIME + ' }) or advanceBlock({ byTime }) to ' +
+            'simulate the live rule set.'
+        );
+    }
 
     /** Merge fields into the current block context ({ height, timestamp, hash }). */
     setBlock(partial) {
@@ -247,6 +307,7 @@ class ContractSimulator {
         if (!contract) {
             throw new Error('no contract deployed at index ' + contractIndex);
         }
+        this._warnIfPreGate();
 
         const execOpts = {
             code: contract.code,
@@ -315,4 +376,4 @@ class ContractSimulator {
     }
 }
 
-module.exports = { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS };
+module.exports = { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME };

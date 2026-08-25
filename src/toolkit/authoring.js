@@ -25,7 +25,13 @@
  *
  *   1. A canonical KNOWLEDGE base (concept map, model shifts, native-primitive
  *      shortcuts, gateway surface, and hard determinism rules), kept in lockstep
- *      with the Solidity->XChain guide and the deploy gate.
+ *      with the Solidity->XChain guide, the deploy gate and the sandbox's
+ *      stripped-global list. Note the last of those is NOT deploy-blocking: the
+ *      globals are deleted from the isolate at runtime, so a contract using one
+ *      passes the gate and throws on its first execution. The taught list is a
+ *      mirror of sandbox.js STRIPPED_GLOBAL_NAMES held equal by a parity test
+ *      (test/toolkit/authoring.test.js), because this module must stay
+ *      isolated-vm-free and sandbox.js is not.
  *   2. buildAuthoringPrompt() turns an English brief or a Solidity source into a
  *      well-formed system+user message pair embedding that knowledge.
  *   3. authorContract() runs a caller-injected `complete()` (any LLM client) and
@@ -110,14 +116,40 @@ const CONCEPT_MAP = [
     { solidity: 'gas limit', xchain: 'GAS_LIMIT on deploy/execute; sdk.suggestGasLimit(...)', note: 'metered per the gas schedule' }
 ];
 
-// Non-negotiable rules the generated contract MUST satisfy (these are exactly
-// what the deploy gate blocks on; teaching them up front cuts repair rounds).
+// Mirror of sandbox.js STRIPPED_GLOBAL_NAMES, duplicated here for the same
+// dependency-light reason lint-core.js mirrors STRIPPED_PROTO_METHODS: this
+// module is deliberately isolated-vm-free (its whole point is that the authoring
+// loop and the acorn gate run on any OS), and sandbox.js requires isolated-vm at
+// the top level. Drift is caught by the parity test in
+// test/toolkit/authoring.test.js, which loads the real list wherever the binding
+// is available. Order follows sandbox.js.
+const STRIPPED_GLOBALS_TAUGHT = [
+    'Date', 'setTimeout', 'setInterval', 'setImmediate',
+    'clearTimeout', 'clearInterval', 'clearImmediate',
+    'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
+    'fetch', 'XMLHttpRequest', 'WebSocket',
+    'SharedArrayBuffer', 'Atomics',
+    'queueMicrotask', 'Promise',
+    'BigInt',
+    'WebAssembly',
+    'Intl', 'Temporal', 'structuredClone', 'performance'
+];
+
+// Non-negotiable rules the generated contract MUST satisfy; teaching them up
+// front cuts repair rounds. Most are deploy-blocking (lint-core CONSENSUS_RULES,
+// the only findings the on-chain validator acts on). The banned-globals rule is
+// NOT: those globals are deleted from the isolate at RUNTIME, so a contract that
+// touches one lints clean, deploys, and then throws a ReferenceError on its first
+// execution. Both are hard rules for an author; only the wording distinguishes
+// where each one bites.
 const HARD_RULES = [
     'Export a CommonJS module: `module.exports = { initialize, methodA, ... }` (object of methods) or a single `module.exports = function (xchain) {...}`. Each method takes exactly one argument: the `xchain` gateway.',
     'No floats anywhere. No numeric literal with a decimal point, no native Math.sqrt/pow/log/log2/log10 (use xchain.math.* bignumber ops). Token amounts are decimal STRINGS.',
     'No BigInt literals, no RegExp literals, no `new RegExp`.',
     'No async surface: no `async`, no `await`, no `Promise`. Methods are synchronous.',
-    'No banned globals: no Date, setTimeout, setInterval, fetch, eval, Function, Proxy, Reflect, SharedArrayBuffer. No `.constructor` access. No `require`/`import`/filesystem/network.',
+    'No host globals. These are DELETED from the sandbox, so a contract that touches one deploys and then throws at execution: ' +
+        STRIPPED_GLOBALS_TAUGHT.join(', ') +
+        '. Also no `eval`, no `Function`, no `.constructor` access, no `require`/`import`/filesystem/network.',
     'ES2020 syntax maximum (no numeric separators, no logical-assignment, no top-level await).',
     'Do not reference identifiers beginning `__gas`/`__concat`/`__tmpl`/`__arrspread`/`__objspread` (reserved by the metering pass).',
     'State keys <= 1024 bytes, values <= 65536 bytes (JSON), <= 10000 keys total; at most 50 emitted actions per call.'
@@ -144,6 +176,10 @@ const KNOWLEDGE = {
     nativePrimitives: NATIVE_PRIMITIVES,
     conceptMap: CONCEPT_MAP,
     hardRules: HARD_RULES,
+    // The taught mirror of sandbox.js STRIPPED_GLOBAL_NAMES. Exported so the
+    // parity test can compare it to the real list by value rather than by
+    // grepping rendered prose.
+    strippedGlobals: STRIPPED_GLOBALS_TAUGHT,
     contractShape: CONTRACT_SHAPE
 };
 
@@ -189,7 +225,10 @@ function buildSystemPrompt(opts = {}) {
         'SOLIDITY -> XCHAIN CONCEPT MAP:',
         renderConceptMap(),
         '',
-        'HARD RULES (the on-chain deploy gate REJECTS any violation, so the contract will not deploy):',
+        'HARD RULES. The on-chain deploy gate REJECTS a violation of most of these and the ' +
+            'contract never deploys. The deleted host globals are the exception: that ' +
+            'contract deploys clean and then THROWS on its first execution. Neither is ' +
+            'recoverable, so treat every rule below as blocking:',
         renderNumbered(HARD_RULES),
         '',
         'CONTRACT SHAPE:',

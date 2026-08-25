@@ -72,9 +72,10 @@ const SIBLINGS = [
     { repo: 'xchain-contracts', envs: ['XCHAIN_CONTRACTS_DIR'],
       marker: path.join('escrow', 'escrow.js'),
       // Describe the discovery RULE, never a snapshot list: lint-parity.test.js
-      // readdirSyncs every <name>/<name>.js template (14 today), and this string
-      // is what the NOT VERIFIED line tells the operator went unchecked.
-      guards: 'lint parity over every shipped <name>/<name>.js contract template' },
+      // readdirSyncs every <name>/<name>.js template AND every patterns/*.js source
+      // (14 templates + 5 patterns today), and this string is what the NOT VERIFIED
+      // line tells the operator went unchecked.
+      guards: 'lint parity over every shipped contract source: <name>/<name>.js templates and patterns/*.js' },
 ];
 
 function resolve(entry) {
