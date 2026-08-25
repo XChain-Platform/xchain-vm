@@ -20,14 +20,67 @@
 // two against each other: it drives the REAL VM derivation and compares it to the
 // indexer's exact preimage formula (copied verbatim below; keep in lockstep).
 //
+// TWO LAYERS, deliberately, because they fail on different things:
+//   1. the GOLDEN pins and the lambda copies below, which need nothing but this
+//      repo and so run in a standalone xchain-vm clone; and
+//   2. the per-field normalization domain block at the foot of the file, which
+//      loads the REAL xchain-indexer re-derivation off the sibling checkout, so
+//      it reddens on indexer-side drift a lambda copy cannot see. A lambda can
+//      only ever agree with itself.
+// Layer 2 skips where the sibling is absent (standalone clones). Where the
+// siblings were provided on purpose (bin/ci-all.sh, the monorepo drift-guard
+// job) export XCHAIN_REQUIRE_SIBLINGS=1 and the skip becomes a hard failure,
+// so the gate can never pass green-by-skip.
+//
 // Runs on Node 24 (no isolated-vm; pure gateway builders).
 
 const assert = require('assert');
 const crypto = require('crypto');
+const fs     = require('fs');
+const path   = require('path');
 const { buildGateway } = require('../../src/gateway.js');
-const { buildEmitAPI, GOLDEN_VECTORS, normalizeRootDiscriminator } = require('../../src/gateway-emit.js');
+const { buildEmitAPI, GOLDEN_VECTORS, normalizeRootDiscriminator,
+        buildRequestIdPreimage, buildCallIdPreimage } = require('../../src/gateway-emit.js');
 const GasTracker = require('../../src/gas.js');
 const EmissionCollector = require('../../src/collector.js');
+
+// Repo root by walking up to the nearest package.json rather than counting '..'
+// hops, so moving this file does not silently point the sibling load at nothing.
+const REPO_ROOT = (function () {
+    let dir = __dirname;
+    while (!fs.existsSync(path.join(dir, 'package.json'))) {
+        const up = path.dirname(dir);
+        if (up === dir) throw new Error('no package.json above ' + __dirname);
+        dir = up;
+    }
+    return dir;
+})();
+const PLATFORM_ROOT  = path.dirname(REPO_ROOT);
+const INDEXER_ATTEST = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'attest.js');
+const INDEXER_XCALL  = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'xcall.js');
+const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
+
+// The indexer's REAL preimage assembly, not a restatement of it.
+//
+// Attest._requestIdPreimageValues and Xcall._callIdPreimageValues are the exact
+// functions the handlers call before hashing (attest.js _parseRequest, xcall.js
+// _parseRequest); they are invoked here on a minimal receiver because the only
+// thing either reads off `this` is the node config the second one needs for
+// NETWORK/COIN. If a future edit makes them read more, this throws, which is a
+// loud failure rather than a quiet pass. That the handlers still call them, and
+// have not grown a second inline formula, is pinned separately by
+// bin/check-preimage-golden-parity.js.
+function loadIndexerDerivation() {
+    if (!fs.existsSync(INDEXER_ATTEST) || !fs.existsSync(INDEXER_XCALL)) return null;
+    const Attest = require(INDEXER_ATTEST);
+    const Xcall  = require(INDEXER_XCALL);
+    return {
+        requestIdPreimage: (data) =>
+            Attest.prototype._requestIdPreimageValues.call({}, data).join(':'),
+        callIdPreimage: (config, data) =>
+            Xcall.prototype._callIdPreimageValues.call({ config: config }, data).join(':')
+    };
+}
 
 const SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
@@ -297,24 +350,49 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
     // divergence each excluded shape produces. That second half is not a blessing of
     // the asymmetry - it is the domain boundary written down. Widening a producer to
     // emit one of these shapes splits request_ids silently (the id is xchain-hub's
-    // cross-chain join key, so the failure mode is stranded legs, not an error), and
-    // the fix is the shared derivation module, which is cross-repo work: it has to
-    // reach xchain-indexer's attest.js / xcall.js and both vendored copies.
+    // cross-chain join key, so the failure mode is stranded legs, not an error).
+    //
+    // BOTH halves here are the REAL code, and that is the point of this block.
+    // The VM half is buildRequestIdPreimage / buildCallIdPreimage, the exported
+    // assembly gateway.js and crossExecute themselves call, so the matrix cannot
+    // drift away from what the VM emits. The indexer half is loaded off the
+    // sibling checkout (Attest._requestIdPreimageValues, Xcall._callIdPreimageValues),
+    // so it reddens when the INDEXER's coercion moves. The previous version of this
+    // block restated both formulas as local lambdas, which meant it could only ever
+    // measure itself: an indexer-side edit left every row green.
     describe('per-field normalization domain (VM folds, indexer stringifies)', function () {
         const TXH = 'abc123', POS = 0;
+        const COIN_CONFIG = { NETWORK: 'regtest', COIN: 'BTC' };
+        let IDX = null;
+
+        before(function () {
+            IDX = loadIndexerDerivation();
+            if (IDX) return;
+            if (REQUIRE_SIBLINGS) {
+                assert.fail('the per-field normalization matrix needs the real xchain-indexer ' +
+                    'derivation at ' + INDEXER_ATTEST + ' and ' + INDEXER_XCALL +
+                    '; XCHAIN_REQUIRE_SIBLINGS=1 forbids the green-by-skip');
+            }
+            this.skip();
+        });
+
         const vmPreimage = (root, callPath, contractIndex) =>
-            String(TXH) + ':' +
-            String(root != null ? normalizeRootDiscriminator(root) : '') + ':' +
-            (typeof callPath === 'string' ? callPath : '') + ':' +
-            String(contractIndex != null ? Number(contractIndex) : '') + ':' + POS;
+            buildRequestIdPreimage({
+                txHash: TXH, rootActionIndex: root, callPath: callPath,
+                contractIndex: contractIndex, emissionIndex: POS
+            });
         const indexerPreimage = (root, callPath, contractIndex) =>
-            String(TXH) + ':' + String(root) + ':' + String(callPath) + ':' +
-            String(contractIndex) + ':' + String(POS);
+            IDX.requestIdPreimage({
+                TX_HASH:           TXH,
+                ROOT_ACTION_INDEX: root,
+                EMITTER_PATH:      callPath,
+                CONTRACT_INDEX:    contractIndex,
+                EMITTER_POSITION:  POS
+            });
 
         // Everything a producer emits today: integer TX_VOUT roots, the numeric-string
         // form of the same, "<vout>.<position>" BATCH composites, integer contract
-        // indexes. The VM's real derivation is pinned against the formula above so this
-        // matrix cannot drift away from what gateway.js actually does.
+        // indexes.
         const IN_DOMAIN = [
             { name: 'integer root',            root: 100,     contractIndex: 7 },
             { name: 'numeric-string root',     root: '100',   contractIndex: 7 },
@@ -328,11 +406,13 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                 assert.strictEqual(vmPreimage(c.root, '', c.contractIndex),
                                    indexerPreimage(c.root, '', c.contractIndex),
                                    'in-domain input ' + c.name + ' no longer byte-matches');
-                // And the matrix's VM half is the real one, not a lookalike.
+                // And gateway.js itself routes through the shared assembly: the id a
+                // real attestation.request emits is the hash of exactly these bytes.
+                // A call site that grew its own inline formula again fails here.
                 assert.strictEqual(
                     vmRequestId({ txHash: TXH, rootActionIndex: c.root, callPath: '', contractIndex: c.contractIndex }),
                     crypto.createHash('sha256').update(vmPreimage(c.root, '', c.contractIndex)).digest('hex'),
-                    'the matrix formula drifted from gateway.js for ' + c.name);
+                    'gateway.js no longer derives the request_id from buildRequestIdPreimage for ' + c.name);
             });
         }
 
@@ -378,6 +458,69 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
             assert.strictEqual(vmPreimage(100, 'a>b', 7), indexerPreimage(100, 'a>b', 7));
             assert.strictEqual(vmPreimage(100, '007>1e3', 7), indexerPreimage(100, '007>1e3', 7),
                 'callPath must pass through unfolded on both sides');
+        });
+
+        // The call_id carries the same two folded fields plus network/coin/target
+        // chain, and its indexer half is a SECOND hand-written re-derivation
+        // (xcall.js _callIdPreimageValues). Driving both real implementations over
+        // the same rows is what makes an xcall.js-only coercion edit visible here.
+        const vmCallPreimage = (root, callPath, contractIndex) =>
+            buildCallIdPreimage({
+                network:     COIN_CONFIG.NETWORK, sourceChain: COIN_CONFIG.COIN,
+                txHash:      TXH,        rootActionIndex: root,
+                contractIndex: contractIndex, callPath: callPath,
+                emissionIndex: POS,      targetChain: 'DOGE'
+            });
+        const indexerCallPreimage = (root, callPath, contractIndex) =>
+            IDX.callIdPreimage(COIN_CONFIG, {
+                TX_HASH:           TXH,
+                ROOT_ACTION_INDEX: root,
+                CONTRACT_INDEX:    contractIndex,
+                EMITTER_PATH:      callPath,
+                EMITTER_POSITION:  POS,
+                TARGET_CHAIN:      'DOGE'
+            });
+
+        for (const c of IN_DOMAIN) {
+            it('call_id agrees on ' + c.name, function () {
+                assert.strictEqual(vmCallPreimage(c.root, '', c.contractIndex),
+                                   indexerCallPreimage(c.root, '', c.contractIndex),
+                                   'in-domain call_id input ' + c.name + ' no longer byte-matches');
+                // And crossExecute routes through the shared assembly, same as above.
+                assert.strictEqual(
+                    vmCallId({ network: COIN_CONFIG.NETWORK, txHash: TXH, rootActionIndex: c.root,
+                               callPath: '', contractIndex: c.contractIndex, targetChain: 'DOGE' }),
+                    crypto.createHash('sha256').update(vmCallPreimage(c.root, '', c.contractIndex)).digest('hex'),
+                    'gateway-emit.js no longer derives the call_id from buildCallIdPreimage for ' + c.name);
+            });
+        }
+
+        // The lambda copies at the head of this file back every assertion that has
+        // to run in a standalone clone, where there is no indexer to read. Nothing
+        // else proves they still describe the indexer, so pin them against it here,
+        // on the golden tuples both repos already pin independently.
+        it('the standalone lambda copies still match the real indexer derivation', function () {
+            const r = GOLDEN_VECTORS.requestId.input;
+            assert.strictEqual(
+                indexerRequestId(r.txHash, r.rootActionIndex, r.emitterPath, r.contractIndex, r.emitterPosition),
+                crypto.createHash('sha256').update(IDX.requestIdPreimage({
+                    TX_HASH: r.txHash, ROOT_ACTION_INDEX: r.rootActionIndex,
+                    EMITTER_PATH: r.emitterPath, CONTRACT_INDEX: r.contractIndex,
+                    EMITTER_POSITION: r.emitterPosition
+                })).digest('hex'),
+                'the request_id lambda copy drifted from xchain-indexer attest.js');
+
+            const v = GOLDEN_VECTORS.callId.input;
+            assert.strictEqual(
+                indexerCallId(v.network, v.coin, v.txHash, v.rootActionIndex, v.contractIndex,
+                              v.emitterPath, v.emitterPosition, v.targetChain),
+                crypto.createHash('sha256').update(IDX.callIdPreimage(
+                    { NETWORK: v.network, COIN: v.coin },
+                    { TX_HASH: v.txHash, ROOT_ACTION_INDEX: v.rootActionIndex,
+                      CONTRACT_INDEX: v.contractIndex, EMITTER_PATH: v.emitterPath,
+                      EMITTER_POSITION: v.emitterPosition, TARGET_CHAIN: v.targetChain }
+                )).digest('hex'),
+                'the call_id lambda copy drifted from xchain-indexer xcall.js');
         });
     });
 });

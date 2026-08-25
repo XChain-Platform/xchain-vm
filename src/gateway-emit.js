@@ -67,6 +67,40 @@ function normalizeRootDiscriminator(value) {
     return Number(value);
 }
 
+// Assemble the ATTEST request_id and XCALL call_id preimages. The one VM-side
+// statement of the per-field rules: both derivation sites (gateway.js
+// attestation.request, crossExecute below) pass RAW host values and hash what
+// comes back, so neither restates a formula.
+//
+// Two fields are folded and the folds are consensus-load-bearing. rootActionIndex
+// goes through normalizeRootDiscriminator, never a bare Number(), or a BATCH
+// subcommand's composite '<TX_VOUT>.<position>' collapses ('3.10' -> 3.1) and
+// re-collides the roots it separates; contractIndex keeps its historical Number()
+// coercion. The indexer re-derives with a bare String() on every field
+// (attest.js/xcall.js), so the two sides agree over the input domain producers
+// emit and not outside it; that edge is measured case by case in
+// test/determinism/crossrepo-request-call-id-bytematch.test.js.
+function buildRequestIdPreimage(fields) {
+    const txHash          = fields.txHash || '';
+    const rootActionIndex = fields.rootActionIndex != null ? normalizeRootDiscriminator(fields.rootActionIndex) : '';
+    const callPath        = typeof fields.callPath === 'string' ? fields.callPath : '';
+    const contractIndex   = fields.contractIndex != null ? Number(fields.contractIndex) : '';
+    return String(txHash) + ':' + String(rootActionIndex) + ':' + callPath + ':' +
+           String(contractIndex) + ':' + fields.emissionIndex;
+}
+
+function buildCallIdPreimage(fields) {
+    const network         = fields.network || '';
+    const txHash          = fields.txHash || '';
+    const rootActionIndex = fields.rootActionIndex != null ? normalizeRootDiscriminator(fields.rootActionIndex) : '';
+    const contractIndex   = fields.contractIndex != null ? Number(fields.contractIndex) : '';
+    const callPath        = typeof fields.callPath === 'string' ? fields.callPath : '';
+    return String(network) + ':' + fields.sourceChain + ':' +
+           String(txHash) + ':' + String(rootActionIndex) + ':' +
+           String(contractIndex) + ':' + callPath + ':' +
+           fields.emissionIndex + ':' + fields.targetChain;
+}
+
 // Cross-CHAIN call (XCALL) protocol constants. Vendored single source of truth:
 // ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
 // constants.js); mirrored in src/index.js exports and re-validated host-side by
@@ -97,17 +131,10 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     const maxCallDepth = Number.isInteger(ctx.maxCallDepth) ? ctx.maxCallDepth : 4;
     const minCallGas   = Number.isInteger(ctx.minCallGas)   ? ctx.minCallGas   : 5000;
     const crossHops    = Number.isInteger(ctx.crossHops)    ? ctx.crossHops    : 0;
-    // Deterministic call-path ('>'-joined per-execution emission positions from the
-    // root on-chain action down to this execution; root = ''). Disambiguates two
-    // nested runs of the same contract in one tx without binding the injection-
-    // timing-dependent action_index. MUST byte-match the indexer (xcall EMITTER_PATH).
-    const callPath     = typeof ctx.callPath === 'string'   ? ctx.callPath     : '';
-    // Per-root discriminator (deterministic root on-chain action_index), pinned at the root
-    // and threaded unchanged. Bound into the call_id preimage alongside callPath so two
-    // forest roots under one tx_hash cannot collide. MUST byte-match the indexer (xcall.js).
-    // Normalized (not bare Number()) so a BATCH subcommand's composite
-    // "<TX_VOUT>.<position>" survives intact; see normalizeRootDiscriminator.
-    const rootActionIndex = ctx.rootActionIndex != null ? normalizeRootDiscriminator(ctx.rootActionIndex) : '';
+    // ctx.callPath (the deterministic '>'-joined call-path, root = '') and
+    // ctx.rootActionIndex (the per-root discriminator, pinned at the root) enter
+    // the call_id preimage. buildCallIdPreimage reads and normalizes them straight
+    // off ctx, so they are deliberately not re-derived into locals here.
     // Controller-guard mode disables the asynchronous cross-chain call path: a
     // guard must return its allow/deny decision synchronously, before the guarded
     // native action settles (the XCALL result would land blocks later).
@@ -282,12 +309,19 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             // unique because emission_index is per-execution; two nested runs of the
             // SAME contract each emitting their first call would collide. The call-path
             // uniquely names this execution in the call tree and is content-derived.
-            const txHash        = ctx.txHash || '';
-            const contractIndex = ctx.contractIndex != null ? Number(ctx.contractIndex) : '';
+            // Assembled by the canonical builder above (raw ctx values in, folds
+            // applied there once) so the formula is not restated at this site.
             const emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
-            const preimage = String(ctx.network || '') + ':' + sourceChain + ':' +
-                             String(txHash) + ':' + String(rootActionIndex) + ':' +
-                             String(contractIndex) + ':' + callPath + ':' + emissionIndex + ':' + targetChain;
+            const preimage = buildCallIdPreimage({
+                network:         ctx.network,
+                sourceChain:     sourceChain,
+                txHash:          ctx.txHash,
+                rootActionIndex: ctx.rootActionIndex,
+                contractIndex:   ctx.contractIndex,
+                callPath:        ctx.callPath,
+                emissionIndex:   emissionIndex,
+                targetChain:     targetChain
+            });
             const callId = crypto.createHash('sha256').update(preimage).digest('hex');
 
             gasTracker.charge(totalCharge);
@@ -466,4 +500,9 @@ const GOLDEN_VECTORS = {
 // cap: this module is the emit-time ENFORCER (crossExecute's hop gate above),
 // and src/index.js re-exports this value for the cross-service parity suite,
 // so the enforced and the parity-tested value can never diverge.
-module.exports = { buildEmitAPI, GOLDEN_VECTORS, XCALL_MAX_HOPS, normalizeRootDiscriminator };
+// The preimage builders are exported for gateway.js and for the cross-repo
+// guards, which drive the REAL derivation rather than a lookalike lambda.
+module.exports = {
+    buildEmitAPI, GOLDEN_VECTORS, XCALL_MAX_HOPS, normalizeRootDiscriminator,
+    buildRequestIdPreimage, buildCallIdPreimage
+};
