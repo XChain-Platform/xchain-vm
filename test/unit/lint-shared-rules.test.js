@@ -41,7 +41,8 @@ const fs     = require('fs');
 
 const {
     lintSource, CONSENSUS_RULES, codeSizeBytes, MAX_CODE_SIZE,
-    findBannedProtoMethods, STRIPPED_PROTO_METHOD_NAMES
+    findBannedProtoMethods, STRIPPED_PROTO_METHOD_NAMES,
+    findBannedStrippedGlobals, STRIPPED_GLOBAL_NAMES_MIRROR, ADVISORY_STRIPPED_GLOBALS
 } = require('../../src/lint-core.js');
 const { RESERVED_IDENTIFIERS } = require('../../src/metering.js');
 const PROTO = require('../../src/protocol/constants.js');
@@ -169,6 +170,108 @@ describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
             )).sort();
             assert.deepStrictEqual(STRIPPED_PROTO_METHOD_NAMES.slice().sort(), fromSandbox,
                 'lint-core mirror drifted from the sandbox neuter list');
+        });
+    });
+
+    // The sandbox deletes 24 globals so every validator computes the same result,
+    // and the shipped templates document that strip as their reason to exist
+    // ("a contract CANNOT fetch a URL directly ..."). Until this rule, exactly two
+    // of the 24 had any lint at all (WebAssembly, Promise), so a contract reading
+    // Date.now() / fetch(url) / structuredClone(v) lint-ed clean, deployed, and
+    // then threw ReferenceError on its first execution. Author-facing warning
+    // only: the sandbox strip is the enforcement, and moving the deploy verdict
+    // would need its own activation epoch.
+    describe('sandbox-stripped globals are linted (banned-stripped-global)', function () {
+        it('flags a bare stripped global as a warning, never an error', function () {
+            const r = lintSource('function f(){ return Date.now(); }');
+            assert.ok(!rules(r.errors).includes('banned-stripped-global'),
+                'must never be an error: the deploy verdict may not move');
+            const w = r.warnings.filter((x) => x.rule === 'banned-stripped-global');
+            assert.strictEqual(w.length, 1);
+            assert.strictEqual(w[0].severity, 'warning');
+            assert.match(w[0].message, /stripped global: Date at line 1/);
+            assert.match(w[0].message, /ReferenceError/);
+            assert.match(w[0].message, /xchain\./, 'must point the author at the gateway');
+        });
+
+        it('covers every advisory stripped-global name', function () {
+            for (const name of ADVISORY_STRIPPED_GLOBALS) {
+                const hits = findBannedStrippedGlobals(`function f(){ return ${name}; }`);
+                assert.strictEqual(hits.length, 1, name + ' not detected');
+                assert.strictEqual(hits[0].name, name);
+            }
+        });
+
+        it('resolves the global-object-qualified spellings', function () {
+            for (const src of ['function f(){ return globalThis.fetch(u); }',
+                'function f(){ return globalThis["setTimeout"](g); }',
+                'function f(){ return this.performance.now(); }']) {
+                const w = lintSource(src).warnings.filter((x) => x.rule === 'banned-stripped-global');
+                assert.strictEqual(w.length, 1, 'missed: ' + src);
+            }
+        });
+
+        it('is identifier-precise: a contract\'s own binding is never flagged', function () {
+            for (const src of ['function f(obj){ return obj.Date; }',
+                'function f(){ return { Date: 1 }; }',
+                'function f(){ var Date = 1; return Date; }',
+                'function f(Date){ return Date; }',
+                'function f(){ function performance(){ return 1; } return performance(); }']) {
+                const w = lintSource(src).warnings.filter((x) => x.rule === 'banned-stripped-global');
+                assert.strictEqual(w.length, 0, 'false positive on: ' + src +
+                    ' -> ' + JSON.stringify(w.map((x) => x.message)));
+            }
+            // ...but the shorthand { Date } READS the global, so it is flagged.
+            const sh = lintSource('function f(){ return { Date }; }')
+                .warnings.filter((x) => x.rule === 'banned-stripped-global');
+            assert.strictEqual(sh.length, 1, 'shorthand { Date } reads the global and must be flagged');
+        });
+
+        it('does not double-report the two names that already carry an error rule', function () {
+            // Promise and WebAssembly are the ONLY consensus-GATED entries in the
+            // strip set (kept in place below their flag days for replay), so the
+            // "the sandbox deletes it" wording is not unconditionally true for
+            // them, and banned-async / banned-wasm already fire.
+            for (const [src, errRule] of [
+                ['function f(){ return Promise.resolve(1); }', 'banned-async'],
+                ['function f(){ return WebAssembly.compile(x); }', 'banned-wasm']
+            ]) {
+                const r = lintSource(src);
+                assert.ok(rules(r.errors).includes(errRule), src + ' lost its ' + errRule);
+                assert.ok(!rules(r.warnings).includes('banned-stripped-global'),
+                    src + ' must not also warn');
+            }
+        });
+
+        it('banned-stripped-global is NOT a consensus rule and never blocks deploy', function () {
+            assert.ok(!CONSENSUS_RULES.has('banned-stripped-global'));
+            if (!XChainVM) return this.skip();
+            const { validateSyntax } = require('../../src/syntax.js');
+            assert.strictEqual(validateSyntax('function f(){ return Date.now(); }').valid, true,
+                'the on-chain deploy verdict must be exactly what it was before this rule');
+        });
+
+        it('a clean contract produces no banned-stripped-global noise', function () {
+            assert.ok(!rules(lintSource(VALID).warnings).includes('banned-stripped-global'));
+        });
+
+        it('the mirrored name list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES', function () {
+            // lint-core cannot require sandbox.js (top-level isolated-vm) and must
+            // stay byte-identical to the SDK vendored copy, so the list is mirrored.
+            // This guard is what keeps the mirror honest.
+            if (!stripGlobalsMod || !stripGlobalsMod.STRIPPED_GLOBAL_NAMES) return this.skip();
+            assert.deepStrictEqual(
+                STRIPPED_GLOBAL_NAMES_MIRROR.slice().sort(),
+                [...stripGlobalsMod.STRIPPED_GLOBAL_NAMES].sort(),
+                'lint-core mirror drifted from the sandbox strip list; a name missing here ' +
+                'is a global that lints clean, deploys, and throws on first execution');
+        });
+
+        it('the advisory set is the mirror minus exactly the two flag-day-gated names', function () {
+            assert.deepStrictEqual(
+                STRIPPED_GLOBAL_NAMES_MIRROR.filter((n) => ADVISORY_STRIPPED_GLOBALS.indexOf(n) === -1),
+                ['Promise', 'WebAssembly'],
+                'only the consensus-gated entries may be held out of the advisory set');
         });
     });
 

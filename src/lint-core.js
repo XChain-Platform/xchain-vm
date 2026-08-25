@@ -92,6 +92,39 @@ const STRIPPED_PROTO_METHOD_NAMES = [
 ];
 const REGEX_COERCING_METHODS = new Set(['match', 'matchAll', 'search']);
 
+// The sandbox's deleted GLOBALS (sandbox.js STRIPPED_GLOBAL_NAMES). Mirrored
+// here for the same dependency-light reason as the proto methods above, with
+// one extra constraint that rules the alternative out: sandbox.js requires
+// isolated-vm at its top level, and this file must load in the SDK and the
+// browser where no isolate exists. A parity test (test/unit/lint-shared-rules.js)
+// asserts the mirror stays equal to sandbox.js wherever the binding loads.
+// Order follows sandbox.js.
+const STRIPPED_GLOBAL_NAMES_MIRROR = [
+    'Date', 'setTimeout', 'setInterval', 'setImmediate',
+    'clearTimeout', 'clearInterval', 'clearImmediate',
+    'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
+    'fetch', 'XMLHttpRequest', 'WebSocket',
+    'SharedArrayBuffer', 'Atomics',
+    'queueMicrotask', 'Promise',
+    'BigInt',
+    'WebAssembly',
+    'Intl', 'Temporal', 'structuredClone', 'performance'
+];
+
+// The subset this file WARNS on. Two names are held out, and neither is a gap:
+//   - Promise and WebAssembly are the only CONSENSUS-GATED entries in the strip
+//     set (sandbox.js stripGlobals keeps them in place below their flag days for
+//     from-genesis replay), so "the sandbox deletes it, this throws at runtime"
+//     is not unconditionally true for them. Both already carry an ERROR-severity
+//     rule that fires regardless of the runtime gate (banned-async, banned-wasm),
+//     so holding them out loses no signal and avoids double-reporting one line.
+// Everything else is stripped from genesis on every network, so the warning's
+// claim holds unconditionally. BigInt stays IN: banned-literal covers only the
+// `2n` literal form, and `BigInt("1")` lints clean today while throwing at
+// runtime.
+const ADVISORY_STRIPPED_GLOBALS = STRIPPED_GLOBAL_NAMES_MIRROR
+    .filter((n) => n !== 'Promise' && n !== 'WebAssembly');
+
 // True if `node` is a static reference to the global Math object: the bare
 // identifier `Math`, or a global-object-qualified form (`globalThis.Math` /
 // `globalThis['Math']` / `globalThis[\`Math\`]`, the last via a template
@@ -621,6 +654,73 @@ function findBannedWasm(code, aliased) {
 }
 
 /**
+ * Scan contract code for reads of a global the sandbox DELETES
+ * (ADVISORY_STRIPPED_GLOBALS). Author-facing WARNING only: the deploy gate
+ * blocks on CONSENSUS_RULES and this rule is deliberately not in it, so the
+ * on-chain verdict is byte-for-byte what it was before this rule existed. What
+ * it buys is that a contract reaching `Date.now()`, `fetch(url)` or
+ * `structuredClone(v)` is told so at lint time, instead of deploying clean and
+ * throwing ReferenceError on its FIRST execution inside the isolate.
+ *
+ * Deliberately a SEPARATE walk rather than a generalization of findBannedWasm:
+ * that scanner feeds the error-severity, CONSENSUS_RULES-member `banned-wasm`
+ * whose findings are gated into the on-chain deploy verdict, so refactoring it
+ * to serve an advisory rule would put a consensus surface at risk for a
+ * cosmetic saving. The matching logic here is deliberately identical to it.
+ *
+ * Identifier-precise, exactly as findBannedWasm is: the property position of a
+ * non-computed member access (`obj.Date`), a non-computed object-literal key
+ * (`{ Date: 1 }`) and an identifier resolving to an in-scope local declaration
+ * are all skipped, so a contract's own binding is never flagged. Shorthand
+ * `{ Date }` IS flagged (acorn materializes a distinct value node). The
+ * global-object-qualified spellings (`globalThis.fetch`, `globalThis['fetch']`,
+ * and under `aliased` `this.fetch`) are flagged through isGlobalObjectRef.
+ *
+ * @param {string} code - Contract source code
+ * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
+ * @param {string[]} [names] - name set to scan for (defaults to
+ *        ADVISORY_STRIPPED_GLOBALS; injectable so tests can drive one name)
+ * @returns {Array<{name: string, line: (number|string)}>}
+ */
+function findBannedStrippedGlobals(code, aliased, names) {
+    if (aliased === undefined) aliased = true;
+    const wanted = new Set(names || ADVISORY_STRIPPED_GLOBALS);
+    const hits = [];
+    let ast;
+    try {
+        ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
+    } catch (e) {
+        // Parse failure; lintSource's metering pass reports it as blocking.
+        return hits;
+    }
+    walk.ancestor(ast, {
+        Identifier(node, state, ancestors) {
+            if (!wanted.has(node.name)) return;
+            const parent = ancestors.length >= 2 ? ancestors[ancestors.length - 2] : null;
+            if (parent) {
+                if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
+                if (parent.type === 'Property' && parent.key === node && !parent.computed) return;
+            }
+            // An in-scope local of the same name is the contract's own binding, not
+            // the global. Same deterministic ancestor-scope approximation the
+            // consensus scanners use; it fails CLOSED (warn) on a miss, which for a
+            // warning costs an author one false line and never a red build.
+            for (let i = ancestors.length - 2; i >= 0; i--) {
+                if (scopeDeclares(ancestors[i], node.name)) return;
+            }
+            hits.push({ name: node.name, line: node.loc ? node.loc.start.line : '?' });
+        },
+        MemberExpression(node) {
+            if (!isGlobalObjectRef(node.object, aliased)) return;
+            const key = staticMemberKey(node);
+            if (key && wanted.has(key))
+                hits.push({ name: key, line: node.loc ? node.loc.start.line : '?' });
+        }
+    });
+    return hits;
+}
+
+/**
  * Scan contract code for non-integer (decimal) number literals (a non-blocking
  * warning that native float arithmetic is being used). Returns structured rules;
  * checkFloatWarnings flattens these to their message strings.
@@ -1127,6 +1227,29 @@ function lintSource(code, opts) {
         });
     }
 
+    // 7b. Sandbox-DELETED globals. sandbox.js removes these from the isolate so
+    //     every validator computes the same result from the same inputs, which
+    //     means a contract that reads one deploys clean and then throws
+    //     ReferenceError on its FIRST execution. Only WebAssembly (banned-wasm)
+    //     and Promise (banned-async) had a rule; the other 22 names had none, so
+    //     the shipped templates' own promise ("a contract CANNOT fetch a URL
+    //     directly: the sandbox strips fetch, Date, timers") was unenforced by
+    //     any static check. WARNING severity and deliberately NOT a
+    //     CONSENSUS_RULE: the sandbox strip is the load-bearing enforcement and
+    //     is already unconditional, so promoting this to a deploy-blocking rule
+    //     would move on-chain verdicts and needs its own activation epoch.
+    for (const hit of findBannedStrippedGlobals(code, globalAlias)) {
+        warnings.push({
+            rule: 'banned-stripped-global',
+            message: 'stripped global: ' + hit.name + ' at line ' + hit.line +
+                     '; the sandbox deletes it so every validator computes the same result, ' +
+                     'so this throws ReferenceError at runtime. Use the xchain.* gateway instead ' +
+                     '(e.g. xchain.attestation.request to read a URL, blockContext.timestamp for time)',
+            line: typeof hit.line === 'number' ? hit.line : null,
+            severity: 'warning'
+        });
+    }
+
     // Move 2: logic-level advisories (crossCallable integrity, gas/footgun heuristics).
     // These run AFTER the consensus checks above and NEVER affect the deploy verdict.
     // validateSyntax blocks only on CONSENSUS_RULES. analyzeContract is fully wrapped so
@@ -1148,10 +1271,13 @@ module.exports = {
     findBannedWasm,
     findBannedExponentiation,
     findBannedProtoMethods,
+    findBannedStrippedGlobals,
     findReservedControlBinding,
     codeSizeBytes,
     MAX_CODE_SIZE,
     STRIPPED_PROTO_METHOD_NAMES,
+    STRIPPED_GLOBAL_NAMES_MIRROR,
+    ADVISORY_STRIPPED_GLOBALS,
     findFloatWarnings,
     CONSENSUS_RULES,
     CONTRACT_ECMA_VERSION,

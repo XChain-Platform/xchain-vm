@@ -24,7 +24,8 @@ const {
     ContractSimulator,
     DEFAULT_GAS_SCHEDULE,
     DEFAULT_LIMITS,
-    DEFAULT_BLOCK_TIME
+    DEFAULT_BLOCK_TIME,
+    GUARD_GAS_CEILING
 } = require('./simulator.js');
 const { runGate, estimateGas } = require('./gate.js');
 const { buildScaffold, writeScaffold } = require('./scaffold.js');
@@ -44,6 +45,7 @@ module.exports = {
     DEFAULT_GAS_SCHEDULE,
     DEFAULT_LIMITS,
     DEFAULT_BLOCK_TIME,
+    GUARD_GAS_CEILING,
     runGate,
     estimateGas,
     buildScaffold,

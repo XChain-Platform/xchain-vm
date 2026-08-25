@@ -198,8 +198,13 @@ runGate(source);                        // { ok, errors, advisories, warnings, g
 
 const sim = new ContractSimulator({ coin: 'BTC' });
 sim.setBalance('alice', 'GOLD', '1000');   // seed read-only ledger/oracle state
+sim.setAttestationResponse('req-1', '{"ok":true}');  // and the async read surfaces
 const { contractIndex } = await sim.deploy(source, { constructorParams: ['5'] });
 const res = await sim.call(contractIndex, 'increment', ['3']); // state persists across calls
+
+// A controller-bound guard runs in the mode the indexer runs it: isGuard on
+// (attestation.request / emit.crossExecute throw) at the 200000 guard ceiling.
+const verdict = await sim.callGuard(contractIndex, { actionType: 'SEND', from: 'alice', tick: 'GOLD' });
 await sim.close();
 ```
 
@@ -214,7 +219,7 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 | Command | Description |
 |---|---|
 | `npm test` | Unit tests (669 tests, 30s timeout) |
-| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (52 tests) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (70 tests) |
 | `npm run test:integration` | Integration tests (164 tests) |
 | `npm run test:security` | Security tests (201 tests) |
 | `npm run test:boundary` | Boundary condition tests (115 tests) |

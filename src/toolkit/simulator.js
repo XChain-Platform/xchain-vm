@@ -26,8 +26,15 @@
  *     commits VM output to the contract's state rows).
  *   - block lifecycle: beginBlock / endBlock bracket execution; the compile
  *     cache is per-block and cleared on advance.
- *   - read-only snapshots: balances, tokenInfo, and the oracle are passed as
- *     the same plain-snapshot shapes the indexer threads into execute().
+ *   - read-only snapshots: balances, tokenInfo, the oracle, cross-chain,
+ *     attestation, poll and contract-stake data are passed as the same
+ *     plain-snapshot shapes the indexer threads into execute().
+ *   - controller-guard mode: callGuard() reproduces the indexer's
+ *     runControllerGuard invocation (method `guard`, seven positional string
+ *     params, isGuard, attestationData null, callPath '') at the same
+ *     GUARD_GAS_CEILING the coin configs set, so a guard calling
+ *     attestation.request / emit.crossExecute fails in simulation exactly as
+ *     it fails on chain instead of simulating green at 5x the gas headroom.
  *   - failure atomicity: on a reverted / out-of-gas / errored call the VM
  *     returns empty stateChanges + emittedActions, so nothing is committed.
  *   - metering activation: the default block time sits at the VM's newest
@@ -41,6 +48,17 @@
  *     the author seeds.
  *   - resolve emit.execute / emit.crossExecute call trees. Those emissions are
  *     captured; the callee is not auto-run.
+ *   - ASSIGN the identity discriminators a real node assigns. txHash,
+ *     actionIndex, rootActionIndex and callPath default to empty/null and are
+ *     only forwarded, never derived, so a simulated request_id / call_id
+ *     matches chain only when the caller supplies the real values.
+ *   - populate the read-only snapshots. They start empty and read back
+ *     null / '0' / [] until seeded, which is the same answer a node gives for
+ *     data that genuinely does not exist; a stale seed is the author's.
+ *   - adjudicate a guard's VERDICT. callGuard runs the guard and commits its
+ *     state on VM success; the indexer additionally parses the returned
+ *     payoutLegs and DENIES (committing nothing) on a malformed leg or one
+ *     over CONTROLLER_MAX_TAKE_BPS. Assert the returnValue yourself.
  *
  * Runtime: execution needs the isolated-vm binding, which loads on Node 22 /
  * Linux (the whole platform's runtime). On a macOS dev box the binding cannot
@@ -91,6 +109,28 @@ const GATE_BLOCK_TIMES = Object.keys(XChainVM)
     .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
     .map((k) => XChainVM[k]);
 const DEFAULT_BLOCK_TIME = GATE_BLOCK_TIMES.length ? Math.max(...GATE_BLOCK_TIMES) : 1786060800;
+
+// Gas ceiling a controller guard runs under. The indexer reads it from
+// GAS_SCHEDULE.VM_GUARD_GAS_CEILING per coin (xchain-indexer/src/coins/BTC.js,
+// DOGE.js, LTC.js all set 200000) and REFUSES to default it
+// (utility.resolveGuardGasCeiling throws when it is missing), so there is no
+// canonical value to import; this is a second home for that number and a
+// deliberate one. A guard's real headroom is 5x smaller than the simulator's
+// 1000000 default, which is the whole reason it is pinned here rather than
+// left to the author. test/toolkit/simulator.test.js pins the value so a
+// change is a test-breaking act, never a silent one.
+const GUARD_GAS_CEILING = 200000;
+
+// Method name the indexer invokes on a token's bound controller contract
+// (xchain-indexer/src/actions/execute.js GUARD_METHOD).
+const GUARD_METHOD = 'guard';
+
+// Positional, all-string guard inputs, in consensus order
+// (xchain-indexer/src/actions/execute.js runControllerGuard). Named here so
+// callGuard cannot drift from the order the chain actually passes.
+const GUARD_PARAM_ORDER = Object.freeze([
+    'actionType', 'from', 'to', 'tick', 'amount', 'price', 'proceedsTick'
+]);
 
 const DEFAULT_LIMITS = Object.freeze({
     maxCpuTimeMs: 30000,
@@ -148,6 +188,13 @@ class ContractSimulator {
         this.tokenInfo = {};       // tick -> info object
         this.oracle = { snapshotAge: 0, prices: {}, rounds: {} };
         this.crossChainData = { attestations: {}, settled: {}, calls: {} };
+        // The remaining read-only snapshots the gateway reads. Shapes are the
+        // ones src/readonly-accessors.js documents; an empty snapshot is
+        // behaviour-identical to a null one, because the gateway's own
+        // null-guards return the same null / '0' / [] it resolves to.
+        this.attestationData   = { responses: {} };
+        this.pollData          = { polls: {} };
+        this.contractStakeData = { stakeByPubkeyTick: {}, totalByTick: {}, stakersByTick: {} };
 
         // Deployed contracts: index -> { code, address, state }
         this.contracts = new Map();
@@ -209,6 +256,81 @@ class ContractSimulator {
     /** Set the oracle snapshot age (seconds) reported by getSnapshotAge(). */
     setOracleSnapshotAge(seconds) {
         this.oracle.snapshotAge = Number(seconds);
+        return this;
+    }
+
+    /**
+     * Seed a settled ATTEST response (read by attestation.getResponse in a
+     * callback method). Keys are request_ids; the simulator does not derive
+     * them, so pass the id your callback will be handed.
+     */
+    setAttestationResponse(requestId, value) {
+        this.attestationData.responses[String(requestId)] = value;
+        return this;
+    }
+
+    /**
+     * Seed a finalized VOTE poll result (read by poll.getPollResult).
+     * @param {number|string} pollIndex - the VOTE v0 action_index
+     * @param {object} result - { status, winning_option, total_weight,
+     *        total_voters, decided_early, options:[{index,weight,voters}] }
+     */
+    setPollResult(pollIndex, result) {
+        this.pollData.polls[String(pollIndex)] = result;
+        return this;
+    }
+
+    /**
+     * Seed one staker's stake on THIS contract, keeping the three derived
+     * views the accessor reads in agreement. `stakersByTick` is what
+     * stake.getStakers returns verbatim, so it is kept sorted by descending
+     * amount here the way the indexer pre-sorts it.
+     * @param {string} pubkey
+     * @param {string} tick
+     * @param {string|number} amount
+     */
+    setStake(pubkey, tick, amount) {
+        const pk = String(pubkey || '').toLowerCase();
+        const tk = String(tick || '');
+        const amt = String(amount);
+        const key = pk + '|' + tk;
+        const prev = this.contractStakeData.stakeByPubkeyTick[key];
+        this.contractStakeData.stakeByPubkeyTick[key] = amt;
+
+        const list = (this.contractStakeData.stakersByTick[tk] || []).filter((s) => s.pubkey !== pk);
+        if (Number(amt) !== 0) list.push({ pubkey: pk, amount: amt });
+        list.sort((a, b) => (Number(b.amount) - Number(a.amount)) || (a.pubkey < b.pubkey ? -1 : 1));
+        this.contractStakeData.stakersByTick[tk] = list;
+
+        // Recomputed from the roster rather than accumulated, so re-seeding the
+        // same pubkey replaces its stake instead of double-counting it (prev is
+        // read only to make that intent explicit at the call site).
+        void prev;
+        this.contractStakeData.totalByTick[tk] =
+            String(list.reduce((sum, s) => sum + Number(s.amount), 0));
+        return this;
+    }
+
+    /** Seed a cross-chain attestation value (read by crosschain.getAttestation). */
+    setCrossChainAttestation(chain, actionIndex, value) {
+        this.crossChainData.attestations[String(chain) + ':' + String(actionIndex)] = value;
+        return this;
+    }
+
+    /** Mark a cross-chain action settled (read by crosschain.isSettled). */
+    setCrossChainSettled(chain, actionIndex, settled = true) {
+        this.crossChainData.settled[String(chain) + ':' + String(actionIndex)] = settled === true;
+        return this;
+    }
+
+    /**
+     * Seed the terminal outcome of a cross-chain call this chain originated
+     * (read by crosschain.getCallResult). Keys are lower-cased call_ids,
+     * matching the accessor's own lookup.
+     */
+    setCallResult(callId, result) {
+        this.crossChainData.calls[String(callId).toLowerCase()] =
+            { status: String(result && result.status), payload: String(result && result.payload) };
         return this;
     }
 
@@ -300,9 +422,58 @@ class ContractSimulator {
      * @param {object} [opts]
      * @param {string} [opts.caller]
      * @param {number} [opts.gasLimit] - per-call ceiling (clamped to gasCeiling)
+     * @param {string} [opts.txHash]   - identity pass-throughs. Forwarded
+     * @param {number} [opts.actionIndex]       verbatim; the VM does its own
+     * @param {string|number} [opts.rootActionIndex]  normalization. Supply them
+     * @param {string} [opts.callPath]          to make a derived request_id /
+     * @param {number} [opts.callDepth]         call_id match a real one.
+     * @param {object} [opts.providerDeadlines] - ATTEST provider deadline windows
      * @returns {Promise<object>} the VM execute() result, unchanged.
      */
     async call(contractIndex, method = 'default', params = [], opts = {}) {
+        return this._execute(contractIndex, method, params, opts, null);
+    }
+
+    /**
+     * Run a token's bound controller contract in the mode the indexer runs it,
+     * mirroring runControllerGuard (xchain-indexer/src/actions/execute.js).
+     *
+     * Guard mode is a MODE, not a flag on call(), on purpose: under isGuard the
+     * chain also passes attestationData null, callPath '' and a 5x smaller gas
+     * ceiling. A raw flag lets an author set one of those four and simulate a
+     * combination the chain never produces.
+     *
+     * @param {number} contractIndex
+     * @param {object} action - { actionType, from, to, tick, amount, price,
+     *        proceedsTick }; each is coerced to a string, absent becomes ''.
+     * @param {object} [opts] - as call(), except attestationData is forced null
+     *        and callPath is forced ''. gasLimit still overrides the ceiling.
+     * @returns {Promise<object>} the VM execute() result, unchanged.
+     */
+    async callGuard(contractIndex, action = {}, opts = {}) {
+        const params = GUARD_PARAM_ORDER.map((k) => {
+            const v = action[k];
+            return (v === undefined || v === null) ? '' : String(v);
+        });
+        return this._execute(contractIndex, GUARD_METHOD, params, opts, {
+            isGuard: true,
+            // A guard has no attestation-request surface (the gateway disables
+            // attestation.request under isGuard), so the chain keeps its read
+            // surface narrow by passing null here. Seeded responses are NOT
+            // visible to a guard, and that is the point.
+            attestationData: null,
+            // A guard is a root execution for its own subtree.
+            callPath: '',
+            gasCeiling: (opts.gasLimit != null) ? Number(opts.gasLimit) : GUARD_GAS_CEILING
+        });
+    }
+
+    /**
+     * Shared execute path for call() and callGuard(). `modeOverrides` is applied
+     * LAST so a mode owns the keys it pins; everything else stays exactly as
+     * call() has always built it.
+     */
+    async _execute(contractIndex, method, params, opts, modeOverrides) {
         const contract = this.contracts.get(Number(contractIndex));
         if (!contract) {
             throw new Error('no contract deployed at index ' + contractIndex);
@@ -326,9 +497,23 @@ class ContractSimulator {
             balances: this.balances,
             tokenInfo: this.tokenInfo,
             oracleData: this.oracle,
-            crossChainData: this.crossChainData
+            crossChainData: this.crossChainData,
+            attestationData: this.attestationData,
+            pollData: this.pollData,
+            contractStakeData: this.contractStakeData,
+            // Identity fields. The VM defaults every one of these itself
+            // (txHash '', actionIndex null, rootActionIndex null, callPath '',
+            // callDepth 0, providerDeadlines null), so an omitted opt lands on
+            // exactly the value the simulator produced before they existed.
+            txHash: opts.txHash != null ? String(opts.txHash) : '',
+            actionIndex: opts.actionIndex != null ? Number(opts.actionIndex) : null,
+            rootActionIndex: opts.rootActionIndex != null ? opts.rootActionIndex : null,
+            callPath: typeof opts.callPath === 'string' ? opts.callPath : '',
+            callDepth: Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
+            providerDeadlines: opts.providerDeadlines || null
         };
         if (opts.gasLimit != null) execOpts.gasCeiling = Number(opts.gasLimit);
+        if (modeOverrides) Object.assign(execOpts, modeOverrides);
 
         const result = await this.vm.execute(execOpts);
 
@@ -376,4 +561,7 @@ class ContractSimulator {
     }
 }
 
-module.exports = { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME };
+module.exports = {
+    ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME,
+    GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER
+};

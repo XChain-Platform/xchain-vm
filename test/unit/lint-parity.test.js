@@ -30,7 +30,7 @@ const fs     = require('fs');
 const path   = require('path');
 
 const { validateSyntax, checkFloatWarnings } = require('../../src/syntax.js');
-const { lintSource, CONSENSUS_RULES } = require('../../src/lint-core.js');
+const { lintSource, CONSENSUS_RULES, findBannedStrippedGlobals } = require('../../src/lint-core.js');
 
 const VM_SRC_DIR     = path.join(__dirname, '..', '..', 'src');
 const SDK_VENDOR_DIR = path.join(__dirname, '..', '..', '..', 'xchain-sdk', 'src', 'contract');
@@ -194,6 +194,33 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                     const code = fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8');
                     const v = validateSyntax(code);
                     assert.strictEqual(v.valid, true, 'patterns/' + f + ' rejected: ' + (v.error || ''));
+                });
+            }
+
+            // The shipped templates advertise the sandbox strip as their reason to
+            // exist ("a contract CANNOT fetch a URL directly: the VM sandbox strips
+            // fetch, Date, timers ... instead the contract ASKS the network to read
+            // the URL for it"). banned-stripped-global is warning severity, so
+            // bin/lint.js exits 0 on it and validateSyntax above stays green even
+            // for a template that broke that promise. THIS is the assertion that
+            // fails the build on such an edit: a shipped source may never read a
+            // global the isolate deletes, or it throws on its first execution.
+            for (const name of dirs) {
+                it(name + ' reads no sandbox-stripped global', function () {
+                    const code = fs.readFileSync(path.join(CONTRACTS_DIR, name, name + '.js'), 'utf8');
+                    const hits = findBannedStrippedGlobals(code);
+                    assert.deepStrictEqual(hits, [], name + ' reads ' +
+                        hits.map((h) => h.name + '@' + h.line).join(', ') +
+                        '; the sandbox deletes it, so this template throws at runtime');
+                });
+            }
+            for (const f of patterns) {
+                it('patterns/' + f + ' reads no sandbox-stripped global', function () {
+                    const code = fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8');
+                    const hits = findBannedStrippedGlobals(code);
+                    assert.deepStrictEqual(hits, [], 'patterns/' + f + ' reads ' +
+                        hits.map((h) => h.name + '@' + h.line).join(', ') +
+                        '; the sandbox deletes it, so this pattern throws at runtime');
                 });
             }
         }
