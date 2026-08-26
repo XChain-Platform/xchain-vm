@@ -20,7 +20,13 @@
  ********************************************************************/
 // @ts-nocheck
 
-const { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS } = require('./simulator.js');
+const {
+    ContractSimulator,
+    DEFAULT_GAS_SCHEDULE,
+    DEFAULT_LIMITS,
+    DEFAULT_BLOCK_TIME,
+    GUARD_GAS_CEILING
+} = require('./simulator.js');
 const { runGate, estimateGas } = require('./gate.js');
 const { buildScaffold, writeScaffold } = require('./scaffold.js');
 const { isTypeScript, stripTypes, toContractJs } = require('./transpile.js');
@@ -38,6 +44,8 @@ module.exports = {
     ContractSimulator,
     DEFAULT_GAS_SCHEDULE,
     DEFAULT_LIMITS,
+    DEFAULT_BLOCK_TIME,
+    GUARD_GAS_CEILING,
     runGate,
     estimateGas,
     buildScaffold,

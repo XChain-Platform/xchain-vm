@@ -24,7 +24,7 @@
 
 const crypto = require('crypto');
 const { ContractRevertError } = require('./errors.js');
-const { buildEmitAPI, normalizeRootDiscriminator } = require('./gateway-emit.js');
+const { buildEmitAPI, buildRequestIdPreimage } = require('./gateway-emit.js');
 const { buildMathAPI } = require('./math.js');
 
 // contract.slash amount forms, pre- and post-activation.
@@ -254,20 +254,17 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // (action_index advanced with injection timing and forked the PBFT).
                 // MUST byte-match the indexer's re-derivation in
                 // xchain-indexer/src/actions/attest.js (_parseRequest, EMITTER_PATH).
-                let txHash          = readOnlyData.txHash || '';
-                // Per-root discriminator (deterministic root on-chain action_index). Without it,
-                // two forest roots under one tx_hash (e.g. a top-level EXECUTE and a controlled-
-                // token guard, both seeding callPath '') derive the SAME request_id. Pinned at the
-                // root, threaded unchanged. MUST byte-match the indexer (attest.js ROOT_ACTION_INDEX).
-                // A BATCH's subcommands are each a root action under ONE TX_VOUT, so for those the
-                // host sends the composite "<TX_VOUT>.<subcommand position>"; it is normalized, not
-                // Number()-folded, or two EXECUTE subcommands on one contract collide again
-                // (see normalizeRootDiscriminator in gateway-emit.js).
-                let rootActionIndex = readOnlyData.rootActionIndex != null ? normalizeRootDiscriminator(readOnlyData.rootActionIndex) : '';
-                let callPath        = typeof readOnlyData.callPath === 'string' ? readOnlyData.callPath : '';
-                let contractIndex   = readOnlyData.contractIndex != null ? Number(readOnlyData.contractIndex) : '';
-                let emissionIndex   = emissionCollector.actions ? emissionCollector.actions.length : 0;
-                let preimage = String(txHash) + ':' + String(rootActionIndex) + ':' + callPath + ':' + String(contractIndex) + ':' + emissionIndex;
+                // Assembled by buildRequestIdPreimage (gateway-emit.js), which owns the
+                // per-field normalization for both preimage classes; raw readOnlyData
+                // values go in.
+                let emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
+                let preimage = buildRequestIdPreimage({
+                    txHash:          readOnlyData.txHash,
+                    rootActionIndex: readOnlyData.rootActionIndex,
+                    callPath:        readOnlyData.callPath,
+                    contractIndex:   readOnlyData.contractIndex,
+                    emissionIndex:   emissionIndex
+                });
                 let requestId = crypto.createHash('sha256').update(preimage).digest('hex');
 
                 emissionCollector.add('ATTEST', {

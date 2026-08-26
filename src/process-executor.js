@@ -26,7 +26,14 @@
  *
  * Protocol (parent → child): {type:'init',config} | {type:'beginBlock'} |
  *   {type:'endBlock'} | {type:'execute',id,opts}
- * Protocol (child → parent): {type:'ready'} | {type:'result',id,result}
+ * Protocol (child → parent): {type:'ready'} | {type:'result',id,result} |
+ *   {type:'hostfault',id,reason}
+ *
+ * The two failure kinds are NOT interchangeable. An execution that never
+ * reached the contract because of a LOCAL host fault (no isolate could be
+ * spawned on this machine) REJECTS with HostFaultError, so the caller halts
+ * and retries; only an execution where the contract actually ran and killed
+ * the worker resolves hostTerminatedResult.
  ********************************************************************/
 // @ts-nocheck
 
@@ -164,6 +171,28 @@ class ProcessExecutor {
             // The in-flight slot is free again: dispatch the next queued entry
             // (single-in-flight invariant; see _flush). Its watchdog starts
             // NOW, at its own dispatch, never during its queue wait.
+            this._flush();
+            return;
+        }
+        if (msg.type === 'hostfault') {
+            // The worker reached vm.execute() and it raised a HostFaultError: THIS
+            // machine could not spawn an isolate for the contract (execution isolate
+            // or the execute-time lint isolate). No contract code ran, so there is no
+            // contract outcome to commit, and every healthy peer commits the normal
+            // result. REJECT, exactly as the broken-latch and shutdown() paths below
+            // already do for never-dispatched work: the caller halts and retries
+            // (the indexer's faultGuard.rethrowIfInfraFault reads EXECUTOR_UNAVAILABLE).
+            // Resolving hostTerminatedResult here instead would commit
+            // 'out_of_resource' at gasUsed = ceiling and fork this node off the chain.
+            const entry = this._pending.get(msg.id);
+            if (!entry) return;   // already settled by the watchdog or an exit
+            this._pending.delete(msg.id);
+            if (entry.timer) clearTimeout(entry.timer);
+            entry.reject(new HostFaultError(msg.reason || 'executor unavailable'));
+            // The worker is alive and its slot is free: dispatch the next queued
+            // entry, same as the result path. Deliberately NOT touching _broken or
+            // _consecutiveSpawnFailures -- the worker started fine, so the
+            // spawn-failure machinery has nothing to count.
             this._flush();
         }
     }

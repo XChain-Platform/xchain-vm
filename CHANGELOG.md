@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-08-25
+
+### Fixed
+- Consolidated the request-id/call-id preimage assembly into one shared implementation and closed a blind spot in the cross-repo consistency check that could not see per-field drift.
+- The developer-toolkit lint gate now covers all five shipped contract-pattern sources instead of only the ones with a same-named entry file.
+- The linter now warns when contract code reads a global the sandbox strips at runtime (for example Date, fetch, structuredClone), instead of leaving most of them uncovered.
+
 ## [0.10.0] - 2026-08-18
 
 Consensus-affecting changes in this release ship behind per-chain activation

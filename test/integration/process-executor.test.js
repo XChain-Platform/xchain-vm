@@ -357,6 +357,91 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
             // shutdown() already ran above; calling again is a harmless no-op.
         }
     });
+
+    // The DISPATCHED half of the halt-vs-fabricate rule, end to end through the
+    // real worker. index.js raises HostFaultError when createIsolate() fails on
+    // THIS host (memory pressure, thread-creation failure) and _classifyError
+    // re-throws it precisely so no verdict is written. Swallowing that into
+    // process.exit(1) makes _onExit commit
+    // 'out_of_resource: execution host terminated' at gasUsed = ceiling for an
+    // execution every healthy peer commits as a success -- a unilateral fork.
+    //
+    // maxMemory below isolated-vm's 8 MB floor makes `new ivm.Isolate` throw for
+    // real, so the whole production path runs: isolate.js -> index.js:2192
+    // HostFaultError -> _classifyError re-throw -> the worker's catch. Nothing is
+    // stubbed, so a regression on either side of the IPC seam reddens this.
+    it('a dispatched execution REJECTS on a host-local isolate-spawn failure (never out_of_resource)', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const { HostFaultError } = require('../../src/errors.js');
+        const exec = new ProcessExecutor({
+            gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING,
+            limits: { ...LIMITS, maxMemory: 1 }
+        });
+        exec.beginBlock();
+        try {
+            const p = exec.execute({ ...BASE, code: `module.exports = function(){ return 1; };` });
+            let settled = null;
+            await p.then((r) => { settled = { resolved: r }; }, (e) => { settled = { rejected: e }; });
+
+            assert.ok(!settled.resolved,
+                'a host-local fault must not resolve a contract outcome, got: ' +
+                JSON.stringify(settled.resolved));
+            const e = settled.rejected;
+            assert.ok(e instanceof HostFaultError && e.code === 'EXECUTOR_UNAVAILABLE',
+                'must reject with HostFaultError so the indexer halts and retries, got: ' + e);
+            assert.match(e.message, /isolate unavailable/,
+                'the reason string must survive the IPC hop for incident diagnosis: ' + e.message);
+
+            // The worker never ran a contract, so it must still be alive and
+            // dispatchable: no respawn, no spawn-failure accounting, no broken latch.
+            assert.ok(exec._child && exec._child.connected, 'the worker must not have been killed');
+            assert.strictEqual(exec._broken, false, 'a per-execution host fault is not the broken latch');
+            assert.strictEqual(exec._consecutiveSpawnFailures, 0, 'the worker started fine; nothing to count');
+            assert.strictEqual(exec._pending.size, 0, 'the in-flight slot must be released');
+        } finally {
+            await exec.shutdown();
+        }
+    });
+
+    // The reject path must also free the dispatch slot. Without the _flush() in
+    // the hostfault branch the queued entry behind the faulted one would sit in
+    // _queue forever (no result, no exit, no watchdog: it was never dispatched),
+    // hanging the block instead of halting it.
+    it('a queued execution behind a host fault still dispatches (the slot is released)', async function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const { HostFaultError } = require('../../src/errors.js');
+        const exec = new ProcessExecutor({
+            gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING,
+            limits: { ...LIMITS, maxMemory: 1 }
+        });
+        exec.beginBlock();
+        try {
+            const first  = exec.execute({ ...BASE, code: `module.exports = function(){ return 'a'; };` });
+            const second = exec.execute({ ...BASE, code: `module.exports = function(){ return 'b'; };` });
+            // Both faults are host-local on this executor, so both must REJECT.
+            // The point is that the second one settles at all.
+            await assert.rejects(first,  (e) => e instanceof HostFaultError);
+            await assert.rejects(second, (e) => e instanceof HostFaultError,
+                'the entry queued behind a host fault must dispatch, not stall');
+            assert.strictEqual(exec._queue.length, 0, 'the queue must have drained');
+        } finally {
+            await exec.shutdown();
+        }
+    });
+
+    // A hostfault message naming an id the parent has already settled (watchdog
+    // fired first, or the worker died in the same tick) must be a no-op, never a
+    // second settle on a resolved promise.
+    it('a hostfault for an unknown id is ignored', function () {
+        const ProcessExecutor = require('../../src/process-executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        try {
+            exec._onMessage({ type: 'hostfault', id: 999999, reason: 'stale' });
+            assert.strictEqual(exec._pending.size, 0);
+        } finally {
+            exec.shutdown();
+        }
+    });
 });
 
 // Single-in-flight dispatch invariant. The per-entry watchdog starts at

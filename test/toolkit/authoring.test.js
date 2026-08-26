@@ -32,6 +32,13 @@ const {
 } = require('../../src/toolkit/authoring.js');
 const { runGate } = require('../../src/toolkit/gate.js');
 
+// sandbox.js requires isolated-vm at the top level, so it is loaded defensively
+// (same convention as test/unit/lint-shared-rules.test.js): the strip-set parity
+// guard below runs for real on Node 22 / Linux and skips where the binding
+// cannot dlopen. Everything else in this suite stays isolate-free.
+let sandboxMod = null;
+try { sandboxMod = require('../../src/sandbox.js'); } catch (e) { /* no isolate */ }
+
 // A gate-clean counter contract used as the model's "good" answer.
 const CLEAN_CONTRACT = `// SPDX-License-Identifier: MIT
 module.exports = {
@@ -83,6 +90,31 @@ describe('Toolkit authoring: knowledge base', function () {
         assert(KNOWLEDGE.conceptMap.some(r => /msg\.value/.test(r.solidity)));
     });
 
+    it('the taught stripped-global list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES', function () {
+        // authoring.js must stay isolated-vm-free (the gate is pure acorn and the
+        // harness is meant to run on any OS), so it carries a MIRROR of the strip
+        // set exactly as lint-core.js mirrors STRIPPED_PROTO_METHODS. This is the
+        // guard that keeps the mirror honest.
+        if (!sandboxMod || !sandboxMod.STRIPPED_GLOBAL_NAMES) return this.skip();
+        assert.deepStrictEqual(
+            KNOWLEDGE.strippedGlobals.slice().sort(),
+            [...sandboxMod.STRIPPED_GLOBAL_NAMES].sort(),
+            'the authoring prompt teaches a different set of stripped globals than the sandbox ' +
+            'actually deletes; a name missing here is a global a model will happily emit, that ' +
+            'lints clean, deploys, and then throws a ReferenceError on first execution'
+        );
+    });
+
+    it('every taught stripped global reaches the rendered hard rules', function () {
+        // The mirror only helps if it is actually rendered: a rule that dropped the
+        // interpolation would still satisfy the equality test above.
+        const text = KNOWLEDGE.hardRules.join('\n');
+        for (const name of KNOWLEDGE.strippedGlobals) {
+            assert.ok(new RegExp('\\b' + name + '\\b').test(text),
+                'the hard rules never name the stripped global ' + name);
+        }
+    });
+
     it('KNOWLEDGE.contractShape is itself a gate-clean contract', function () {
         // If our own teaching example would be rejected on deploy, the prompt is lying.
         const g = runGate(KNOWLEDGE.contractShape);
@@ -96,6 +128,13 @@ describe('Toolkit authoring: prompt construction', function () {
         assert(/msg\.sender/.test(sys) && /getSourceAddress/.test(sys));
         assert(/DEPOSIT/.test(sys) && /BATCH/.test(sys));
         assert(/REJECTS/.test(sys), 'must warn the gate rejects violations');
+        // The stripped globals are NOT deploy-blocking: they are deleted from the
+        // isolate, so that contract deploys and throws at execution. The prompt has
+        // to say so, or an author reads a gate-clean lint as proof it will run.
+        assert(/THROWS on its first execution/.test(sys),
+            'must distinguish the runtime-throw class from the deploy-reject class');
+        assert(/\bstructuredClone\b/.test(sys) && /\bperformance\b/.test(sys),
+            'the rendered hard rules must carry the full stripped-global list');
         assert(/deterministic/i.test(sys));
     });
 

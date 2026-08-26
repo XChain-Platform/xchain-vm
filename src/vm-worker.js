@@ -25,6 +25,7 @@
 // @ts-nocheck
 
 const XChainVM = require('./index.js');
+const { HostFaultError } = require('./errors.js');
 
 let vm = null;
 
@@ -92,17 +93,43 @@ process.on('message', (msg) => {
             try {
                 result = await vm.execute(msg.opts);
             } catch (e) {
-                // vm.execute() throwing is a HOST fault, not a contract outcome:
-                // the throwing window is host-side construction (new GasTracker /
-                // new StateManager) that runs BEFORE execute()'s own try block, and
-                // a contract cannot make those throw. Fabricating a consensus result
-                // here was a fork hazard: gasUsed:0 zeroes the fee, the 'error:'
-                // prefix maps to the frozen failed status, and the raw host
-                // exception text leaked cross-chain via VM_ERROR_MESSAGE. Instead
-                // die, so the parent's deterministic host-termination machinery
-                // (process-executor _onExit, hostTerminatedResult) clamps this
-                // request to its caller-funded ceiling, identically on every
+                // vm.execute() throwing is a HOST fault, not a contract outcome, and
+                // the two host-fault shapes need OPPOSITE handling.
+                //
+                // A HostFaultError says THIS MACHINE cannot run the contract at all:
+                // index.js raises it when isolateManager.createIsolate() fails, and
+                // syntax.js raises it when the execute-time lint isolate cannot be
+                // spawned (reaching execute() through _getLintVerdict, outside its own
+                // try block). Both are properties of this host's memory/thread budget,
+                // not of the contract, so every healthy peer commits a normal result
+                // for the same execution. Dying here handed the parent's crash clamp a
+                // dispatched entry, which resolved a committed
+                // 'out_of_resource: execution host terminated' at gasUsed = ceiling --
+                // a unilateral fork, and the exact laundering index.js:_classifyError
+                // re-throws HostFaultError to prevent. Report it instead; the parent
+                // rejects the request so the caller HALTS and retries, which is the
+                // rule process-executor already enforces for queued and shutdown work.
+                // Tested with instanceof, never e.code or the message: an error that
+                // crossed the isolate boundary arrives as a plain host Error built from
+                // contract-controlled text, and a name/code match would let a contract
+                // spoof a chain-wide halt (same anti-spoof rule as _classifyError).
+                //
+                // Every OTHER throw still dies into the parent's deterministic
+                // host-termination machinery (_onExit -> hostTerminatedResult), which
+                // clamps the request to its caller-funded ceiling identically on every
                 // validator, exactly as an in-isolate resource failure would.
+                if (e instanceof HostFaultError) {
+                    send({
+                        type: 'hostfault',
+                        id: msg.id,
+                        reason: String((e && e.message) || 'executor unavailable').slice(0, 200)
+                    });
+                    // The isolate never came up, so worker state is intact (execute()'s
+                    // finally disposes nothing when createIsolate threw). Staying alive
+                    // avoids a respawn for what is usually a transient pressure blip.
+                    flushCoverage();
+                    return;
+                }
                 process.exit(1);
                 return;
             }
