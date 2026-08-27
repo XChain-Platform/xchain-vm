@@ -45,6 +45,41 @@ describe('Read-only accessors', function () {
             assert.strictEqual(a.getPriceAtRound('BTC/USD', 6), null);
             assert.strictEqual(a.getPriceAtRound('LTC/USD', 5), null);
         });
+        // The host preloads a BOUNDED window of oracle history. Without a floor, an
+        // evicted round and a round that never happened were the same null, and the
+        // price-bet family voids a bet on exactly that null - so the loser of a bet
+        // consensus history had already settled could reclaim their stake by waiting
+        // for the settle round to scroll out of the window.
+        it('reports a round below the preload floor as outside the window, not as absent', function () {
+            const a = buildOracleAccessor({ rounds: { 'BTC/USD': { '100': { price: '59000' } } }, roundFloor: 100 });
+            const r = a.getPriceAtRound('BTC/USD', 99);
+            assert.ok(r, 'an evicted round must not answer with the null that means "never existed"');
+            assert.strictEqual(r.outsideWindow, true);
+            assert.strictEqual(r.price, null, 'the price is genuinely unknown, not zero');
+            assert.strictEqual(r.roundNumber, 99);
+        });
+        it('still answers null for a missing round AT or ABOVE the floor', function () {
+            // The other half: inside the window the snapshot is authoritative, so an
+            // absent round really never existed and a void guard should still fire.
+            const a = buildOracleAccessor({ rounds: { 'BTC/USD': { '100': { price: '59000' } } }, roundFloor: 100 });
+            assert.strictEqual(a.getPriceAtRound('BTC/USD', 101), null);
+            assert.strictEqual(a.getPriceAtRound('BTC/USD', 100).price, '59000');
+        });
+        it('answers outside-window for a pair the snapshot carries nothing for', function () {
+            // Below the floor every pair's rows were evicted together, so "no such
+            // pair" is not knowable there either.
+            const a = buildOracleAccessor({ rounds: { 'BTC/USD': { '100': { price: '1' } } }, roundFloor: 100 });
+            assert.strictEqual(a.getPriceAtRound('LTC/USD', 99).outsideWindow, true);
+            assert.strictEqual(a.getPriceAtRound('LTC/USD', 101), null);
+        });
+        it('hides nothing when the floor is 0 or absent', function () {
+            // A young chain holds all the history there is, and a host that predates
+            // the field must keep its exact previous behaviour.
+            const withZero = buildOracleAccessor({ rounds: {}, roundFloor: 0 });
+            assert.strictEqual(withZero.getPriceAtRound('BTC/USD', 1), null);
+            const legacyHost = buildOracleAccessor({ rounds: {} });
+            assert.strictEqual(legacyHost.getPriceAtRound('BTC/USD', 1), null);
+        });
         it('getSnapshotAge uses the snapshot value or MAX_SAFE_INTEGER', function () {
             assert.strictEqual(buildOracleAccessor({ snapshotAge: 9 }).getSnapshotAge(), 9);
             assert.strictEqual(buildOracleAccessor({}).getSnapshotAge(), Number.MAX_SAFE_INTEGER);
