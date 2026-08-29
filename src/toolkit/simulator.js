@@ -41,6 +41,11 @@
  *     block-time flag-day, so the gas-metering legs every live chain runs today
  *     are ON and gasUsed is a live-rule-set number. Pin an earlier
  *     block.timestamp to simulate the pre-activation rules (it warns once).
+ *   - height-gate activation: the default block HEIGHT sits at the newest armed
+ *     per-coin activation for the configured (coin, network), so a mainnet
+ *     simulation runs the Package-3 sandbox and the other height-keyed gates the
+ *     live chain runs. regtest/testnet stay at height 1 (genesis-active). Pin a
+ *     lower height to simulate the pre-activation rules (it warns once).
  *
  * What it does NOT do (out of scope; that is the real indexer + regtest):
  *   - process emitted ACTIONs against the ledger (SEND/ISSUE/... are captured
@@ -93,7 +98,9 @@ const DEFAULT_GAS_SCHEDULE = Object.freeze({
 // upgrades, math-output metering, the emission proto-strip, the non-finite gas
 // clamp -- compares blockContext.timestamp against a *_GATE_BLOCK_TIME constant
 // with NO network term, unlike the network-aware gates (async surface, lint
-// hardening, state-key, Pkg-3 sandbox) that regtest activates from genesis. So
+// hardening, state-key, Pkg-3 sandbox) that regtest activates from genesis. On
+// mainnet three of those are keyed on block HEIGHT per coin instead, which is
+// what defaultBlockHeight() below derives (see HEIGHT_GATES). So
 // `network: 'regtest'` does NOT turn the meters on; only the block time does. A
 // default below the newest flag-day meters under a rule set no live chain runs:
 // measured on Node 22 / Linux, `new Uint8Array(100000)` costs 225 gas at the old
@@ -109,6 +116,50 @@ const GATE_BLOCK_TIMES = Object.keys(XChainVM)
     .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
     .map((k) => XChainVM[k]);
 const DEFAULT_BLOCK_TIME = GATE_BLOCK_TIMES.length ? Math.max(...GATE_BLOCK_TIMES) : 1786060800;
+
+// The sibling class of activations, keyed on block HEIGHT per coin rather than on
+// block time: the Package-3 sandbox bundle, the execute-time source re-lint and the
+// lint global-alias refinement all resolve `<COIN>:<network>` against a threshold
+// map. testnet/regtest are genesis-active, so only mainnet (and any other network
+// string) has a height to reach; a default of 1 there runs the PRE-activation rule
+// set, which BTC:mainnet left behind at 961000 (~2026-08-04). Each entry names the
+// exported map and the exported predicate, so the toolkit reads the consensus
+// decision instead of restating it.
+const HEIGHT_GATES = Object.freeze([
+    { label: 'Pkg-3 sandbox',          map: 'PKG3_SANDBOX_ACTIVATION',      isActive: 'isPkg3SandboxActive' },
+    { label: 'execute-time re-lint',   map: 'EXEC_LINT_ACTIVATION',         isActive: 'isExecLintActive' },
+    { label: 'lint global-alias',      map: 'LINT_GLOBAL_ALIAS_ACTIVATION', isActive: 'isLintGlobalAliasActive' }
+]);
+
+// Networks whose height gates open at genesis, so no height can be "too low".
+const GENESIS_ACTIVE_NETWORKS = Object.freeze(['regtest', 'testnet']);
+
+/**
+ * Armed threshold for one height gate at (coin, network), or undefined.
+ * EXEC_LINT / LINT_GLOBAL_ALIAS still carry an explicit `null` sentinel on every
+ * mainnet coin, which means UNARMED, so it is filtered out rather than coerced to 0.
+ */
+function heightGateThreshold(gate, coin, network) {
+    const map = XChainVM[gate.map];
+    if (!map || coin == null) return undefined;
+    const t = map[String(coin) + ':' + String(network)];
+    return Number.isFinite(t) ? t : undefined;
+}
+
+/**
+ * Default simulated block height for (coin, network): the MAX armed threshold across
+ * the height gates, so sitting on it activates all of them (every predicate compares
+ * with `>=`), exactly as DEFAULT_BLOCK_TIME does for the block-time gates. Read off
+ * the VM's exported maps, never retyped, so a newly ratified height needs no edit
+ * here. Genesis-active networks and an unrecognized coin/network keep the historical 1.
+ */
+function defaultBlockHeight(coin, network) {
+    if (GENESIS_ACTIVE_NETWORKS.indexOf(network) !== -1) return 1;
+    const armed = HEIGHT_GATES
+        .map((g) => heightGateThreshold(g, coin, network))
+        .filter((t) => Number.isFinite(t));
+    return armed.length ? Math.max(...armed) : 1;
+}
 
 // Gas ceiling a controller guard runs under. The indexer reads it from
 // GAS_SCHEDULE.VM_GUARD_GAS_CEILING per coin (xchain-indexer/src/coins/BTC.js,
@@ -155,7 +206,10 @@ class ContractSimulator {
      *        hardening, the state-key gates, the Package-3 sandbox bundle),
      *        which regtest/testnet activate from genesis. Gas-METERING
      *        activation carries no network term at all: it follows
-     *        opts.block.timestamp (see DEFAULT_BLOCK_TIME).
+     *        opts.block.timestamp (see DEFAULT_BLOCK_TIME). On mainnet the
+     *        Package-3 sandbox, the execute-time re-lint and the lint
+     *        global-alias refinement are per-coin block-HEIGHT gates, so there
+     *        they follow opts.block.height and opts.coin together.
      * @param {number} [opts.gasCeiling=1000000]
      * @param {object} [opts.gasSchedule]    - override the canonical schedule
      * @param {object} [opts.limits]         - override the default resource limits
@@ -163,6 +217,10 @@ class ContractSimulator {
      *        timestamp defaults to the VM's newest *_GATE_BLOCK_TIME, so the
      *        block-time-keyed meters are ON and gas matches a live chain; a
      *        lower value simulates the pre-activation rule set and warns once.
+     *        height defaults to the newest ARMED activation height for
+     *        (coin, network) across the exported per-coin gate maps -- 1 on
+     *        regtest/testnet, which activate from genesis -- so a mainnet
+     *        simulation runs today's rule set; a lower value warns once too.
      * @param {string} [opts.defaultCaller]  - caller address used when a call omits one
      * @param {string} [opts.execution='in-process'] - VM execution mode. The
      *        simulator defaults to in-process for millisecond author-time
@@ -176,12 +234,21 @@ class ContractSimulator {
         this.limits = Object.assign({}, DEFAULT_LIMITS, opts.limits || {});
         this.defaultCaller = opts.defaultCaller || 'sim_caller';
 
+        // Height, like the timestamp, is DERIVED from the activations it has to
+        // clear; the hash follows the height so it keeps advanceBlock's own naming.
+        const height0 = defaultBlockHeight(this.coin, this.network);
         this.block = Object.assign(
-            { height: 1, timestamp: DEFAULT_BLOCK_TIME, hash: 'sim_block_0000000000000001' },
+            {
+                height: height0,
+                timestamp: DEFAULT_BLOCK_TIME,
+                hash: 'sim_block_' + String(height0).padStart(16, '0')
+            },
             opts.block || {}
         );
         // One pre-flag-day warning per instance, not per call (see _warnIfPreGate).
         this._preGateWarned = false;
+        // Likewise for the height-gate warning (see _warnIfPreHeightGate).
+        this._preHeightGateWarned = false;
 
         // Read-only snapshots the author seeds.
         this.balances = {};        // address -> tick -> amountStr
@@ -356,6 +423,53 @@ class ContractSimulator {
         );
     }
 
+    /**
+     * Warn once per simulator when a height-keyed gate is OFF for the contract being
+     * executed. The derived default clears every armed gate for the CONFIGURED coin,
+     * so this fires only where the default cannot help: an author-pinned height below
+     * a threshold, or a contractAddress that is not `C:<COIN>:<idx>` (an unresolvable
+     * coin resolves every one of these gates to inactive whatever the height).
+     *
+     * The gate decision itself is delegated to the VM's exported predicates, so the
+     * toolkit can never drift from index.js; the map is read only to tell an ARMED
+     * gate from the explicit `null` unarmed sentinel, which must never warn.
+     * Deliberate below-gate runs stay legal, so this warns rather than throwing.
+     */
+    _warnIfPreHeightGate(contractAddress) {
+        if (this._preHeightGateWarned) return;
+        if (GENESIS_ACTIVE_NETWORKS.indexOf(this.network) !== -1) return;
+
+        const coin = XChainVM.pkg3CoinFromAddress(contractAddress);
+        const height = Number(this.block.height);
+        const armed = HEIGHT_GATES.filter(
+            (g) => heightGateThreshold(g, coin, this.network) !== undefined);
+
+        if (!armed.length) {
+            this._preHeightGateWarned = true;
+            console.warn(
+                '[xchain-vm simulator] no block-HEIGHT activation is armed for coin ' +
+                JSON.stringify(coin) + ' on network ' + JSON.stringify(this.network) + ' ' +
+                '(resolved from contract address ' + JSON.stringify(contractAddress) + '): the ' +
+                'Pkg-3 sandbox, the execute-time re-lint and the lint global-alias refinement ' +
+                'all resolve to INACTIVE at every height, so this run does NOT reproduce a ' +
+                'mainnet rule set. Deploy at a C:<COIN>:<idx> address whose coin the VM gates.'
+            );
+            return;
+        }
+
+        const off = armed.filter((g) => !XChainVM[g.isActive](this.network, coin, height));
+        if (!off.length) return;
+        this._preHeightGateWarned = true;
+        console.warn(
+            '[xchain-vm simulator] block.height ' + height + ' is below the ' + this.network +
+            ' activation for ' + coin + ': ' +
+            off.map((g) => g.label + ' (' + heightGateThreshold(g, coin, this.network) + ')').join(', ') +
+            ' ' + (off.length === 1 ? 'is' : 'are') + ' OFF, so this run executes a ' +
+            'PRE-activation rule set the live chain has left behind. Use the default block or ' +
+            'setBlock({ height: ' + defaultBlockHeight(coin, this.network) + ' }).'
+        );
+    }
+
     /** Merge fields into the current block context ({ height, timestamp, hash }). */
     setBlock(partial) {
         Object.assign(this.block, partial || {});
@@ -479,6 +593,7 @@ class ContractSimulator {
             throw new Error('no contract deployed at index ' + contractIndex);
         }
         this._warnIfPreGate();
+        this._warnIfPreHeightGate(contract.address);
 
         const execOpts = {
             code: contract.code,

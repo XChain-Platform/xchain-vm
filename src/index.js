@@ -1821,16 +1821,21 @@ class XChainVM {
             this.limits.maxMeteredCacheSize = this.limits.maxBlockCacheSize || 1000;
 
         // Execute-time lint-verdict cache:
-        //   Map<sha256(code):asyncBit:hardenBit:pkg3Bit, {valid, error?}>.
+        //   Map<sha256(code):asyncBit:hardenBit:pkg3Bit:aliasBit, {valid, error?}>.
+        // INVARIANT: the key carries the code digest plus EVERY consensus flag the
+        // verdict depends on, with no count written down here that a new flag can
+        // falsify. Adding a flag to _getLintVerdict without adding its bit lets a warm
+        // node answer from a verdict computed under the other setting, which is the one
+        // way this cache can reach consensus.
         // Shares the metering cache's sha256(code) key material (the digest is computed
-        // ONCE per execution and handed to both lookups) and appends the three consensus
-        // flag bits the verdict depends on. validateSyntax is a pure function of exactly
-        // those four inputs, so a hit returns the identical verdict a fresh call would:
-        // the cache is invisible to consensus and only removes the repeated ivm.Isolate
-        // spawn + acorn parse that the check would otherwise pay on every execute of the
-        // same contract. Its GAS is charged unconditionally (hit or miss), so a cold and
-        // a warm node bill the same. Bounded by maxMeteredCacheSize with FIFO eviction,
-        // exactly like _meteredCache; correctness holds when it is empty.
+        // ONCE per execution and handed to both lookups). validateSyntax is a pure
+        // function of exactly those inputs, so a hit returns the identical verdict a
+        // fresh call would: the cache is invisible to consensus and only removes the
+        // repeated ivm.Isolate spawn + acorn parse that the check would otherwise pay
+        // on every execute of the same contract. Its GAS is charged unconditionally
+        // (hit or miss), so a cold and a warm node bill the same. Bounded by
+        // maxMeteredCacheSize with FIFO eviction, exactly like _meteredCache;
+        // correctness holds when it is empty.
         this._lintVerdictCache = new Map();
 
         // Pre-compile the harness script source (it's the same every time)
@@ -1946,7 +1951,7 @@ class XChainVM {
     }
 
     /**
-     * Return the execute-time consensus source-lint verdict for `code` under the three
+     * Return the execute-time consensus source-lint verdict for `code` under the
      * resolved ban flags, from the verdict cache when possible.
      *
      * validateSyntax() is a pure function of (code, enforceBannedAsync,
