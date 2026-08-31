@@ -27,6 +27,12 @@
 const { create, all } = require('mathjs');
 const math = create(all, { number: 'BigNumber', precision: 64 });
 
+// The PRODUCTION oracle accessor builder. The mock feeds it a snapshot in the
+// host's shape rather than hand-rolling the read semantics, so a contract under
+// test meets the accessor the indexer's preload actually produces - including its
+// answer for a round that has scrolled out of the preloaded window.
+const { buildOracleAccessor } = require('../../../src/readonly-accessors.js');
+
 class MockLedger {
     constructor() {
         this.balances         = {};  // { address: { tick: quantityStr } }
@@ -35,6 +41,7 @@ class MockLedger {
         this.contractBalances = {};  // { contractAddress: { tick: quantityStr } }
         this.tokenDecimals    = {};  // { tick: decimalsInt } (registered ticks only)
         this.stateHistory     = {};  // { contractAddress: [{ key, value, blockIndex, deleted }] }
+        this.oracleRoundFloor = 0;   // oldest round the host's preload guarantees (0 = all history)
         this.oraclePrices     = {};  // { coinPair: { current: {price,roundNumber,timestamp}, rounds: {}, snapshotAge: N } }
         this.crossChain       = {};  // { "chain:idx": attestation }
         this.pollResults      = {};  // { pollIndex: frozen VOTE poll result }
@@ -190,11 +197,28 @@ class MockLedger {
         };
     }
 
+    /**
+     * Oldest round the host's preload would guarantee. 0 (the default) means all
+     * history is loaded; a positive value makes every round below it read as
+     * "outside the loaded window" rather than as a round that never existed.
+     */
+    seedOracleRoundFloor(roundFloor) {
+        this.oracleRoundFloor = Number(roundFloor) || 0;
+    }
+
     buildOracleAccessor() {
         const self = this;
+        const snap = { prices: {}, rounds: {}, roundFloor: self.oracleRoundFloor || 0 };
+        for (const pair in self.oraclePrices) {
+            snap.prices[pair] = self.oraclePrices[pair].current;
+            snap.rounds[pair] = self.oraclePrices[pair].rounds || {};
+        }
+        const real = buildOracleAccessor(snap);
         return {
-            getPrice: (coinPair) => self.oraclePrices[coinPair]?.current || null,
-            getPriceAtRound: (coinPair, round) => self.oraclePrices[coinPair]?.rounds?.[round] || null,
+            getPrice: real.getPrice,
+            getPriceAtRound: real.getPriceAtRound,
+            // Kept local: the mock reports the max age across pairs, where the host
+            // ships a single per-snapshot age.
             getSnapshotAge: () => {
                 // Simplified: max snapshot age across all pairs, not per-pair.
                 let maxAge = 0;
@@ -321,6 +345,7 @@ class MockLedger {
         this.tokenDecimals = {};
         this.stateHistory = {};
         this.oraclePrices = {};
+        this.oracleRoundFloor = 0;
         this.crossChain = {};
         this.pollResults = {};
         this.blockHeight = 1;

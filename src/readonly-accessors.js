@@ -28,7 +28,8 @@
  *
  * Snapshot shapes (all plain JSON):
  *   oracle:        { snapshotAge:Number, prices:{ [pair]:{price,roundNumber,timestamp} },
- *                    rounds:{ [pair]:{ [round]:{price,roundNumber,timestamp} } } }
+ *                    rounds:{ [pair]:{ [round]:{price,roundNumber,timestamp} } },
+ *                    roundFloor:Number }   // oldest round `rounds` guarantees, 0 = all of it
  *   contractStake: { stakeByPubkeyTick:{ ["pubkey|tick"]:amountStr },
  *                    totalByTick:{ [tick]:amountStr },
  *                    stakersByTick:{ [tick]:[{pubkey,amount}] } }   // pre-sorted, pre-capped
@@ -51,13 +52,31 @@ function buildOracleAccessor(snap) {
     const prices = snap.prices || {};
     const rounds = snap.rounds || {};
     const age = (snap.snapshotAge != null) ? snap.snapshotAge : MAX_SAFE;
+    // Oldest round the host's preload GUARANTEES. The host ships a bounded window
+    // of oracle history, so "not in the snapshot" carries two very different
+    // meanings that must not collapse into one null: a round below this floor was
+    // evicted and may well have been published, while a round at or above it
+    // genuinely never existed. Contracts vote on that distinction. The price-bet
+    // family voids a bet when its settle round reads null, so without the floor
+    // the loser of a bet consensus already settled could reclaim their stake by
+    // waiting for the round to scroll out of the window. 0 (or absent, for a host
+    // that predates the field) means nothing is hidden.
+    const roundFloor = Number(snap.roundFloor) > 0 ? Number(snap.roundFloor) : 0;
     return {
         getPrice: (coinPair) => (prices[coinPair] != null ? prices[coinPair] : null),
         getPriceAtRound: (coinPair, roundNumber) => {
             const byRound = rounds[coinPair];
-            if (!byRound) return null;
-            const r = byRound[String(roundNumber)];
-            return r != null ? r : null;
+            const r = byRound ? byRound[String(roundNumber)] : undefined;
+            if (r != null) return r;
+            // Below the floor the honest answer is "cannot know", including for a
+            // pair the snapshot carries nothing for: the pair's rows for that round
+            // were evicted with everyone else's. Shaped like a price row with the
+            // price withheld, the same shape a stale tip already uses, so a contract
+            // reading `.price` gets null rather than a type it cannot handle.
+            const n = Number(roundNumber);
+            if (roundFloor > 0 && Number.isFinite(n) && n < roundFloor)
+                return { price: null, roundNumber: n, timestamp: 0, outsideWindow: true };
+            return null;
         },
         getSnapshotAge: () => age
     };

@@ -30,7 +30,8 @@ const fs     = require('fs');
 const path   = require('path');
 
 const { validateSyntax, checkFloatWarnings } = require('../../src/syntax.js');
-const { lintSource, CONSENSUS_RULES, findBannedStrippedGlobals } = require('../../src/lint-core.js');
+const { lintSource, CONSENSUS_RULES, findBannedStrippedGlobals,
+        findBannedProtoMethods } = require('../../src/lint-core.js');
 
 const VM_SRC_DIR     = path.join(__dirname, '..', '..', 'src');
 const SDK_VENDOR_DIR = path.join(__dirname, '..', '..', '..', 'xchain-sdk', 'src', 'contract');
@@ -221,6 +222,34 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                     assert.deepStrictEqual(hits, [], 'patterns/' + f + ' reads ' +
                         hits.map((h) => h.name + '@' + h.line).join(', ') +
                         '; the sandbox deletes it, so this pattern throws at runtime');
+                });
+            }
+
+            // The sandbox's OTHER neutering half, same argument as the block above:
+            // sandbox.js redefines each STRIPPED_PROTO_METHOD_NAMES entry to
+            // undefined, so a shipped source that calls one throws TypeError on its
+            // first execution. 'banned-proto-method' is warning severity and outside
+            // CONSENSUS_RULES because a name-only match cannot tell a String receiver
+            // from a contract's own object, so validateSyntax and bin/lint.js both
+            // stay green and this is the only gate that reddens on such an edit. That
+            // false positive is bounded here to a fixed, hand-audited source set, so a
+            // hit is one-time triage rather than a false red on user code.
+            for (const name of dirs) {
+                it(name + ' calls no sandbox-neutered prototype method', function () {
+                    const code = fs.readFileSync(path.join(CONTRACTS_DIR, name, name + '.js'), 'utf8');
+                    const hits = findBannedProtoMethods(code);
+                    assert.deepStrictEqual(hits, [], name + ' calls ' +
+                        hits.map((h) => h.name + '()@' + h.line).join(', ') +
+                        '; the sandbox neuters it, so this template throws TypeError at runtime');
+                });
+            }
+            for (const f of patterns) {
+                it('patterns/' + f + ' calls no sandbox-neutered prototype method', function () {
+                    const code = fs.readFileSync(path.join(PATTERNS_DIR, f), 'utf8');
+                    const hits = findBannedProtoMethods(code);
+                    assert.deepStrictEqual(hits, [], 'patterns/' + f + ' calls ' +
+                        hits.map((h) => h.name + '()@' + h.line).join(', ') +
+                        '; the sandbox neuters it, so this pattern throws TypeError at runtime');
                 });
             }
         }
