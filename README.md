@@ -4,8 +4,8 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.11.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/tests-1653%2B%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/version-0.12.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/tests-2%2C343%2B%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
 </p>
@@ -218,23 +218,23 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 
 | Command | Description |
 |---|---|
-| `npm test` | Unit tests (669 tests, 30s timeout) |
-| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (70 tests) |
-| `npm run test:integration` | Integration tests (164 tests) |
-| `npm run test:security` | Security tests (201 tests) |
-| `npm run test:boundary` | Boundary condition tests (115 tests) |
-| `npm run test:determinism` | Determinism tests (79 tests) |
+| `npm test` | Unit tests (1,064 tests, 30s timeout) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (76 tests) |
+| `npm run test:integration` | Integration tests (194 tests) |
+| `npm run test:security` | Security tests (284 tests) |
+| `npm run test:boundary` | Boundary condition tests (117 tests) |
+| `npm run test:determinism` | Determinism tests (150 tests) |
 | `npm run test:performance` | Performance benchmarks-as-tests (5 tests) |
-| `npm run test:all` | Every `*.test.js` under `test/` (1,653+ tests) |
-| `npm run test:e2e` | E2E tests only (64 tests) |
-| `npm run smoke` | Smoke tests (10 tests, < 5s) |
-| `npm run test:fuzz` | Fuzz / property-based tests (57 tests) |
-| `npm run test:chaos` | Chaos engineering tests (76 tests) |
+| `npm run test:all` | Every `*.test.js` under `test/` (2,343+ tests) |
+| `npm run test:e2e` | E2E tests only (66 tests) |
+| `npm run smoke` | Smoke tests (12 tests, < 5s) |
+| `npm run test:fuzz` | Fuzz / property-based tests (92 tests) |
+| `npm run test:chaos` | Chaos engineering tests (95 tests) |
 | `npm run test:regression:smoke` | P0 regression (11 tests, < 50ms) |
-| `npm run test:regression:core` | P0+P1 regression (31 tests, < 200ms) |
-| `npm run test:regression:full` | P0-P3 + gate/pin regression (128 tests, < 1s) |
-| `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 |
-| `npm run test:regression:release` | All tests + mutation testing |
+| `npm run test:regression:core` | P0+P1 regression (45 tests, < 200ms) |
+| `npm run test:regression:full` | P0-P3 + gate/pin regression (224 tests, < 1s) |
+| `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 (416 tests) |
+| `npm run test:regression:release` | All tests + mutation testing (2,343 tests) |
 | `npm run mutation` | Mutation testing (Stryker, full suite) |
 | `npm run bench:quick` | Pipeline + gateway benchmarks |
 | `npm run bench:full` | All benchmarks except soak |
