@@ -21,67 +21,13 @@
 const ivm = require('isolated-vm');
 
 // The canonical, FROZEN set of non-deterministic / dangerous global identifiers
-// the sandbox deletes from the isolate. This is consensus-critical surface: a
-// contract that reaches one of these can route a non-deterministic value into
-// hashed state and fork the fleet, so the set is frozen with CONSENSUS_VERSION
-// and digested by the determinism guard (test/determinism/consensus-params.test.js)
-// Any add/remove must bump CONSENSUS_VERSION and re-golden in lockstep.
-//
-// Per-entry rationale:
-//   - Date / timers (setTimeout, setInterval, setImmediate, clear*): wall-clock
-//     and scheduling are pure non-determinism.
-//   - WeakRef / FinalizationRegistry: GC-timing-observable.
-//   - Proxy / Reflect: trap-based metering/identity escapes.
-//   - fetch / XMLHttpRequest / WebSocket: network I/O.
-//   - SharedArrayBuffer / Atomics: shared-memory / timing side channels.
-//   - queueMicrotask + Promise: contracts run SYNCHRONOUSLY under the
-//     CONTRACT_WRAPPER (runSync), so any microtask a contract schedules
-//     (.then continuation, post-await write) drains on isolated-vm-version-
-//     dependent timing that is outside the consensus pin, forking validators on
-//     success-vs-timeout or post-await state. async/await/Promise are also
-//     rejected at deploy time (lint-core findBannedAsync); stripping the Promise
-//     global is defense in depth. The host still derives AsyncFunction below from
-//     async-function syntax, which does not depend on the Promise global binding.
-//     NOTE: the Promise strip is GATED on a block-time flag-day (see stripGlobals
-//     opts.stripPromise) so a from-genesis replay reproduces the historical
-//     pre-flag-day behaviour (Promise present); queueMicrotask was stripped from
-//     the start and is NOT gated.
-//   - BigInt: BigInt arithmetic (** / *) is a native operation whose cost is
-//     super-linear in operand size but invisible to the AST gas meter -- e.g.
-//     2n ** 5000000n costs ~2 gas yet burns heavy CPU under the memory limit.
-//     Removed to close the unmetered-CPU DoS surface; contracts use the metered
-//     xchain.math bignumber API. BigInt literals (10n) are rejected at deploy
-//     time (syntax.js) since a global delete cannot disable literal syntax.
-//   - Intl / Temporal / structuredClone / performance: Intl (ECMAScript 402) is
-//     locale-sensitive and depends on the host ICU data; Temporal exposes
-//     time-zone-sensitive output; structuredClone's serialization edge cases
-//     have varied across V8 versions; performance.now() returns wall-clock
-//     microseconds. All are non-deterministic risks (the deletes are no-ops if a
-//     given build does not expose them, and critical guards if it does).
-const STRIPPED_GLOBAL_NAMES = Object.freeze([
-    'Date', 'setTimeout', 'setInterval', 'setImmediate',
-    'clearTimeout', 'clearInterval', 'clearImmediate',
-    'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
-    'fetch', 'XMLHttpRequest', 'WebSocket',
-    'SharedArrayBuffer', 'Atomics',
-    'queueMicrotask', 'Promise',
-    'BigInt',
-    'WebAssembly',
-    'Intl', 'Temporal', 'structuredClone', 'performance'
-]);
-//   - WebAssembly (flag-day Pkg 3, 75190596): a core V8 global reachable from
-//     contract code. A wasm body carries NO __gas instrumentation (the AST meter
-//     only touches the JS source), so WebAssembly.instantiate/compile/Module/
-//     Instance runs unmetered native code under the memory limit -- the same
-//     unmetered-CPU DoS class as BigInt, plus a consensus-fork surface (a wasm
-//     trap / float result observed and routed into hashed state can diverge across
-//     builds). Stripping the global closes it deterministically. GATED on the
-//     per-coin Pkg 3 bundle height flag-day (index.js isPkg3SandboxActive, threaded
-//     as stripGlobals opts.stripWasm), exactly like Promise: below the flag day
-//     WebAssembly is LEFT IN PLACE so a from-genesis replay reproduces the historical
-//     execution; at/after it the global is absent fleet-wide. (The companion
-//     deploy-lint ban is gated indexer-side via validateSyntax enforce-flags and is
-//     tracked separately; this runtime strip is the load-bearing consensus fix.)
+// the sandbox deletes from the isolate. Defined ONCE in ./stripped-globals.js,
+// which carries the per-entry rationale and the flag-day notes, and is required
+// (not re-copied) by the contract linter and the AI-authoring knowledge base so
+// the three consumers cannot drift. That module is dependency-free on purpose:
+// this file requires isolated-vm at the top level, and the other two consumers
+// must load where no isolate exists.
+const { STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for

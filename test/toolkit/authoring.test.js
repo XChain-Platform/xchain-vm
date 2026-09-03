@@ -31,6 +31,7 @@ const {
     authorContract
 } = require('../../src/toolkit/authoring.js');
 const { runGate } = require('../../src/toolkit/gate.js');
+const SHARED = require('../../src/stripped-globals.js');
 
 // sandbox.js requires isolated-vm at the top level, so it is loaded defensively
 // (same convention as test/unit/lint-shared-rules.test.js): the strip-set parity
@@ -90,11 +91,24 @@ describe('Toolkit authoring: knowledge base', function () {
         assert(KNOWLEDGE.conceptMap.some(r => /msg\.value/.test(r.solidity)));
     });
 
-    it('the taught stripped-global list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES', function () {
+    it('teaches the one shared definition, not a copy of it', function () {
         // authoring.js must stay isolated-vm-free (the gate is pure acorn and the
-        // harness is meant to run on any OS), so it carries a MIRROR of the strip
-        // set exactly as lint-core.js mirrors STRIPPED_PROTO_METHODS. This is the
-        // guard that keeps the mirror honest.
+        // harness runs on any OS), so it requires src/stripped-globals.js, the same
+        // module sandbox.js and lint-core.js require, and this identity check runs
+        // without the binding rather than skipping wherever isolated-vm will not load.
+        assert.strictEqual(KNOWLEDGE.strippedGlobals, SHARED.STRIPPED_GLOBAL_NAMES,
+            'the authoring knowledge base must teach the very array stripped-globals.js ' +
+            'froze; a distinct array means a second literal crept back in');
+        assert.strictEqual(KNOWLEDGE.strippedGlobals,
+            require('../../src/lint-core.js').STRIPPED_GLOBAL_NAMES,
+            'the knowledge base and the linter must read one source of truth');
+    });
+
+    it('the taught stripped-global list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES', function () {
+        // Defence in depth for the identity check above: sandbox.js interpolates
+        // these names into the real strip script, so this proves the taught set is
+        // what the isolate actually deletes. Skips without the binding, which is
+        // why it is no longer the only guard.
         if (!sandboxMod || !sandboxMod.STRIPPED_GLOBAL_NAMES) return this.skip();
         assert.deepStrictEqual(
             KNOWLEDGE.strippedGlobals.slice().sort(),

@@ -45,6 +45,7 @@ const {
     findBannedStrippedGlobals, STRIPPED_GLOBAL_NAMES_MIRROR, ADVISORY_STRIPPED_GLOBALS
 } = require('../../src/lint-core.js');
 const { RESERVED_IDENTIFIERS } = require('../../src/metering.js');
+const SHARED = require('../../src/stripped-globals.js');
 const PROTO = require('../../src/protocol/constants.js');
 
 // isolated-vm-dependent modules (Node 22 only); preflight.test.js is the loud guard.
@@ -255,19 +256,56 @@ describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
             assert.ok(!rules(lintSource(VALID).warnings).includes('banned-stripped-global'));
         });
 
-        it('the mirrored name list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES', function () {
-            // lint-core cannot require sandbox.js (top-level isolated-vm) and must
-            // stay byte-identical to the SDK vendored copy, so the list is mirrored.
-            // This guard is what keeps the mirror honest.
+        // ONE definition of the strip set lives in src/stripped-globals.js. A
+        // hand-copied literal in sandbox.js, lint-core.js or toolkit/authoring.js
+        // could only be held equal by parity tests that SKIP wherever isolated-vm
+        // will not load, i.e. exactly where the copies are consumed (the SDK, a
+        // browser, a non-Linux dev box). These guards run WITHOUT the isolate, so
+        // they cannot green-by-skip.
+        it('the linter reads the one shared definition, not a copy of it', function () {
+            assert.strictEqual(STRIPPED_GLOBAL_NAMES_MIRROR, SHARED.STRIPPED_GLOBAL_NAMES,
+                'lint-core must expose the very array stripped-globals.js froze; a distinct ' +
+                'array means a second literal crept back in and can drift again');
+            assert.strictEqual(ADVISORY_STRIPPED_GLOBALS, SHARED.ADVISORY_STRIPPED_GLOBAL_NAMES);
+            assert.ok(Object.isFrozen(STRIPPED_GLOBAL_NAMES_MIRROR), 'the shared set must be frozen');
+        });
+
+        it('no consumer re-declares the strip set as its own literal', function () {
+            // A require can always be reverted to a paste. Every consumer source is
+            // read here and must mention no name-bearing array literal of its own:
+            // 'structuredClone' is the tell, since it appears in the strip set and
+            // nowhere else in these files.
+            const CONSUMERS = [
+                path.join(__dirname, '..', '..', 'src', 'sandbox.js'),
+                path.join(__dirname, '..', '..', 'src', 'lint-core.js'),
+                path.join(__dirname, '..', '..', 'src', 'toolkit', 'authoring.js')
+            ];
+            for (const file of CONSUMERS) {
+                const code = fs.readFileSync(file, 'utf8');
+                // Strip comments so the prose that EXPLAINS the set does not count.
+                const bare = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+                assert.ok(!/['"]structuredClone['"]/.test(bare),
+                    path.basename(file) + ' names a stripped global in its own code; the set has ' +
+                    'ONE home (src/stripped-globals.js) and must be required, never re-listed');
+                assert.ok(/require\((['"])\.{1,2}\/stripped-globals\.js\1\)/.test(bare),
+                    path.basename(file) + ' must require the shared strip-set module');
+            }
+        });
+
+        it('the shared set still equals what the sandbox actually deletes', function () {
+            // Defence in depth for the require above: sandbox.js interpolates the
+            // names into the real strip script, so this proves the one definition is
+            // the set the isolate acts on. Skips without the binding, which is why
+            // it is not the only guard.
             if (!stripGlobalsMod || !stripGlobalsMod.STRIPPED_GLOBAL_NAMES) return this.skip();
             assert.deepStrictEqual(
                 STRIPPED_GLOBAL_NAMES_MIRROR.slice().sort(),
                 [...stripGlobalsMod.STRIPPED_GLOBAL_NAMES].sort(),
-                'lint-core mirror drifted from the sandbox strip list; a name missing here ' +
+                'the linter and the sandbox disagree on the strip set; a name missing here ' +
                 'is a global that lints clean, deploys, and throws on first execution');
         });
 
-        it('the advisory set is the mirror minus exactly the two flag-day-gated names', function () {
+        it('the advisory set is the full set minus exactly the two flag-day-gated names', function () {
             assert.deepStrictEqual(
                 STRIPPED_GLOBAL_NAMES_MIRROR.filter((n) => ADVISORY_STRIPPED_GLOBALS.indexOf(n) === -1),
                 ['Promise', 'WebAssembly'],
