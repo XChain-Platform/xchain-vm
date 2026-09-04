@@ -1,7 +1,7 @@
 {
   "name": "xchain-vm",
   "description": "XChain Platform Virtual Machine (VM) runtime - deterministic smart contract execution in sandboxed V8 isolates",
-  "version": "0.12.0",
+  "version": "0.15.0",
   "ciPlatform": "linux",
   "license": "AGPL-3.0-or-later",
   "main": "src/index.js",
