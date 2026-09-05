@@ -2976,6 +2976,12 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.ASYNC_SURFACE_GATE_BLOCK_TIME = ASYNC_SURFACE_GATE_BLOCK_TIME;
+// The resolver alongside it, exported like its three sibling predicates
+// (isLintHardeningActive, isPkg3SandboxActive, isLintGlobalAliasActive) so a
+// caller resolving the deploy-lint flag set for a block gets all four from here
+// rather than re-deriving one from the constant. Additive: no gate value, no
+// predicate body and no activation table moves with it.
+module.exports.isAsyncSurfaceActive = isAsyncSurfaceActive;
 // Coordinated flag-day (block time) that activates NUL-byte state-key rejection
 // at the state-write boundary (H-5: a NUL-bearing state_key wedges the indexer's
 // block merkle root). Exposed so the consensus-params freeze guard can pin it;

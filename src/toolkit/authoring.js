@@ -124,6 +124,19 @@ const CONCEPT_MAP = [
 // lint-core.js require the same module.
 const { STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT } = require('../stripped-globals.js');
 
+// The identifiers the deploy gate rejects, taught by NAME rather than retyped as
+// a prefix sketch. Two authorities, both acorn-only (so requiring them keeps this
+// module isolated-vm-free, and lint-core is already in the graph via gate.js):
+// metering.RESERVED_IDENTIFIERS is the metering pass's own helper set, and
+// lint-core.RESERVED_CONTROL_BINDINGS the contract wrapper's control bindings,
+// rejected by the same 'reserved-identifier' rule once hardening is active.
+// Matching in findReservedIdentifier / findReservedControlBinding is on the exact
+// name, so a prefix wording would ban ordinary names (`__gasBudget`) the chain
+// allows while missing the helpers it does not.
+const { RESERVED_IDENTIFIERS } = require('../metering.js');
+const { RESERVED_CONTROL_BINDINGS } = require('../lint-core.js');
+const RESERVED_NAMES_TAUGHT = RESERVED_IDENTIFIERS.concat(RESERVED_CONTROL_BINDINGS);
+
 // Non-negotiable rules the generated contract MUST satisfy; teaching them up
 // front cuts repair rounds. Most are deploy-blocking (lint-core CONSENSUS_RULES,
 // the only findings the on-chain validator acts on). The banned-globals rule is
@@ -140,7 +153,9 @@ const HARD_RULES = [
         STRIPPED_GLOBALS_TAUGHT.join(', ') +
         '. Also no `eval`, no `Function`, no `.constructor` access, no `require`/`import`/filesystem/network.',
     'ES2020 syntax maximum (no numeric separators, no logical-assignment, no top-level await).',
-    'Do not reference identifiers beginning `__gas`/`__concat`/`__tmpl`/`__arrspread`/`__objspread` (reserved by the metering pass).',
+    'Do not declare or reference these reserved identifiers (the metering pass and the contract wrapper inject them; the deploy gate rejects any reference): ' +
+        RESERVED_NAMES_TAUGHT.join(', ') +
+        '. Matching is on the exact name, so an ordinary name such as `__gasBudget` is fine.',
     'State keys <= 1024 bytes, values <= 65536 bytes (JSON), <= 10000 keys total; at most 50 emitted actions per call.'
 ];
 
@@ -169,6 +184,10 @@ const KNOWLEDGE = {
     // Exported so a test can compare it to the enforced list by value rather
     // than by grepping rendered prose.
     strippedGlobals: STRIPPED_GLOBALS_TAUGHT,
+    // The deploy gate's reserved identifiers, derived from metering.js and
+    // lint-core.js. Exported for the same reason strippedGlobals is: a test
+    // compares it to the enforced lists by value instead of grepping prose.
+    reservedIdentifiers: RESERVED_NAMES_TAUGHT,
     contractShape: CONTRACT_SHAPE
 };
 

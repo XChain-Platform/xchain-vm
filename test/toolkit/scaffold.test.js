@@ -60,6 +60,24 @@ describe('Toolkit scaffold', function() {
             JSON.stringify(gate.errors));
     });
 
+    it('offers the subprocess execution mode in the generated test harness', function() {
+        // The generated beforeEach runs the simulator's in-process default, which
+        // cannot reproduce the chain's host-termination result: a contract that
+        // aborts the JS engine kills the test run instead of returning
+        // out_of_resource. The commented option is the author's route to the mode
+        // the indexer runs, so it must survive an edit to the template. It stays
+        // COMMENTED because the un-awaited isolate probe above it would leak a
+        // worker child in subprocess mode.
+        const { files } = buildScaffold({ name: 'exec-mode' });
+        const testJs = files['test/exec-mode.test.js'];
+        assert.match(testJs, /\/\/ execution: 'subprocess'/,
+            'the scaffolded test harness no longer names the subprocess mode');
+        assert.match(testJs, /out_of_resource/,
+            'the scaffolded comment must say what the mode buys, not merely name it');
+        assert.doesNotMatch(testJs, /^\s*execution: 'subprocess'/m,
+            'the subprocess option must stay commented out in the generated harness');
+    });
+
     it('rejects an unsafe project name', function() {
         assert.throws(() => buildScaffold({ name: '../evil' }), /invalid project name/);
     });

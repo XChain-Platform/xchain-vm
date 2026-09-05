@@ -171,7 +171,12 @@ const IS_TS = '${contractFile}'.endsWith('.ts');
     let sim, addr;
 
     beforeEach(async function() {
-        sim = new ContractSimulator({ coin: 'BTC' });
+        sim = new ContractSimulator({
+            coin: 'BTC'
+            // execution: 'subprocess'  // slower (forks a worker), but it is the mode
+            // the chain runs: a contract that aborts the JS engine then returns
+            // out_of_resource with gasUsed at the ceiling instead of killing this test run.
+        });
         const dep = await sim.deploy(CONTRACT, {
             filename: '${contractFile}',
             constructorParams: ['5']

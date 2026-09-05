@@ -32,6 +32,10 @@ const {
 } = require('../../src/toolkit/authoring.js');
 const { runGate } = require('../../src/toolkit/gate.js');
 const SHARED = require('../../src/stripped-globals.js');
+// The two authorities behind the taught reserved-identifier list. Both are
+// acorn-only, so they load wherever this suite does.
+const meteringMod = require('../../src/metering.js');
+const lintCoreMod = require('../../src/lint-core.js');
 
 // sandbox.js requires isolated-vm at the top level, so it is loaded defensively
 // (same convention as test/unit/lint-shared-rules.test.js): the strip-set parity
@@ -126,6 +130,30 @@ describe('Toolkit authoring: knowledge base', function () {
         for (const name of KNOWLEDGE.strippedGlobals) {
             assert.ok(new RegExp('\\b' + name + '\\b').test(text),
                 'the hard rules never name the stripped global ' + name);
+        }
+    });
+
+    it('the taught reserved identifiers are the set the deploy gate rejects', function () {
+        // Pins the taught set against both gate authorities rather than a hand-typed
+        // sketch, which drifts in both directions: missing names the gate rejects and
+        // banning ordinary ones it allows. Both authorities are acorn-only, so this
+        // runs without the isolate binding.
+        assert.deepStrictEqual(
+            KNOWLEDGE.reservedIdentifiers.slice().sort(),
+            meteringMod.RESERVED_IDENTIFIERS
+                .concat(lintCoreMod.RESERVED_CONTROL_BINDINGS).sort(),
+            'the authoring prompt teaches a different reserved set than the deploy gate ' +
+            'enforces; a name missing here is one a model will happily emit and the ' +
+            'reserved-identifier rule then rejects on deploy');
+    });
+
+    it('every taught reserved identifier reaches the rendered hard rules', function () {
+        // Same defence as the stripped-global renderer above: an edit that dropped
+        // the interpolation would still satisfy the equality test.
+        const text = KNOWLEDGE.hardRules.join('\n');
+        for (const name of KNOWLEDGE.reservedIdentifiers) {
+            assert.ok(new RegExp('\\b' + name + '\\b').test(text),
+                'the hard rules never name the reserved identifier ' + name);
         }
     });
 
