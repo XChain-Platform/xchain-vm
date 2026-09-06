@@ -49,7 +49,7 @@ class IsolateManager {
     /**
      * Compile source code in an isolate.
      *
-     * Cache handling is API-version-specific. Under isolated-vm 5.x cached
+     * Cache handling is API-version-specific. Under isolated-vm 6.x cached
      * compilation data is an ExternalCopy<ArrayBuffer> handle carried on the
      * ScriptInfo, NOT a Script method: you CONSUME it by passing `cachedData`,
      * and you PRODUCE it by passing `produceCachedData: true` (V8 then attaches
@@ -70,11 +70,11 @@ class IsolateManager {
 
     /**
      * Read the cached compilation data produced by a compileScript() call made
-     * without a `cachedData` argument. Under isolated-vm 5.x the produced handle
-     * is attached as `script.cachedData` (an ExternalCopy<ArrayBuffer>); there is
-     * no `Script.createCachedData()` method in this API line (the earlier code
-     * called it, so every read threw and the cache silently never populated: the
-     * harness and per-block contract compiles re-parsed on every execution).
+     * without a `cachedData` argument. Under isolated-vm 6.x the produced handle
+     * is attached as `script.cachedData` (an ExternalCopy<ArrayBuffer>); this API
+     * line carries no `Script.createCachedData()` method, and calling one throws
+     * rather than returning a handle, which leaves the cache empty and re-parses
+     * the harness and every per-block contract compile.
      * @param {ivm.Script} script
      * @returns {ivm.ExternalCopy|null}
      */
