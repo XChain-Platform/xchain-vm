@@ -35,8 +35,9 @@
  *
  * IMPORTANT: every value below is a STRING unless typed otherwise. Contract
  * params, state values, and token amounts are all strings; do arithmetic on
- * amounts with `xchain.math.*` (bignumber), never native float math (floats
- * are rejected at deploy).
+ * amounts with `xchain.math.*` (bignumber), never native float math. The deploy
+ * gate rejects the native transcendental `Math` calls and `**`; a decimal literal
+ * is only a linter warning, so a float-using contract WILL deploy and be wrong.
  ********************************************************************/
 
 /** Token metadata as returned by `getTokenInfo` (fields are strings). */

@@ -100,7 +100,7 @@ const CONCEPT_MAP = [
     { solidity: 'require(c, "m")', xchain: 'xchain.require(c, "m")', note: 'reverts the whole execution + emissions' },
     { solidity: 'revert("m")', xchain: 'xchain.revert("m")', note: '' },
     { solidity: 'emit Event(...)', xchain: 'xchain.emit.broadcast(...)', note: 'or rely on the indexer action log' },
-    { solidity: 'uint math / SafeMath', xchain: 'xchain.math.add/subtract/multiply/divide/compare/gt/gte/lt/lte/eq/...', note: 'bignumber, no overflow; FLOATS ARE REJECTED AT DEPLOY' },
+    { solidity: 'uint math / SafeMath', xchain: 'xchain.math.add/subtract/multiply/divide/compare/gt/gte/lt/lte/eq/...', note: 'bignumber, no overflow; NATIVE Math.pow/sqrt/log AND `**` ARE REJECTED AT DEPLOY (a decimal literal only warns)' },
     { solidity: 'transfer / send value', xchain: 'xchain.emit.send({ ... })', note: 'emits SEND; applied after return' },
     { solidity: 'external call returning a value', xchain: 'xchain.emit.execute({ contractIndex, method, params, gasLimit })', note: 'ASYNC, NO return value; respond via a callback method' },
     { solidity: 'cross-chain call', xchain: 'xchain.emit.crossExecute({ targetChain, contractIndex, method, params, gasLimit, callbackMethod, callbackParams, deadlineBlocks })', note: 'bridgeless; target must export crossCallable' },
@@ -139,14 +139,23 @@ const RESERVED_NAMES_TAUGHT = RESERVED_IDENTIFIERS.concat(RESERVED_CONTROL_BINDI
 
 // Non-negotiable rules the generated contract MUST satisfy; teaching them up
 // front cuts repair rounds. Most are deploy-blocking (lint-core CONSENSUS_RULES,
-// the only findings the on-chain validator acts on). The banned-globals rule is
-// NOT: those globals are deleted from the isolate at RUNTIME, so a contract that
-// touches one lints clean, deploys, and then throws a ReferenceError on its first
-// execution. Both are hard rules for an author; only the wording distinguishes
-// where each one bites.
+// the only findings the on-chain validator acts on). Two are NOT, and the wording
+// has to keep them apart or an author reads the wrong signal off a clean lint:
+//   - banned globals are deleted from the isolate at RUNTIME, so a contract that
+//     touches one lints clean, deploys, and then throws a ReferenceError on its
+//     first execution;
+//   - a decimal NUMBER LITERAL is rule 'float-literal', which findFloatWarnings
+//     emits at severity 'warning' and which is absent from CONSENSUS_RULES, so
+//     validateSyntax returns { valid: true } and the contract deploys
+//     (test/toolkit/gate.test.js pins exactly that). The deploy-blocking half of
+//     the old combined sentence is 'banned-math': the native transcendental Math
+//     calls, plus `**` once VM_LINT_HARDENING is active.
+// All of them are hard rules for an author; only the wording distinguishes where
+// each one bites.
 const HARD_RULES = [
     'Export a CommonJS module: `module.exports = { initialize, methodA, ... }` (object of methods) or a single `module.exports = function (xchain) {...}`. Each method takes exactly one argument: the `xchain` gateway.',
-    'No floats anywhere. No numeric literal with a decimal point, no native Math.sqrt/pow/log/log2/log10 (use xchain.math.* bignumber ops). Token amounts are decimal STRINGS.',
+    'No native float math: no Math.sqrt/pow/log/log2/log10 and no `**` exponentiation. The deploy gate REJECTS these; use xchain.math.* bignumber ops instead.',
+    'No numeric literal with a decimal point, and token amounts are decimal STRINGS. Mandatory authoring practice: the linter reports a decimal literal as a WARNING, not a deploy rejection, so the chain will accept a contract that quietly does native floating-point arithmetic. Route every amount through xchain.math.*.',
     'No BigInt literals, no RegExp literals, no `new RegExp`.',
     'No async surface: no `async`, no `await`, no `Promise`. Methods are synchronous.',
     'No host globals. These are DELETED from the sandbox, so a contract that touches one deploys and then throws at execution: ' +
@@ -234,9 +243,12 @@ function buildSystemPrompt(opts = {}) {
         renderConceptMap(),
         '',
         'HARD RULES. The on-chain deploy gate REJECTS a violation of most of these and the ' +
-            'contract never deploys. The deleted host globals are the exception: that ' +
-            'contract deploys clean and then THROWS on its first execution. Neither is ' +
-            'recoverable, so treat every rule below as blocking:',
+            'contract never deploys. Two are exceptions to that mechanism, not to the rule: ' +
+            'a contract touching a deleted host global deploys clean and then THROWS on its ' +
+            'first execution, and a decimal number literal is reported as a linter WARNING ' +
+            'that still deploys, leaving native floating-point arithmetic running on chain. ' +
+            'None of the three is recoverable after the fact, so treat every rule below as ' +
+            'blocking:',
         renderNumbered(HARD_RULES),
         '',
         'CONTRACT SHAPE:',

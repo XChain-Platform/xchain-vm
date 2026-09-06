@@ -180,6 +180,36 @@ describe('Toolkit authoring: prompt construction', function () {
         assert(/deterministic/i.test(sys));
     });
 
+    it('never claims a decimal literal is rejected at deploy, and still names the Math ban as blocking', function () {
+        // Enforcement parity, derived from the gate rather than from prose: rule
+        // 'float-literal' is absent from CONSENSUS_RULES, so a contract with `0.5`
+        // deploys with a warning (test/toolkit/gate.test.js pins that), while
+        // 'banned-math' IS in the set and rejects. Guidance that welds the two into
+        // one "floats are rejected at deploy" sentence teaches a rule the chain does
+        // not enforce; this asserts the wording cannot drift back.
+        const sys = buildSystemPrompt();
+
+        assert.strictEqual(runGate('module.exports = function(xchain) { var r = 0.5; return String(r); };').ok,
+            true, 'precondition: a decimal literal must still be gate-clean');
+        assert.strictEqual(runGate('module.exports = function(xchain) { return String(Math.pow(2, 3)); };').ok,
+            false, 'precondition: native Math.pow must still be gate-rejected');
+
+        // The affirmative claim, in every phrasing the guidance has actually used.
+        const FALSE_CLAIMS = [
+            /FLOATS ARE REJECTED AT DEPLOY/i,
+            /floats?\s+(?:are|is)\s+rejected/i,
+            /(?:decimal|number|numeric)\s+literals?\s+(?:are|is)\s+rejected/i,
+            /No floats anywhere/i
+        ];
+        for (const re of FALSE_CLAIMS)
+            assert(!re.test(sys), 'guidance still claims deploy rejects floats: ' + re);
+
+        // The genuinely blocking half must survive the split.
+        assert(/Math\.sqrt\/pow\/log/.test(sys), 'the banned Math calls must still be named');
+        assert(/decimal literal[\s\S]{0,120}WARNING|WARNING[\s\S]{0,120}decimal literal/i.test(sys),
+            'the decimal-literal rule must be stated as a warning');
+    });
+
     it('describe mode puts the English brief in the user prompt', function () {
         const u = buildUserPrompt({ mode: 'describe', input: 'a vesting vault for TEAM tokens' });
         assert(/vesting vault for TEAM tokens/.test(u));
