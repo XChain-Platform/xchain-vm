@@ -60,6 +60,27 @@
  *   - populate the read-only snapshots. They start empty and read back
  *     null / '0' / [] until seeded, which is the same answer a node gives for
  *     data that genuinely does not exist; a stale seed is the author's.
+ *   - REFUSE a deploy the chain's deploy gate would reject. deploy() runs that
+ *     gate (code size + validateSyntax, resolved at the configured network /
+ *     coin / block) and hands the verdict back as `deployGate`, warning once on a
+ *     reject, but it still registers the contract: simulating a source the chain
+ *     would not accept is a legitimate move, and this repo's own fixtures do it to
+ *     measure the runtime strips. A `deployGate.valid === false` means the later
+ *     call() results are simulation-only; on chain the contract never exists.
+ *     Note this is the only source check a MAINNET-configured simulator gets: the
+ *     VM's execute-time re-lint rides EXEC_LINT_ACTIVATION, whose mainnet entries
+ *     are the unarmed null sentinel, so nothing else lints there.
+ *   - reproduce a HOST-TERMINATION outcome. The default in-process mode has no
+ *     worker to lose, so a contract that aborts the JS engine (bulk allocation
+ *     past the isolate memory limit is the shape) takes the simulator's own
+ *     process down and the author sees a crashed test run. The indexer runs
+ *     execution: 'subprocess' (xchain-indexer/src/actions.js), where the same
+ *     contract kills only the worker and the executor returns the deterministic
+ *     `out_of_resource: execution host terminated (...)` with gasUsed at the
+ *     ceiling (src/process-executor.js hostTerminatedResult). Pass
+ *     execution: 'subprocess' (or `xchain-foundry simulate --execution
+ *     subprocess`) to see that result. The wall-clock half of this seam IS
+ *     faithful: DEFAULT_LIMITS.maxCpuTimeMs equals CONSENSUS_MAX_WALL_MS.
  *   - adjudicate a guard's VERDICT. callGuard runs the guard and commits its
  *     state on VM success; the indexer additionally parses the returned
  *     payoutLegs and DENIES (committing nothing) on a malformed leg or one
@@ -168,8 +189,11 @@ function defaultBlockHeight(coin, network) {
 // canonical value to import; this is a second home for that number and a
 // deliberate one. A guard's real headroom is 5x smaller than the simulator's
 // 1000000 default, which is the whole reason it is pinned here rather than
-// left to the author. test/toolkit/simulator.test.js pins the value so a
-// change is a test-breaking act, never a silent one.
+// left to the author. test/determinism/simulator-defaults-cross-repo.test.js
+// compares this constant against GAS_SCHEDULE.VM_GUARD_GAS_CEILING in the
+// sibling coin configs, so a coin-side re-pricing reddens this repo instead of
+// leaving simulate quoting stale headroom; test/toolkit/simulator.test.js keeps
+// a literal pin for a standalone clone with no sibling to read.
 const GUARD_GAS_CEILING = 200000;
 
 // Method name the indexer invokes on a token's bound controller contract
@@ -222,9 +246,15 @@ class ContractSimulator {
      *        regtest/testnet, which activate from genesis -- so a mainnet
      *        simulation runs today's rule set; a lower value warns once too.
      * @param {string} [opts.defaultCaller]  - caller address used when a call omits one
-     * @param {string} [opts.execution='in-process'] - VM execution mode. The
-     *        simulator defaults to in-process for millisecond author-time
-     *        feedback (no per-block fork); production embedders use 'subprocess'.
+     * @param {string} [opts.execution='in-process'] - VM execution mode. Not a
+     *        pure latency knob: the two modes differ on a RESULT. in-process
+     *        gives millisecond feedback with no per-block fork, but has no worker
+     *        to lose, so a contract that aborts the JS engine takes this process
+     *        down instead of failing. 'subprocess' forks one worker per
+     *        simulator, is the mode the indexer runs, and returns the chain's
+     *        deterministic `out_of_resource: execution host terminated (...)`
+     *        with gasUsed at the ceiling. Reach for it when a contract crashes
+     *        the runner rather than failing.
      */
     constructor(opts = {}) {
         this.coin = opts.coin || 'BTC';
@@ -249,6 +279,8 @@ class ContractSimulator {
         this._preGateWarned = false;
         // Likewise for the height-gate warning (see _warnIfPreHeightGate).
         this._preHeightGateWarned = false;
+        // Likewise for the deploy-gate rejection warning (see _warnDeployGate).
+        this._deployGateWarned = false;
 
         // Read-only snapshots the author seeds.
         this.balances = {};        // address -> tick -> amountStr
@@ -470,6 +502,48 @@ class ContractSimulator {
         );
     }
 
+    /**
+     * Run the chain's DEPLOY gate over already-transpiled source and return its
+     * verdict as `{ valid, error }`. ADVISORY: deploy() reports it and warns once,
+     * it never refuses, because simulating a source the chain would reject is a
+     * legitimate move (this repo's own fixtures deploy a WebAssembly probe to
+     * measure the runtime strip) and a public toolkit API that started throwing
+     * would break those callers silently.
+     *
+     * The gate is the indexer's, resolved at THIS simulator's epoch rather than
+     * hardcoded on: xchain-indexer/src/actions/deploy.js checks the UTF-8 size cap
+     * and then calls vm.validateSyntax with five epoch-resolved ban flags. It reads
+     * those flags from its own protocolChanges table and per-coin activation
+     * modules; the VM's exported predicates are the twins index.js already uses for
+     * the execute-time re-lint (see the flag map above isExecLintActive's caller),
+     * so they resolve the same verdict without a second copy of the thresholds.
+     * The two height-keyed flags take the CONFIGURED coin, matching deploy.js,
+     * which reads its node's COIN rather than deriving one from the address.
+     */
+    _deployGateVerdict(src) {
+        if (Buffer.byteLength(src, 'utf8') > this.limits.maxCodeSize)
+            return { valid: false, error: 'exceeds max size' };
+        const time   = Number(this.block.timestamp);
+        const height = Number(this.block.height);
+        const pkg3   = XChainVM.isPkg3SandboxActive(this.network, this.coin, height);
+        try {
+            return this.vm.validateSyntax(src, {
+                enforceBannedAsync:     XChainVM.isAsyncSurfaceActive(this.network, time),
+                enforceLintHardening:   XChainVM.isLintHardeningActive(this.network, time),
+                enforceBannedGenerator: pkg3,
+                enforceBannedWasm:      pkg3,
+                enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height)
+            });
+        } catch (e) {
+            // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a
+            // property of THIS machine, not of the contract (syntax.js raises
+            // HostFaultError for exactly that split). Reporting `valid: true` there
+            // would hand the author the reassuring answer a real pass gives, so the
+            // verdict is neither: null says the gate did not run.
+            return { valid: null, error: 'deploy gate could not run on this host: ' + e.message };
+        }
+    }
+
     /** Merge fields into the current block context ({ height, timestamp, hash }). */
     setBlock(partial) {
         Object.assign(this.block, partial || {});
@@ -505,10 +579,15 @@ class ContractSimulator {
      * @param {string} [opts.filename] - drives TS detection (.ts -> type-strip)
      * @param {string[]} [opts.constructorParams] - if present, runs `initialize`
      * @param {string} [opts.caller]
-     * @returns {Promise<{contractIndex, contractAddress, initResult}>}
+     * @returns {Promise<{contractIndex, contractAddress, initResult, deployGate}>}
+     *          deployGate is the chain's deploy verdict, `{ valid: true }` or
+     *          `{ valid: false, error }`. Advisory: a reject warns once and the
+     *          contract is still registered (see _deployGateVerdict).
      */
     async deploy(code, opts = {}) {
         const src = toContractJs(code, opts.filename || '');
+        const deployGate = this._deployGateVerdict(src);
+        if (deployGate.valid !== true) this._warnDeployGate(deployGate);
         const index = (opts.contractIndex != null) ? Number(opts.contractIndex) : this._nextIndex;
         if (index >= this._nextIndex) this._nextIndex = index + 1;
         const address = opts.contractAddress || ('C:' + this.coin + ':' + index);
@@ -525,7 +604,30 @@ class ContractSimulator {
                 caller: opts.caller
             });
         }
-        return { contractIndex: index, contractAddress: address, initResult };
+        return { contractIndex: index, contractAddress: address, initResult, deployGate };
+    }
+
+    /**
+     * Warn once per simulator when the deploy gate rejects a source. Fires only on
+     * a REJECT, so a clean contract keeps the simulator silent, and once per
+     * instance for the same reason the two block-gate warnings are (see
+     * _warnIfPreGate): a per-call warning trains authors to ignore it.
+     */
+    _warnDeployGate(verdict) {
+        if (this._deployGateWarned) return;
+        this._deployGateWarned = true;
+        if (verdict.valid === null) {
+            console.warn('[xchain-vm simulator] ' + verdict.error +
+                '; deployGate.valid is null, which is NOT a pass. `xchain-foundry lint` runs ' +
+                'the acorn half of the same gate without an isolate.');
+            return;
+        }
+        console.warn(
+            '[xchain-vm simulator] the DEPLOY gate rejects this contract: ' + verdict.error +
+            '. On chain xchain-indexer records `invalid: CODE_ENCODING (...)` and the contract ' +
+            'never exists, so any call() result below is simulation-only. The verdict rides ' +
+            'back on deploy() as `deployGate`; `xchain-foundry lint` reports it without an isolate.'
+        );
     }
 
     /**

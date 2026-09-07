@@ -63,7 +63,8 @@ const assert = require('assert');
 const fs     = require('fs');
 const path   = require('path');
 
-const { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS } = require('../../src/toolkit/simulator.js');
+const { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, GUARD_GAS_CEILING } =
+    require('../../src/toolkit/simulator.js');
 const XChainVM = require('../../src/index.js');
 const { CANONICAL_GAS_KEYS } = require('../../src/gas.js');
 const { MAX_CODE_SIZE } = require('../../src/lint-core.js');
@@ -210,9 +211,12 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
 
             // SUBSET equality, deliberately: the indexer legitimately carries fee
             // rows the VM never charges (VM_EXECUTE_BASE, VM_DEPLOY_BASE,
-            // VM_DEPLOY_PER_BYTE, VM_GUARD_GAS_CEILING and the non-VM actions), so
-            // a key-set comparison would fail on correct data. What must hold is
-            // that every key the simulator quotes is priced identically on chain.
+            // VM_DEPLOY_PER_BYTE and the non-VM actions), so a key-set comparison
+            // would fail on correct data. What must hold is that every key the
+            // simulator quotes is priced identically on chain. VM_GUARD_GAS_CEILING
+            // is not a schedule key the simulator charges, so it is not in this
+            // loop, but it IS a number the simulator mirrors: compared explicitly
+            // below.
             for (const key of Object.keys(DEFAULT_GAS_SCHEDULE)) {
                 assert.ok(key in schedule,
                     rel + ': GAS_SCHEDULE is missing ' + key + ', which the simulator quotes to ' +
@@ -223,6 +227,22 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
                     'or `xchain-foundry simulate` under-reports and a contract that passed ' +
                     'locally runs out of gas on chain');
             }
+
+            // The guard ceiling: callGuard() runs a controller guard at the
+            // simulator's GUARD_GAS_CEILING, a hand-copied second home for this
+            // row. The indexer refuses to default it (utility.resolveGuardGasCeiling
+            // throws when it is missing), so the coin config is the only authority
+            // and this is the only thing comparing the two.
+            assert.ok('VM_GUARD_GAS_CEILING' in schedule,
+                rel + ': GAS_SCHEDULE no longer carries VM_GUARD_GAS_CEILING, which the toolkit ' +
+                'simulator mirrors as GUARD_GAS_CEILING; re-point this guard rather than ' +
+                'deleting it');
+            assert.strictEqual(schedule.VM_GUARD_GAS_CEILING, GUARD_GAS_CEILING,
+                rel + ': VM_GUARD_GAS_CEILING = ' + schedule.VM_GUARD_GAS_CEILING + ' on chain ' +
+                'but GUARD_GAS_CEILING = ' + GUARD_GAS_CEILING + ' in the toolkit simulator. ' +
+                'callGuard() would simulate a controller guard at the wrong headroom, so a guard ' +
+                'that passes `xchain-foundry simulate` can run out of gas on chain; move both, ' +
+                'or move neither');
         });
     }
 

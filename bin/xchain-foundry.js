@@ -27,9 +27,13 @@
  *
  *   xchain-foundry simulate <file> [--method M] [--params a,b]
  *                                   [--constructor a,b] [--caller ADDR]
+ *                                   [--execution in-process|subprocess]
  *       Deploy the contract in the in-memory simulator and run one method,
  *       printing the result (success, returnValue, gasUsed, emitted actions,
  *       state changes). Requires the isolated-vm binding (Node 22 / Linux).
+ *       --execution subprocess runs the mode the indexer runs: slower (one
+ *       forked worker) but it reports the chain's out_of_resource result for a
+ *       contract that aborts the JS engine, instead of taking this process down.
  *
  *   xchain-foundry describe "<what the contract should do>" [--ts]
  *       AI-assisted authoring (Tier 3). Prints the ready-to-use LLM prompt
@@ -69,6 +73,7 @@ function usage(msg) {
         '  xchain-foundry lint <file...> [--json]\n' +
         '  xchain-foundry gas <file...>\n' +
         '  xchain-foundry simulate <file> [--method M] [--params a,b] [--constructor a,b] [--caller ADDR]\n' +
+        '                                 [--execution in-process|subprocess]\n' +
         '  xchain-foundry describe "<what it should do>" [--ts] [--json]\n' +
         '  xchain-foundry from-solidity <file.sol> [--ts] [--json]\n' +
         '  xchain-foundry validate <response-file|-> [--ts] [--json]\n'
@@ -197,10 +202,19 @@ async function cmdSimulate(args) {
     const params = splitList(args.flags.params);
     const ctorParams = args.flags.constructor !== undefined ? splitList(args.flags.constructor) : undefined;
     const caller = args.flags.caller ? String(args.flags.caller) : undefined;
+    // Default left to the simulator (in-process). 'subprocess' is the mode the
+    // indexer runs: it costs a fork, and it is the only way to see the chain's
+    // out_of_resource result for a contract that aborts the JS engine.
+    let execution;
+    if (args.flags.execution !== undefined) {
+        execution = String(args.flags.execution);
+        if (execution !== 'in-process' && execution !== 'subprocess')
+            usage('--execution must be in-process or subprocess, got ' + JSON.stringify(execution));
+    }
 
     let sim;
     try {
-        sim = new ContractSimulator();
+        sim = new ContractSimulator(execution ? { execution } : {});
     } catch (e) {
         process.stderr.write('error: cannot start the simulator (' + e.message + ')\n' +
             'Run on Node 22 / Linux where isolated-vm loads.\n');

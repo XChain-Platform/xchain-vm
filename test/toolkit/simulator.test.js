@@ -134,6 +134,70 @@ module.exports = {
         } finally { await sim.close(); }
     });
 
+    it('reports the chain deploy verdict, on mainnet too, where nothing else lints', async function() {
+        // A mainnet-configured simulator gets NO source lint anywhere else: the VM's
+        // execute-time re-lint rides EXEC_LINT_ACTIVATION, whose mainnet entries are
+        // the unarmed null sentinel, so without this gate a deploy-rejected source is
+        // reported only if some RUNTIME strip happens to catch it too. This one is
+        // caught (banned-math also strips Math.sqrt, so call() errors), which is why
+        // it is the readable case to assert on; the classes with no runtime twin run
+        // green end to end, measured on a default mainnet simulator: `2 ** 3` returns
+        // "8", a `__setconcat` binding returns "5", and a generator yields 1, each of
+        // them CODE_ENCODING on chain. The gate is what reports all four alike.
+        const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
+        const warned = [];
+        const real = console.warn;
+        console.warn = (...a) => warned.push(a.join(' '));
+        try {
+            const dep = await sim.deploy(
+                'module.exports = { run: function(xchain){ return String(Math.sqrt(4)); } };');
+            assert.strictEqual(dep.deployGate.valid, false,
+                'a mainnet simulator must still report the banned-math deploy rejection');
+            assert.match(String(dep.deployGate.error), /Math\.sqrt/);
+            // Advisory by design: the contract is still registered, so a fixture that
+            // deliberately simulates a chain-rejected source keeps working.
+            assert.strictEqual(sim.contracts.size, 1);
+            // Warned once, not once per deploy.
+            await sim.deploy(
+                'module.exports = { run: function(xchain){ return String(Math.pow(2, 3)); } };');
+            const gateWarnings = warned.filter((l) => /DEPLOY gate rejects/.test(l));
+            assert.strictEqual(gateWarnings.length, 1, JSON.stringify(warned));
+        } finally { console.warn = real; await sim.close(); }
+    });
+
+    it('passes a clean contract through the deploy gate on both networks', async function() {
+        const dflt = new ContractSimulator();
+        const main = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
+        try {
+            for (const sim of [dflt, main]) {
+                const dep = await sim.deploy(COUNTER, { constructorParams: ['1'] });
+                assert.deepStrictEqual(dep.deployGate, { valid: true });
+                assert.strictEqual(dep.initResult.success, true, dep.initResult.error);
+            }
+        } finally { await dflt.close(); await main.close(); }
+    });
+
+    it('resolves the gate flags at the configured epoch, not hardcoded on', async function() {
+        // The point of resolving from (network, coin, block) rather than passing
+        // literal `true`: a mainnet simulator pinned BELOW the Pkg-3 activation must
+        // accept a source whose only violation rides that unarmed gate, exactly as
+        // the chain accepted it at that height. Hardcoding the flags would reject it
+        // and teach the author their historical contract was never deployable.
+        const WASM = 'module.exports = { probe: function(xchain){ return typeof WebAssembly; } };';
+        const pre = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { height: 1 } });
+        const at  = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
+        const real = console.warn;
+        console.warn = () => {};
+        try {
+            assert.strictEqual((await pre.deploy(WASM)).deployGate.valid, true,
+                'below the Pkg-3 height the banned-wasm rule is not enforced on chain either');
+            const atGate = await at.deploy(WASM);
+            assert.strictEqual(atGate.deployGate.valid, false,
+                'at the armed height the chain rejects WebAssembly at deploy');
+            assert.match(String(atGate.deployGate.error), /WebAssembly/);
+        } finally { console.warn = real; await pre.close(); await at.close(); }
+    });
+
     it('runs a TypeScript contract via the strip step', async function() {
         const sim = new ContractSimulator();
         try {

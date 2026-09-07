@@ -28,10 +28,10 @@
  *      with the Solidity->XChain guide, the deploy gate and the sandbox's
  *      stripped-global list. Note the last of those is NOT deploy-blocking: the
  *      globals are deleted from the isolate at runtime, so a contract using one
- *      passes the gate and throws on its first execution. The taught list is a
- *      mirror of sandbox.js STRIPPED_GLOBAL_NAMES held equal by a parity test
- *      (test/toolkit/authoring.test.js), because this module must stay
- *      isolated-vm-free and sandbox.js is not.
+ *      passes the gate and throws on its first execution. The taught list is not
+ *      a copy: it is required from src/stripped-globals.js, the one definition
+ *      sandbox.js and lint-core.js consume too, which is dependency-free so this
+ *      module stays isolated-vm-free while sandbox.js is not.
  *   2. buildAuthoringPrompt() turns an English brief or a Solidity source into a
  *      well-formed system+user message pair embedding that knowledge.
  *   3. authorContract() runs a caller-injected `complete()` (any LLM client) and
@@ -100,7 +100,7 @@ const CONCEPT_MAP = [
     { solidity: 'require(c, "m")', xchain: 'xchain.require(c, "m")', note: 'reverts the whole execution + emissions' },
     { solidity: 'revert("m")', xchain: 'xchain.revert("m")', note: '' },
     { solidity: 'emit Event(...)', xchain: 'xchain.emit.broadcast(...)', note: 'or rely on the indexer action log' },
-    { solidity: 'uint math / SafeMath', xchain: 'xchain.math.add/subtract/multiply/divide/compare/gt/gte/lt/lte/eq/...', note: 'bignumber, no overflow; FLOATS ARE REJECTED AT DEPLOY' },
+    { solidity: 'uint math / SafeMath', xchain: 'xchain.math.add/subtract/multiply/divide/compare/gt/gte/lt/lte/eq/...', note: 'bignumber, no overflow; NATIVE Math.pow/sqrt/log AND `**` ARE REJECTED AT DEPLOY (a decimal literal only warns)' },
     { solidity: 'transfer / send value', xchain: 'xchain.emit.send({ ... })', note: 'emits SEND; applied after return' },
     { solidity: 'external call returning a value', xchain: 'xchain.emit.execute({ contractIndex, method, params, gasLimit })', note: 'ASYNC, NO return value; respond via a callback method' },
     { solidity: 'cross-chain call', xchain: 'xchain.emit.crossExecute({ targetChain, contractIndex, method, params, gasLimit, callbackMethod, callbackParams, deadlineBlocks })', note: 'bridgeless; target must export crossCallable' },
@@ -116,42 +116,55 @@ const CONCEPT_MAP = [
     { solidity: 'gas limit', xchain: 'GAS_LIMIT on deploy/execute; sdk.suggestGasLimit(...)', note: 'metered per the gas schedule' }
 ];
 
-// Mirror of sandbox.js STRIPPED_GLOBAL_NAMES, duplicated here for the same
-// dependency-light reason lint-core.js mirrors STRIPPED_PROTO_METHODS: this
-// module is deliberately isolated-vm-free (its whole point is that the authoring
-// loop and the acorn gate run on any OS), and sandbox.js requires isolated-vm at
-// the top level. Drift is caught by the parity test in
-// test/toolkit/authoring.test.js, which loads the real list wherever the binding
-// is available. Order follows sandbox.js.
-const STRIPPED_GLOBALS_TAUGHT = [
-    'Date', 'setTimeout', 'setInterval', 'setImmediate',
-    'clearTimeout', 'clearInterval', 'clearImmediate',
-    'WeakRef', 'FinalizationRegistry', 'Proxy', 'Reflect',
-    'fetch', 'XMLHttpRequest', 'WebSocket',
-    'SharedArrayBuffer', 'Atomics',
-    'queueMicrotask', 'Promise',
-    'BigInt',
-    'WebAssembly',
-    'Intl', 'Temporal', 'structuredClone', 'performance'
-];
+// The names the sandbox deletes, taught verbatim. Required from the one module
+// that defines them rather than re-copied: ../stripped-globals.js is
+// dependency-free, so requiring it keeps this module isolated-vm-free (its whole
+// point is that the authoring loop and the acorn gate run on any OS) while
+// making a taught/enforced mismatch impossible to write. sandbox.js and
+// lint-core.js require the same module.
+const { STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT } = require('../stripped-globals.js');
+
+// The identifiers the deploy gate rejects, taught by NAME rather than retyped as
+// a prefix sketch. Two authorities, both acorn-only (so requiring them keeps this
+// module isolated-vm-free, and lint-core is already in the graph via gate.js):
+// metering.RESERVED_IDENTIFIERS is the metering pass's own helper set, and
+// lint-core.RESERVED_CONTROL_BINDINGS the contract wrapper's control bindings,
+// rejected by the same 'reserved-identifier' rule once hardening is active.
+// Matching in findReservedIdentifier / findReservedControlBinding is on the exact
+// name, so a prefix wording would ban ordinary names (`__gasBudget`) the chain
+// allows while missing the helpers it does not.
+const { RESERVED_IDENTIFIERS } = require('../metering.js');
+const { RESERVED_CONTROL_BINDINGS } = require('../lint-core.js');
+const RESERVED_NAMES_TAUGHT = RESERVED_IDENTIFIERS.concat(RESERVED_CONTROL_BINDINGS);
 
 // Non-negotiable rules the generated contract MUST satisfy; teaching them up
 // front cuts repair rounds. Most are deploy-blocking (lint-core CONSENSUS_RULES,
-// the only findings the on-chain validator acts on). The banned-globals rule is
-// NOT: those globals are deleted from the isolate at RUNTIME, so a contract that
-// touches one lints clean, deploys, and then throws a ReferenceError on its first
-// execution. Both are hard rules for an author; only the wording distinguishes
-// where each one bites.
+// the only findings the on-chain validator acts on). Two are NOT, and the wording
+// has to keep them apart or an author reads the wrong signal off a clean lint:
+//   - banned globals are deleted from the isolate at RUNTIME, so a contract that
+//     touches one lints clean, deploys, and then throws a ReferenceError on its
+//     first execution;
+//   - a decimal NUMBER LITERAL is rule 'float-literal', which findFloatWarnings
+//     emits at severity 'warning' and which is absent from CONSENSUS_RULES, so
+//     validateSyntax returns { valid: true } and the contract deploys
+//     (test/toolkit/gate.test.js pins exactly that). The deploy-blocking half of
+//     the old combined sentence is 'banned-math': the native transcendental Math
+//     calls, plus `**` once VM_LINT_HARDENING is active.
+// All of them are hard rules for an author; only the wording distinguishes where
+// each one bites.
 const HARD_RULES = [
     'Export a CommonJS module: `module.exports = { initialize, methodA, ... }` (object of methods) or a single `module.exports = function (xchain) {...}`. Each method takes exactly one argument: the `xchain` gateway.',
-    'No floats anywhere. No numeric literal with a decimal point, no native Math.sqrt/pow/log/log2/log10 (use xchain.math.* bignumber ops). Token amounts are decimal STRINGS.',
+    'No native float math: no Math.sqrt/pow/log/log2/log10 and no `**` exponentiation. The deploy gate REJECTS these; use xchain.math.* bignumber ops instead.',
+    'No numeric literal with a decimal point, and token amounts are decimal STRINGS. Mandatory authoring practice: the linter reports a decimal literal as a WARNING, not a deploy rejection, so the chain will accept a contract that quietly does native floating-point arithmetic. Route every amount through xchain.math.*.',
     'No BigInt literals, no RegExp literals, no `new RegExp`.',
     'No async surface: no `async`, no `await`, no `Promise`. Methods are synchronous.',
     'No host globals. These are DELETED from the sandbox, so a contract that touches one deploys and then throws at execution: ' +
         STRIPPED_GLOBALS_TAUGHT.join(', ') +
         '. Also no `eval`, no `Function`, no `.constructor` access, no `require`/`import`/filesystem/network.',
     'ES2020 syntax maximum (no numeric separators, no logical-assignment, no top-level await).',
-    'Do not reference identifiers beginning `__gas`/`__concat`/`__tmpl`/`__arrspread`/`__objspread` (reserved by the metering pass).',
+    'Do not declare or reference these reserved identifiers (the metering pass and the contract wrapper inject them; the deploy gate rejects any reference): ' +
+        RESERVED_NAMES_TAUGHT.join(', ') +
+        '. Matching is on the exact name, so an ordinary name such as `__gasBudget` is fine.',
     'State keys <= 1024 bytes, values <= 65536 bytes (JSON), <= 10000 keys total; at most 50 emitted actions per call.'
 ];
 
@@ -176,10 +189,14 @@ const KNOWLEDGE = {
     nativePrimitives: NATIVE_PRIMITIVES,
     conceptMap: CONCEPT_MAP,
     hardRules: HARD_RULES,
-    // The taught mirror of sandbox.js STRIPPED_GLOBAL_NAMES. Exported so the
-    // parity test can compare it to the real list by value rather than by
-    // grepping rendered prose.
+    // The sandbox's stripped-global list, straight from src/stripped-globals.js.
+    // Exported so a test can compare it to the enforced list by value rather
+    // than by grepping rendered prose.
     strippedGlobals: STRIPPED_GLOBALS_TAUGHT,
+    // The deploy gate's reserved identifiers, derived from metering.js and
+    // lint-core.js. Exported for the same reason strippedGlobals is: a test
+    // compares it to the enforced lists by value instead of grepping prose.
+    reservedIdentifiers: RESERVED_NAMES_TAUGHT,
     contractShape: CONTRACT_SHAPE
 };
 
@@ -226,9 +243,12 @@ function buildSystemPrompt(opts = {}) {
         renderConceptMap(),
         '',
         'HARD RULES. The on-chain deploy gate REJECTS a violation of most of these and the ' +
-            'contract never deploys. The deleted host globals are the exception: that ' +
-            'contract deploys clean and then THROWS on its first execution. Neither is ' +
-            'recoverable, so treat every rule below as blocking:',
+            'contract never deploys. Two are exceptions to that mechanism, not to the rule: ' +
+            'a contract touching a deleted host global deploys clean and then THROWS on its ' +
+            'first execution, and a decimal number literal is reported as a linter WARNING ' +
+            'that still deploys, leaving native floating-point arithmetic running on chain. ' +
+            'None of the three is recoverable after the fact, so treat every rule below as ' +
+            'blocking:',
         renderNumbered(HARD_RULES),
         '',
         'CONTRACT SHAPE:',

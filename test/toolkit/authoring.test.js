@@ -31,6 +31,11 @@ const {
     authorContract
 } = require('../../src/toolkit/authoring.js');
 const { runGate } = require('../../src/toolkit/gate.js');
+const SHARED = require('../../src/stripped-globals.js');
+// The two authorities behind the taught reserved-identifier list. Both are
+// acorn-only, so they load wherever this suite does.
+const meteringMod = require('../../src/metering.js');
+const lintCoreMod = require('../../src/lint-core.js');
 
 // sandbox.js requires isolated-vm at the top level, so it is loaded defensively
 // (same convention as test/unit/lint-shared-rules.test.js): the strip-set parity
@@ -90,11 +95,24 @@ describe('Toolkit authoring: knowledge base', function () {
         assert(KNOWLEDGE.conceptMap.some(r => /msg\.value/.test(r.solidity)));
     });
 
-    it('the taught stripped-global list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES', function () {
+    it('teaches the one shared definition, not a copy of it', function () {
         // authoring.js must stay isolated-vm-free (the gate is pure acorn and the
-        // harness is meant to run on any OS), so it carries a MIRROR of the strip
-        // set exactly as lint-core.js mirrors STRIPPED_PROTO_METHODS. This is the
-        // guard that keeps the mirror honest.
+        // harness runs on any OS), so it requires src/stripped-globals.js, the same
+        // module sandbox.js and lint-core.js require, and this identity check runs
+        // without the binding rather than skipping wherever isolated-vm will not load.
+        assert.strictEqual(KNOWLEDGE.strippedGlobals, SHARED.STRIPPED_GLOBAL_NAMES,
+            'the authoring knowledge base must teach the very array stripped-globals.js ' +
+            'froze; a distinct array means a second literal crept back in');
+        assert.strictEqual(KNOWLEDGE.strippedGlobals,
+            require('../../src/lint-core.js').STRIPPED_GLOBAL_NAMES,
+            'the knowledge base and the linter must read one source of truth');
+    });
+
+    it('the taught stripped-global list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES', function () {
+        // Defence in depth for the identity check above: sandbox.js interpolates
+        // these names into the real strip script, so this proves the taught set is
+        // what the isolate actually deletes. Skips without the binding, which is
+        // why it is no longer the only guard.
         if (!sandboxMod || !sandboxMod.STRIPPED_GLOBAL_NAMES) return this.skip();
         assert.deepStrictEqual(
             KNOWLEDGE.strippedGlobals.slice().sort(),
@@ -112,6 +130,30 @@ describe('Toolkit authoring: knowledge base', function () {
         for (const name of KNOWLEDGE.strippedGlobals) {
             assert.ok(new RegExp('\\b' + name + '\\b').test(text),
                 'the hard rules never name the stripped global ' + name);
+        }
+    });
+
+    it('the taught reserved identifiers are the set the deploy gate rejects', function () {
+        // Pins the taught set against both gate authorities rather than a hand-typed
+        // sketch, which drifts in both directions: missing names the gate rejects and
+        // banning ordinary ones it allows. Both authorities are acorn-only, so this
+        // runs without the isolate binding.
+        assert.deepStrictEqual(
+            KNOWLEDGE.reservedIdentifiers.slice().sort(),
+            meteringMod.RESERVED_IDENTIFIERS
+                .concat(lintCoreMod.RESERVED_CONTROL_BINDINGS).sort(),
+            'the authoring prompt teaches a different reserved set than the deploy gate ' +
+            'enforces; a name missing here is one a model will happily emit and the ' +
+            'reserved-identifier rule then rejects on deploy');
+    });
+
+    it('every taught reserved identifier reaches the rendered hard rules', function () {
+        // Same defence as the stripped-global renderer above: an edit that dropped
+        // the interpolation would still satisfy the equality test.
+        const text = KNOWLEDGE.hardRules.join('\n');
+        for (const name of KNOWLEDGE.reservedIdentifiers) {
+            assert.ok(new RegExp('\\b' + name + '\\b').test(text),
+                'the hard rules never name the reserved identifier ' + name);
         }
     });
 
@@ -136,6 +178,36 @@ describe('Toolkit authoring: prompt construction', function () {
         assert(/\bstructuredClone\b/.test(sys) && /\bperformance\b/.test(sys),
             'the rendered hard rules must carry the full stripped-global list');
         assert(/deterministic/i.test(sys));
+    });
+
+    it('never claims a decimal literal is rejected at deploy, and still names the Math ban as blocking', function () {
+        // Enforcement parity, derived from the gate rather than from prose: rule
+        // 'float-literal' is absent from CONSENSUS_RULES, so a contract with `0.5`
+        // deploys with a warning (test/toolkit/gate.test.js pins that), while
+        // 'banned-math' IS in the set and rejects. Guidance that welds the two into
+        // one "floats are rejected at deploy" sentence teaches a rule the chain does
+        // not enforce; this asserts the wording cannot drift back.
+        const sys = buildSystemPrompt();
+
+        assert.strictEqual(runGate('module.exports = function(xchain) { var r = 0.5; return String(r); };').ok,
+            true, 'precondition: a decimal literal must still be gate-clean');
+        assert.strictEqual(runGate('module.exports = function(xchain) { return String(Math.pow(2, 3)); };').ok,
+            false, 'precondition: native Math.pow must still be gate-rejected');
+
+        // The affirmative claim, in every phrasing the guidance has actually used.
+        const FALSE_CLAIMS = [
+            /FLOATS ARE REJECTED AT DEPLOY/i,
+            /floats?\s+(?:are|is)\s+rejected/i,
+            /(?:decimal|number|numeric)\s+literals?\s+(?:are|is)\s+rejected/i,
+            /No floats anywhere/i
+        ];
+        for (const re of FALSE_CLAIMS)
+            assert(!re.test(sys), 'guidance still claims deploy rejects floats: ' + re);
+
+        // The genuinely blocking half must survive the split.
+        assert(/Math\.sqrt\/pow\/log/.test(sys), 'the banned Math calls must still be named');
+        assert(/decimal literal[\s\S]{0,120}WARNING|WARNING[\s\S]{0,120}decimal literal/i.test(sys),
+            'the decimal-literal rule must be stated as a warning');
     });
 
     it('describe mode puts the English brief in the user prompt', function () {

@@ -234,22 +234,6 @@ function printMemory(before, after) {
     console.log('    External:   ' + before.externalMb + ' -> ' + after.externalMb + ' MB (delta: ' + (after.externalMb - before.externalMb).toFixed(2) + ')');
 }
 
-/**
- * Generate a JSON report for CI consumption.
- * @param {string} scenario
- * @param {object} results
- * @returns {object}
- */
-function buildReport(scenario, results) {
-    return {
-        timestamp: new Date().toISOString(),
-        node:      process.version,
-        platform:  process.platform + '-' + process.arch,
-        scenario,
-        results
-    };
-}
-
 module.exports = {
     GAS_SCHEDULE,
     createVM,
@@ -258,10 +242,7 @@ module.exports = {
     measure,
     collectStats,
     memSnapshot,
-    printHeader,
     printTable,
     printMemory,
-    formatStatsRow,
-    buildReport,
     fmt
 };

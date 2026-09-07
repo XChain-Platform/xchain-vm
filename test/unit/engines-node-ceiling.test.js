@@ -14,16 +14,16 @@
 
 // engines.node must keep an upper bound below Node 23.
 //
-// isolated-vm 5.0.4 carries a native binding that node-gyp cannot build on
-// Node 24: it uses `T::IsStackAllocatedTypeMarker`, a V8 API that major
-// removed. A clean build probe compiles and loads on 22.22.3 and fails on
-// 24.15.0, so the bound is measured rather than stylistic.
+// src/consensus-runtime.js pins process.versions.modules to 127 (Node 22)
+// alongside v8/icu/unicode/cldr, so a process on Node 24 (ABI 137) fails
+// checkConsensusRuntime() and cannot agree with the fleet. isolated-vm 6.2.0
+// installs on either major from per-ABI prebuilt bindings, so the ceiling is
+// the consensus pin rather than a build limit.
 //
 // The failure mode this pins is quiet: an `engines.node` of ">=22.0.0"
-// ADMITS 24, so `npm install` proceeds normally right up to the compile,
-// and preflight.test.js (the dlopen guard) only fires later, on a machine
-// that got far enough to run tests at all. Declared policy has to state the
-// constraint the dependency actually has.
+// ADMITS 24, so `npm install` proceeds normally and the mismatch surfaces
+// only when a validator refuses to run, on a machine that got far enough to
+// deploy. Declared policy has to state the constraint the runtime has.
 //
 // Deliberately requires nothing from src/: this file must stay green on a
 // host where the native binding cannot load, which is exactly the host that

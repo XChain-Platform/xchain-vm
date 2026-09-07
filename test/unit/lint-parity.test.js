@@ -36,7 +36,10 @@ const { lintSource, CONSENSUS_RULES, findBannedStrippedGlobals,
 const VM_SRC_DIR     = path.join(__dirname, '..', '..', 'src');
 const SDK_VENDOR_DIR = path.join(__dirname, '..', '..', '..', 'xchain-sdk', 'src', 'contract');
 const CONTRACTS_DIR  = path.join(__dirname, '..', '..', '..', 'xchain-contracts');
-const VENDORED_FILES = ['lint-core.js', 'metering.js'];
+// stripped-globals.js is in the vendor set because lint-core.js requires it by a
+// path that must resolve at BOTH vendored depths, so the copy has to travel with
+// lint-core.js in the same change or the SDK linter cannot load.
+const VENDORED_FILES = ['lint-core.js', 'metering.js', 'stripped-globals.js'];
 
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');

@@ -76,4 +76,4 @@ function toContractJs(source, filename) {
     return isTypeScript(filename) ? stripTypes(source, filename) : String(source);
 }
 
-module.exports = { isTypeScript, stripTypes, toContractJs, TS_EXTENSIONS };
+module.exports = { isTypeScript, stripTypes, toContractJs };
