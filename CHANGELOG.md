@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- The deploy-time manifest read reports a contract's exported `meta` object (name, description, version), serialised and size-bounded inside the isolate.
+- Foundry gate blocks a contract with no valid meta.name/meta.description under the new contract-meta rule; the scaffolder and the AI-authoring prompt now emit and ask for contract identity.
+
 ## [0.15.0] - 2026-09-07
 
 ### Changed

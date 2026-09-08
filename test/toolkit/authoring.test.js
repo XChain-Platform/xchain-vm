@@ -44,9 +44,12 @@ const lintCoreMod = require('../../src/lint-core.js');
 let sandboxMod = null;
 try { sandboxMod = require('../../src/sandbox.js'); } catch (e) { /* no isolate */ }
 
-// A gate-clean counter contract used as the model's "good" answer.
+// A gate-clean counter contract used as the model's "good" answer. It carries
+// `meta` because CONTRACT_META_REQUIRED makes identity a deploy verdict: a
+// nameless contract is gate-BLOCKED, which is what NAMELESS_CONTRACT below drives.
 const CLEAN_CONTRACT = `// SPDX-License-Identifier: MIT
 module.exports = {
+    meta: { name: 'Counter', description: 'A counter anyone may increment.', version: '1.0.0' },
     initialize: function (xchain) {
         xchain.state.set('count', '0');
     },
@@ -58,9 +61,19 @@ module.exports = {
 };`;
 
 // A contract that FAILS the deploy gate: native Math.pow (banned transcendental).
+// It carries a valid `meta` so it fails on exactly one axis.
 const BAD_CONTRACT = `module.exports = {
+    meta: { name: 'Powers', description: 'Stores a power of two.', version: '1.0.0' },
     initialize: function (xchain) {
         xchain.state.set('x', String(Math.pow(2, 3)));
+    }
+};`;
+
+// Determinism-clean but with no identity: the shape CONTRACT_META_REQUIRED
+// rejects on chain, and therefore the shape the repair loop has to fix.
+const NAMELESS_CONTRACT = `module.exports = {
+    initialize: function (xchain) {
+        xchain.state.set('count', '0');
     }
 };`;
 
@@ -222,6 +235,38 @@ describe('Toolkit authoring: prompt construction', function () {
         assert(/DIFFERENCES/.test(u));
     });
 
+    it('asks for the contract identity up front, in both modes', function () {
+        // A missing `meta` is a deploy REJECTION, not a style note, so the ask is in
+        // the user message before the brief rather than left to a repair round.
+        for (const mode of ['describe', 'from-solidity']) {
+            const u = buildUserPrompt({ mode, input: 'a vesting vault' });
+            assert(/`meta`/.test(u), mode + ': the prompt must name the meta export');
+            assert(/FIRST key/.test(u), mode + ': meta must be asked for as the first key');
+            assert(/`name` \(1\.\.64 bytes\)/.test(u), mode + ': the name ask must carry its cap');
+            assert(/one-line `description` \(1\.\.512 bytes\)/.test(u), mode + ': the description ask must carry its cap');
+            assert(/REQUIRED/.test(u), mode + ': the ask must say the fields are required');
+            assert(/rejected/.test(u), mode + ': the ask must say a deploy without them is rejected');
+        }
+    });
+
+    it('pins the caller-supplied name and description when given', function () {
+        const u = buildUserPrompt({ mode: 'describe', input: 'x', name: 'Escrow', description: 'Two-party escrow.' });
+        assert(/Use exactly this name: "Escrow"/.test(u));
+        assert(/Use exactly this description: "Two-party escrow\."/.test(u));
+        assert(!/Choose a name/.test(u), 'nothing is left to the model once both are pinned');
+        const half = buildUserPrompt({ mode: 'describe', input: 'x', name: 'Escrow' });
+        assert(/Choose a one-line description/.test(half));
+    });
+
+    it('the hard rules teach the identity export', function () {
+        const text = KNOWLEDGE.hardRules.join('\n');
+        assert(/meta: \{ name, description, version \}/.test(text));
+        assert(/contract\.meta = \{ \.\.\. \}/.test(text), 'the function-export form must be taught (spec R1)');
+        const sys = buildSystemPrompt();
+        assert(/1\.\.64 bytes/.test(sys) && /1\.\.512 bytes/.test(sys),
+            'the rendered system prompt must carry the identity caps');
+    });
+
     it('buildAuthoringPrompt returns a chat-style messages array', function () {
         const p = buildAuthoringPrompt({ mode: 'describe', input: 'x' });
         assert.strictEqual(p.messages.length, 2);
@@ -296,6 +341,26 @@ describe('Toolkit authoring: authorContract harness', function () {
         assert(repairMsg, 'a repair prompt citing banned-math must be in the transcript');
     });
 
+    it('repairs a model answer that omits meta, citing the consensus string', async function () {
+        const complete = fakeComplete([reply(NAMELESS_CONTRACT), reply(CLEAN_CONTRACT)]);
+        const res = await authorContract({ mode: 'describe', input: 'a counter', complete, maxRepairs: 2 });
+        assert.strictEqual(res.ok, true);
+        assert.strictEqual(res.attempts, 2, 'the nameless answer must cost exactly one repair round');
+        const repairMsg = res.transcript.find(m => m.role === 'user' &&
+            /invalid: CONTRACT_MANIFEST \(meta required\)/.test(m.content));
+        assert(repairMsg, 'the repair prompt must feed back the chain\'s own verdict string');
+        assert(/contract-meta/.test(repairMsg.content), 'and name the rule that blocked it');
+    });
+
+    it('reports a still-nameless contract as a gate failure after the retry budget', async function () {
+        const complete = fakeComplete([reply(NAMELESS_CONTRACT)]); // never adds meta
+        const res = await authorContract({ mode: 'describe', input: 'x', complete, maxRepairs: 1 });
+        assert.strictEqual(res.ok, false);
+        assert.strictEqual(res.attempts, 2);
+        assert(res.gate.errors.some(e => e.rule === 'contract-meta'),
+            'the unrepaired failure must surface as a blocking contract-meta error');
+    });
+
     it('gives up after maxRepairs and returns the last gate failure', async function () {
         const complete = fakeComplete([reply(BAD_CONTRACT)]); // always bad
         const res = await authorContract({ mode: 'describe', input: 'x', complete, maxRepairs: 2 });
@@ -328,6 +393,7 @@ describe('Toolkit authoring: authorContract harness', function () {
 
     it('strips TypeScript before gating when the model returns TS', async function () {
         const tsContract = `module.exports = {
+    meta: { name: 'Typed', description: 'A typed counter.', version: '1.0.0' },
     initialize: function (xchain: any): void {
         let n: string = '0';
         xchain.state.set('n', n);

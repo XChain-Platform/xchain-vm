@@ -23,7 +23,7 @@ const os = require('os');
 const path = require('path');
 
 const { buildScaffold, writeScaffold } = require('../../src/toolkit/scaffold.js');
-const { runGate } = require('../../src/toolkit/gate.js');
+const { runGate, getExportedMeta } = require('../../src/toolkit/gate.js');
 const { toContractJs } = require('../../src/toolkit/transpile.js');
 
 describe('Toolkit scaffold', function() {
@@ -46,6 +46,40 @@ describe('Toolkit scaffold', function() {
         const gate = runGate(files['contracts/' + contractFile]);
         assert.strictEqual(gate.ok, true, 'scaffolded contract must pass the gate: ' +
             JSON.stringify(gate.errors));
+    });
+
+    it('emits a deployable identity: meta first, named for the project, gate-clean', function() {
+        // A scaffold without `meta` is undeployable under CONTRACT_META_REQUIRED, so
+        // the starting point the toolkit hands an author has to carry one.
+        const { files, contractFile } = buildScaffold({ name: 'ident-js' });
+        const src = files['contracts/' + contractFile];
+        const meta = getExportedMeta(src);
+        assert.strictEqual(meta.status, 'present', 'the scaffold must export a literal meta');
+        assert.strictEqual(meta.name, 'ident-js', 'meta.name must be the project name');
+        assert.strictEqual(meta.version, '1.0.0');
+        assert(meta.description && meta.description.length > 0, 'a placeholder description must be emitted');
+        assert(/TODO/.test(meta.description), 'the description must read as an author TODO, not as final copy');
+        // First key: the author sees identity before anything else, and it matches
+        // the shape the templates and the docs teach.
+        assert.match(src, /module\.exports = \{\s*(?:\/\/[^\n]*\n\s*)*meta: \{/,
+            'meta must be the FIRST key of the export object');
+        assert.strictEqual(runGate(src).errors.filter(e => e.rule === 'contract-meta').length, 0);
+    });
+
+    it('emits a TS scaffold whose stripped identity is the same', function() {
+        const { files, contractFile } = buildScaffold({ name: 'ident-ts', typescript: true });
+        const js = toContractJs(files['contracts/' + contractFile], contractFile);
+        const meta = getExportedMeta(js);
+        assert.strictEqual(meta.status, 'present');
+        assert.strictEqual(meta.name, 'ident-ts');
+        assert.strictEqual(meta.version, '1.0.0');
+    });
+
+    it('refuses a project name past the 64-byte meta.name cap', function() {
+        // The name is emitted as meta.name, so an over-long one would scaffold a
+        // project that cannot deploy; fail at scaffold time instead.
+        assert.throws(() => buildScaffold({ name: 'a'.repeat(65) }), /64 bytes/);
+        assert.doesNotThrow(() => buildScaffold({ name: 'a'.repeat(64) }));
     });
 
     it('emits a TS contract that strips to a gate-clean JS contract', function() {

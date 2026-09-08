@@ -1236,6 +1236,47 @@ const CONTRACT_WRAPPER = `
     // rejection lives host-side (actions/deploy.js); the VM only reports faithfully.
     if (__readManifest) {
         var __ce = (typeof contractExports === 'object' && contractExports !== null) ? contractExports : {};
+
+        // Contract identity (CONTRACT_META_REQUIRED). Read off an object export OR
+        // a function export, because a function-style contract has nowhere else to
+        // hang it; __ce stays object-only on purpose, so a function export's
+        // permissions/maxTakeBps verdicts do not move (they are ungated today).
+        //
+        // The serialisation and the 4096-unit cap live HERE, in the isolate,
+        // because the host only ever sees this report after JSON.parse and the
+        // whole report is truncated at 65536 characters before parsing: a
+        // programmatically built multi-megabyte meta would otherwise produce an
+        // unparseable report and skip every check. Bounding it here keeps the
+        // report parseable whatever the contract does.
+        //
+        // Nothing in this block may throw. A throw would escape the wrapper and
+        // report the whole manifest as unread, which would silently move the
+        // EXISTING permissions/maxTakeBps verdicts for any contract whose meta
+        // read misbehaves, including below the activation flag. So the property
+        // read is caught (meta may be a throwing getter) and a stringify that
+        // yields undefined (a toJSON returning undefined) is normalised.
+        //
+        // Reported faithfully; every verdict lives host-side (actions/deploy.js).
+        var __metaSrc = undefined;
+        var __metaJson = null, __metaError = false, __metaOversize = false;
+        try {
+            __metaSrc = ((typeof contractExports === 'object' && contractExports !== null) || typeof contractExports === 'function')
+                      ? contractExports.meta : undefined;
+        } catch (e) { __metaError = true; }
+        var __metaType = (__metaSrc === undefined) ? 'undefined'
+                       : (__metaSrc === null)      ? 'null'
+                       : Array.isArray(__metaSrc)  ? 'array'
+                       : typeof __metaSrc;
+        if (__metaType === 'object') {
+            try { __metaJson = JSON.stringify(__metaSrc); } catch (e) { __metaError = true; }
+            // A toJSON that returns undefined serialises to undefined, not a string.
+            if (__metaJson === undefined) { __metaJson = null; __metaError = true; }
+            if (__metaJson !== null && __metaJson.length > 4096) { __metaOversize = true; __metaJson = null; }
+            // A Date or a boxed String serialises to a non-object; the host wants a
+            // manifest object or nothing at all.
+            if (__metaJson !== null && __metaJson.charAt(0) !== '{') { __metaError = true; __metaJson = null; }
+        }
+
         return '\\x02' + JSON.stringify({
             permissions:     Array.isArray(__ce.permissions) ? __ce.permissions : null,
             permissionsType: (__ce.permissions === undefined) ? 'undefined' : (Array.isArray(__ce.permissions) ? 'array' : typeof __ce.permissions),
@@ -1247,7 +1288,11 @@ const CONTRACT_WRAPPER = `
             // DEPLOY that declares a constructor but supplies no CONSTRUCTOR_PARAMS,
             // gated on the DEPLOY_INIT_STRICT flag-day. Reported faithfully here;
             // all verdict logic lives host-side in actions/deploy.js.
-            hasInitialize:   (typeof __ce.initialize === 'function')
+            hasInitialize:   (typeof __ce.initialize === 'function'),
+            metaType:        __metaType,
+            metaJson:        __metaJson,
+            metaError:       __metaError,
+            metaOversize:    __metaOversize
         });
     }
 

@@ -154,6 +154,13 @@ const RESERVED_NAMES_TAUGHT = RESERVED_IDENTIFIERS.concat(RESERVED_CONTROL_BINDI
 // each one bites.
 const HARD_RULES = [
     'Export a CommonJS module: `module.exports = { initialize, methodA, ... }` (object of methods) or a single `module.exports = function (xchain) {...}`. Each method takes exactly one argument: the `xchain` gateway.',
+    'Export contract identity as the FIRST key: `meta: { name, description, version }`. ' +
+        '`name` and `description` are REQUIRED and the deploy gate REJECTS a contract without them ' +
+        '(name 1..64 bytes, description 1..512 bytes, both plain printable text with no leading or ' +
+        'trailing whitespace and no control, zero-width or bidi characters; `version` is optional, ' +
+        '1..32 bytes, e.g. "1.0.0"). Use plain STRING LITERALS, never a computed expression: the ' +
+        'chain evaluates meta once at deploy and records what it evaluated to. For a single-function ' +
+        'contract attach it as a property: `contract.meta = { ... }; module.exports = contract;`.',
     'No native float math: no Math.sqrt/pow/log/log2/log10 and no `**` exponentiation. The deploy gate REJECTS these; use xchain.math.* bignumber ops instead.',
     'No numeric literal with a decimal point, and token amounts are decimal STRINGS. Mandatory authoring practice: the linter reports a decimal literal as a WARNING, not a deploy rejection, so the chain will accept a contract that quietly does native floating-point arithmetic. Route every amount through xchain.math.*.',
     'No BigInt literals, no RegExp literals, no `new RegExp`.',
@@ -171,6 +178,11 @@ const HARD_RULES = [
 const CONTRACT_SHAPE = [
     '// SPDX-License-Identifier: MIT',
     'module.exports = {',
+    '    meta: {                                    // REQUIRED identity; string literals only',
+    '        name: "OwnerCounter",                  // 1..64 bytes',
+    '        description: "A counter only its owner may increment.",  // 1..512 bytes',
+    '        version: "1.0.0"                       // optional, 1..32 bytes',
+    '    },',
     '    initialize: function (xchain) {           // constructor; runs once at DEPLOY',
     '        var owner = xchain.getInputParam(0);  // params arrive as strings',
     '        xchain.require(owner, "owner required");',
@@ -262,18 +274,48 @@ function buildSystemPrompt(opts = {}) {
     ].join('\n');
 }
 
+// The identity ask, first thing in the user message. It is asked UP FRONT rather
+// than left to the repair loop because a missing `meta` is a deploy REJECTION, not
+// a style note, and a round trip to discover that costs a model call. A caller who
+// already knows the name/description pins them; otherwise the model proposes them
+// from the brief.
+function renderIdentityAsk(opts) {
+    const name = opts.name == null ? '' : String(opts.name).trim();
+    const description = opts.description == null ? '' : String(opts.description).trim();
+    const lines = [
+        'FIRST, give the contract its on-chain identity. Export `meta` as the FIRST key of the ' +
+            'contract with a `name` (1..64 bytes), a one-line `description` (1..512 bytes) and a ' +
+            '`version` ("1.0.0" for a new contract). They are REQUIRED: a deploy without them is ' +
+            'rejected, and they are what a wallet and the explorer show beside the contract address. ' +
+            'Use plain string literals.'
+    ];
+    if (name) lines.push('Use exactly this name: ' + JSON.stringify(name) + '.');
+    if (description) lines.push('Use exactly this description: ' + JSON.stringify(description) + '.');
+    if (!name || !description) {
+        lines.push('Choose ' +
+            (!name && !description ? 'a name and a one-line description' : (!name ? 'a name' : 'a one-line description')) +
+            ' that describes what the contract does, from the request below.');
+    }
+    return lines.join(' ');
+}
+
 /**
  * Build the user message for an authoring request.
  * @param {object} opts
  * @param {'describe'|'from-solidity'} opts.mode
  * @param {string} opts.input - English brief (describe) or Solidity source (from-solidity)
+ * @param {string} [opts.name] - pin the contract's meta.name (else the model proposes one)
+ * @param {string} [opts.description] - pin the contract's meta.description
  * @returns {string}
  */
 function buildUserPrompt(opts = {}) {
     const mode = opts.mode || 'describe';
     const input = String(opts.input == null ? '' : opts.input);
+    const identity = renderIdentityAsk(opts);
     if (mode === 'from-solidity') {
         return [
+            identity,
+            '',
             'Translate the following Solidity contract into the equivalent XChain contract. ' +
                 'Where a native XChain primitive replaces the whole contract (e.g. an ERC-20 is ' +
                 'just an ISSUE action), say so instead of porting it. In a "Notes:" section after ' +
@@ -288,6 +330,8 @@ function buildUserPrompt(opts = {}) {
     }
     // describe (English brief)
     return [
+        identity,
+        '',
         'Write an XChain smart contract that does the following:',
         '',
         input,
@@ -406,6 +450,8 @@ function looksTypeScript(lang, requestedTs) {
  *        text. Injected so the harness is provider-agnostic and testable; the
  *        caller wires a real model (or the platform `llm` attestation provider).
  * @param {boolean} [opts.typescript]             - request/allow a TS contract
+ * @param {string}  [opts.name]                   - pin the contract's meta.name
+ * @param {string}  [opts.description]            - pin the contract's meta.description
  * @param {number}  [opts.maxRepairs=2]           - gate-driven repair attempts after the first
  * @param {(code:string)=>object} [opts.gate=runGate] - override the gate (tests)
  * @returns {Promise<{ ok:boolean, code:string|null, contractJs:string|null,
@@ -425,7 +471,13 @@ async function authorContract(opts = {}) {
     const maxRepairs = Number.isInteger(opts.maxRepairs) ? Math.max(0, opts.maxRepairs) : 2;
     const requestedTs = !!opts.typescript;
 
-    const { messages } = buildAuthoringPrompt({ mode: opts.mode, input: opts.input, typescript: requestedTs });
+    const { messages } = buildAuthoringPrompt({
+        mode: opts.mode,
+        input: opts.input,
+        typescript: requestedTs,
+        name: opts.name,
+        description: opts.description
+    });
     const transcript = messages.slice();
 
     let attempts = 0;

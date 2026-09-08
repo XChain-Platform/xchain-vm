@@ -31,6 +31,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap
 - **Consensus wall-clock bound**: one execution's wall-clock budget is a protocol constant (`CONSENSUS_MAX_WALL_MS`), not a per-node setting; see below
 - **Multi-method contracts**: contracts export a function (single entry) or an object with named methods
+- **Contract identity (`meta`)**: beside `abi`, `permissions`, `maxTakeBps` and `crossCallable`, a contract exports `meta: { name, description, version }`. `readManifest` evaluates it once at deploy and reports it (`metaType`, `metaJson`, `metaError`, `metaOversize`); under the `CONTRACT_META_REQUIRED` flag day the indexer REJECTS a `DEPLOY` whose contract has no valid `meta.name` (1..64 bytes) and `meta.description` (1..512 bytes), `version` being optional (1..32 bytes). A single-function contract attaches it as a property (`contract.meta = { ... }`). The name is a label; the derived `C:<CHAIN>:<index>` address remains the identity
 
 ## Documentation
 
@@ -195,6 +196,10 @@ Programmatic use:
 const { ContractSimulator, runGate } = require('xchain-vm/toolkit');
 
 runGate(source);                        // { ok, errors, advisories, warnings, gas }
+// errors also carry rule 'contract-meta': a contract with no valid meta.name /
+// meta.description is deploy-blocking, reported with the chain's own verdict
+// string ("invalid: CONTRACT_MANIFEST (meta required)"). A meta the static walk
+// cannot read (computed, spread, non-literal) is an advisory, not a block.
 
 const sim = new ContractSimulator({ coin: 'BTC' });
 sim.setBalance('alice', 'GOLD', '1000');   // seed read-only ledger/oracle state
@@ -208,8 +213,14 @@ const verdict = await sim.callGuard(contractIndex, { actionType: 'SEND', from: '
 await sim.close();
 ```
 
-The `lint` gate (banned-API / float / async / syntax checks + gas estimate)
-is pure JS and runs anywhere. The simulator executes contracts, so it needs
+The `lint` gate (banned-API / float / async / syntax checks, the code-size cap,
+the `contract-meta` identity rule, + gas estimate) is pure JS and runs anywhere.
+`runGate` enforces contract identity: a contract exporting no valid
+`meta: { name, description, version }` fails the gate with the same string the
+chain writes, so a nameless contract is caught before a fee is paid rather than
+at the deploy verdict. `create-xchain-contract` scaffolds `meta` as the first key
+of the contract, and the `describe` / `from-solidity` authoring prompts ask for a
+name and a one-line description up front and repair a reply that omits them. The simulator executes contracts, so it needs
 the isolated-vm binding (Node 22 / Linux); on a macOS dev box use `lint`
 locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 `src/toolkit/` modules for details.
