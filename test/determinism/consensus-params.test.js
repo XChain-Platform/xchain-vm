@@ -372,28 +372,30 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isPkg3SandboxActive('mainnet', null, 10000000), false);
     });
 
-    it('execute-time source-lint gate: per-coin map is UNARMED on mainnet and the gas divisor is frozen', function () {
-        // Re-linting stored contract code at EXECUTE time flips previously-succeeding
-        // executions into failures and adds a source-length-derived gas charge, so both
+    it('execute-time source-lint gate: per-coin map is ARMED AT GENESIS on mainnet and the gas divisor is frozen', function () {
+        // Re-linting stored contract code at EXECUTE time flips executions that pass the
+        // deploy-time check into failures and adds a source-length-derived gas charge, so both
         // the activation heights and the gas divisor are consensus parameters: a node
         // that armed a different height, or charged on a different divisor, forks on the
         // first execution of an affected contract.
         //
-        // The operator ratified the MECHANISM on 2026-08-11 but still owes the per-coin
-        // train heights, so every mainnet entry is the explicit unarmed `null` sentinel.
-        // This assertion is what makes an accidental arming visible: filling a height in
-        // here is a deliberate, reviewed edit that must move the xchain-indexer twin
+        // The operator ratified the MECHANISM on 2026-08-11 and ruled on 2026-09-09 that
+        // a gate which is identity on the indexed mainnet history arms at genesis. This
+        // one is: mainnet carries 0 contracts, 0 DEPLOY and 0 EXECUTE actions (measured
+        // 2026-09-09), so height 0 rejects nothing and moves no gas. This assertion is
+        // what makes a DISARMING or a divergent height visible: moving it is a
+        // deliberate, reviewed edit that must move the xchain-indexer twin
         // (src/vm_exec_lint_activation.js) in the SAME change.
-        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['BTC:mainnet'], null);
-        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['LTC:mainnet'], null);
-        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['DOGE:mainnet'], null);
+        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['BTC:mainnet'], 0);
+        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['LTC:mainnet'], 0);
+        assert.strictEqual(vm.EXEC_LINT_ACTIVATION['DOGE:mainnet'], 0);
         assert.strictEqual(vm.EXEC_LINT_GAS_BYTES_PER_UNIT, 256);
-        // Unarmed means inactive at EVERY mainnet height, including absurd ones: mainnet
-        // execution is byte-identical to pre-gate until the operator arms it.
-        assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 0), false);
-        assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 961000), false);
-        assert.strictEqual(vm.isExecLintActive('mainnet', 'LTC', 10000000), false);
-        assert.strictEqual(vm.isExecLintActive('mainnet', 'DOGE', Number.MAX_SAFE_INTEGER), false);
+        // Armed at genesis means active at EVERY mainnet height from 0 up, including
+        // absurd ones: there is no pre-activation window left on mainnet.
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 0), true);
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 961000), true);
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'LTC', 10000000), true);
+        assert.strictEqual(vm.isExecLintActive('mainnet', 'DOGE', Number.MAX_SAFE_INTEGER), true);
         // Unknown network is treated as mainnet (conservative), unknown coin resolves off.
         assert.strictEqual(vm.isExecLintActive(undefined, 'BTC', 961000), false);
         assert.strictEqual(vm.isExecLintActive('mainnet', 'XYZ', 961000), false);
@@ -406,26 +408,27 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', NaN), false);
     });
 
-    it('lint global-alias gate: per-coin map is UNARMED on mainnet and cannot ride an open gate', function () {
+    it('lint global-alias gate: per-coin map is ARMED AT GENESIS on mainnet and cannot ride an open gate', function () {
         // Widening banned-async / banned-wasm to the aliased global reads (sloppy-mode
         // `this`, the globalThis self-reference chain) changes which contracts the chain
         // ACCEPTS, so the activation heights are consensus parameters exactly like the
         // exec-lint ones above: a node that armed a different height rejects a deploy its
         // peers accept, and a from-genesis replay rewrites settled verdicts.
         //
-        // Mainnet is the explicit unarmed `null` sentinel pending the operator's ratified
-        // per-coin train heights. Filling one in here is a deliberate, reviewed edit that
-        // must move the xchain-indexer twin (src/vm_lint_global_alias_activation.js) in
-        // the SAME change; that repo's suite pins the pair to equality.
-        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['BTC:mainnet'], null);
-        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['LTC:mainnet'], null);
-        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['DOGE:mainnet'], null);
+        // Mainnet arms at genesis by the 2026-09-09 ruling: the indexed mainnet history
+        // carries 0 contracts and 0 DEPLOY actions (measured 2026-09-09), so there is no
+        // accepted deploy verdict the widened rules can reverse. Moving this height is a
+        // deliberate, reviewed edit that must move the xchain-indexer twin
+        // (src/vm_lint_global_alias_activation.js) in the SAME change; that repo's suite
+        // pins the pair to equality.
+        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['BTC:mainnet'], 0);
+        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['LTC:mainnet'], 0);
+        assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['DOGE:mainnet'], 0);
         assert.ok(Object.isFrozen(vm.LINT_GLOBAL_ALIAS_ACTIVATION));
-        // Unarmed means inactive at EVERY mainnet height: deploy verdicts on mainnet are
-        // byte-identical to pre-gate until the operator arms it.
-        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 0), false);
-        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 961000), false);
-        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'DOGE', Number.MAX_SAFE_INTEGER), false);
+        // Armed at genesis means active at EVERY mainnet height from 0 up.
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 0), true);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 961000), true);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'DOGE', Number.MAX_SAFE_INTEGER), true);
         // Unknown network / coin / height resolve pre-activation (safe legacy default).
         assert.strictEqual(vm.isLintGlobalAliasActive(undefined, 'BTC', 961000), false);
         assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'XYZ', 961000), false);
@@ -434,12 +437,19 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // Pre-launch nets are genesis-active (no accepted history to preserve).
         assert.strictEqual(vm.isLintGlobalAliasActive('regtest', 'BTC', 0), true);
         assert.strictEqual(vm.isLintGlobalAliasActive('testnet', 'DOGE', 0), true);
-        // It is a DISTINCT epoch, not a rider on VM_LINT_HARDENING. That block-time gate
-        // is already open on every network, so reusing it would retroactively reject
-        // contracts the chain has already accepted. This pin is what reddens if someone
-        // "simplifies" the new gate away onto the old one.
+        // It is a DISTINCT epoch, not a rider on VM_LINT_HARDENING. Both are open on
+        // mainnet now, so equality of the two verdicts no longer separates them; what
+        // still does is the axis each reads. VM_LINT_HARDENING is a coin-blind BLOCK-TIME
+        // gate that is shut below 1786060800, while this one is a per-coin BLOCK-HEIGHT
+        // gate open from 0, so they disagree at time 0 / height 0. That disagreement is
+        // what reddens if someone "simplifies" the new gate away onto the old one.
         assert.strictEqual(vm.isLintHardeningActive('mainnet', vm.VM_LINT_HARDENING_GATE_BLOCK_TIME), true);
-        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 961000), false);
+        assert.strictEqual(vm.isLintHardeningActive('mainnet', 0), false);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 0), true);
+        // And the height gate stays coin-keyed: an unknown coin resolves off where the
+        // coin-blind time gate would have said yes.
+        assert.strictEqual(vm.isLintHardeningActive('mainnet', vm.VM_LINT_HARDENING_GATE_BLOCK_TIME), true);
+        assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'XYZ', 961000), false);
     });
 
     it('STATE_KEY_NUL_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {

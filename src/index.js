@@ -1695,7 +1695,7 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
 //
 // The remedy is to re-run validateSyntax at EXECUTE time against the bans active for THAT
 // block, and fail the execution deterministically when the stored source no longer passes.
-// That flips previously-succeeding executions to failures, so it is consensus-visible in
+// That flips executions that pass the deploy-time check to failures, so it is consensus-visible in
 // the strongest sense and MUST ride its own activation: the three existing gates cannot be
 // reused (both 1786060800 block-time gates are already open on every network and the Pkg 3
 // heights are in the past, so there would be nothing left to ride, and a from-genesis
@@ -1710,17 +1710,20 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
 // non-finite height resolves to pre-activation (no check, no gas), the byte-identical-
 // replay-safe default.
 //
-// !! MAINNET IS DELIBERATELY UNARMED. The operator ratified the MECHANISM on 2026-08-11
+// !! MAINNET IS ARMED AT GENESIS. The operator ratified the MECHANISM on 2026-08-11
 // (execute-time enforcement, verdict cached by the metering sha256 key, cost metered as
-// gas) but still owes the concrete per-coin heights. `null` is the explicit unarmed
-// sentinel: it resolves to inactive on every mainnet height, so mainnet behaviour is
-// byte-identical to today until the operator fills in the ratified train heights here AND
-// in the xchain-indexer twin (xchain-indexer/src/vm_exec_lint_activation.js), which the
-// consensus-params suites in both repos pin to equality. Arming one side alone forks.
+// gas) and ruled on 2026-09-09 that a mainnet gate which is identity on the indexed
+// mainnet history arms at genesis instead of at a train height. This one qualifies:
+// mainnet carries 0 contracts, 0 DEPLOY and 0 EXECUTE actions (measured 2026-09-09), so
+// there is no stored source for the re-lint to reject and no execution whose gas the lint
+// charge could move. A from-genesis OLD-vs-ON replay witness per chain is the proof. The
+// height lives here AND in the xchain-indexer twin
+// (xchain-indexer/src/vm_exec_lint_activation.js), which the consensus-params suites in
+// both repos pin to equality. Arming one side alone forks.
 const EXEC_LINT_ACTIVATION = Object.freeze({
-    'BTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'LTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'BTC:mainnet':  0,   // ARMED at genesis by the 2026-09-09 ruling: identity on the indexed mainnet history (0 contracts, 0 DEPLOY, 0 EXECUTE, measured 2026-09-09)
+    'LTC:mainnet':  0,
+    'DOGE:mainnet': 0,
 });
 
 // ----- Deploy/execute lint global-alias refinement: per-coin block-HEIGHT gate -----
@@ -1751,15 +1754,18 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
 // derived from the C:<COIN>:<idx> contract address, testnet/regtest genesis-active because
 // both are pre-launch, unknown network/coin or non-finite height -> pre-activation).
 //
-// !! MAINNET IS DELIBERATELY UNARMED. `null` is the explicit unarmed sentinel: it resolves
-// to inactive at every mainnet height, so mainnet behaviour is byte-identical to today
-// until the operator ratifies concrete per-coin train heights here AND in the xchain-indexer
-// twin (xchain-indexer/src/vm_lint_global_alias_activation.js), which the consensus-params
+// !! MAINNET IS ARMED AT GENESIS. The operator ruled on 2026-09-09 that a mainnet gate
+// which is identity on the indexed mainnet history arms at genesis instead of at a train
+// height. This one qualifies: mainnet carries 0 contracts and 0 DEPLOY actions (measured
+// 2026-09-09), so there is no accepted deploy verdict the widened rules could
+// retroactively reverse. A from-genesis OLD-vs-ON replay witness per chain is the proof.
+// The height lives here AND in the xchain-indexer twin
+// (xchain-indexer/src/vm_lint_global_alias_activation.js), which the consensus-params
 // suites in both repos pin to equality. Arming one side alone forks.
 const LINT_GLOBAL_ALIAS_ACTIVATION = Object.freeze({
-    'BTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'LTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'BTC:mainnet':  0,   // ARMED at genesis by the 2026-09-09 ruling: identity on the indexed mainnet history (0 contracts, 0 DEPLOY, measured 2026-09-09)
+    'LTC:mainnet':  0,
+    'DOGE:mainnet': 0,
 });
 
 // Whether the lint global-alias refinement is active for (network, coin) at blockHeight.
@@ -1791,10 +1797,7 @@ const EXEC_LINT_GAS_BYTES_PER_UNIT = 256;
 // (null) per-coin entry all resolve to inactive (legacy, byte-identical below).
 //
 // Keyed on the network actually passed, matching the indexer twin
-// (xchain-indexer/src/vm_exec_lint_activation.js) and isPkg3SandboxActive above. Every
-// mainnet entry is still the unarmed null sentinel, so this resolution change is a
-// no-op on every network today; fixing it while the map is unarmed is the window in
-// which it costs nothing.
+// (xchain-indexer/src/vm_exec_lint_activation.js) and isPkg3SandboxActive above.
 function isExecLintActive(network, coin, blockHeight) {
     if (network === 'testnet' || network === 'regtest') return true;
     const b = Number(blockHeight);
@@ -2182,9 +2185,10 @@ class XChainVM {
         //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
         //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
         //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
-        // The whole check rides its own per-coin height gate (isExecLintActive), which is
-        // UNARMED on mainnet: below it nothing is charged and nothing is checked, so the
-        // pre-activation path is byte-identical, gasUsed included.
+        // The whole check rides its own per-coin height gate (isExecLintActive), armed at
+        // genesis on every named network: below it, which now means only a chain the
+        // resolver cannot place, nothing is charged and nothing is checked, so the
+        // pre-activation path stays byte-identical, gasUsed included.
         const __execLintCoin   = pkg3CoinFromAddress(opts.contractAddress);
         const __execLintHeight = opts.blockContext && Number(opts.blockContext.height);
         if (isExecLintActive(opts.network, __execLintCoin, __execLintHeight)) {

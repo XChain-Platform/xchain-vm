@@ -135,15 +135,12 @@ module.exports = {
     });
 
     it('reports the chain deploy verdict, on mainnet too, where nothing else lints', async function() {
-        // A mainnet-configured simulator gets NO source lint anywhere else: the VM's
-        // execute-time re-lint rides EXEC_LINT_ACTIVATION, whose mainnet entries are
-        // the unarmed null sentinel, so without this gate a deploy-rejected source is
-        // reported only if some RUNTIME strip happens to catch it too. This one is
-        // caught (banned-math also strips Math.sqrt, so call() errors), which is why
-        // it is the readable case to assert on; the classes with no runtime twin run
-        // green end to end, measured on a default mainnet simulator: `2 ** 3` returns
-        // "8", a `__setconcat` binding returns "5", and a generator yields 1, each of
-        // them CODE_ENCODING on chain. The gate is what reports all four alike.
+        // This gate is what surfaces a chain-rejected source at DEPLOY, where the
+        // author sees it. The 2026-09-09 ruling armed EXEC_LINT_ACTIVATION on mainnet,
+        // so a mainnet simulator now re-lints at call() time too, but only for a source
+        // that is actually called; a deploy-rejected source that is never called stays
+        // silent without this gate. The case asserted here is the readable one because
+        // banned-math also strips Math.sqrt, so the rejection is observable either way.
         const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
         const warned = [];
         const real = console.warn;

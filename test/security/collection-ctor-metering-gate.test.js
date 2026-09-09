@@ -149,13 +149,21 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
     it('regtest meters the Set ctor from genesis (height 0)', async function () {
         const belowMain = await runAt(oneSet, 960999, 'mainnet', 'BTC');
         const regtest = await runAt(oneSet, 0, 'regtest', 'BTC');
-        // The pre-launch nets are ALSO genesis-active for the execute-time source
-        // lint, whose cost is metered as gas, so the regtest run carries one extra charge
-        // the mainnet baseline does not. Derive it from the exported divisor rather than
+        // Both venues meter the execute-time source lint (regtest from genesis, mainnet from
+        // genesis since the 2026-09-09 arm), so that charge cancels and only the Set ctor
+        // charge separates them: the Pkg 3 gate is live on regtest at 0 and not yet on
+        // mainnet at 960999. The lint charge is pinned on its own against an unplaceable
+        // chain, where isExecLintActive resolves off, so a dropped charge cannot hide inside
+        // a cancelled difference. Derive it from the exported divisor rather than
         // hard-coding it, so a re-tuned divisor moves this expectation with it.
         const lintGas = GAS_SCHEDULE.VM_COMPUTATION * Math.max(1, Math.ceil(
             Buffer.byteLength(oneSet, 'utf8') / EXEC_LINT_GAS_BYTES_PER_UNIT));
-        assert.strictEqual(regtest.gasUsed - belowMain.gasUsed, 500 + lintGas,
-            'regtest must charge the source size from genesis, plus the metered execute-time lint');
+        assert.strictEqual(XChainVM.isExecLintActive('stagenet', 'BTC', 960999), false,
+            'the lint baseline needs a venue where the execute-time lint resolves off');
+        const unlinted = await runAt(oneSet, 960999, 'stagenet', 'BTC');
+        assert.strictEqual(belowMain.gasUsed - unlinted.gasUsed, lintGas,
+            'mainnet below the Pkg 3 gate must still carry the metered execute-time lint');
+        assert.strictEqual(regtest.gasUsed - belowMain.gasUsed, 500,
+            'regtest must charge the Set ctor from genesis; the lint charge sits on both sides');
     });
 });

@@ -54,24 +54,40 @@ const PEEK = 'module.exports = { peek: function(x) { return String(typeof __meth
     });
     afterEach(function () { vm.endBlock(); });
 
-    it('post-gate (regtest from genesis): the execute-time lint rejects the peek before the wrapper starves it', async function () {
+    it('post-gate (every named network from genesis): the execute-time lint rejects the peek before the wrapper starves it', async function () {
         // Execute-time lint supersession. The wrapper's starvation of the control bindings is the
         // defence-in-depth layer for a contract that DEPLOYED before the reserved-identifier
-        // rule armed. Where execute-time source-lint enforcement is active (the pre-launch
-        // nets, from genesis), such a contract can no longer run at all: the stored source
-        // is re-linted against the bans live at this block and fails first. The wrapper
-        // starvation itself stays pinned below the exec-lint gate by the mainnet case below.
-        const res = await run(vm, 'regtest', 1700000000);
-        assert.strictEqual(res.success, false);
-        assert.ok(res.error.startsWith('error: banned syntax: '), res.error);
-        assert.ok(res.error.includes('__methodName'), res.error);
+        // rule armed. Where execute-time source-lint enforcement is active, such a contract can
+        // no longer run at all: the stored source is re-linted against the bans live at this
+        // block and fails first. That is now every named network, mainnet included, since the
+        // 2026-09-09 ruling armed EXEC_LINT_ACTIVATION at mainnet genesis. The wrapper
+        // starvation itself stays pinned below the exec-lint gate by the case below.
+        // Mainnet needs the post-hardening timestamp because the reserved-identifier rule it
+        // trips on is keyed on block TIME, unlike the exec-lint gate that runs the check.
+        for (const [network, timestamp] of [['regtest', 1700000000], ['mainnet', 1786060800]]) {
+            const res = await run(vm, network, timestamp);
+            assert.strictEqual(res.success, false, network + ' must re-lint the stored source');
+            assert.ok(res.error.startsWith('error: banned syntax: '), res.error);
+            assert.ok(res.error.includes('__methodName'), res.error);
+        }
     });
 
-    // The wrapper-starvation pin. Mainnet is below the execute-time lint gate
-    // (unarmed), so the stored source still reaches the wrapper and the closure move is
-    // what has to starve it, exactly as before.
-    it('post-gate (mainnet at the flag-day): bindings are starved there too', async function () {
-        const res = await run(vm, 'mainnet', 1786060800);
+    // The wrapper-starvation pin, and it needs a venue where the stored source actually
+    // REACHES the wrapper: post-VM_LINT_HARDENING by block time, but with the
+    // execute-time re-lint off. Mainnet is not that venue: the 2026-09-09 ruling
+    // armed EXEC_LINT_ACTIVATION there from height 0, so the re-lint rejects this
+    // source first (proved by the regtest case above, which mainnet matches). The
+    // venue left is a chain the resolver cannot place: VM_LINT_HARDENING is keyed on
+    // block TIME and so is in force at the flag-day timestamp regardless of the network
+    // string, while the per-coin height maps have no key for it and resolve off. That is
+    // exactly the defence-in-depth case this test exists for, and starving the bindings
+    // in the wrapper is the last layer standing.
+    it('post-gate, exec-lint off (an unplaceable chain at the flag-day): bindings are starved there too', async function () {
+        assert.strictEqual(XChainVM.isLintHardeningActive('stagenet', 1786060800), true,
+            'the venue must be POST the hardening flag-day, or the wrapper is not in its closure form');
+        assert.strictEqual(XChainVM.isExecLintActive('stagenet', 'BTC', 1), false,
+            'the venue must be below the exec-lint gate, or the source never reaches the wrapper');
+        const res = await run(vm, 'stagenet', 1786060800);
         assert.strictEqual(res.success, true, res.error);
         assert.strictEqual(JSON.parse(res.returnValue), 'undefined:undefined');
     });

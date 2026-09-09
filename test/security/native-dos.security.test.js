@@ -164,13 +164,19 @@ describe('Async surface banned (deploy-time): async/await/Promise', function () 
     });
 
     it('Promise is undefined inside the sandbox at runtime', async function () {
-        // Run on mainnet at/after the async-surface flag-day: the Promise strip is live
-        // there, and mainnet is below the execute-time source-lint gate (unarmed),
-        // so a stored contract that predates the banned-async rule still reaches the
-        // sandbox and the runtime strip is what has to starve it. On the pre-launch nets
-        // the exec-lint rejects the same source a layer earlier (asserted below).
+        // The runtime strip needs a venue where the async-surface flag-day is live but the
+        // execute-time source lint is off, so a stored contract that predates the
+        // banned-async rule still reaches the sandbox and the strip is what has to starve
+        // it. Every named network re-lints first (mainnet included, armed from genesis by
+        // the 2026-09-09 ruling; asserted below), so the venue is an unplaceable chain: the
+        // async-surface gate is keyed on block TIME and fires there at the flag-day
+        // timestamp, while the per-coin exec-lint height map has no key for it.
+        assert.strictEqual(XChainVM.isAsyncSurfaceActive('stagenet', 1786060800), true,
+            'the venue must be at/after the async-surface flag-day, or the strip is not live');
+        assert.strictEqual(XChainVM.isExecLintActive('stagenet', 'BTC', 100), false,
+            'the venue must be below the exec-lint gate, or the source never reaches the sandbox');
         const r = await execute(vm, fn('return typeof Promise;'), {
-            network: 'mainnet',
+            network: 'stagenet',
             blockContext: { height: 100, timestamp: 1786060800, hash: 'abc123' }
         });
         assert.strictEqual(r.success, true, r.error);
@@ -226,12 +232,16 @@ describe('Native-op DoS: gas exhaustion cannot be swallowed', function () {
     });
 
     it('the __gas hook cannot be overwritten to bypass metering', async function () {
-        // Run below the execute-time source-lint gate (mainnet, unarmed) so the
-        // reserved-identifier source actually reaches the isolate: this test is about the
-        // RUNTIME containment, which is the only line of defence for a contract that
-        // deployed before the reserved-identifier rule armed.
+        // Run below the execute-time source-lint gate so the reserved-identifier source
+        // actually reaches the isolate: this test is about the RUNTIME containment, which is
+        // the only line of defence for a contract that deployed before the
+        // reserved-identifier rule armed. Every named network re-lints first (mainnet from
+        // genesis since the 2026-09-09 ruling), so the venue is an unplaceable chain, whose
+        // per-coin exec-lint height map has no key and resolves off.
+        assert.strictEqual(XChainVM.isExecLintActive('stagenet', 'BTC', 100), false,
+            'the venue must be below the exec-lint gate, or the source never reaches the isolate');
         const r = await execute(vm, fn('try { __gas = function(){}; } catch(e){} var x=0; while(true){ x++; }'),
-            { network: 'mainnet' });
+            { network: 'stagenet' });
         assert.strictEqual(r.success, false);
         assert.match(r.error, /out_of_gas|timeout/);
     });
