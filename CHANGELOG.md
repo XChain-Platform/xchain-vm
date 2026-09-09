@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The toolkit index re-exports `getExportedMeta` and `isValidMetaText`, so a tool that requires the toolkit can read a source's declared identity without re-implementing the walk.
 - The deploy-time manifest read reports a contract's exported `meta` object (name, description, version), serialised and size-bounded inside the isolate.
 - Foundry gate blocks a contract with no valid meta.name/meta.description under the new contract-meta rule; the scaffolder and the AI-authoring prompt now emit and ask for contract identity.
 

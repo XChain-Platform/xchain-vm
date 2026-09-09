@@ -27,7 +27,7 @@ const {
     DEFAULT_BLOCK_TIME,
     GUARD_GAS_CEILING
 } = require('./simulator.js');
-const { runGate, estimateGas } = require('./gate.js');
+const { runGate, estimateGas, getExportedMeta, isValidMetaText } = require('./gate.js');
 const { buildScaffold, writeScaffold } = require('./scaffold.js');
 const { isTypeScript, stripTypes, toContractJs } = require('./transpile.js');
 const {
@@ -48,6 +48,11 @@ module.exports = {
     GUARD_GAS_CEILING,
     runGate,
     estimateGas,
+    // The contract-meta walk behind the `contract-meta` gate rule, so a tool that
+    // requires the toolkit can read a source's declared identity without
+    // re-implementing the acorn walk (CONTRACT_META_REQUIRED).
+    getExportedMeta,
+    isValidMetaText,
     buildScaffold,
     writeScaffold,
     isTypeScript,
