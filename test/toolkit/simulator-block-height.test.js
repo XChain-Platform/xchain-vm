@@ -109,26 +109,44 @@ function heightWarnings(lines) {
         const preGate = new ContractSimulator({
             coin: 'BTC', network: 'mainnet', block: { height: 1 } });
         try {
+            // What the probe reports across the gate CHANGED with the 2026-09-09 ruling,
+            // which armed EXEC_LINT_ACTIVATION on mainnet from height 0. Every mainnet
+            // call is now re-linted against the bans live at that block, and the
+            // re-lint's banned-wasm leg resolves through isPkg3SandboxActive, the same
+            // per-coin height as the runtime strip (index.js, the four-flag block above
+            // _getLintVerdict). So at/after the Pkg-3 height the source is REJECTED
+            // before it runs instead of running against a stripped global. It is still a
+            // per-height answer, still measured by executing, and still exactly the thing
+            // a stale default would get wrong.
             const results = {};
+            const errors = {};
             await captureWarnings(async function () {
                 for (const [name, sim] of [['dflt', dflt], ['atGate', atGate], ['preGate', preGate]]) {
                     const dep = await sim.deploy(WASM_PROBE);
                     const res = await sim.call(dep.contractIndex, 'probe', []);
-                    assert.ok(res.success, name + ' probe failed: ' + res.error);
-                    results[name] = JSON.parse(res.returnValue);
+                    results[name] = res.success ? JSON.parse(res.returnValue) : 'rejected';
+                    errors[name] = res.success ? '' : String(res.error);
                 }
             });
 
             assert.strictEqual(results.preGate, 'object',
-                'a pre-activation mainnet height should still see WebAssembly; if it does not, ' +
-                'this probe no longer measures the Pkg-3 sandbox and the test below proves nothing');
-            assert.strictEqual(results.atGate, 'undefined',
-                'the Pkg-3 sandbox should strip WebAssembly at the activation height');
+                'a pre-activation mainnet height should still run and still see WebAssembly; if ' +
+                'it does not, this probe no longer measures the Pkg-3 height and the test below ' +
+                'proves nothing');
+            assert.strictEqual(results.atGate, 'rejected',
+                'at the Pkg-3 activation height the execute-time re-lint should refuse the stored ' +
+                'WebAssembly source outright');
+            assert.match(errors.atGate, /banned global: WebAssembly/,
+                'the rejection must be the WebAssembly ban, not some unrelated failure: ' +
+                errors.atGate);
             assert.strictEqual(results.dflt, results.atGate,
-                'a DEFAULT mainnet simulator saw WebAssembly as "' + results.dflt + '" while one ' +
-                'pinned at the activation height saw "' + results.atGate + '": the default block ' +
-                'height is below the gate, so `xchain-foundry simulate` accepts contracts the ' +
-                'live chain rejects');
+                'a DEFAULT mainnet simulator reported "' + results.dflt + '" for the WebAssembly ' +
+                'probe while one pinned at the activation height reported "' + results.atGate +
+                '": the default block height is below the gate, so `xchain-foundry simulate` ' +
+                'accepts contracts the live chain rejects');
+            assert.strictEqual(errors.dflt, errors.atGate,
+                'the default simulator must fail for the same reason, byte for byte, as one ' +
+                'pinned at the activation height');
         } finally {
             await dflt.close();
             await atGate.close();

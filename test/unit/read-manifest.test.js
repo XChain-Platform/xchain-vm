@@ -127,6 +127,21 @@ function createVM() {
         assert.deepStrictEqual(a.manifest, b.manifest);
     });
 
+    it('carries the contract-identity fields beside the permissions manifest', async function () {
+        // The report grew four fields (CONTRACT_META_REQUIRED). A contract that
+        // declares no meta reports them inert, and none of the Phase E fields move.
+        // The report shape itself is pinned by test/unit/contract-meta-report.test.js.
+        const code = "module.exports = { permissions: ['SEND'], maxTakeBps: 250, guard: function(){} };";
+        const res = await vm.readManifest(code);
+        assert.strictEqual(res.success, true);
+        assert.deepStrictEqual(res.manifest.permissions, ['SEND']);
+        assert.strictEqual(res.manifest.maxTakeBps, 250);
+        assert.strictEqual(res.manifest.metaType, 'undefined');
+        assert.strictEqual(res.manifest.metaJson, null);
+        assert.strictEqual(res.manifest.metaError, false);
+        assert.strictEqual(res.manifest.metaOversize, false);
+    });
+
     it('does NOT dispatch a method (a throwing guard does not affect the read)', async function () {
         const code = "module.exports = { permissions: ['SEND'], guard: function(){ throw new Error('should not run'); } };";
         const res = await vm.readManifest(code);

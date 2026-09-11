@@ -5,7 +5,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.15.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/tests-2%2C347%2B%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-2%2C480%2B%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
 </p>
@@ -31,6 +31,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap
 - **Consensus wall-clock bound**: one execution's wall-clock budget is a protocol constant (`CONSENSUS_MAX_WALL_MS`), not a per-node setting; see below
 - **Multi-method contracts**: contracts export a function (single entry) or an object with named methods
+- **Contract identity (`meta`)**: beside `abi`, `permissions`, `maxTakeBps` and `crossCallable`, a contract exports `meta: { name, description, version }`. `readManifest` evaluates it once at deploy and reports it (`metaType`, `metaJson`, `metaError`, `metaOversize`); under the `CONTRACT_META_REQUIRED` flag day the indexer REJECTS a `DEPLOY` whose contract has no valid `meta.name` (1..64 bytes) and `meta.description` (1..512 bytes), `version` being optional (1..32 bytes). A single-function contract attaches it as a property (`contract.meta = { ... }`). The name is a label; the derived `C:<CHAIN>:<index>` address remains the identity
 
 ## Documentation
 
@@ -195,6 +196,10 @@ Programmatic use:
 const { ContractSimulator, runGate } = require('xchain-vm/toolkit');
 
 runGate(source);                        // { ok, errors, advisories, warnings, gas }
+// errors also carry rule 'contract-meta': a contract with no valid meta.name /
+// meta.description is deploy-blocking, reported with the chain's own verdict
+// string ("invalid: CONTRACT_MANIFEST (meta required)"). A meta the static walk
+// cannot read (computed, spread, non-literal) is an advisory, not a block.
 
 const sim = new ContractSimulator({ coin: 'BTC' });
 sim.setBalance('alice', 'GOLD', '1000');   // seed read-only ledger/oracle state
@@ -208,8 +213,14 @@ const verdict = await sim.callGuard(contractIndex, { actionType: 'SEND', from: '
 await sim.close();
 ```
 
-The `lint` gate (banned-API / float / async / syntax checks + gas estimate)
-is pure JS and runs anywhere. The simulator executes contracts, so it needs
+The `lint` gate (banned-API / float / async / syntax checks, the code-size cap,
+the `contract-meta` identity rule, + gas estimate) is pure JS and runs anywhere.
+`runGate` enforces contract identity: a contract exporting no valid
+`meta: { name, description, version }` fails the gate with the same string the
+chain writes, so a nameless contract is caught before a fee is paid rather than
+at the deploy verdict. `create-xchain-contract` scaffolds `meta` as the first key
+of the contract, and the `describe` / `from-solidity` authoring prompts ask for a
+name and a one-line description up front and repair a reply that omits them. The simulator executes contracts, so it needs
 the isolated-vm binding (Node 22 / Linux); on a macOS dev box use `lint`
 locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 `src/toolkit/` modules for details.
@@ -218,14 +229,14 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 
 | Command | Description |
 |---|---|
-| `npm test` | Unit tests (1,068 tests, 30s timeout) |
-| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (77 tests) |
+| `npm test` | Unit tests (1,185 tests, 30s timeout) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (130 tests) |
 | `npm run test:integration` | Integration tests (194 tests) |
-| `npm run test:security` | Security tests (284 tests) |
+| `npm run test:security` | Security tests (298 tests) |
 | `npm run test:boundary` | Boundary condition tests (117 tests) |
-| `npm run test:determinism` | Determinism tests (150 tests) |
+| `npm run test:determinism` | Determinism tests (152 tests) |
 | `npm run test:performance` | Performance benchmarks-as-tests (5 tests) |
-| `npm run test:all` | Every `*.test.js` under `test/` (2,347+ tests) |
+| `npm run test:all` | Every `*.test.js` under `test/` (2,480+ tests) |
 | `npm run test:e2e` | E2E tests only (66 tests) |
 | `npm run smoke` | Smoke tests (12 tests, < 5s) |
 | `npm run test:fuzz` | Fuzz / property-based tests (92 tests) |
@@ -234,7 +245,7 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 | `npm run test:regression:core` | P0+P1 regression (45 tests, < 200ms) |
 | `npm run test:regression:full` | P0-P3 + gate/pin regression (224 tests, < 1s) |
 | `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 (416 tests) |
-| `npm run test:regression:release` | All tests + mutation testing (2,347 tests) |
+| `npm run test:regression:release` | All tests + mutation testing (2,480 tests) |
 | `npm run mutation` | Mutation testing (Stryker, full suite) |
 | `npm run bench:quick` | Pipeline + gateway benchmarks |
 | `npm run bench:full` | All benchmarks except soak |

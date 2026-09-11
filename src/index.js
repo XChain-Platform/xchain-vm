@@ -1236,6 +1236,47 @@ const CONTRACT_WRAPPER = `
     // rejection lives host-side (actions/deploy.js); the VM only reports faithfully.
     if (__readManifest) {
         var __ce = (typeof contractExports === 'object' && contractExports !== null) ? contractExports : {};
+
+        // Contract identity (CONTRACT_META_REQUIRED). Read off an object export OR
+        // a function export, because a function-style contract has nowhere else to
+        // hang it; __ce stays object-only on purpose, so a function export's
+        // permissions/maxTakeBps verdicts do not move (they are ungated today).
+        //
+        // The serialisation and the 4096-unit cap live HERE, in the isolate,
+        // because the host only ever sees this report after JSON.parse and the
+        // whole report is truncated at 65536 characters before parsing: a
+        // programmatically built multi-megabyte meta would otherwise produce an
+        // unparseable report and skip every check. Bounding it here keeps the
+        // report parseable whatever the contract does.
+        //
+        // Nothing in this block may throw. A throw would escape the wrapper and
+        // report the whole manifest as unread, which would silently move the
+        // EXISTING permissions/maxTakeBps verdicts for any contract whose meta
+        // read misbehaves, including below the activation flag. So the property
+        // read is caught (meta may be a throwing getter) and a stringify that
+        // yields undefined (a toJSON returning undefined) is normalised.
+        //
+        // Reported faithfully; every verdict lives host-side (actions/deploy.js).
+        var __metaSrc = undefined;
+        var __metaJson = null, __metaError = false, __metaOversize = false;
+        try {
+            __metaSrc = ((typeof contractExports === 'object' && contractExports !== null) || typeof contractExports === 'function')
+                      ? contractExports.meta : undefined;
+        } catch (e) { __metaError = true; }
+        var __metaType = (__metaSrc === undefined) ? 'undefined'
+                       : (__metaSrc === null)      ? 'null'
+                       : Array.isArray(__metaSrc)  ? 'array'
+                       : typeof __metaSrc;
+        if (__metaType === 'object') {
+            try { __metaJson = JSON.stringify(__metaSrc); } catch (e) { __metaError = true; }
+            // A toJSON that returns undefined serialises to undefined, not a string.
+            if (__metaJson === undefined) { __metaJson = null; __metaError = true; }
+            if (__metaJson !== null && __metaJson.length > 4096) { __metaOversize = true; __metaJson = null; }
+            // A Date or a boxed String serialises to a non-object; the host wants a
+            // manifest object or nothing at all.
+            if (__metaJson !== null && __metaJson.charAt(0) !== '{') { __metaError = true; __metaJson = null; }
+        }
+
         return '\\x02' + JSON.stringify({
             permissions:     Array.isArray(__ce.permissions) ? __ce.permissions : null,
             permissionsType: (__ce.permissions === undefined) ? 'undefined' : (Array.isArray(__ce.permissions) ? 'array' : typeof __ce.permissions),
@@ -1247,7 +1288,11 @@ const CONTRACT_WRAPPER = `
             // DEPLOY that declares a constructor but supplies no CONSTRUCTOR_PARAMS,
             // gated on the DEPLOY_INIT_STRICT flag-day. Reported faithfully here;
             // all verdict logic lives host-side in actions/deploy.js.
-            hasInitialize:   (typeof __ce.initialize === 'function')
+            hasInitialize:   (typeof __ce.initialize === 'function'),
+            metaType:        __metaType,
+            metaJson:        __metaJson,
+            metaError:       __metaError,
+            metaOversize:    __metaOversize
         });
     }
 
@@ -1502,6 +1547,35 @@ function isCallSpreadMeterActive(network, blockTime) {
     return Number.isFinite(blockTime) && blockTime >= CALL_SPREAD_METER_GATE_BLOCK_TIME;
 }
 
+// Coordinated activation for size-metering destructuring REST patterns
+// (`var [x, ...c] = a`, `var {k, ...c} = o`, and their assignment-expression forms),
+// plus the deploy rejection of the rest positions metering cannot reach.
+//
+// This is the CALL_SPREAD_METER hole one AST dispatch away. transformAllocators
+// dispatched purely on EXPRESSION node types (ArrayExpression/ObjectExpression carrying
+// a SpreadElement), but a destructuring rest is an ArrayPattern/ObjectPattern carrying a
+// RestElement, so it matched nothing and performed an unbounded native O(n) copy for a
+// flat __gas(1). A loop of `var [...c] = bigArr` therefore copied millions of elements
+// almost free: native CPU decoupled from gas, and a run's success-vs-wall-clock-timeout
+// became CPU-speed dependent across the fleet. Post-gate the transform wraps the rest
+// SOURCE in the size-charged __arrspread / __objspreadmeter helper; pre-gate the
+// destructure is emitted verbatim so historical blocks replay byte-identically.
+//
+// !! IT DOES NOT RIDE THE CONTRACT-ERA FLAG DAY. 1786060800 (2026-08-07) is already in
+// the PAST, so reusing it would retroactively re-price every rest destructure that has
+// already executed and rewrite settled gasUsed on any replay -- the exact retroactivity
+// the LINT_GLOBAL_ALIAS epoch was minted to avoid. It gets its own FUTURE instant, armed
+// alongside the already-scheduled CROSS_CHAIN_ROYALTY flag day (2027-01-01 00:00:00 UTC)
+// so the fleet has one coordination event rather than two. It is therefore deliberately
+// NOT part of the six-gate CONTROLLER_GUARD cross-repo pin; its indexer twin is the
+// REST_PATTERN_METER entry in protocol_changes.js, which the consensus-params suites in
+// both repos pin to equality. A value that differs across the fleet is itself a fork.
+const REST_PATTERN_METER_GATE_BLOCK_TIME = 1798761600;
+function isRestPatternMeterActive(network, blockTime) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    return Number.isFinite(blockTime) && blockTime >= REST_PATTERN_METER_GATE_BLOCK_TIME;
+}
+
 // Activation for the contract.slash `token` wire-delimiter guard. Every
 // other emit validator rejects a '|' in a field the indexer may pipe-join;
 // contract.slash never had that check. It is inert against today's consumer (SLASH
@@ -1650,7 +1724,7 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
 //
 // The remedy is to re-run validateSyntax at EXECUTE time against the bans active for THAT
 // block, and fail the execution deterministically when the stored source no longer passes.
-// That flips previously-succeeding executions to failures, so it is consensus-visible in
+// That flips executions that pass the deploy-time check to failures, so it is consensus-visible in
 // the strongest sense and MUST ride its own activation: the three existing gates cannot be
 // reused (both 1786060800 block-time gates are already open on every network and the Pkg 3
 // heights are in the past, so there would be nothing left to ride, and a from-genesis
@@ -1665,17 +1739,20 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
 // non-finite height resolves to pre-activation (no check, no gas), the byte-identical-
 // replay-safe default.
 //
-// !! MAINNET IS DELIBERATELY UNARMED. The operator ratified the MECHANISM on 2026-08-11
+// !! MAINNET IS ARMED AT GENESIS. The operator ratified the MECHANISM on 2026-08-11
 // (execute-time enforcement, verdict cached by the metering sha256 key, cost metered as
-// gas) but still owes the concrete per-coin heights. `null` is the explicit unarmed
-// sentinel: it resolves to inactive on every mainnet height, so mainnet behaviour is
-// byte-identical to today until the operator fills in the ratified train heights here AND
-// in the xchain-indexer twin (xchain-indexer/src/vm_exec_lint_activation.js), which the
-// consensus-params suites in both repos pin to equality. Arming one side alone forks.
+// gas) and ruled on 2026-09-09 that a mainnet gate which is identity on the indexed
+// mainnet history arms at genesis instead of at a train height. This one qualifies:
+// mainnet carries 0 contracts, 0 DEPLOY and 0 EXECUTE actions (measured 2026-09-09), so
+// there is no stored source for the re-lint to reject and no execution whose gas the lint
+// charge could move. A from-genesis OLD-vs-ON replay witness per chain is the proof. The
+// height lives here AND in the xchain-indexer twin
+// (xchain-indexer/src/vm_exec_lint_activation.js), which the consensus-params suites in
+// both repos pin to equality. Arming one side alone forks.
 const EXEC_LINT_ACTIVATION = Object.freeze({
-    'BTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'LTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'BTC:mainnet':  0,   // ARMED at genesis by the 2026-09-09 ruling: identity on the indexed mainnet history (0 contracts, 0 DEPLOY, 0 EXECUTE, measured 2026-09-09)
+    'LTC:mainnet':  0,
+    'DOGE:mainnet': 0,
 });
 
 // ----- Deploy/execute lint global-alias refinement: per-coin block-HEIGHT gate -----
@@ -1706,15 +1783,18 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
 // derived from the C:<COIN>:<idx> contract address, testnet/regtest genesis-active because
 // both are pre-launch, unknown network/coin or non-finite height -> pre-activation).
 //
-// !! MAINNET IS DELIBERATELY UNARMED. `null` is the explicit unarmed sentinel: it resolves
-// to inactive at every mainnet height, so mainnet behaviour is byte-identical to today
-// until the operator ratifies concrete per-coin train heights here AND in the xchain-indexer
-// twin (xchain-indexer/src/vm_lint_global_alias_activation.js), which the consensus-params
+// !! MAINNET IS ARMED AT GENESIS. The operator ruled on 2026-09-09 that a mainnet gate
+// which is identity on the indexed mainnet history arms at genesis instead of at a train
+// height. This one qualifies: mainnet carries 0 contracts and 0 DEPLOY actions (measured
+// 2026-09-09), so there is no accepted deploy verdict the widened rules could
+// retroactively reverse. A from-genesis OLD-vs-ON replay witness per chain is the proof.
+// The height lives here AND in the xchain-indexer twin
+// (xchain-indexer/src/vm_lint_global_alias_activation.js), which the consensus-params
 // suites in both repos pin to equality. Arming one side alone forks.
 const LINT_GLOBAL_ALIAS_ACTIVATION = Object.freeze({
-    'BTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'LTC:mainnet':  null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
-    'DOGE:mainnet': null,   // AWAITING OPERATOR RATIFICATION (per-coin train height)
+    'BTC:mainnet':  0,   // ARMED at genesis by the 2026-09-09 ruling: identity on the indexed mainnet history (0 contracts, 0 DEPLOY, measured 2026-09-09)
+    'LTC:mainnet':  0,
+    'DOGE:mainnet': 0,
 });
 
 // Whether the lint global-alias refinement is active for (network, coin) at blockHeight.
@@ -1746,10 +1826,7 @@ const EXEC_LINT_GAS_BYTES_PER_UNIT = 256;
 // (null) per-coin entry all resolve to inactive (legacy, byte-identical below).
 //
 // Keyed on the network actually passed, matching the indexer twin
-// (xchain-indexer/src/vm_exec_lint_activation.js) and isPkg3SandboxActive above. Every
-// mainnet entry is still the unarmed null sentinel, so this resolution change is a
-// no-op on every network today; fixing it while the map is unarmed is the window in
-// which it costs nothing.
+// (xchain-indexer/src/vm_exec_lint_activation.js) and isPkg3SandboxActive above.
 function isExecLintActive(network, coin, blockHeight) {
     if (network === 'testnet' || network === 'regtest') return true;
     const b = Number(blockHeight);
@@ -1804,11 +1881,13 @@ class XChainVM {
         // is a cache MISS rather than a byte-length-collision hit (see execute()).
         this._blockCache = null;
 
-        // Metered-source cache: Map<sha256(code):evalOrderBit:callSpreadBit, meteredCode>.
+        // Metered-source cache:
+        //   Map<sha256(code):evalOrderBit+callSpreadBit+restPatternBit, meteredCode>.
         // meterCode() is a pure AST transform (acorn parse + walk + astring regen over
         // up to maxCodeSize bytes), the single most expensive step of a warm execute,
         // and its output depends ONLY on the contract source plus the two consensus
-        // gate flags (specEvalOrder, meterCallSpread), both baked into the key. So a
+        // gate flags (specEvalOrder, meterCallSpread, meterRestPattern), all baked into
+        // the key. So a
         // hit returns byte-identical metered source to a fresh call: no consensus
         // effect, only a parse-time speedup. Unlike _blockCache (V8 cachedData, which
         // is per-block and cleared by endBlock), this cache persists ACROSS blocks:
@@ -1916,7 +1995,7 @@ class XChainVM {
      * redundant per-execute parsing.
      *
      * The key hashes the source with sha256 so a 64KB body is compared in 32 bytes
-     * and appends the two gate bits (evalOrder, callSpread). The cache persists
+     * and appends the three gate bits (evalOrder, callSpread, restPattern). The cache persists
      * across blocks (unlike _blockCache, the V8 cachedData store cleared by
      * endBlock): a contract re-executing block after block re-meters at most once
      * per (source, gate-flags) pair. Bounded by maxMeteredCacheSize with FIFO
@@ -1927,18 +2006,24 @@ class XChainVM {
      * @param {string} code
      * @param {boolean} specEvalOrder
      * @param {boolean} meterCallSpread
+     * @param {boolean} meterRestPattern
      * @param {string} [codeHash] - precomputed sha256(code) hex. Optional: execute()
      *        computes the digest once and shares it with the lint-verdict cache
      *        so a 64KB body is hashed once per execution, not twice.
      *        Omitting it recomputes the identical digest, so the key is unchanged.
      * @returns {string} metered source
      */
-    _getMeteredCode(code, specEvalOrder, meterCallSpread, codeHash) {
+    _getMeteredCode(code, specEvalOrder, meterCallSpread, meterRestPattern, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
-            ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0');
+            ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0') +
+            (meterRestPattern ? '1' : '0');
         const hit = this._meteredCache.get(key);
         if (hit !== undefined) return hit;
-        const metered = meterCode(code, { specEvalOrder: specEvalOrder, meterCallSpread: meterCallSpread });
+        const metered = meterCode(code, {
+            specEvalOrder: specEvalOrder,
+            meterCallSpread: meterCallSpread,
+            meterRestPattern: meterRestPattern
+        });
         // FIFO-evict the oldest entry at capacity (Map preserves insertion order).
         // This cache never feeds consensus, so the eviction policy is a pure
         // memory/hit-rate tradeoff, not a determinism concern.
@@ -1972,15 +2057,17 @@ class XChainVM {
      * @param {boolean} enforceLintHardening
      * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
      * @param {boolean} enforceLintGlobalAlias - LINT_GLOBAL_ALIAS refinement (own gate)
+     * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
      * @param {string} [codeHash] - precomputed sha256(code) hex (see _getMeteredCode)
      * @returns {{valid: boolean, error?: string}}
      */
-    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, codeHash) {
+    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, enforceBannedRest, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
             (enforcePkg3Bans ? '1' : '0') +
-            (enforceLintGlobalAlias ? '1' : '0');
+            (enforceLintGlobalAlias ? '1' : '0') +
+            (enforceBannedRest ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -1988,7 +2075,8 @@ class XChainVM {
             enforceLintHardening:    enforceLintHardening,
             enforceBannedGenerator:  enforcePkg3Bans,
             enforceBannedWasm:       enforcePkg3Bans,
-            enforceLintGlobalAlias:  enforceLintGlobalAlias
+            enforceLintGlobalAlias:  enforceLintGlobalAlias,
+            enforceBannedRest:       enforceBannedRest
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;
@@ -2129,7 +2217,7 @@ class XChainVM {
         // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
         // under the rule set of the deploy block and its verdict was final.
         //
-        // The four flags are resolved by the SAME predicates the rest of the VM already
+        // The five flags are resolved by the SAME predicates the rest of the VM already
         // uses, which are the execution-side twins of the flags the indexer threads into
         // deploy.js validateSyntax, so the execute-time verdict agrees with what a deploy
         // in this block would have produced:
@@ -2137,9 +2225,11 @@ class XChainVM {
         //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
         //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
         //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
-        // The whole check rides its own per-coin height gate (isExecLintActive), which is
-        // UNARMED on mainnet: below it nothing is charged and nothing is checked, so the
-        // pre-activation path is byte-identical, gasUsed included.
+        //   banned-rest (unmeterable rest)  -> isRestPatternMeterActive (block time)
+        // The whole check rides its own per-coin height gate (isExecLintActive), armed at
+        // genesis on every named network: below it, which now means only a chain the
+        // resolver cannot place, nothing is charged and nothing is checked, so the
+        // pre-activation path stays byte-identical, gasUsed included.
         const __execLintCoin   = pkg3CoinFromAddress(opts.contractAddress);
         const __execLintHeight = opts.blockContext && Number(opts.blockContext.height);
         if (isExecLintActive(opts.network, __execLintCoin, __execLintHeight)) {
@@ -2166,6 +2256,7 @@ class XChainVM {
                 isLintHardeningActive(opts.network, __lintBlockTime),
                 isPkg3SandboxActive(opts.network, __execLintCoin, __execLintHeight),
                 isLintGlobalAliasActive(opts.network, __execLintCoin, __execLintHeight),
+                isRestPatternMeterActive(opts.network, __lintBlockTime),
                 __codeHash
             );
             if (!__lintVerdict.valid) {
@@ -2423,9 +2514,15 @@ class XChainVM {
             // Same block-time route resolves the call/new argument-spread metering gate
             // (isCallSpreadMeterActive); below it the spread is emitted verbatim (legacy).
             const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime);
+            // ...and the destructuring-rest metering gate (isRestPatternMeterActive).
+            // Below it a rest destructure is emitted verbatim (legacy flat __gas(1)), so
+            // a pre-gate block replays byte-identically; at/after it the rest SOURCE is
+            // routed through __arrspread/__objspreadmeter and the O(n) copy is billed.
+            const __meterRestPattern = isRestPatternMeterActive(opts.network, __moBlockTime);
             let meteredCode;
             try {
-                meteredCode = this._getMeteredCode(__codeStr, __specEvalOrder, __meterCallSpread, __codeHash);
+                meteredCode = this._getMeteredCode(
+                    __codeStr, __specEvalOrder, __meterCallSpread, __meterRestPattern, __codeHash);
             } catch (e) {
                 return this._errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }
@@ -2996,6 +3093,11 @@ module.exports.METERING_EVAL_ORDER_GATE_BLOCK_TIME = METERING_EVAL_ORDER_GATE_BL
 // argument spread in the metering transform (legacy left the O(n) copy unmetered).
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_TIME;
+// Destructuring-rest metering + the deploy rejection of unmeterable rest positions.
+// Its own FUTURE flag-day (see the constant); consensus-visible, pinned in
+// test/determinism/consensus-params.test.js against the indexer's REST_PATTERN_METER.
+module.exports.REST_PATTERN_METER_GATE_BLOCK_TIME = REST_PATTERN_METER_GATE_BLOCK_TIME;
+module.exports.isRestPatternMeterActive = isRestPatternMeterActive;
 // Coordinated flag-day (block time) that activates canonical string state keys
 // (String(key) normalization for primitives, deterministic rejection of
 // non-primitive keys) so the key-size/NUL/keyCount guards apply to every key.

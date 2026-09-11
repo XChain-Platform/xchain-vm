@@ -41,6 +41,16 @@ function contractJs() {
 
 module.exports = {
 
+    // Contract identity. REQUIRED: a DEPLOY whose contract exports no meta.name and
+    // meta.description is rejected on chain. Use string literals (the chain records
+    // what this evaluates to, once, at deploy) and EDIT the description before you
+    // deploy: it is what wallets and the explorer show beside the address.
+    meta: {
+        name:        '__NAME__',
+        description: 'TODO: describe what this contract does, in one line.',
+        version:     '1.0.0'
+    },
+
     // Optional display metadata for wallets/explorers (advisory; never executed).
     abi: { version: 1, methods: {
         initialize: { summary: 'Set the starting count (constructor)', params: ['start'] },
@@ -109,6 +119,14 @@ interface XChain {
 }
 
 module.exports = {
+
+    // Contract identity. REQUIRED on chain (see the JS scaffold); edit the
+    // description before deploying.
+    meta: {
+        name:        '__NAME__',
+        description: 'TODO: describe what this contract does, in one line.',
+        version:     '1.0.0'
+    },
 
     abi: { version: 1, methods: {
         initialize: { summary: 'Set the starting count (constructor)', params: ['start'] },
@@ -254,6 +272,10 @@ which loads on Node 22 / Linux.
 
 ## Deploy
 
+Edit the contract's \`meta\` block first: \`name\` and \`description\` are REQUIRED on
+chain (a DEPLOY without them is rejected), are recorded once at deploy, and are
+what wallets and the explorer show beside the contract address.
+
 Lint clean here means the DEPLOY passes the indexer's determinism gate. Encode
 the DEPLOY with \`xchain-sdk\` / \`xchain-encoder\` and broadcast it; fund the
 contract with a separate DEPOSIT (there is no msg.value on XChain).
@@ -272,6 +294,12 @@ function buildScaffold(opts = {}) {
     if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
         throw new Error('invalid project name: ' + JSON.stringify(name) +
             ' (use letters, digits, . _ -)');
+    }
+    // The name is emitted as the contract's meta.name, which the chain caps at 64
+    // bytes; a longer one would scaffold a project that cannot deploy.
+    if (Buffer.byteLength(name, 'utf8') > 64) {
+        throw new Error('invalid project name: ' + JSON.stringify(name) +
+            ' (meta.name is capped at 64 bytes on chain)');
     }
     const useTs = !!opts.typescript;
     const contractFile = name + (useTs ? '.ts' : '.js');

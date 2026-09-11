@@ -176,9 +176,41 @@ function _memberKey(member) {
         : (member.property.type === 'Identifier' ? _lit(member.property.name) : _lit(member.property.value));
 }
 
+// The rest-destructuring kind of a BINDING PATTERN, or null when the pattern carries
+// no TOP-LEVEL rest. Only a rest that sits directly in the pattern being destructured
+// has an addressable source expression to wrap; a rest nested one level deeper
+// (`var {a: {...c}} = o`) reads an intermediate value with no expression to meter, and
+// is rejected at deploy instead (lint-core findBannedRest).
+function _restKind(pat) {
+    if (!pat) return null;
+    if (pat.type === 'ObjectPattern')
+        return (pat.properties || []).some(function (p) { return p.type === 'RestElement'; }) ? 'obj' : null;
+    if (pat.type === 'ArrayPattern')
+        return (pat.elements || []).some(function (e) { return e && e.type === 'RestElement'; }) ? 'arr' : null;
+    return null;
+}
+
+// Wrap the SOURCE expression of a rest destructure in the size-charged helper that
+// matches the copy the pattern is about to perform. Returns src unchanged when the
+// pattern carries no top-level rest.
+//   ObjectPattern: __objspreadmeter(src) charges by own-key count and returns src
+//     verbatim, so the native own-key copy the rest performs is billed without
+//     touching evaluation order, getters, or the null/undefined TypeError.
+//   ArrayPattern:  __arrspread([['s', src]]) materialises the iterable ONCE through
+//     the already-charged helper and hands the pattern a plain array. Sound only
+//     because a rest element drains the iterator anyway; a rest-less ArrayPattern is
+//     left alone so a lazy or infinite iterator is never over-drained.
+function _meterRestSource(pat, src) {
+    const kind = _restKind(pat);
+    if (kind === 'obj') return _call('__objspreadmeter', [src]);
+    if (kind === 'arr') return _call('__arrspread', [_arr([_arr([_lit('s'), src])])]);
+    return src;
+}
+
 /**
  * Rewrite the syntax-level allocators (string +/+=, template literals, tagged and
- * untagged, array and object spread) into calls to the harness metering helpers.
+ * untagged, array and object spread, gated call/new argument spread, and gated
+ * destructuring-rest sources) into calls to the harness metering helpers.
  * Post-order so nested forms (a + b + c) are converted leaf-up. Mutates the AST in
  * place.
  *
@@ -191,8 +223,18 @@ function _memberKey(member) {
  * __arrspread helper, which charges O(n) by element count. The "bounded by V8's
  * argument-count limit" reasoning held for one oversized call but NOT for a loop of
  * bounded calls, which copied millions of elements for a flat __gas(1) each.
+ *
+ * Destructuring REST patterns (`var [x, ...c] = a`, `var {k, ...c} = o`) are the same
+ * failure mode one dispatch away: a rest is an ArrayPattern/ObjectPattern carrying a
+ * RestElement, NOT an ArrayExpression/ObjectExpression carrying a SpreadElement, so
+ * every branch above missed it and the O(n) native copy ran for a flat __gas(1) per
+ * iteration. At/after the flag day (meterRestPattern) the SOURCE expression of a
+ * top-level rest destructure is wrapped in the matching size-charged helper. Rest
+ * positions with no addressable source (parameter lists, rest nested inside another
+ * pattern, catch-clause rest, for-of/for-in heads) cannot be reached by wrapping and
+ * are rejected at deploy on the same flag day instead (lint-core findBannedRest).
  */
-function transformAllocators(ast, specEvalOrder, meterCallSpread) {
+function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern) {
     // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's
     // quasi must NOT be (the tag receives the raw template strings object); we
     // collect those quasis up front, skip converting them here, and instead rewrite
@@ -334,6 +376,26 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread) {
             node.arguments = [{ type: 'SpreadElement', argument: _call('__arrspread', [_arr(segs)]) }];
             return node;
         }
+        // destructuring rest, addressable source:  var [x, ...c] = a  /  var {k, ...c} = o
+        //   ->  var [x, ...c] = __arrspread([['s', a]])  /  var {k, ...c} = __objspreadmeter(o)
+        // The pattern itself is untouched (its bindings, defaults, holes and evaluation
+        // order all stay exactly as written); only the SOURCE is routed through the
+        // size-charged helper, so the O(n) copy the rest performs is billed by count.
+        // Over-charging by the few keys destructured out ahead of an object rest is
+        // accepted: it is deterministic, and under-charging is the bug being closed.
+        // A declarator with no init (a for-of/for-in head) has no source expression to
+        // wrap and is left alone here; findBannedRest rejects it at deploy instead.
+        // CONSENSUS-GATED for the same reason the call-spread rewrite is: it adds a
+        // charge that moves gasUsed, so pre-gate the destructure is emitted verbatim.
+        if (meterRestPattern && node.type === 'VariableDeclarator' && node.init) {
+            node.init = _meterRestSource(node.id, node.init);
+            return node;
+        }
+        if (meterRestPattern && node.type === 'AssignmentExpression' && node.operator === '=' &&
+            (node.left.type === 'ArrayPattern' || node.left.type === 'ObjectPattern')) {
+            node.right = _meterRestSource(node.left, node.right);
+            return node;
+        }
         return node;
     }
 
@@ -372,11 +434,18 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread) {
  *   size-charged __arrspread helper so the O(n) element copy is metered; when
  *   false/omitted the call is emitted verbatim (legacy flat __gas(1)). index.js
  *   resolves this from the block time so pre-gate blocks replay identically.
+ * @param {boolean} [opts.meterRestPattern] - consensus gate. When true, the SOURCE of a
+ *   destructuring rest with an addressable source (`var [x, ...c] = a`,
+ *   `var {k, ...c} = o`, and the assignment-expression forms) is wrapped in
+ *   __arrspread / __objspreadmeter so the O(n) copy is metered; when false/omitted the
+ *   destructure is emitted verbatim (legacy flat __gas(1)). index.js resolves this from
+ *   the block time so pre-gate blocks replay identically.
  * @returns {string} Transformed source with __gas(1) calls injected
  */
 function meterCode(source, opts) {
     const specEvalOrder = !!(opts && opts.specEvalOrder);
     const meterCallSpread = !!(opts && opts.meterCallSpread);
+    const meterRestPattern = !!(opts && opts.meterRestPattern);
     const ast = acorn.parse(source, {
         ecmaVersion: CONTRACT_ECMA_VERSION,
         sourceType: 'script',
@@ -387,7 +456,7 @@ function meterCode(source, opts) {
     // array/object spread, and gated call/new argument spread) into metered helper
     // calls, on the pristine AST before any __gas() insertion. The helper calls are
     // exempted from Phase 3 below.
-    transformAllocators(ast, specEvalOrder, meterCallSpread);
+    transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern);
 
     // Track nodes we've already processed to avoid double-injection
     const processed = new WeakSet();

@@ -510,6 +510,67 @@ describe('Metering', function() {
             const metered = meterCode('obj.method(a, ...x, b); new C(...y);', { meterCallSpread: true });
             require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
         });
+
+        // REST_PATTERN_METER gate: a destructuring rest is an ArrayPattern/ObjectPattern
+        // carrying a RestElement, NOT an Expression carrying a SpreadElement, so every
+        // branch above missed it and `var [...c] = bigArr` performed a native O(n) copy
+        // for a flat __gas(1). Post-gate the SOURCE is wrapped in the size-charged helper
+        // that matches the copy. Pre-gate output stays byte-stable so historical blocks
+        // replay identically.
+        it('default meterCode leaves rest destructuring verbatim (no helper wrap)', function() {
+            const arr = meterCode('var [x, ...c] = a;');
+            assert(arr.includes('var [x, ...c] = a'), 'pre-gate array rest emitted verbatim: ' + arr);
+            assert(!arr.includes('__arrspread('), 'pre-gate array rest must NOT route through __arrspread');
+            const obj = meterCode('var {k, ...c} = o;');
+            assert(obj.includes('var {k, ...c} = o'), 'pre-gate object rest emitted verbatim: ' + obj);
+            assert(!obj.includes('__objspreadmeter('), 'pre-gate object rest must NOT route through __objspreadmeter');
+        });
+
+        it('meterRestPattern wraps the SOURCE of var [x, ...c] = a in __arrspread', function() {
+            const metered = meterCode('var [x, ...c] = a;', { meterRestPattern: true });
+            assert(metered.includes('__arrspread('), 'gated array rest source → __arrspread: ' + metered);
+            assert(metered.includes('var [x, ...c] ='), 'the PATTERN itself is untouched: ' + metered);
+            assert(/'s'|"s"/.test(metered), 'the source rides as an s (spread) segment');
+        });
+
+        it('meterRestPattern wraps the SOURCE of var {k, ...c} = o in __objspreadmeter', function() {
+            const metered = meterCode('var {k, ...c} = o;', { meterRestPattern: true });
+            assert(metered.includes('__objspreadmeter(o)'), 'gated object rest source → __objspreadmeter: ' + metered);
+            assert(metered.includes('var {k, ...c} ='), 'the PATTERN itself is untouched: ' + metered);
+        });
+
+        it('meterRestPattern covers the assignment-expression forms too', function() {
+            const arr = meterCode('[a, ...c] = x;', { meterRestPattern: true });
+            assert(arr.includes('__arrspread('), 'array-rest assignment rhs → __arrspread: ' + arr);
+            const obj = meterCode('({k, ...c} = o);', { meterRestPattern: true });
+            assert(obj.includes('__objspreadmeter(o)'), 'object-rest assignment rhs → __objspreadmeter: ' + obj);
+        });
+
+        // Load-bearing: __arrspread materialises the iterable, which DRAINS it. That is
+        // sound for a rest (which drains it anyway) and NOT sound for a rest-less pattern,
+        // where a lazy source must stay lazy. The narrowness of the trigger is the safety
+        // property, so pin it directly.
+        it('meterRestPattern leaves a rest-LESS destructure completely alone', function() {
+            const arr = meterCode('var [x, y] = a;', { meterRestPattern: true });
+            assert(!arr.includes('__arrspread('), 'rest-less array pattern must not be drained: ' + arr);
+            assert.strictEqual(arr, meterCode('var [x, y] = a;'), 'byte-identical to pre-gate output');
+            const obj = meterCode('var {k, j} = o;', { meterRestPattern: true });
+            assert(!obj.includes('__objspreadmeter('), 'rest-less object pattern must not be wrapped: ' + obj);
+            assert.strictEqual(obj, meterCode('var {k, j} = o;'), 'byte-identical to pre-gate output');
+        });
+
+        // A for-of/for-in head declarator has NO init, so there is no source expression
+        // to wrap; it is rejected at deploy (lint-core banned-rest) instead of metered.
+        it('meterRestPattern leaves a for-of head rest alone (no init to wrap)', function() {
+            const metered = meterCode('for (var [x, ...c] of xs) { y = 1; }', { meterRestPattern: true });
+            assert(!metered.includes('__arrspread('), 'for-of head has no addressable source: ' + metered);
+        });
+
+        it('meterRestPattern output re-parses under the ES2020 pin', function() {
+            const metered = meterCode('var [x, ...c] = a; var {k, ...d} = o; [p, ...q] = z;',
+                { meterRestPattern: true });
+            require('acorn').parse(metered, { ecmaVersion: 2020, sourceType: 'script' });
+        });
     });
 
     // Braceless (single-statement) bodies → ensureBlock

@@ -22,9 +22,13 @@
  * This suite pins BOTH sides of the gate:
  *   - below each coin's height: WebAssembly is present (typeof 'object'),
  *     byte-identical to today;
- *   - at/after it: WebAssembly is undefined (stripped) and unreachable;
- *   - testnet/regtest: stripped from genesis;
- *   - per-coin: LTC/DOGE mainnet stay present at a bare BTC 961000 and strip
+ *   - at/after it: the execute-time source lint rejects the stored source before
+ *     an isolate is built (every named network re-lints, mainnet from genesis
+ *     since the 2026-09-09 ruling), so the WebAssembly global is unreachable a
+ *     layer above the strip; the strip itself is pinned directly in
+ *     test/unit/sandbox.test.js (stripWasm);
+ *   - testnet/regtest: rejected from genesis the same way;
+ *   - per-coin: LTC/DOGE mainnet stay present at a bare BTC 961000 and close
  *     only at their own calendar heights (the per-coin fix).
  ********************************************************************/
 // @ts-nocheck
@@ -59,16 +63,23 @@ const useWasm = `module.exports = function(xchain){ try { return typeof WebAssem
         assert.strictEqual(JSON.parse(r.returnValue), 'object');
     });
 
-    it('at the BTC gate (961000), WebAssembly is stripped (typeof undefined)', async function () {
-        const r = await run(typeofWasm, 961000, 'mainnet', 'BTC');
-        assert.strictEqual(r.success, true, r.error);
-        assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
+    // At/after a coin's Pkg 3 height the banned-wasm rule is live, and the execute-time
+    // source lint (armed on mainnet from genesis by the 2026-09-09 ruling) re-lints the
+    // stored source against it before any isolate exists. The strip underneath is the
+    // defence-in-depth layer and is pinned directly in test/unit/sandbox.test.js; through
+    // execute() the observable verdict at the gate is the lint's.
+    const expectLintRejectsWasm = (r) => {
+        assert.strictEqual(r.success, false, 'the re-lint must reject the stored source at the gate');
+        assert.ok(r.error.startsWith('error: banned syntax: '), r.error);
+        assert.ok(/WebAssembly/.test(r.error), r.error);
+    };
+
+    it('at the BTC gate (961000), a WebAssembly-referencing contract is rejected at execute', async function () {
+        expectLintRejectsWasm(await run(typeofWasm, 961000, 'mainnet', 'BTC'));
     });
 
-    it('at the BTC gate, reaching WebAssembly.instantiate throws (global unreachable)', async function () {
-        const r = await run(useWasm, 961000, 'mainnet', 'BTC');
-        assert.strictEqual(r.success, true, r.error);
-        assert.strictEqual(JSON.parse(r.returnValue), 'THROWN');
+    it('at the BTC gate, reaching for WebAssembly.instantiate is rejected the same way', async function () {
+        expectLintRejectsWasm(await run(useWasm, 961000, 'mainnet', 'BTC'));
     });
 
     it('below the BTC gate, WebAssembly.instantiate is a real function (present pre-flag-day)', async function () {
@@ -84,10 +95,8 @@ const useWasm = `module.exports = function(xchain){ try { return typeof WebAssem
         assert.strictEqual(JSON.parse(r.returnValue), 'object');
     });
 
-    it('LTC mainnet at its proposed height (3154250) strips WebAssembly', async function () {
-        const r = await run(typeofWasm, 3154250, 'mainnet', 'LTC');
-        assert.strictEqual(r.success, true, r.error);
-        assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
+    it('LTC mainnet at its proposed height (3154250) rejects a WebAssembly-referencing contract', async function () {
+        expectLintRejectsWasm(await run(typeofWasm, 3154250, 'mainnet', 'LTC'));
     });
 
     it('DOGE mainnet at 961000 keeps WebAssembly present (per-coin fix)', async function () {
@@ -96,19 +105,16 @@ const useWasm = `module.exports = function(xchain){ try { return typeof WebAssem
         assert.strictEqual(JSON.parse(r.returnValue), 'object');
     });
 
-    it('DOGE mainnet at its proposed height (6319000) strips WebAssembly', async function () {
-        const r = await run(typeofWasm, 6319000, 'mainnet', 'DOGE');
-        assert.strictEqual(r.success, true, r.error);
-        assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
+    it('DOGE mainnet at its proposed height (6319000) rejects a WebAssembly-referencing contract', async function () {
+        expectLintRejectsWasm(await run(typeofWasm, 6319000, 'mainnet', 'DOGE'));
     });
 
-    // ---- Pre-launch nets: the execute-time lint supersedes the strip ----
+    // ---- Pre-launch nets: rejected from genesis ----
     // The strip is the defence-in-depth layer for a contract that DEPLOYED before the
-    // banned-wasm rule armed. Where execute-time source-lint enforcement is active (the
-    // pre-launch nets, from genesis) such a contract can no longer execute at all: the
-    // stored source is re-linted against the bans live at this block and rejected before
-    // an isolate is even built, so the WebAssembly global is unreachable a layer earlier.
-    // The strip itself stays pinned above, on mainnet, which is below the exec-lint gate.
+    // banned-wasm rule armed. Where execute-time source-lint enforcement is active (every
+    // named network; the pre-launch nets from genesis) such a contract can no longer
+    // execute at all: the stored source is re-linted against the bans live at this block
+    // and rejected before an isolate is even built.
     for (const network of ['testnet', 'regtest']) {
         it(`${network} rejects a WebAssembly-referencing contract at execute (lint supersedes the strip)`, async function () {
             const r = await run(typeofWasm, 0, network, 'BTC');

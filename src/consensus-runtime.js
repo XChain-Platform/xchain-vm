@@ -123,7 +123,18 @@ const REFERENCE_NODE = 'v22.22.3';
 // window, so below each coin's height WebAssembly is left in place and a
 // from-genesis replay is byte-identical. The musl-safe recursion bound rides
 // the same per-coin gate.
-const CONSENSUS_VERSION = '3';
+//
+// Epoch '4' (this bump) adds 'banned-rest' to the deploy validator's CONSENSUS_RULES:
+// the destructuring-rest positions the allocator meter cannot charge by wrapping a
+// source expression (parameter lists, rest nested inside another pattern, catch-clause
+// rest, for-of/for-in heads). It is the deploy half of the REST_PATTERN_METER change,
+// whose execution half charges the rest forms that DO have an addressable source. Gated
+// on a coordinated block-TIME flag-day of its own (index.js isRestPatternMeterActive /
+// REST_PATTERN_METER_GATE_BLOCK_TIME, and the indexer's REST_PATTERN_METER twin), NOT on
+// the contract-era instant, which is already in the past: below the flag-day the rule is
+// dropped from the blocking set and no rest destructure is metered, so a from-genesis
+// replay reproduces the historical accept-below/reject-above verdict and gasUsed.
+const CONSENSUS_VERSION = '4';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash

@@ -16,10 +16,13 @@
 // metered and ran the PERSISTED code with no re-check, so a contract accepted
 // before a ban activated kept executing banned syntax afterwards. These tests
 // pin the remedy on both sides of its activation:
-//   - below the gate (mainnet, still unarmed) a banned-syntax contract executes
-//     exactly as it did before, gasUsed included;
-//   - at/after it (the genesis-active pre-launch nets) the execution fails
-//     deterministically with a frozen 'error:' prefix;
+//   - below the gate a banned-syntax contract executes exactly as it did before,
+//     gasUsed included. Since the 2026-09-09 ruling armed mainnet at genesis
+//     (0 contracts, 0 DEPLOY, 0 EXECUTE on the indexed mainnet history), the only
+//     venue left below the gate is a chain the resolver cannot place, which is the
+//     conservative default this half now pins;
+//   - at/after it (mainnet from genesis, and the pre-launch nets) the execution
+//     fails deterministically with a frozen 'error:' prefix;
 //   - the verdict cache is invisible to consensus (same verdict, same gas, hit
 //     or miss) and the lint gas is charged before the check, on a
 //     source-length-derived divisor.
@@ -71,13 +74,17 @@ function runOpts(extra) {
 describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
     this.timeout(30000);
 
-    describe('below the activation (mainnet, still unarmed)', function () {
+    // Every named network is genesis-active now (mainnet by the 2026-09-09 ruling,
+    // testnet/regtest since the gate landed), so the pre-activation path is reachable
+    // only on a chain the resolver cannot place. It is still live code and still the
+    // conservative default, so it keeps its half of the suite.
+    describe('below the activation (an unplaceable chain)', function () {
 
         it('a banned-generator contract still executes, exactly as before the change', async function () {
             const vm = newVm();
-            const res = await vm.execute(runOpts({ code: GENERATOR, network: 'mainnet' }));
+            const res = await vm.execute(runOpts({ code: GENERATOR, network: 'stagenet' }));
             assert.strictEqual(res.success, true,
-                'mainnet is unarmed, so the stored generator contract must keep executing: ' + res.error);
+                'an unplaceable chain resolves the gate off, so the stored generator contract must keep executing: ' + res.error);
             assert.strictEqual(JSON.parse(res.returnValue), 7);
         });
 
@@ -86,9 +93,9 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             // be) without changing the metered AST, so identical gasUsed proves no
             // source-length-derived charge was levied below the gate.
             const vm = newVm();
-            const bare   = await vm.execute(runOpts({ code: CLEAN, network: 'mainnet' }));
+            const bare   = await vm.execute(runOpts({ code: CLEAN, network: 'stagenet' }));
             const padded = await vm.execute(runOpts({
-                code: CLEAN + '\n//' + 'x'.repeat(4096), network: 'mainnet'
+                code: CLEAN + '\n//' + 'x'.repeat(4096), network: 'stagenet'
             }));
             assert.strictEqual(bare.success, true, bare.error);
             assert.strictEqual(padded.success, true, padded.error);
@@ -98,12 +105,42 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
 
         it('populates no verdict-cache entry (the check never runs)', async function () {
             const vm = newVm();
-            await vm.execute(runOpts({ code: GENERATOR, network: 'mainnet' }));
+            await vm.execute(runOpts({ code: GENERATOR, network: 'stagenet' }));
             assert.strictEqual(vm._lintVerdictCache.size, 0);
         });
     });
 
-    describe('at/after the activation (genesis-active pre-launch nets)', function () {
+    describe('at/after the activation (mainnet from genesis, and the pre-launch nets)', function () {
+
+        it('rejects a banned-generator contract on MAINNET once the rule itself is in force', async function () {
+            // The 2026-09-09 ruling armed the RE-LINT at mainnet height 0. What the
+            // re-lint enforces is still whatever ban set that block carries, and
+            // banned-generator is a Pkg 3 rule that opens on BTC:mainnet at 961000, so
+            // the rejection starts there and never stops.
+            for (const height of [961000, Number.MAX_SAFE_INTEGER]) {
+                const res = await newVm().execute(runOpts({
+                    code: GENERATOR, network: 'mainnet',
+                    blockContext: { height, timestamp: 1786060800, hash: 'b'.repeat(64) }
+                }));
+                assert.strictEqual(res.success, false, 'mainnet height ' + height + ' must re-lint');
+                assert.ok(res.error.startsWith('error: banned syntax: '), res.error);
+            }
+        });
+
+        it('runs the re-lint on MAINNET from height 0, not from a train height', async function () {
+            // The gate itself, separated from the ban set: a verdict-cache entry can only
+            // exist if validateSyntax was re-run at execute time, so this is what goes red
+            // if mainnet is ever disarmed back to a sentinel or a future height. Height 0
+            // predates the Pkg 3 bans, so the generator legitimately still returns 7 here.
+            const vm = newVm();
+            const res = await vm.execute(runOpts({
+                code: GENERATOR, network: 'mainnet',
+                blockContext: { height: 0, timestamp: 1786060800, hash: 'b'.repeat(64) }
+            }));
+            assert.strictEqual(res.success, true, res.error);
+            assert.strictEqual(vm._lintVerdictCache.size, 1,
+                'the execute-time re-lint must have run at mainnet height 0');
+        });
 
         it('rejects a banned-generator contract deterministically', async function () {
             const vm = newVm();
@@ -193,62 +230,68 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             const vm = newVm();
             const { validateSyntax } = require('../../src/syntax.js');
             for (const code of [CLEAN, GENERATOR, ASYNC]) {
-                const cached = vm._getLintVerdict(code, true, true, true, true);
+                const cached = vm._getLintVerdict(code, true, true, true, true, true);
                 const fresh  = validateSyntax(code, {
                     enforceBannedAsync: true, enforceLintHardening: true,
                     enforceBannedGenerator: true, enforceBannedWasm: true,
-                    enforceLintGlobalAlias: true
+                    enforceLintGlobalAlias: true, enforceBannedRest: true
                 });
                 assert.deepStrictEqual(cached, fresh, 'cached verdict drifted from a fresh one for: ' + code);
             }
         });
 
-        it('partitions on the four consensus flag bits, not just the source', function () {
+        it('partitions on the five consensus flag bits, not just the source', function () {
             const vm = newVm();
-            vm._getLintVerdict(GENERATOR, false, false, false, false);
-            vm._getLintVerdict(GENERATOR, true,  false, false, false);
-            vm._getLintVerdict(GENERATOR, false, true,  false, false);
-            vm._getLintVerdict(GENERATOR, false, false, true,  false);
-            vm._getLintVerdict(GENERATOR, false, false, false, true);
-            assert.strictEqual(vm._lintVerdictCache.size, 5);
+            vm._getLintVerdict(GENERATOR, false, false, false, false, false);
+            vm._getLintVerdict(GENERATOR, true,  false, false, false, false);
+            vm._getLintVerdict(GENERATOR, false, true,  false, false, false);
+            vm._getLintVerdict(GENERATOR, false, false, true,  false, false);
+            vm._getLintVerdict(GENERATOR, false, false, false, true,  false);
+            vm._getLintVerdict(GENERATOR, false, false, false, false, true);
+            assert.strictEqual(vm._lintVerdictCache.size, 6);
             // And the flags actually change the verdict: the Pkg 3 bit is what bans the
             // generator, so the same source is valid with the bit off and invalid with it on.
-            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, false, false).valid, true);
-            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, true, false).valid, false);
+            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, false, false, false).valid, true);
+            assert.strictEqual(vm._getLintVerdict(GENERATOR, false, false, true, false, false).valid, false);
             // The global-alias bit is a partition of its own: the same source is accepted
             // with it off and rejected with it on, which is what the epoch gate protects.
             const ALIASED = 'module.exports = function(){ return this.WebAssembly; };';
-            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, false).valid, true);
-            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, true).valid, false);
+            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, false, false).valid, true);
+            assert.strictEqual(vm._getLintVerdict(ALIASED, true, true, true, true, false).valid, false);
+            // ...and so is the banned-rest bit (REST_PATTERN_METER): a rest PARAMETER is
+            // accepted below the flag-day and rejected at/above it.
+            const RESTPARAM = 'module.exports = function(){ function s(...n){ return n.length; } return s(1); };';
+            assert.strictEqual(vm._getLintVerdict(RESTPARAM, true, true, true, true, false).valid, true);
+            assert.strictEqual(vm._getLintVerdict(RESTPARAM, true, true, true, true, true).valid, false);
         });
 
         it('accepts the shared sha256 digest and keys identically to computing it itself', function () {
             const crypto = require('crypto');
             const vm = newVm();
             const hash = crypto.createHash('sha256').update(CLEAN).digest('hex');
-            vm._getLintVerdict(CLEAN, true, true, true, true, hash);
-            vm._getLintVerdict(CLEAN, true, true, true, true);
+            vm._getLintVerdict(CLEAN, true, true, true, true, true, hash);
+            vm._getLintVerdict(CLEAN, true, true, true, true, true);
             assert.strictEqual(vm._lintVerdictCache.size, 1,
                 'a shared digest and a self-computed one must produce the same cache key');
         });
 
         it('evicts FIFO at the bound instead of growing without limit', function () {
             const vm = newVm({ limits: { maxMeteredCacheSize: 2 } });
-            vm._getLintVerdict(CLEAN,     true, true, true, true);
-            vm._getLintVerdict(GENERATOR, true, true, true, true);
-            vm._getLintVerdict(ASYNC,     true, true, true, true);
+            vm._getLintVerdict(CLEAN,     true, true, true, true, true);
+            vm._getLintVerdict(GENERATOR, true, true, true, true, true);
+            vm._getLintVerdict(ASYNC,     true, true, true, true, true);
             assert.ok(vm._lintVerdictCache.size <= 2, 'cache must stay within its bound');
             // Correctness survives eviction: the evicted entry recomputes to the same verdict.
-            assert.strictEqual(vm._getLintVerdict(CLEAN, true, true, true, true).valid, true);
+            assert.strictEqual(vm._getLintVerdict(CLEAN, true, true, true, true, true).valid, true);
         });
     });
 
     describe('activation resolver', function () {
 
-        it('mainnet is unarmed at every height for every coin', function () {
+        it('mainnet is armed at genesis for every coin', function () {
             for (const coin of ['BTC', 'LTC', 'DOGE']) {
-                assert.strictEqual(isExecLintActive('mainnet', coin, 0), false);
-                assert.strictEqual(isExecLintActive('mainnet', coin, Number.MAX_SAFE_INTEGER), false);
+                assert.strictEqual(isExecLintActive('mainnet', coin, 0), true);
+                assert.strictEqual(isExecLintActive('mainnet', coin, Number.MAX_SAFE_INTEGER), true);
             }
         });
 

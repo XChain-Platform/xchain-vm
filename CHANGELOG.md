@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.17.0] - 2026-09-10
+
+### Added
+- The toolkit index re-exports `getExportedMeta` and `isValidMetaText`, so a tool that requires the toolkit can read a source's declared identity without re-implementing the walk.
+- The deploy-time manifest read reports a contract's exported `meta` object (name, description, version), serialised and size-bounded inside the isolate.
+- Foundry gate blocks a contract with no valid meta.name/meta.description under the new contract-meta rule; the scaffolder and the AI-authoring prompt now emit and ask for contract identity.
+- Destructuring rest patterns are size-metered and the four unmeterable rest positions are refused at deploy under the new `banned-rest` rule, moving the consensus epoch to 4; armed at genesis on testnet and regtest and on 2027-01-01 on mainnet.
+
+### Changed
+- The vendored mainnet activation twin is armed at genesis under the 2026-09-09 ruling.
+
+### Fixed
+- Both CI call sites pass the siblings ref, so a release PR checks its siblings at the train branch rather than at develop.
+
 ## [0.15.0] - 2026-09-07
 
 ### Changed

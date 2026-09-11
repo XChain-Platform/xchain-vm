@@ -264,24 +264,25 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             if (!vm) this.skip();
         });
 
-        it('exposes a per-coin mainnet map that is still UNARMED', function () {
+        it('exposes a per-coin mainnet map ARMED AT GENESIS by the 2026-09-09 ruling', function () {
             const map = vm.LINT_GLOBAL_ALIAS_ACTIVATION;
             assert.ok(map, 'the epoch map must be exported');
-            // null is the explicit unarmed sentinel; a number here means the operator
-            // ratified heights and the indexer twin MUST carry the same ones.
-            assert.strictEqual(map['BTC:mainnet'], null);
-            assert.strictEqual(map['LTC:mainnet'], null);
-            assert.strictEqual(map['DOGE:mainnet'], null);
+            // 0 because the indexed mainnet history is identity under this gate: 0
+            // contracts, 0 DEPLOY actions (measured 2026-09-09). The indexer twin MUST
+            // carry the same heights or the fleet forks on the first mainnet deploy.
+            assert.strictEqual(map['BTC:mainnet'], 0);
+            assert.strictEqual(map['LTC:mainnet'], 0);
+            assert.strictEqual(map['DOGE:mainnet'], 0);
         });
 
         it('is frozen (a mutable consensus map is a fork surface)', function () {
             assert.ok(Object.isFrozen(vm.LINT_GLOBAL_ALIAS_ACTIVATION));
         });
 
-        it('resolves inactive on mainnet at every height while unarmed', function () {
-            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 0), false);
-            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 999999999), false);
-            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'DOGE', 999999999), false);
+        it('resolves active on mainnet at every height, genesis included', function () {
+            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 0), true);
+            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 999999999), true);
+            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'DOGE', 999999999), true);
         });
 
         it('is genesis-active on testnet and regtest', function () {
@@ -295,11 +296,15 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', NaN), false);
         });
 
-        it('does NOT ride VM_LINT_HARDENING, which is already open', function () {
-            // The whole reason the epoch exists: reusing the open block-time gate would
-            // apply the tightened rules to contracts the chain already accepted.
+        it('does NOT ride VM_LINT_HARDENING: it reads a different axis', function () {
+            // The whole reason the epoch exists. Both gates are open on mainnet now, so
+            // the separation shows in the axis, not the verdict: VM_LINT_HARDENING is a
+            // coin-blind BLOCK-TIME gate shut below 1786060800, this one a per-coin
+            // BLOCK-HEIGHT gate open from 0, and an unknown coin resolves it off.
             assert.strictEqual(vm.isLintHardeningActive('mainnet', vm.VM_LINT_HARDENING_GATE_BLOCK_TIME), true);
-            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 961000), false);
+            assert.strictEqual(vm.isLintHardeningActive('mainnet', 0), false);
+            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'BTC', 0), true);
+            assert.strictEqual(vm.isLintGlobalAliasActive('mainnet', 'XYZ', 961000), false);
         });
     });
 });

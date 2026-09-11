@@ -67,9 +67,12 @@
  *     would not accept is a legitimate move, and this repo's own fixtures do it to
  *     measure the runtime strips. A `deployGate.valid === false` means the later
  *     call() results are simulation-only; on chain the contract never exists.
- *     Note this is the only source check a MAINNET-configured simulator gets: the
- *     VM's execute-time re-lint rides EXEC_LINT_ACTIVATION, whose mainnet entries
- *     are the unarmed null sentinel, so nothing else lints there.
+ *     Note deployGate no longer stands alone here: the VM's execute-time re-lint
+ *     rides EXEC_LINT_ACTIVATION, whose mainnet entries are ARMED at genesis by
+ *     the 2026-09-09 ruling (identity on the indexed mainnet history: 0 contracts,
+ *     0 DEPLOY, 0 EXECUTE, measured 2026-09-09), and call() below reaches it
+ *     through this.vm.execute(), so a MAINNET-configured simulator now gets that
+ *     second source check too.
  *   - reproduce a HOST-TERMINATION outcome. The default in-process mode has no
  *     worker to lose, so a contract that aborts the JS engine (bulk allocation
  *     past the isolate memory limit is the shape) takes the simulator's own
@@ -157,8 +160,9 @@ const GENESIS_ACTIVE_NETWORKS = Object.freeze(['regtest', 'testnet']);
 
 /**
  * Armed threshold for one height gate at (coin, network), or undefined.
- * EXEC_LINT / LINT_GLOBAL_ALIAS still carry an explicit `null` sentinel on every
- * mainnet coin, which means UNARMED, so it is filtered out rather than coerced to 0.
+ * EXEC_LINT / LINT_GLOBAL_ALIAS now carry an explicit `0` on every mainnet coin
+ * (ARMED at genesis by the 2026-09-09 ruling); a missing entry or a non-finite
+ * height is still filtered out rather than coerced to 0.
  */
 function heightGateThreshold(gate, coin, network) {
     const map = XChainVM[gate.map];
