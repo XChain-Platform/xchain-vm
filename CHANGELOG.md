@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-11
+
+### Added
+- The bugfix regression tier carries four bug tests: null emit params, byte-counted log truncation, return-value serialization and tier integrity.
+
 ## [0.17.0] - 2026-09-10
 
 ### Added
