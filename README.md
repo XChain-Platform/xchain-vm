@@ -4,8 +4,8 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.15.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/tests-2%2C480%2B%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/version-0.17.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/tests-2%2C497%2B%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
 </p>
@@ -236,7 +236,7 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 | `npm run test:boundary` | Boundary condition tests (117 tests) |
 | `npm run test:determinism` | Determinism tests (152 tests) |
 | `npm run test:performance` | Performance benchmarks-as-tests (5 tests) |
-| `npm run test:all` | Every `*.test.js` under `test/` (2,480+ tests) |
+| `npm run test:all` | Every `*.test.js` under `test/` (2,497+ tests) |
 | `npm run test:e2e` | E2E tests only (66 tests) |
 | `npm run smoke` | Smoke tests (12 tests, < 5s) |
 | `npm run test:fuzz` | Fuzz / property-based tests (92 tests) |
@@ -245,7 +245,7 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 | `npm run test:regression:core` | P0+P1 regression (45 tests, < 200ms) |
 | `npm run test:regression:full` | P0-P3 + gate/pin regression (224 tests, < 1s) |
 | `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 (416 tests) |
-| `npm run test:regression:release` | All tests + mutation testing (2,480 tests) |
+| `npm run test:regression:release` | All tests + mutation testing (2,497 tests) |
 | `npm run mutation` | Mutation testing (Stryker, full suite) |
 | `npm run bench:quick` | Pipeline + gateway benchmarks |
 | `npm run bench:full` | All benchmarks except soak |
