@@ -326,6 +326,7 @@ function objectFreezeRemoval(source, filename) {
 function embeddedCodeMutation(source, filename) {
     const mutants = [];
 
+    // Find template literals and multiline string constants that contain JS code
     // Pattern: variable = `...code...`; or variable = '...code...';
     const embeddedPatterns = [
         // Template literal: const VARNAME = `...`;

@@ -170,6 +170,7 @@ function hashResult(result) {
             const sim1 = await runSimulation();
             const sim2 = await runSimulation();
 
+            // Final state must match
             assert.deepStrictEqual(sim1.finalState, sim2.finalState,
                 'Final state should be identical after replay');
 

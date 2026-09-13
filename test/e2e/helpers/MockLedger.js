@@ -185,7 +185,7 @@ class MockLedger {
     // --- Oracle helpers ---
 
     // `currentPrice` should be a { price, roundNumber, timestamp } object (the
-    // shape the indexer's getOracleDataForVM feeds through readonly-accessors).
+    // shape the indexer's getOracleDataForVM feeds through readonly_accessors).
     // A bare string/number is kept as a string for legacy tests, but contracts
     // written against the production accessor expect the object.
     seedOracle(coinPair, currentPrice, snapshotAge, rounds) {

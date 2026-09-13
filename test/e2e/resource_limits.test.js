@@ -60,6 +60,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             });
             assertOutOfGas(result);
             assert(result.gasUsed > 0, 'Should have used some gas');
+            // State should not have been persisted
             assertContractState(hLow.ledger, 'C:BTC:40', 'val', '0');
         });
 
@@ -290,6 +291,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 params: [], caller: 'deployer'
             });
             assertSuccess(r2);
+            // Gas should be roughly the same (fresh budget, not accumulated)
             assert(Math.abs(r2.gasUsed - gas1) < gas1 * 0.1,
                 `Gas should reset: first=${gas1}, second=${r2.gasUsed}`);
         });

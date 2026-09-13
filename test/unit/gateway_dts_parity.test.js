@@ -13,7 +13,7 @@
 // Drift guard for src/gateway.d.ts (the typed in-contract `xchain` gateway
 // shipped for editor autocomplete). Builds the real runtime gateway and asserts
 // every top-level method, every namespace, and every namespace member has a
-// declaration in the .d.ts. A method added to gateway.js / gateway-emit.js /
+// declaration in the .d.ts. A method added to gateway.js / gateway_emit.js /
 // math.js without a matching type here fails this test, so the published types
 // can never silently fall behind the runtime surface authors call. Pure host
 // functions, no isolate, so it runs on any Node.

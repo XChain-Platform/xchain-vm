@@ -49,7 +49,7 @@ const BASE = {
 let HAVE_IVM = true;
 try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 
-(HAVE_IVM ? describe : describe.skip)('process-executor: out-of-process execution', function () {
+(HAVE_IVM ? describe : describe.skip)('process_executor: out-of-process execution', function () {
     this.timeout(60000);
 
     let vm;
@@ -452,7 +452,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 // fast validator ran normally (a fork). The production embedder awaits every
 // execute(), but the executor itself now ENFORCES at-most-one in flight so a
 // future non-awaiting caller cannot silently re-open the divergence.
-(HAVE_IVM ? describe : describe.skip)('process-executor: single-in-flight dispatch invariant', function () {
+(HAVE_IVM ? describe : describe.skip)('process_executor: single-in-flight dispatch invariant', function () {
     this.timeout(60000);
 
     it('concurrent execute() calls are dispatched one at a time and all complete', async function () {

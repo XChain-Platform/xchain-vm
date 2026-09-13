@@ -42,7 +42,7 @@ const { meterCode }     = require('./metering.js');
 const { validateSyntax, checkFloatWarnings } = require('./syntax.js');
 const { ContractRevertError, GasExhaustedError, HostFaultError } = require('./errors.js');
 const { resolveAccessors } = require('./readonly_accessors.js');
-// Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
+// Consensus wall-clock budget per execution (see consensus_wall_clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
 const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus_wall_clock.js');
 
@@ -1388,10 +1388,10 @@ const MAX_STACK_DEPTH_MUSL = 256;
 // host-side (execute/index.js processEmission + actions/xcall/index.js).
 const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;     // = MIN_CALL_GAS
 const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;     // target-side ceiling cap (the run is fee-less on the target chain)
-// Single in-VM source of truth: gateway-emit.js declares the hop cap it
+// Single in-VM source of truth: gateway_emit.js declares the hop cap it
 // ENFORCES (emit.crossExecute's hop gate) and this module re-exports it, so a
 // future bump cannot leave the enforcer and the exported/parity-tested value
-// disagreeing. (gateway-emit.js has no require-cycle back into this file.)
+// disagreeing. (gateway_emit.js has no require-cycle back into this file.)
 const XCALL_MAX_HOPS            = require('./gateway_emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
 const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
 const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
@@ -1613,7 +1613,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 }
 
 // Activation for the CONSENSUS wall-clock budget per execution
-// (CONSENSUS_MAX_WALL_MS, ./consensus-wall-clock.js). Below this gate the
+// (CONSENSUS_MAX_WALL_MS, ./consensus_wall_clock.js). Below this gate the
 // wall-clock net is the per-NODE limits.maxCpuTimeMs, which is not a consensus
 // value: two validators configured differently return DIFFERENT statuses and
 // DIFFERENT gasUsed for the same execution (timeout + gasUsed clamped to the
@@ -1629,7 +1629,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 // what makes riding an already-ratified flag-day safe: no execution on a
 // default-configured node changes outcome, so there is no history to preserve
 // below the gate. TIGHTENING the value later is a different change and needs
-// its own future flag-day (see consensus-wall-clock.js).
+// its own future flag-day (see consensus_wall_clock.js).
 //
 // NOTE for a future reader: three comments inside HARNESS_SOURCE (the F3-globals,
 // Set/Map and TypedArray metering notes) still describe maxCpuTimeMs as "the
@@ -2260,7 +2260,7 @@ class XChainVM {
                 __codeHash
             );
             if (!__lintVerdict.valid) {
-                // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus-runtime.js);
+                // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus_runtime.js);
                 // the indexer collapses it to the generic failure token. The lint message is
                 // deterministic and path-free, so it is safe to surface verbatim.
                 return this._errorResult(gasTracker, emissionCollector,
@@ -2375,7 +2375,7 @@ class XChainVM {
                     // the asynchronous frameworks (attestation, cross-chain calls) are
                     // disabled: their results arrive blocks later, after the guarded
                     // action has already committed or reverted. Enforced at emit time
-                    // in gateway.js (attestation.request) + gateway-emit.js (crossExecute).
+                    // in gateway.js (attestation.request) + gateway_emit.js (crossExecute).
                     isGuard:         Boolean(opts.isGuard),
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
@@ -2606,7 +2606,7 @@ class XChainVM {
                 hostSignals.runStartNs = process.hrtime.bigint();
                 // CONSENSUS: the timeout is the per-execution wall-clock budget
                 // resolved above, NOT the node's limits.maxCpuTimeMs (which binds
-                // ungated executions only). See consensus-wall-clock.js.
+                // ungated executions only). See consensus_wall_clock.js.
                 const rawReturn = script.runSync(context, { timeout: hostSignals.wallBudgetMs });
                 // The contract wrapper JSON-serializes non-null return values
                 // with a \x02 prefix inside the isolate
@@ -2794,8 +2794,8 @@ class XChainVM {
      * Classify an execution error and return the appropriate result.
      *
      * The error STRING prefixes emitted here (revert/out_of_gas/timeout/
-     * out_of_memory/out_of_stack/error; out_of_resource from process-executor)
-     * are the frozen STATUS_ERROR_PREFIXES in consensus-runtime.js. The indexer
+     * out_of_memory/out_of_stack/error; out_of_resource from process_executor)
+     * are the frozen STATUS_ERROR_PREFIXES in consensus_runtime.js. The indexer
      * collapses them into CONSENSUS_STATUS_TOKENS (utility.vmFailureStatus).
      * Changing a prefix is a consensus change; guarded by the consensus-params
      * tests in both repos.

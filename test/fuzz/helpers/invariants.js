@@ -96,9 +96,11 @@ function checkNoPrototypePollution() {
     arr.push(1);
     assert.strictEqual(arr.length, 1, 'Array.prototype.push is broken');
 
+    // Function.prototype must be intact
     assert.strictEqual(typeof Function.prototype.call, 'function',
         'Function.prototype.call is broken');
 
+    // Object.prototype.toString must work correctly
     assert.strictEqual(Object.prototype.toString.call({}), '[object Object]',
         'Object.prototype.toString is broken');
 }

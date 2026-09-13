@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Cross-Node/V8 consensus-runtime gate.
+ * Cross-Node/V8 consensus_runtime gate.
  *
  * Asserts the engine THIS process runs on matches the pinned consensus
  * runtime (src/consensus_runtime.js). Running in `ci` on every Node/V8 a
@@ -31,7 +31,7 @@ const {
     PINNED, REFERENCE_NODE, checkConsensusRuntime, describeMismatch
 } = require('../../src/consensus_runtime.js');
 
-describe('consensus-runtime gate', function () {
+describe('consensus_runtime gate', function () {
 
     it('THIS engine matches the pinned consensus runtime (else this validator would FORK)', function () {
         const result = checkConsensusRuntime();

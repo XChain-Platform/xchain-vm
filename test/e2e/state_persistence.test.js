@@ -102,6 +102,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
                 });
             }
 
+            // A should be 10, B should be 3
             assertContractState(h.ledger, 'C:BTC:61A', 'counter', '10');
             assertContractState(h.ledger, 'C:BTC:61B', 'counter', '3');
 

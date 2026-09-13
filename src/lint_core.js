@@ -444,7 +444,7 @@ function scopeDeclares(node, name) {
  * an `async` export returns a pending Promise (JSON.stringify(result) yields
  * "{}"), and whether its post-`await` state writes land depends on isolated-vm's
  * microtask-drain timing inside runSync, a property of the package version that
- * is NOT part of the consensus-runtime pin. A wall-clock interrupt landing
+ * is NOT part of the consensus_runtime pin. A wall-clock interrupt landing
  * mid-drain turns a success on one validator into a timeout on another. async/
  * await is ES2017, so it parses clean under the ES2020 deploy pin and meters
  * cleanly; reject it at the syntax layer like BigInt/RegExp literals (the
@@ -1260,7 +1260,7 @@ function lintSource(code, opts) {
     //    CONTRACT_WRAPPER invokes exports synchronously, so a pending Promise
     //    returned by an async export resolves (or not) per isolated-vm's
     //    version-dependent microtask-drain timing, which is outside the
-    //    consensus-runtime pin: two validators can diverge (success vs timeout,
+    //    consensus_runtime pin: two validators can diverge (success vs timeout,
     //    or differing post-await state). Rejected at deploy like BigInt/RegExp.
     const asyncs = findBannedAsync(code, hardened, globalAlias);
     for (const hit of asyncs) {

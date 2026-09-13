@@ -58,6 +58,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertContractState(h.ledger, 'C:BTC:10', 'reserveA', '1000');
             assertContractState(h.ledger, 'C:BTC:10', 'reserveB', '1000');
 
+            // Swap 100 TOKENA for TOKENB
             // k = 1000 * 1000 = 1000000
             // newResA = 1000 + 100 = 1100
             // newResB = 1000000 / 1100 ≈ 909.090909...
@@ -71,6 +72,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert.strictEqual(swapResult.emittedActions[0].action, 'SEND');
             assert.strictEqual(swapResult.emittedActions[0].params.tick, 'TOKENB');
 
+            // Verify reserves changed
             assertContractState(h.ledger, 'C:BTC:10', 'reserveA', '1100');
             assertLogsContain(swapResult, 'swapped');
         });

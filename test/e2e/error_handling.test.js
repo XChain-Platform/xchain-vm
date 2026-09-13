@@ -148,6 +148,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             });
             assertReverted(r1, 'counter is zero');
 
+            // Counter should still be 0
             assertContractState(h.ledger, 'C:BTC:54', 'counter', '0');
 
             const r2 = await h.execute({

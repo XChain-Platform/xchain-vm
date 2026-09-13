@@ -205,7 +205,7 @@ class ProcessExecutor {
     // nodes and run it on others, producing a divergent result and a fork.
     _flush() {
         // AT MOST ONE ENTRY IN FLIGHT (`_pending.size === 0` in the loop guard):
-        // the worker (vm-worker.js) executes strictly sequentially, so if two
+        // the worker (vm_worker.js) executes strictly sequentially, so if two
         // entries were dispatched together the 2nd's watchdog would start
         // counting while the 1st still ran head-of-line. Its effective budget
         // would become `_watchdogMs - (runtime of the contracts ahead)`, a

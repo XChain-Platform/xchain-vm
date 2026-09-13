@@ -113,7 +113,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
     // of undefined (reading 'x')" at V8 8.4; JSON SyntaxError gained a
     // "(line N column M)" suffix in recent V8). The mitigation this depends
     // on has SHIPPED: src/consensus_runtime.js pins the exact V8/ICU build the
-    // fleet runs and test/determinism/consensus-runtime-gate.test.js fails any
+    // fleet runs and test/determinism/consensus_runtime_gate.test.js fails any
     // validator that is not on it, both in `npm run ci`. So the residual is
     // testable after all, as the pair it actually is: the exposure is still
     // open (nobody may delete the pin believing this got fixed in-VM) and the

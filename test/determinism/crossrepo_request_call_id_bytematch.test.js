@@ -13,7 +13,7 @@
 // CROSS-REPO BYTE-MATCH GUARD (consensus-critical).
 //
 // The ATTEST request_id and XCALL call_id are derived in the VM (gateway.js /
-// gateway-emit.js) and RE-derived in the indexer (xchain-indexer
+// gateway_emit.js) and RE-derived in the indexer (xchain-indexer
 // actions/attest/index.js / actions/xcall/index.js). If the two preimages ever
 // drift by a single byte, every legitimate
 // emission is rejected by the re-derivation and the fleet forks. The VM-side suites
@@ -276,7 +276,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                 const contractIndex = 42, targetChain = 'DOGE';
                 const vm = vmCallId({ network, txHash, rootActionIndex: c.rootActionIndex, callPath: c.callPath, contractIndex, targetChain });
                 // sourceChain in the VM preimage is the COIN the emit API is bound to;
-                // gateway-emit derives it from contractAddress/config; here it equals coin.
+                // gateway_emit derives it from contractAddress/config; here it equals coin.
                 const idx = indexerCallId(network, coin, txHash, c.rootActionIndex, contractIndex, c.callPath, 0, targetChain);
                 assert.strictEqual(vm, idx, 'VM and indexer call_id diverged for ' + c.name);
             });
@@ -494,7 +494,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                     vmCallId({ network: COIN_CONFIG.NETWORK, txHash: TXH, rootActionIndex: c.root,
                                callPath: '', contractIndex: c.contractIndex, targetChain: 'DOGE' }),
                     crypto.createHash('sha256').update(vmCallPreimage(c.root, '', c.contractIndex)).digest('hex'),
-                    'gateway-emit.js no longer derives the call_id from buildCallIdPreimage for ' + c.name);
+                    'gateway_emit.js no longer derives the call_id from buildCallIdPreimage for ' + c.name);
             });
         }
 

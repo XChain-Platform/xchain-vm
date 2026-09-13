@@ -100,6 +100,7 @@ async function main() {
 
     printTable('Block Time by Cache Hit Rate', rows);
 
+    // Speedup analysis
     if (results.length >= 2) {
         const baseline = results[0].meanBlockMs; // 0% hit rate
         console.log('\n  Speedup vs 0% hit rate:');

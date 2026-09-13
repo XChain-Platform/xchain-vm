@@ -35,7 +35,7 @@
  * sanitize a value V8 sets internally, so you instead PIN the engine that
  * sets it and GATE every validator against the
  * pin. `checkConsensusRuntime()` powers that gate
- * (test/determinism/consensus-runtime-gate.test.js, in `ci`).
+ * (test/determinism/consensus_runtime_gate.test.js, in `ci`).
  *
  * RE-PINNING IS A CONSENSUS EVENT. Do not bump these to silence a failing
  * gate on a dev box running a different Node. Either run the canonical
@@ -142,7 +142,7 @@ const CONSENSUS_VERSION = '4';
 // (utility.vmFailureStatus). The whole resource-exhaustion family collapses to
 // 'out_of_resource' (the gas-vs-wallclock fork fix); adding/splitting a token
 // is a consensus change. STATUS_ERROR_PREFIXES documents the raw error prefixes
-// the VM's _classifyError (+ process-executor) can emit, which the indexer maps
+// the VM's _classifyError (+ process_executor) can emit, which the indexer maps
 // into the tokens above; the cross-service parity test locks the mapping.
 // NOTE: 'out_of_gas' remains in STATUS_ERROR_PREFIXES as a raw prefix the VM
 // can still emit; the indexer's vmFailureStatus normalises it to 'out_of_resource',

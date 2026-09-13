@@ -47,6 +47,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             });
             assertSuccess(deploy.result);
 
+            // Verify state was initialized
             assertContractState(h.ledger, 'C:BTC:1', 'owner', 'deployer');
             assertContractState(h.ledger, 'C:BTC:1', 'token', 'TEST');
             assertContractState(h.ledger, 'C:BTC:1', 'sends', '0');
@@ -66,6 +67,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             ]);
             assertLogsContain(result, 'sent 50 to user1');
 
+            // Verify state updated
             assertContractState(h.ledger, 'C:BTC:1', 'sends', '1');
         });
     });

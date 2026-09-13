@@ -687,6 +687,7 @@ function executeCode(vm, code, opts) {
             sm.set('__proto__', 'injected');
             assert.strictEqual(sm.get('__proto__'), 'injected');
             assert.strictEqual(sm.has('__proto__'), true);
+            // Verify it doesn't affect the state object's actual prototype
             assert.strictEqual(Object.getPrototypeOf(sm.state), null,
                 'state store should have null prototype');
         });

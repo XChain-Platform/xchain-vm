@@ -79,6 +79,7 @@ function buildDeepObject(depth) {
         checkResultShape(result);
         checkNoPrototypePollution();
 
+        // Verify host Object.prototype is not polluted
         assert.strictEqual(({}).isAdmin, undefined, 'Object.prototype should not be polluted');
     });
 

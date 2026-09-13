@@ -12,8 +12,8 @@
  *
  *********************************************************************/
 
-// Coverage for src/vm-worker.js. The
-// worker is the child side of process-executor: it holds one XChainVM and runs
+// Coverage for src/vm_worker.js. The
+// worker is the child side of process_executor: it holds one XChainVM and runs
 // executions sequentially. Loading it here would pull in isolated-vm (native,
 // Linux-only in this repo), so this pins the worker's determinism-critical
 // contract by compiling and statically inspecting the module instead of
@@ -29,9 +29,9 @@ const vm = require('vm');
 const SRC = path.join(__dirname, '../../src/vm_worker.js');
 const source = fs.readFileSync(SRC, 'utf8').replace(/^#!.*\n/, '');
 
-describe('vm-worker (static contract)', function () {
+describe('vm_worker (static contract)', function () {
     it('is syntactically valid JavaScript (compiles without executing)', function () {
-        assert.doesNotThrow(() => new vm.Script(source, { filename: 'vm-worker.js' }));
+        assert.doesNotThrow(() => new vm.Script(source, { filename: 'vm_worker.js' }));
     });
 
     it('registers a process IPC message handler', function () {

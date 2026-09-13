@@ -159,6 +159,7 @@ async function main() {
     console.log('  Latency P99:       ' + fmt(overallStats.p99));
     console.log('  Latency Mean:      ' + fmt(overallStats.mean));
 
+    // Memory stability
     if (samples.length >= 2) {
         const firstMem = samples[0].rssMb;
         const lastMem  = samples[samples.length - 1].rssMb;
