@@ -25,6 +25,8 @@ const {
     DEFAULT_GAS_SCHEDULE,
     DEFAULT_LIMITS,
     DEFAULT_BLOCK_TIME,
+    SCHEDULED_BLOCK_TIME,
+    liveBlockTime,
     GUARD_GAS_CEILING
 } = require('./simulator.js');
 const { runGate, estimateGas, getExportedMeta, isValidMetaText } = require('./gate.js');
@@ -45,6 +47,11 @@ module.exports = {
     DEFAULT_GAS_SCHEDULE,
     DEFAULT_LIMITS,
     DEFAULT_BLOCK_TIME,
+    // The preview anchor beside the live one: SCHEDULED_BLOCK_TIME is the newest
+    // ratified gate including future-dated flag days, and liveBlockTime(now) is the
+    // newest one that has elapsed. A default simulator seeds the live value.
+    SCHEDULED_BLOCK_TIME,
+    liveBlockTime,
     GUARD_GAS_CEILING,
     runGate,
     estimateGas,

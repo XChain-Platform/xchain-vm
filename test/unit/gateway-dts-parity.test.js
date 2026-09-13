@@ -81,3 +81,45 @@ describe('gateway.d.ts parity with the runtime gateway', function () {
         });
     }
 });
+
+// The getTokenInfo payload is built UPPERCASE with an integer DECIMALS by the
+// indexer (buildVmBalancesAndTokenInfo) and passed through untouched, and nine
+// value-holding templates feed info.DECIMALS to floorToDecimals. A lowercase
+// member on TokenInfo makes info.decimals type-check and read undefined, which
+// floorToDecimals answers with the integer part rather than a revert, so the
+// casing and the numeric type are pinned here the way method names are above.
+describe('gateway.d.ts TokenInfo matches the runtime token-info payload', function () {
+    const body = (function () {
+        const open = DTS.indexOf('export interface TokenInfo {');
+        assert.ok(open >= 0, 'TokenInfo interface missing from gateway.d.ts');
+        const close = DTS.indexOf('\n}', open);
+        assert.ok(close > open, 'TokenInfo interface is unterminated');
+        return DTS.substring(open, close);
+    }());
+
+    // Member names only: `NAME:` or `NAME?:` at the head of a line, so doc-comment
+    // prose inside the interface cannot be mistaken for a declaration.
+    const members = [];
+    const memberRe = /^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\??[ \t]*:/gm;
+    let m;
+    while ((m = memberRe.exec(body)) !== null) members.push(m[1]);
+
+    it('declares every key the token-info payload carries', function () {
+        const MockLedger = require('../e2e/helpers/MockLedger.js');
+        const ledger = new MockLedger();
+        ledger.setTokenDecimals('TOK', 8);
+        const emitted = Object.keys(ledger.buildTokenInfoMap().TOK);
+        const missing = emitted.filter((k) => !members.includes(k));
+        assert.deepStrictEqual(missing, [], 'token-info keys missing from TokenInfo: ' + missing.join(', '));
+    });
+
+    it('types DECIMALS as a number, not a string', function () {
+        assert.ok(/\bDECIMALS\??\s*:\s*number\b/.test(body), 'DECIMALS must be typed number in TokenInfo');
+    });
+
+    it('declares no lowercase member and no open index signature', function () {
+        const lowercase = members.filter((k) => k !== k.toUpperCase());
+        assert.deepStrictEqual(lowercase, [], 'lowercase TokenInfo members read undefined at runtime: ' + lowercase.join(', '));
+        assert.ok(!/\[\s*key\s*:\s*string\s*\]/.test(body), 'an index signature lets a misspelled key type-check');
+    });
+});

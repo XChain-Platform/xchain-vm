@@ -130,16 +130,55 @@ const DEFAULT_GAS_SCHEDULE = Object.freeze({
 // measured on Node 22 / Linux, `new Uint8Array(100000)` costs 225 gas at the old
 // 1700000000 default and 100228 gas at the flag-day.
 //
-// Read off the VM's own exported gate constants rather than retyping one, and
-// take the MAX so a later-dated flag day cannot silently strand the simulator
-// below it. Every activation compares with `>=`, so sitting exactly on the
-// newest gate activates all of them. The literal fallback is the ratified 2.0.0
-// flag-day (2026-08-07 00:00:00 UTC) and is reached only if the VM stops
-// exporting the constants at all.
+// Read off the VM's own exported gate constants rather than retyping one. Two
+// anchors come out of that list, and the distinction is the whole point:
+//
+//   LIVE (the default) is the newest gate that has ALREADY ELAPSED, so a default
+//   simulation meters and deploy-validates under the rule set a live chain is
+//   running at this moment.
+//   SCHEDULED is the max over every gate, elapsed or not, so a future-dated
+//   flag-day can be previewed on purpose.
+//
+// A single MAX cannot be both. A future-dated gate turns it into a preview of
+// rules no chain runs yet: with REST_PATTERN_METER dated 2027-01-01, a MAX-seeded
+// default mainnet simulation rejects top-level rest destructuring that mainnet
+// accepts and charges size for rest copies mainnet does not charge, silently.
+// The split keeps the property the MAX is there for (a newly dated flag day can
+// never strand a simulation below an ACTIVE gate, because every elapsed gate is
+// in the live max) and ends the silent early activation.
+//
+// Every activation compares with `>=`, so sitting exactly on a gate activates
+// it. The literal fallback is the ratified 2.0.0 flag-day (2026-08-07 00:00:00
+// UTC) and is reached only if the VM stops exporting the constants at all, or
+// if no gate has elapsed yet.
 const GATE_BLOCK_TIMES = Object.keys(XChainVM)
     .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
     .map((k) => XChainVM[k]);
-const DEFAULT_BLOCK_TIME = GATE_BLOCK_TIMES.length ? Math.max(...GATE_BLOCK_TIMES) : 1786060800;
+const GATE_FALLBACK_BLOCK_TIME = 1786060800;
+const SCHEDULED_BLOCK_TIME = GATE_BLOCK_TIMES.length
+    ? Math.max(...GATE_BLOCK_TIMES)
+    : GATE_FALLBACK_BLOCK_TIME;
+
+/**
+ * The newest gate that has elapsed at `nowSeconds`: the rule set a live chain runs.
+ * Takes the instant as an argument and is called per construction rather than once
+ * at module load, so a long-lived process straddling a flag day picks the new rules
+ * up on its next simulator instead of holding the old ones. The value always snaps
+ * to a ratified gate constant, so the only clock dependence is which side of a
+ * flag day the host sits on, which is exactly the question being asked.
+ *
+ * @param {number} [nowSeconds] - unix seconds; defaults to the host clock
+ * @returns {number} unix seconds
+ */
+function liveBlockTime(nowSeconds = Math.floor(Date.now() / 1000)) {
+    const elapsed = GATE_BLOCK_TIMES.filter((t) => t <= nowSeconds);
+    return elapsed.length ? Math.max(...elapsed) : GATE_FALLBACK_BLOCK_TIME;
+}
+
+// Back-compatible name for the seed a default simulator takes, kept exported (and
+// re-exported from toolkit/index.js) for callers that read it. It is the LIVE
+// anchor; SCHEDULED_BLOCK_TIME above is the preview anchor.
+const DEFAULT_BLOCK_TIME = liveBlockTime();
 
 // The sibling class of activations, keyed on block HEIGHT per coin rather than on
 // block time: the Package-3 sandbox bundle, the execute-time source re-lint and the
@@ -241,8 +280,15 @@ class ContractSimulator {
      * @param {number} [opts.gasCeiling=1000000]
      * @param {object} [opts.gasSchedule]    - override the canonical schedule
      * @param {object} [opts.limits]         - override the default resource limits
+     * @param {string} [opts.rules='live']    - which rule set the default block time
+     *        anchors on. 'live' is the newest ELAPSED *_GATE_BLOCK_TIME, so a
+     *        default simulation matches what a live chain runs right now.
+     *        'scheduled' is the newest RATIFIED gate including future-dated ones,
+     *        for previewing a flag day before it arrives; it warns once, naming
+     *        each gate it activates ahead of the live chain. An explicit
+     *        opts.block.timestamp wins over either mode.
      * @param {object} [opts.block]          - initial { height, timestamp, hash }.
-     *        timestamp defaults to the VM's newest *_GATE_BLOCK_TIME, so the
+     *        timestamp defaults to the newest ELAPSED *_GATE_BLOCK_TIME, so the
      *        block-time-keyed meters are ON and gas matches a live chain; a
      *        lower value simulates the pre-activation rule set and warns once.
      *        height defaults to the newest ARMED activation height for
@@ -268,17 +314,46 @@ class ContractSimulator {
         this.limits = Object.assign({}, DEFAULT_LIMITS, opts.limits || {});
         this.defaultCaller = opts.defaultCaller || 'sim_caller';
 
+        // Which rule set the default anchors on; an unrecognized value reads as
+        // 'live', the fail-safe direction (a typo must not silently preview).
+        this.rules = (opts.rules === 'scheduled') ? 'scheduled' : 'live';
+        // Resolved per construction, never once at module load, so a process that
+        // outlives a flag day picks the new rules up on its next simulator. Held on
+        // the instance because _warnIfPreGate measures against THIS simulator's live
+        // anchor rather than a module-wide one.
+        this._liveBlockTime = liveBlockTime();
+        const time0 = (this.rules === 'scheduled') ? SCHEDULED_BLOCK_TIME : this._liveBlockTime;
+
         // Height, like the timestamp, is DERIVED from the activations it has to
         // clear; the hash follows the height so it keeps advanceBlock's own naming.
         const height0 = defaultBlockHeight(this.coin, this.network);
         this.block = Object.assign(
             {
                 height: height0,
-                timestamp: DEFAULT_BLOCK_TIME,
+                timestamp: time0,
                 hash: 'sim_block_' + String(height0).padStart(16, '0')
             },
             opts.block || {}
         );
+
+        // Scheduled mode is a preview and says so once, naming the gates it turns on
+        // ahead of the live chain by constant name, epoch value and UTC date. Suppressed
+        // when an explicit block.timestamp won, because then the caller chose the instant
+        // and the mode did not seed anything.
+        if (this.rules === 'scheduled' && Number(this.block.timestamp) === SCHEDULED_BLOCK_TIME) {
+            const early = Object.keys(XChainVM)
+                .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+                .filter((k) => XChainVM[k] > this._liveBlockTime)
+                .map((k) => k + ' (' + XChainVM[k] + ', ' + new Date(XChainVM[k] * 1000).toISOString() + ')');
+            if (early.length) {
+                console.warn(
+                    '[xchain-vm simulator] rules: scheduled simulates block time ' +
+                    SCHEDULED_BLOCK_TIME + ', which activates ' + early.length + ' gate(s) ahead ' +
+                    'of the live chain: ' + early.join(', ') + '. Gas and deploy verdicts from ' +
+                    'this simulator are a PREVIEW, not what a chain charges today.'
+                );
+            }
+        }
         // One pre-flag-day warning per instance, not per call (see _warnIfPreGate).
         this._preGateWarned = false;
         // Likewise for the height-gate warning (see _warnIfPreHeightGate).
@@ -445,16 +520,23 @@ class ContractSimulator {
      * so the gasUsed this run reports is a pre-activation number no live chain
      * charges. Deliberate below-gate runs are legitimate (the VM's own gated
      * fixtures do exactly that), so this warns rather than throwing.
+     *
+     * Measured against THIS instance's live anchor, not against the newest ratified
+     * gate. A future-dated flag day is not a rule any chain runs, so a caller who
+     * simulates a real present-day mainnet timestamp is not behind anything and gets
+     * no warning; against the max anchor that caller was told it predated a flag-day
+     * it had in fact already passed.
      */
     _warnIfPreGate() {
         if (this._preGateWarned) return;
-        if (Number(this.block.timestamp) >= DEFAULT_BLOCK_TIME) return;
+        const live = this._liveBlockTime;
+        if (Number(this.block.timestamp) >= live) return;
         this._preGateWarned = true;
         console.warn(
             '[xchain-vm simulator] block.timestamp ' + this.block.timestamp + ' predates the VM ' +
-            'metering flag-day ' + DEFAULT_BLOCK_TIME + ': the block-time-keyed gas meters are OFF, ' +
+            'metering flag-day ' + live + ': the block-time-keyed gas meters are OFF, ' +
             'so gasUsed UNDER-REPORTS what a live chain charges. Use the default block, ' +
-            'setBlock({ timestamp: ' + DEFAULT_BLOCK_TIME + ' }) or advanceBlock({ byTime }) to ' +
+            'setBlock({ timestamp: ' + live + ' }) or advanceBlock({ byTime }) to ' +
             'simulate the live rule set.'
         );
     }
@@ -791,5 +873,6 @@ class ContractSimulator {
 
 module.exports = {
     ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME,
+    SCHEDULED_BLOCK_TIME, liveBlockTime,
     GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER
 };

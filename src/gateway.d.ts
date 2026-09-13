@@ -40,18 +40,61 @@
  * is only a linter warning, so a float-using contract WILL deploy and be wrong.
  ********************************************************************/
 
-/** Token metadata as returned by `getTokenInfo` (fields are strings). */
+/**
+ * Token metadata as returned by `getTokenInfo`.
+ *
+ * Keys are UPPERCASE and two of them are NUMBERS, not strings: the map is built
+ * by `buildVmBalancesAndTokenInfo` in `xchain-indexer/src/db.js` and handed to
+ * the contract untouched by `src/gateway.js`, so that builder is the authority
+ * for both the casing and the value form. There is deliberately no index
+ * signature: a lowercase or misspelled read (`info.decimals`) must be a type
+ * error, because `floorToDecimals(value, undefined)` does not revert, it returns
+ * the integer part and the contract silently retains the fraction.
+ */
 export interface TokenInfo {
-    tick: string;
-    /** Total minted supply, as a decimal string. */
-    supply?: string;
-    /** Maximum supply cap, as a decimal string. */
-    maxSupply?: string;
-    /** Decimal places (0-18). */
-    decimals?: string;
+    /** Token symbol, same string the tick was looked up by. */
+    TICK: string;
+    /** Numeric ledger id of the tick. */
+    TICK_ID: number;
+    /** Decimal places (0-18), an INTEGER, parsed by the indexer. */
+    DECIMALS: number;
+    /** Total minted supply at the reading action, as a decimal string. */
+    SUPPLY?: string;
     /** Issuing / controlling address. */
-    owner?: string;
-    [key: string]: string | undefined;
+    OWNER?: string;
+    /** Maximum supply cap, as a decimal string. */
+    MAX_SUPPLY?: string | null;
+    /** Per-mint cap, as a decimal string. */
+    MAX_MINT?: string | null;
+    /** Free-text token description. */
+    DESCRIPTION?: string | null;
+    /** Action index of the first valid issuance. */
+    ACTION_INDEX?: number | null;
+    /** Callback token symbol, and its block / amount terms. */
+    CALLBACK_TICK?: string | null;
+    CALLBACK_BLOCK?: number | null;
+    CALLBACK_AMOUNT?: string | null;
+    /** Mint-window and per-address mint limits. */
+    MINT_ADDRESS_MAX?: string | null;
+    MINT_START_BLOCK?: number | null;
+    MINT_STOP_BLOCK?: number | null;
+    /** Comma-separated address lists, when the issuer set them. */
+    ALLOW_LIST?: string | null;
+    BLOCK_LIST?: string | null;
+    /** Token-bridge opt-in: destination chains and the confirmation depth. */
+    BRIDGE_CHAINS?: string | null;
+    MIN_DEPTH?: number | null;
+    /** 1 when the tick is bridged in on this network, 0 otherwise. */
+    BRIDGED?: number;
+    /** Issuer locks, each 0 or 1 as stored on the issuance row. */
+    LOCK_MAX_SUPPLY?: number | null;
+    LOCK_MINT_SUPPLY?: number | null;
+    LOCK_MINT?: number | null;
+    LOCK_MAX_MINT?: number | null;
+    LOCK_DESCRIPTION?: number | null;
+    LOCK_SLEEP?: number | null;
+    LOCK_CALLBACK?: number | null;
+    LOCK_BRIDGE?: number | null;
 }
 
 /** One staker of a contract-targeted stake, from `contract.getStakers`. */

@@ -40,9 +40,12 @@ const assert = require('assert');
 
 let ContractSimulator = null;
 let DEFAULT_BLOCK_TIME = null;
+let SCHEDULED_BLOCK_TIME = null;
+let liveBlockTime = null;
 let XChainVM = null;
 try {
-    ({ ContractSimulator, DEFAULT_BLOCK_TIME } = require('../../src/toolkit/simulator.js'));
+    ({ ContractSimulator, DEFAULT_BLOCK_TIME, SCHEDULED_BLOCK_TIME, liveBlockTime } =
+        require('../../src/toolkit/simulator.js'));
     XChainVM = require('../../src/index.js');
 } catch (e) {
     console.log('Skipping simulator block-time tests (isolated-vm unavailable):', e.message);
@@ -66,7 +69,12 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
 (ContractSimulator ? describe : describe.skip)('toolkit: simulator default block time', function () {
     this.timeout(30000);
 
-    it('exposes a default at/after every exported *_GATE_BLOCK_TIME', function () {
+    // The default anchors on the newest gate that has ELAPSED, which is what a live
+    // chain is running. Anchoring it on the newest RATIFIED gate instead turns every
+    // default mainnet simulation into a silent preview of a future flag day: with
+    // REST_PATTERN_METER dated 2027-01-01 it rejects top-level rest destructuring
+    // that mainnet accepts and charges size for rest copies mainnet does not charge.
+    it('exposes a default at/after every ELAPSED gate and below every scheduled one', function () {
         const gates = Object.keys(XChainVM)
             .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]));
 
@@ -74,18 +82,130 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
             'the VM stopped exporting *_GATE_BLOCK_TIME constants; the simulator default ' +
             'can no longer be derived from them and has fallen back to a literal');
 
+        const now = Math.floor(Date.now() / 1000);
+        let elapsedSeen = 0;
         for (const name of gates) {
-            assert.ok(DEFAULT_BLOCK_TIME >= XChainVM[name],
-                'simulator DEFAULT_BLOCK_TIME (' + DEFAULT_BLOCK_TIME + ') is below ' + name +
-                ' (' + XChainVM[name] + '): every default simulation would meter under the ' +
-                'pre-activation rule set for that gate and under-report gas. Move the default ' +
-                'forward in the same change that dates the new flag-day.');
+            if (XChainVM[name] <= now) {
+                elapsedSeen += 1;
+                assert.ok(DEFAULT_BLOCK_TIME >= XChainVM[name],
+                    'simulator DEFAULT_BLOCK_TIME (' + DEFAULT_BLOCK_TIME + ') is below the ' +
+                    'already-elapsed ' + name + ' (' + XChainVM[name] + '): every default ' +
+                    'simulation would meter under a pre-activation rule set the live chain has ' +
+                    'already left behind, and under-report gas.');
+            } else {
+                assert.ok(DEFAULT_BLOCK_TIME < XChainVM[name],
+                    'simulator DEFAULT_BLOCK_TIME (' + DEFAULT_BLOCK_TIME + ') is at or above the ' +
+                    'not-yet-elapsed ' + name + ' (' + XChainVM[name] + '): every default ' +
+                    'simulation would activate a flag day the live chain has not reached, ' +
+                    'diverging from mainnet on both gas and deploy verdicts.');
+            }
         }
+        assert.ok(elapsedSeen > 0, 'no gate has elapsed, so this assertion proves nothing');
+    });
+
+    it('keeps the scheduled anchor at the newest ratified gate', function () {
+        const gates = Object.keys(XChainVM)
+            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+            .map((k) => XChainVM[k]);
+        assert.strictEqual(SCHEDULED_BLOCK_TIME, Math.max(...gates));
+        assert.ok(SCHEDULED_BLOCK_TIME >= DEFAULT_BLOCK_TIME);
+    });
+
+    // liveBlockTime takes the instant, so this does not depend on the host clock.
+    it('advances the live anchor across a flag day and never past one', function () {
+        const gates = Object.keys(XChainVM)
+            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+            .map((k) => XChainVM[k]);
+        const newest = Math.max(...gates);
+        const oldest = Math.min(...gates);
+        assert.strictEqual(liveBlockTime(newest), newest, 'sitting exactly on a gate activates it');
+        assert.strictEqual(liveBlockTime(newest - 1), Math.max(...gates.filter((t) => t <= newest - 1)));
+        assert.strictEqual(liveBlockTime(oldest - 1), 1786060800,
+            'no elapsed gate falls back to the ratified 2.0.0 flag-day, never to 0');
     });
 
     it('seeds a default-constructed simulator with that block time', function () {
         const sim = new ContractSimulator();
         assert.strictEqual(sim.block.timestamp, DEFAULT_BLOCK_TIME);
+        assert.strictEqual(sim.rules, 'live');
+    });
+
+    it('seeds the scheduled anchor under rules: scheduled, and says so once', function () {
+        const seen = [];
+        const real = console.warn;
+        console.warn = (...args) => seen.push(args.join(' '));
+        let sim;
+        try {
+            sim = new ContractSimulator({ network: 'mainnet', rules: 'scheduled' });
+        } finally {
+            console.warn = real;
+        }
+        assert.strictEqual(sim.block.timestamp, SCHEDULED_BLOCK_TIME);
+        assert.strictEqual(sim.rules, 'scheduled');
+        if (SCHEDULED_BLOCK_TIME > DEFAULT_BLOCK_TIME) {
+            assert.strictEqual(seen.length, 1, 'expected exactly one preview warning, got ' + seen.length);
+            assert.ok(/PREVIEW/.test(seen[0]), 'unexpected warning: ' + seen[0]);
+        }
+    });
+
+    it('lets an explicit block.timestamp win over either mode', function () {
+        const real = console.warn;
+        console.warn = () => {};
+        let live, sched;
+        try {
+            live = new ContractSimulator({ block: { timestamp: PRE_GATE_TIME } });
+            sched = new ContractSimulator({ rules: 'scheduled', block: { timestamp: PRE_GATE_TIME } });
+        } finally {
+            console.warn = real;
+        }
+        assert.strictEqual(live.block.timestamp, PRE_GATE_TIME);
+        assert.strictEqual(sched.block.timestamp, PRE_GATE_TIME);
+    });
+
+    // The parity the finding is about, asserted on the rule itself rather than on a
+    // gas number: the default must resolve the rest-pattern gate exactly as a live
+    // mainnet block does, and the scheduled mode must resolve it the other way.
+    it('resolves the rest-pattern gate as the live chain does by default', function () {
+        const real = console.warn;
+        console.warn = () => {};
+        let sched;
+        try {
+            sched = new ContractSimulator({ network: 'mainnet', rules: 'scheduled' });
+        } finally {
+            console.warn = real;
+        }
+        const dflt = new ContractSimulator({ network: 'mainnet' });
+        const now = Math.floor(Date.now() / 1000);
+        assert.strictEqual(
+            XChainVM.isRestPatternMeterActive('mainnet', dflt.block.timestamp),
+            XChainVM.isRestPatternMeterActive('mainnet', now),
+            'a default mainnet simulation must resolve the rest-pattern gate the way a ' +
+            'mainnet block at the present instant does');
+        if (XChainVM.REST_PATTERN_METER_GATE_BLOCK_TIME > now) {
+            assert.strictEqual(
+                XChainVM.isRestPatternMeterActive('mainnet', sched.block.timestamp), true,
+                'scheduled mode must still preview the not-yet-active gate');
+        }
+    });
+
+    // The same parity at the deploy gate rather than at the predicate, so the whole
+    // path is exercised. Stated against the live predicate rather than against a
+    // fixed verdict, so it keeps its teeth on both sides of the flag day instead of
+    // going vacuous the day the gate elapses.
+    it('gives a default mainnet simulation the live chain\'s banned-rest verdict', async function () {
+        const REST = 'module.exports = { run: function(xchain, ...rest){ return String(rest.length); } };';
+        const now = Math.floor(Date.now() / 1000);
+        const restEnforcedNow = XChainVM.isRestPatternMeterActive('mainnet', now);
+        const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
+        const real = console.warn;
+        console.warn = () => {};
+        try {
+            const r = await sim.deploy(REST);
+            assert.strictEqual(r.deployGate.valid, !restEnforcedNow,
+                'a default mainnet simulation returned deployGate.valid=' + r.deployGate.valid +
+                ' for a top-level rest parameter while a mainnet block at this instant ' +
+                (restEnforcedNow ? 'rejects' : 'accepts') + ' it');
+        } finally { console.warn = real; await sim.close(); }
     });
 
     it('still honours an explicit pre-flag-day block override', function () {
