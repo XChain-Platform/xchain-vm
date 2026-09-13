@@ -35,7 +35,8 @@
  *
  * The resource LIMITS get the same two layers. The production VM's limits live
  * as inline literals inside the `limits: { ... }` object in
- * xchain-indexer/src/actions.js, which is not a requireable data table, so layer
+ * xchain-indexer/src/actions/index.js, which is not a requireable data table,
+ * so layer
  * 2 SCRAPES that one block. The scrape is shape-coupled by necessity and says so
  * loudly: a block that moved or was reshaped fails with a re-point message
  * instead of silently matching nothing and passing. maxCpuTimeMs is additionally
@@ -246,8 +247,8 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
         });
     }
 
-    it('sibling xchain-indexer actions.js enforces the same VM resource limits', function () {
-        const rel  = path.join('xchain-indexer', 'src', 'actions.js');
+    it('sibling xchain-indexer actions/index.js enforces the same VM resource limits', function () {
+        const rel  = path.join('xchain-indexer', 'src', 'actions', 'index.js');
         const file = path.join(PLATFORM_ROOT, rel);
         if (!siblingOrSkip(this, file, rel)) return;
 

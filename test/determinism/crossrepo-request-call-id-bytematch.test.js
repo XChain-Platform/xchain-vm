@@ -13,8 +13,9 @@
 // CROSS-REPO BYTE-MATCH GUARD (consensus-critical).
 //
 // The ATTEST request_id and XCALL call_id are derived in the VM (gateway.js /
-// gateway-emit.js) and RE-derived in the indexer (xchain-indexer attest.js /
-// xcall.js). If the two preimages ever drift by a single byte, every legitimate
+// gateway-emit.js) and RE-derived in the indexer (xchain-indexer
+// actions/attest/index.js / actions/xcall/index.js). If the two preimages ever
+// drift by a single byte, every legitimate
 // emission is rejected by the re-derivation and the fleet forks. The VM-side suites
 // pin the VM output; the indexer-side suites pin the handler. THIS test pins the
 // two against each other: it drives the REAL VM derivation and compares it to the
@@ -56,8 +57,8 @@ const REPO_ROOT = (function () {
     return dir;
 })();
 const PLATFORM_ROOT  = path.dirname(REPO_ROOT);
-const INDEXER_ATTEST = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'attest.js');
-const INDEXER_XCALL  = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'xcall.js');
+const INDEXER_ATTEST = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'attest', 'index.js');
+const INDEXER_XCALL  = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'xcall', 'index.js');
 const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
 
 // The indexer's REAL preimage assembly, not a restatement of it.
@@ -89,8 +90,8 @@ const SCHEDULE = {
 };
 
 // Indexer-side preimage formulas. MUST byte-match, verbatim, the strings in:
-//      xchain-indexer/src/actions/attest.js  (request_id)
-//      xchain-indexer/src/actions/xcall.js   (call_id)
+//      xchain-indexer/src/actions/attest/index.js  (request_id)
+//      xchain-indexer/src/actions/xcall/index.js   (call_id)
 // EMITTER_PATH = the emitter execution's callPath; EMITTER_POSITION = emissionIndex;
 // ROOT_ACTION_INDEX = the per-root discriminator (deterministic root on-chain action_index).
 const indexerRequestId = (txHash, rootActionIndex, emitterPath, contractIndex, position) =>
@@ -193,7 +194,8 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
     // discriminator could not tell two same-contract EXECUTE subcommands apart and
     // both derived one request_id (the second request was then dropped). The host
     // sends the composite "<TX_VOUT>.<subcommand position>" for such a root
-    // (xchain-indexer/src/batch_root_discriminator.js, flag-day gated); these cases
+    // (xchain-indexer/src/consensus/batch_root_discriminator.js, flag-day gated);
+    // these cases
     // pin the VM half of that contract.
     describe('BATCH subcommand roots (composite discriminator)', function () {
 
@@ -319,7 +321,8 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
 
         // The hex pins catch a field skew only as an opaque hash difference.
         // Naming the count makes a dropped or added field read as what it is. The
-        // indexer declares the same eight names in xchain-indexer/src/actions/xcall.js
+        // indexer declares the same eight names in
+        // xchain-indexer/src/actions/xcall/index.js
         // (CALL_ID_PREIMAGE_FIELDS), pinned against this order by
         // bin/check-preimage-golden-parity.js.
         it('golden vector: the call_id preimage carries exactly eight fields', function () {
@@ -508,7 +511,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                     EMITTER_PATH: r.emitterPath, CONTRACT_INDEX: r.contractIndex,
                     EMITTER_POSITION: r.emitterPosition
                 })).digest('hex'),
-                'the request_id lambda copy drifted from xchain-indexer attest.js');
+                'the request_id lambda copy drifted from xchain-indexer actions/attest/index.js');
 
             const v = GOLDEN_VECTORS.callId.input;
             assert.strictEqual(
@@ -520,7 +523,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                       CONTRACT_INDEX: v.contractIndex, EMITTER_PATH: v.emitterPath,
                       EMITTER_POSITION: v.emitterPosition, TARGET_CHAIN: v.targetChain }
                 )).digest('hex'),
-                'the call_id lambda copy drifted from xchain-indexer xcall.js');
+                'the call_id lambda copy drifted from xchain-indexer actions/xcall/index.js');
         });
     });
 });
