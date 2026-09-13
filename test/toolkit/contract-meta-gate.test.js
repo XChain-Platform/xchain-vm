@@ -21,7 +21,7 @@
 // @ts-nocheck
 
 const assert = require('assert');
-// Directly, not via the toolkit index: gate.js pulls in acorn and lint-core only,
+// Directly, not via the toolkit index: gate.js pulls in acorn and lint_core only,
 // so this stays runnable where isolated-vm cannot dlopen.
 const { runGate, getExportedMeta, isValidMetaText } = require('../../src/toolkit/gate.js');
 

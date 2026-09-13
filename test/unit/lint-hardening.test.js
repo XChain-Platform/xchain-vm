@@ -14,7 +14,7 @@
  * VM_LINT_HARDENING rule set (flag-day Pkg 4), two-way:
  * every hardened rule must fire with hardened=true (the default) AND
  * reproduce the legacy verdict with hardened=false (pre-gate replay
- * parity). Acorn-only (lint-core), so this suite runs anywhere.
+ * parity). Acorn-only (lint_core), so this suite runs anywhere.
  ********************************************************************/
 
 'use strict';
@@ -28,7 +28,7 @@ const {
     findReservedControlBinding,
     SAFE_MATH_MEMBERS,
     RESERVED_CONTROL_BINDINGS
-} = require('../../src/lint-core.js');
+} = require('../../src/lint_core.js');
 
 function firstError(code, opts) {
     const res = lintSource(code, opts);
@@ -99,7 +99,7 @@ describe('VM_LINT_HARDENING lint rules', function () {
                 return this.skip();
             }
             assert.deepStrictEqual([...SAFE_MATH_MEMBERS].sort(), [...sandbox.SAFE_MATH_MEMBERS].sort(),
-                'lint-core SAFE_MATH_MEMBERS drifted from sandbox.js; update both in lockstep');
+                'lint_core SAFE_MATH_MEMBERS drifted from sandbox.js; update both in lockstep');
         });
         it('rejects Math.random under hardening, accepts it pre-gate', function () {
             const code = 'module.exports = function(x) { return Math.random(); };';

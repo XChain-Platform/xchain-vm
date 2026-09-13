@@ -35,7 +35,7 @@
 'use strict';
 
 const assert = require('assert');
-const { lintSource, findBannedRest, CONSENSUS_RULES } = require('../../src/lint-core.js');
+const { lintSource, findBannedRest, CONSENSUS_RULES } = require('../../src/lint_core.js');
 
 // isolated-vm-dependent deploy validator (Node 22 only); guarded like the sibling
 // suites so the acorn-only assertions still run where the isolate can't dlopen.

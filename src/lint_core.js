@@ -19,7 +19,7 @@
  * metering.js), so it is safe to run in a browser / any-Node context.
  *
  * THIS FILE IS A SHARED SOURCE OF TRUTH. xchain-sdk vendors a byte-identical
- * copy at src/contract/lint-core.js; a CI parity guard (sha256) fails the
+ * copy at src/contract/lint_core.js; a CI parity guard (sha256) fails the
  * build on drift. Edit here, then re-sync the vendored copy.
  *
  * lintSource(code) -> { errors: Rule[], warnings: Rule[] }
@@ -66,7 +66,7 @@ const RESERVED_CONTROL_BINDINGS = [
 // The deploy code-size cap, in UTF-8 BYTES. Inlined (not required from
 // index.js or protocol/constants.js) for the same reason SAFE_MATH_MEMBERS is
 // duplicated above: this file must be BYTE-IDENTICAL to the SDK's vendored copy
-// at xchain-sdk/src/contract/lint-core.js, and constants.js sits at a different
+// at xchain-sdk/src/contract/lint_core.js, and constants.js sits at a different
 // relative depth in each tree, so no single require() line resolves in both.
 // It MUST stay equal to src/protocol/constants.js MAX_CODE_SIZE (and therefore
 // to the indexer's deploy.js cap); a parity test asserts it.
@@ -93,19 +93,19 @@ const STRIPPED_PROTO_METHOD_NAMES = [
 const REGEX_COERCING_METHODS = new Set(['match', 'matchAll', 'search']);
 
 // The sandbox's deleted GLOBALS. NOT mirrored: required from the one module
-// that defines them, ./stripped-globals.js, which sandbox.js and the AI-authoring
+// that defines them, ./stripped_globals.js, which sandbox.js and the AI-authoring
 // knowledge base require too. That module is dependency-free precisely so this
 // single require line resolves in BOTH trees at the two depths this file is
 // vendored to (xchain-vm/src/ and xchain-sdk/src/contract/), which is the reason
 // SAFE_MATH_MEMBERS and MAX_CODE_SIZE above still cannot be required: their
 // homes (sandbox.js, protocol/constants.js) do not sit at a common relative
 // path, and sandbox.js additionally pulls isolated-vm, which this file must
-// never load. The SDK vendors stripped-globals.js byte-identically under the
+// never load. The SDK vendors stripped_globals.js byte-identically under the
 // same sha256 parity guard as this file.
 const {
     STRIPPED_GLOBAL_NAMES,
     ADVISORY_STRIPPED_GLOBAL_NAMES
-} = require('./stripped-globals.js');
+} = require('./stripped_globals.js');
 
 // Retained under its historical export name: the list is no longer a mirror,
 // but callers (and the SDK's vendored copy's tests) import it by this name.
@@ -113,7 +113,7 @@ const STRIPPED_GLOBAL_NAMES_MIRROR = STRIPPED_GLOBAL_NAMES;
 
 // The subset this file WARNS on: every name stripped from genesis on every
 // network, so the warning's claim holds unconditionally. The two consensus-gated
-// names (Promise, WebAssembly) are held out by stripped-globals.js, which
+// names (Promise, WebAssembly) are held out by stripped_globals.js, which
 // explains why that is not a gap.
 const ADVISORY_STRIPPED_GLOBALS = ADVISORY_STRIPPED_GLOBAL_NAMES;
 

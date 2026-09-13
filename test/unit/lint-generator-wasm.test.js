@@ -32,7 +32,7 @@ const {
     findBannedGenerator,
     findBannedWasm,
     CONSENSUS_RULES
-} = require('../../src/lint-core.js');
+} = require('../../src/lint_core.js');
 
 // isolated-vm-dependent deploy validator (Node 22 only); guarded like the sibling
 // suites so acorn-only assertions still run where the isolate can't dlopen.

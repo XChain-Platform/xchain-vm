@@ -14,7 +14,7 @@
 // WRAPPER's control bindings (__contractCode/__methodName/__isCrossCall/
 // __readManifest) are IIFE parameters, invisible to the Function-constructed
 // contract body, so a contract can no longer read them to steer dispatch
-// (deploy-side, lint-core also rejects any reference). Pre-gate the legacy
+// (deploy-side, lint_core also rejects any reference). Pre-gate the legacy
 // script-level `let` form (readable from the contract) is preserved verbatim
 // for replay parity.
 

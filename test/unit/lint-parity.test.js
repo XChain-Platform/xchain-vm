@@ -14,11 +14,11 @@
  * Contract-lint PARITY (deploy path ⇆ shared rules) + DRIFT guard.
  *
  * The deploy-time validator (validateSyntax, including the isolated-vm V8
- * step-1 compile) and the dependency-light shared rules (lint-core.lintSource,
+ * step-1 compile) and the dependency-light shared rules (lint_core.lintSource,
  * which the SDK/CLI consume) MUST agree on every acorn-coverable verdict: same
  * valid flag AND byte-identical first-error message, or contract authors get
  * false greens / false reds. This is the authoritative cross-engine check;
- * because the SDK vendors lint-core/metering byte-identically (asserted below),
+ * because the SDK vendors lint_core/metering byte-identically (asserted below),
  * proving validateSyntax ⇆ lintSource here transitively covers the SDK linter.
  *
  * Requires isolated-vm → Node 22 (see .nvmrc).
@@ -31,15 +31,15 @@ const path   = require('path');
 
 const { validateSyntax, checkFloatWarnings } = require('../../src/syntax.js');
 const { lintSource, CONSENSUS_RULES, findBannedStrippedGlobals,
-        findBannedProtoMethods } = require('../../src/lint-core.js');
+        findBannedProtoMethods } = require('../../src/lint_core.js');
 
 const VM_SRC_DIR     = path.join(__dirname, '..', '..', 'src');
 const SDK_VENDOR_DIR = path.join(__dirname, '..', '..', '..', 'xchain-sdk', 'src', 'contract');
 const CONTRACTS_DIR  = path.join(__dirname, '..', '..', '..', 'xchain-contracts');
-// stripped-globals.js is in the vendor set because lint-core.js requires it by a
+// stripped_globals.js is in the vendor set because lint_core.js requires it by a
 // path that must resolve at BOTH vendored depths, so the copy has to travel with
-// lint-core.js in the same change or the SDK linter cannot load.
-const VENDORED_FILES = ['lint-core.js', 'metering.js', 'stripped-globals.js'];
+// lint_core.js in the same change or the SDK linter cannot load.
+const VENDORED_FILES = ['lint_core.js', 'metering.js', 'stripped_globals.js'];
 
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -60,7 +60,7 @@ function requireSiblingOrSkip(ctx, present, what) {
 }
 
 // All bad fixtures use syntax V8 accepts, so validateSyntax clears step 1 and the
-// failure must come from a shared (lint-core) rule, making the messages comparable.
+// failure must come from a shared (lint_core) rule, making the messages comparable.
 const BAD_FIXTURES = [
     { name: 'banned-math',           code: 'function f(){ return Math.sqrt(4); }' },
     { name: 'banned-literal-bigint', code: 'function f(){ return 2n; }' },
@@ -111,7 +111,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     });
 
     describe('Move 2 rules NEVER change the deploy verdict (parity invariant)', function () {
-        // The critical guarantee: lint-core gained a new ERROR rule
+        // The critical guarantee: lint_core gained a new ERROR rule
         // (crossCallable-not-array) and several warnings, but validateSyntax (the
         // on-chain deploy gate) must block on CONSENSUS_RULES ONLY. A contract that
         // only trips a Move-2 rule still deploys.

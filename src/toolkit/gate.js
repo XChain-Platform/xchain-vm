@@ -27,7 +27,7 @@
  ********************************************************************/
 // @ts-nocheck
 
-const { lintSource, findFloatWarnings, CONSENSUS_RULES } = require('../lint-core.js');
+const { lintSource, findFloatWarnings, CONSENSUS_RULES } = require('../lint_core.js');
 const acorn = require('acorn');
 const walk = require('acorn-walk');
 
@@ -38,7 +38,7 @@ const walk = require('acorn-walk');
 // exports no conforming `meta`. The gate has to see that BEFORE the author pays a
 // fee, so `contract-meta` joins 'code-size' as a gate-local DEPLOY_BLOCKING rule.
 //
-// It is gate-local (not a lint-core rule) because lint-core's CONSENSUS_RULES is
+// It is gate-local (not a lint_core rule) because lint_core's CONSENSUS_RULES is
 // the frozen set the on-chain validateSyntax acts on, byte-vendored into the SDK
 // and pinned by a sha256 parity guard; the chain rejects a nameless contract in
 // deploy/index.js, not in validateSyntax, exactly as it rejects an oversized one. Same
@@ -175,7 +175,7 @@ function readMetaLiterals(metaObj) {
 function getExportedMeta(source) {
     let ast;
     try {
-        // acorn is a hard dependency of lint-core, already required above, so an
+        // acorn is a hard dependency of lint_core, already required above, so an
         // unparseable source is the only way to land here.
         ast = acorn.parse(String(source), { ecmaVersion: 2020, sourceType: 'script', locations: true });
     } catch (e) {
@@ -385,7 +385,7 @@ function runGate(code) {
     const advisories = allErrors.filter((e) => !DEPLOY_BLOCKING.has(e.rule));
 
     const warnings = Array.isArray(lint.warnings) ? lint.warnings.slice() : [];
-    // Defensive: if a future lint-core stops folding float warnings in, keep them.
+    // Defensive: if a future lint_core stops folding float warnings in, keep them.
     if (warnings.length === 0) {
         try {
             for (const w of (findFloatWarnings(code) || [])) warnings.push(w);

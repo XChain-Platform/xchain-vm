@@ -20,9 +20,9 @@ const assert = require('assert');
 // Require the module DIRECTLY (not the toolkit index) so this stays runnable
 // on a host where isolated-vm cannot dlopen. gate.js pulls in only acorn.
 const { runGate, estimateGas } = require('../../src/toolkit/gate.js');
-// lint-core (not index.js) so this suite still runs where isolated-vm cannot
+// lint_core (not index.js) so this suite still runs where isolated-vm cannot
 // dlopen; mirrors the boundary fixtures in test/unit/lint-cli.test.js.
-const { MAX_CODE_SIZE } = require('../../src/lint-core.js');
+const { MAX_CODE_SIZE } = require('../../src/lint_core.js');
 
 // Pad a clean contract to exactly `bytes` UTF-8 bytes with a trailing line
 // comment, so the padded source stays otherwise lint-clean.

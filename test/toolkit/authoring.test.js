@@ -31,11 +31,11 @@ const {
     authorContract
 } = require('../../src/toolkit/authoring.js');
 const { runGate } = require('../../src/toolkit/gate.js');
-const SHARED = require('../../src/stripped-globals.js');
+const SHARED = require('../../src/stripped_globals.js');
 // The two authorities behind the taught reserved-identifier list. Both are
 // acorn-only, so they load wherever this suite does.
 const meteringMod = require('../../src/metering.js');
-const lintCoreMod = require('../../src/lint-core.js');
+const lintCoreMod = require('../../src/lint_core.js');
 
 // sandbox.js requires isolated-vm at the top level, so it is loaded defensively
 // (same convention as test/unit/lint-shared-rules.test.js): the strip-set parity
@@ -110,14 +110,14 @@ describe('Toolkit authoring: knowledge base', function () {
 
     it('teaches the one shared definition, not a copy of it', function () {
         // authoring.js must stay isolated-vm-free (the gate is pure acorn and the
-        // harness runs on any OS), so it requires src/stripped-globals.js, the same
-        // module sandbox.js and lint-core.js require, and this identity check runs
+        // harness runs on any OS), so it requires src/stripped_globals.js, the same
+        // module sandbox.js and lint_core.js require, and this identity check runs
         // without the binding rather than skipping wherever isolated-vm will not load.
         assert.strictEqual(KNOWLEDGE.strippedGlobals, SHARED.STRIPPED_GLOBAL_NAMES,
-            'the authoring knowledge base must teach the very array stripped-globals.js ' +
+            'the authoring knowledge base must teach the very array stripped_globals.js ' +
             'froze; a distinct array means a second literal crept back in');
         assert.strictEqual(KNOWLEDGE.strippedGlobals,
-            require('../../src/lint-core.js').STRIPPED_GLOBAL_NAMES,
+            require('../../src/lint_core.js').STRIPPED_GLOBAL_NAMES,
             'the knowledge base and the linter must read one source of truth');
     });
 

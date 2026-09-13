@@ -21,13 +21,13 @@
 const ivm = require('isolated-vm');
 
 // The canonical, FROZEN set of non-deterministic / dangerous global identifiers
-// the sandbox deletes from the isolate. Defined ONCE in ./stripped-globals.js,
+// the sandbox deletes from the isolate. Defined ONCE in ./stripped_globals.js,
 // which carries the per-entry rationale and the flag-day notes, and is required
 // (not re-copied) by the contract linter and the AI-authoring knowledge base so
 // the three consumers cannot drift. That module is dependency-free on purpose:
 // this file requires isolated-vm at the top level, and the other two consumers
 // must load where no isolate exists.
-const { STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
+const { STRIPPED_GLOBAL_NAMES } = require('./stripped_globals.js');
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for

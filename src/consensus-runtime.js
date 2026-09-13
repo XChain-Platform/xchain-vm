@@ -101,7 +101,7 @@ const REFERENCE_NODE = 'v22.22.3';
 // runtime, the indexer's GAS_SCHEDULE + GAS_PRICE, the status vocabulary below,
 // AND the deploy-time/execution-time contract surface (the sandbox strip set
 // in sandbox.js STRIPPED_GLOBAL_NAMES and the deploy validator's CONSENSUS_RULES
-// in lint-core.js). Bumping it is a CONSENSUS EVENT and must accompany a new
+// in lint_core.js). Bumping it is a CONSENSUS EVENT and must accompany a new
 // golden in both repos and (post-launch) a protocol_changes.js block-height
 // activation. The indexer asserts the bundled VM's CONSENSUS_VERSION equals its
 // expected value (test/unit/consensus_params.test.js), and the VM determinism

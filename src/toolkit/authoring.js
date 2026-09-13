@@ -29,8 +29,8 @@
  *      stripped-global list. Note the last of those is NOT deploy-blocking: the
  *      globals are deleted from the isolate at runtime, so a contract using one
  *      passes the gate and throws on its first execution. The taught list is not
- *      a copy: it is required from src/stripped-globals.js, the one definition
- *      sandbox.js and lint-core.js consume too, which is dependency-free so this
+ *      a copy: it is required from src/stripped_globals.js, the one definition
+ *      sandbox.js and lint_core.js consume too, which is dependency-free so this
  *      module stays isolated-vm-free while sandbox.js is not.
  *   2. buildAuthoringPrompt() turns an English brief or a Solidity source into a
  *      well-formed system+user message pair embedding that knowledge.
@@ -117,28 +117,28 @@ const CONCEPT_MAP = [
 ];
 
 // The names the sandbox deletes, taught verbatim. Required from the one module
-// that defines them rather than re-copied: ../stripped-globals.js is
+// that defines them rather than re-copied: ../stripped_globals.js is
 // dependency-free, so requiring it keeps this module isolated-vm-free (its whole
 // point is that the authoring loop and the acorn gate run on any OS) while
 // making a taught/enforced mismatch impossible to write. sandbox.js and
-// lint-core.js require the same module.
-const { STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT } = require('../stripped-globals.js');
+// lint_core.js require the same module.
+const { STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT } = require('../stripped_globals.js');
 
 // The identifiers the deploy gate rejects, taught by NAME rather than retyped as
 // a prefix sketch. Two authorities, both acorn-only (so requiring them keeps this
-// module isolated-vm-free, and lint-core is already in the graph via gate.js):
+// module isolated-vm-free, and lint_core is already in the graph via gate.js):
 // metering.RESERVED_IDENTIFIERS is the metering pass's own helper set, and
-// lint-core.RESERVED_CONTROL_BINDINGS the contract wrapper's control bindings,
+// lint_core.RESERVED_CONTROL_BINDINGS the contract wrapper's control bindings,
 // rejected by the same 'reserved-identifier' rule once hardening is active.
 // Matching in findReservedIdentifier / findReservedControlBinding is on the exact
 // name, so a prefix wording would ban ordinary names (`__gasBudget`) the chain
 // allows while missing the helpers it does not.
 const { RESERVED_IDENTIFIERS } = require('../metering.js');
-const { RESERVED_CONTROL_BINDINGS } = require('../lint-core.js');
+const { RESERVED_CONTROL_BINDINGS } = require('../lint_core.js');
 const RESERVED_NAMES_TAUGHT = RESERVED_IDENTIFIERS.concat(RESERVED_CONTROL_BINDINGS);
 
 // Non-negotiable rules the generated contract MUST satisfy; teaching them up
-// front cuts repair rounds. Most are deploy-blocking (lint-core CONSENSUS_RULES,
+// front cuts repair rounds. Most are deploy-blocking (lint_core CONSENSUS_RULES,
 // the only findings the on-chain validator acts on). Two are NOT, and the wording
 // has to keep them apart or an author reads the wrong signal off a clean lint:
 //   - banned globals are deleted from the isolate at RUNTIME, so a contract that
@@ -201,12 +201,12 @@ const KNOWLEDGE = {
     nativePrimitives: NATIVE_PRIMITIVES,
     conceptMap: CONCEPT_MAP,
     hardRules: HARD_RULES,
-    // The sandbox's stripped-global list, straight from src/stripped-globals.js.
+    // The sandbox's stripped-global list, straight from src/stripped_globals.js.
     // Exported so a test can compare it to the enforced list by value rather
     // than by grepping rendered prose.
     strippedGlobals: STRIPPED_GLOBALS_TAUGHT,
     // The deploy gate's reserved identifiers, derived from metering.js and
-    // lint-core.js. Exported for the same reason strippedGlobals is: a test
+    // lint_core.js. Exported for the same reason strippedGlobals is: a test
     // compares it to the enforced lists by value instead of grepping prose.
     reservedIdentifiers: RESERVED_NAMES_TAUGHT,
     contractShape: CONTRACT_SHAPE

@@ -1416,7 +1416,7 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 // Coordinated activation (block time, unix seconds) for the async/Promise
 // contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
 // `Promise` (sandbox.js) and the deploy validator rejects async/await/Promise
-// (lint-core CONSENSUS_RULES 'banned-async'). Both are consensus-affecting: a
+// (lint_core CONSENSUS_RULES 'banned-async'). Both are consensus-affecting: a
 // node that strips Promise / rejects an async DEPLOY and a node that does not
 // produce a different gasUsed/status (→ contract_hash → fee debit, and a
 // different deploy verdict), so a mixed-version fleet forks on the first
@@ -1451,7 +1451,7 @@ function isAsyncSurfaceActive(network, blockTime) {
 // consensus package (flag-day Pkg 4): the hardened deploy-linter rule set
 // (exponentiation ban, reserved control bindings, SAFE_MATH complement,
 // dynamic import(), shorthand { Promise }, shadowed-local Promise relaxation
-// in lint-core.js), the CONTRACT_WRAPPER control-binding closure move, and the
+// in lint_core.js), the CONTRACT_WRAPPER control-binding closure move, and the
 // corroborated error-classifier tightening below. All are consensus-visible
 // (deploy verdicts / execution status / gasUsed), so they flip fleet-wide at
 // the ratified flag-day anchor, the same instant banned-async activates (zero
@@ -3151,7 +3151,7 @@ module.exports.HostFaultError = require('./errors.js').HostFaultError;
 // digest it: the sandbox strip set and the deploy validator's CONSENSUS_RULES.
 // Any change to either must bump CONSENSUS_VERSION + re-golden in lockstep.
 module.exports.STRIPPED_GLOBAL_NAMES = require('./sandbox.js').STRIPPED_GLOBAL_NAMES;
-module.exports.CONSENSUS_RULES = require('./lint-core.js').CONSENSUS_RULES;
+module.exports.CONSENSUS_RULES = require('./lint_core.js').CONSENSUS_RULES;
 // The sandbox neuters more than the global deletes: prototype-method strips
 // (regex + locale/ICU), the prototype .constructor neuters, and the SafeMath
 // member whitelist are each consensus-critical surface. Expose them frozen so the
@@ -3161,13 +3161,13 @@ module.exports.STRIPPED_PROTO_METHODS = require('./sandbox.js').STRIPPED_PROTO_M
 module.exports.NEUTERED_PROTO_CONSTRUCTORS = require('./sandbox.js').NEUTERED_PROTO_CONSTRUCTORS;
 module.exports.SAFE_MATH_MEMBERS = require('./sandbox.js').SAFE_MATH_MEMBERS;
 // Fail loudly if any frozen export goes missing (e.g. an internal rename in
-// sandbox.js / lint-core.js). Without this, the re-export silently becomes
+// sandbox.js / lint_core.js). Without this, the re-export silently becomes
 // undefined and the cross-repo freeze guards that digest it would skip rather
 // than redden, defeating the whole point of the surface freeze.
 if(!module.exports.STRIPPED_GLOBAL_NAMES)
     throw new Error('xchain-vm: sandbox.js no longer exports STRIPPED_GLOBAL_NAMES (frozen consensus surface)');
 if(!module.exports.CONSENSUS_RULES)
-    throw new Error('xchain-vm: lint-core.js no longer exports CONSENSUS_RULES (frozen consensus surface)');
+    throw new Error('xchain-vm: lint_core.js no longer exports CONSENSUS_RULES (frozen consensus surface)');
 if(!module.exports.STRIPPED_PROTO_METHODS)
     throw new Error('xchain-vm: sandbox.js no longer exports STRIPPED_PROTO_METHODS (frozen consensus surface)');
 if(!module.exports.NEUTERED_PROTO_CONSTRUCTORS)

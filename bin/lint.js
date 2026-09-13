@@ -37,9 +37,9 @@ const fs   = require('fs');
 const path = require('path');
 
 const { validateSyntax } = require('../src/syntax.js');
-const { lintSource, CONSENSUS_RULES } = require('../src/lint-core.js');
-// The 64 KiB deploy cap used to be re-implemented here. It now lives in
-// lint-core's `code-size` rule, emitted FIRST and with the same message, so
+const { lintSource, CONSENSUS_RULES } = require('../src/lint_core.js');
+// The 64 KiB deploy cap is not re-implemented here. It lives in
+// lint_core's `code-size` rule, emitted FIRST and with the same message, so
 // every linting surface (this CLI, the SDK pre-flight, any third-party
 // lintSource caller) enforces it rather than only the one that remembered to.
 
@@ -85,7 +85,7 @@ function lintFile(file) {
 
     const errors = lint.errors.slice();
     // A V8-only step-1 failure (acorn parsed, but V8 rejected) won't appear in
-    // lint-core's errors. Surface validateSyntax's message in that case.
+    // lint_core's errors. Surface validateSyntax's message in that case.
     if (!verdict.valid && !errors.some((e) => CONSENSUS_RULES.has(e.rule)))
         errors.unshift({ rule: 'syntax', message: verdict.error, line: null, severity: 'error' });
 

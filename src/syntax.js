@@ -16,7 +16,7 @@
  * Deploy-time validation: V8 syntax check (the only step needing
  * isolated-vm), then the acorn-coverable rules (metering pass, reserved
  * identifiers, banned Math.*, banned literals, and float warnings) which
- * live in the dependency-light, vendorable ./lint-core.js. Keeping the
+ * live in the dependency-light, vendorable ./lint_core.js. Keeping the
  * rules in one place guarantees the deploy path and the SDK/CLI linter
  * never diverge.
  ********************************************************************/
@@ -24,12 +24,12 @@
 
 const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
-const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
+const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint_core.js');
 
 /**
  * Validate contract code syntax before deployment. Runs a V8 syntax check
  * (the only step needing isolated-vm) then the acorn-coverable consensus rules
- * via lint-core.lintSource(); error messages are byte-identical to the
+ * via lint_core.lintSource(); error messages are byte-identical to the
  * historical output, so the on-chain deploy verdict is unchanged.
  *
  * @param {string} code - Contract source code
@@ -158,6 +158,6 @@ function checkFloatWarnings(code) {
     return findFloatWarnings(code).map((w) => w.message);
 }
 
-// findBannedMathCalls / findBannedLiterals moved to lint-core.js; re-exported
+// findBannedMathCalls / findBannedLiterals moved to lint_core.js; re-exported
 // here so existing callers of syntax.js keep working unchanged.
 module.exports = { validateSyntax, checkFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest };

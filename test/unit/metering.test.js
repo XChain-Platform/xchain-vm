@@ -560,7 +560,7 @@ describe('Metering', function() {
         });
 
         // A for-of/for-in head declarator has NO init, so there is no source expression
-        // to wrap; it is rejected at deploy (lint-core banned-rest) instead of metered.
+        // to wrap; it is rejected at deploy (lint_core banned-rest) instead of metered.
         it('meterRestPattern leaves a for-of head rest alone (no init to wrap)', function() {
             const metered = meterCode('for (var [x, ...c] of xs) { y = 1; }', { meterRestPattern: true });
             assert(!metered.includes('__arrspread('), 'for-of head has no addressable source: ' + metered);

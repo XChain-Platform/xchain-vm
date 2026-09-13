@@ -180,7 +180,7 @@ function _memberKey(member) {
 // no TOP-LEVEL rest. Only a rest that sits directly in the pattern being destructured
 // has an addressable source expression to wrap; a rest nested one level deeper
 // (`var {a: {...c}} = o`) reads an intermediate value with no expression to meter, and
-// is rejected at deploy instead (lint-core findBannedRest).
+// is rejected at deploy instead (lint_core findBannedRest).
 function _restKind(pat) {
     if (!pat) return null;
     if (pat.type === 'ObjectPattern')
@@ -232,7 +232,7 @@ function _meterRestSource(pat, src) {
  * top-level rest destructure is wrapped in the matching size-charged helper. Rest
  * positions with no addressable source (parameter lists, rest nested inside another
  * pattern, catch-clause rest, for-of/for-in heads) cannot be reached by wrapping and
- * are rejected at deploy on the same flag day instead (lint-core findBannedRest).
+ * are rejected at deploy on the same flag day instead (lint_core findBannedRest).
  */
 function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern) {
     // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's

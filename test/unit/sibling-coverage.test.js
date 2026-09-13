@@ -27,7 +27,7 @@
 // Measured 2026-08-12 against a full local checkout, a venue carrying only
 // this repo's then-declared siblings ran 901 passing / 19 pending where a full
 // checkout runs 920 / 13, and the two undeclared siblings were xchain-sdk and
-// xchain-contracts, which carry lint-core and contract-template parity. The
+// xchain-contracts, which carry lint_core and contract-template parity. The
 // count comes from Linux: isolated-vm does not load on macOS, so it cannot be
 // taken there.
 //
@@ -68,7 +68,7 @@ const SIBLINGS = [
       guards: 'XCALL constant parity and the consensus-params twin' },
     { repo: 'xchain-sdk', envs: [],
       marker: 'src',
-      guards: 'XCALL constant parity and lint-core parity' },
+      guards: 'XCALL constant parity and lint_core parity' },
     { repo: 'xchain-contracts', envs: ['XCHAIN_CONTRACTS_DIR'],
       marker: path.join('escrow', 'escrow.js'),
       // Describe the discovery RULE, never a snapshot list: lint-parity.test.js

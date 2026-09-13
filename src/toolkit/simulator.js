@@ -98,7 +98,7 @@
 
 const XChainVM = require('../index.js');
 const { toContractJs } = require('./transpile.js');
-const { MAX_CODE_SIZE } = require('../lint-core.js');
+const { MAX_CODE_SIZE } = require('../lint_core.js');
 const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../protocol/constants.js');
 
 // Canonical VM gas schedule (matches the component-doc Gas Schedule table and
