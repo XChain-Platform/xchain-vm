@@ -13,7 +13,7 @@
  **********************************************************************
  * Out-of-process executor: sustained worker-respawn soak.
  *
- * The subprocess executor (src/process-executor.js) forks a fresh worker on
+ * The subprocess executor (src/process_executor.js) forks a fresh worker on
  * every crash / hang / watchdog kill (the F2/F3 fault-recovery surface). A
  * long-running validator can respawn the worker millions of times over its
  * life. This soak hammers that lifecycle and watches for the leaks it would

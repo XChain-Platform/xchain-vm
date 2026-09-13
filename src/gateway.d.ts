@@ -29,7 +29,7 @@
  *   };
  *
  * The runtime surface is built by src/gateway.js (buildGateway) and
- * src/gateway-emit.js (buildEmitAPI). test/unit/gateway-dts-parity.test.js
+ * src/gateway_emit.js (buildEmitAPI). test/unit/gateway-dts-parity.test.js
  * asserts this file stays in lockstep with that surface, so a method added
  * to the gateway without a type here fails CI.
  *

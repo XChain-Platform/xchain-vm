@@ -20,7 +20,7 @@
 'use strict';
 
 const assert = require('assert');
-const wallClock = require('../../src/consensus-wall-clock.js');
+const wallClock = require('../../src/consensus_wall_clock.js');
 
 let XChainVM = null;
 try {
@@ -179,7 +179,7 @@ describe('consensus wall-clock budget: the subprocess watchdog cannot pre-empt i
     // returns 'out_of_resource: execution host terminated' where every other
     // validator returned the contract's real result: the operator-configurable fork,
     // one layer up from the isolate.
-    const ProcessExecutor = require('../../src/process-executor.js');
+    const ProcessExecutor = require('../../src/process_executor.js');
     const executors = [];
 
     function watchdogFor(maxCpuTimeMs) {

@@ -14,7 +14,7 @@
  * Cross-Node/V8 consensus-runtime gate.
  *
  * Asserts the engine THIS process runs on matches the pinned consensus
- * runtime (src/consensus-runtime.js). Running in `ci` on every Node/V8 a
+ * runtime (src/consensus_runtime.js). Running in `ci` on every Node/V8 a
  * validator may use, this fails LOUDLY on any validator built against a
  * different V8/ICU. The deployment-side mitigation for the not-in-VM-
  * fixable native-error-text / ICU-primitive residual. A pinned engine is
@@ -29,7 +29,7 @@
 const assert = require('assert');
 const {
     PINNED, REFERENCE_NODE, checkConsensusRuntime, describeMismatch
-} = require('../../src/consensus-runtime.js');
+} = require('../../src/consensus_runtime.js');
 
 describe('consensus-runtime gate', function () {
 

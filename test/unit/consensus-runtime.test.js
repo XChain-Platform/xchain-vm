@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// Unit tests for src/consensus-runtime.js: the engine-version pin and the pure
+// Unit tests for src/consensus_runtime.js: the engine-version pin and the pure
 // check/describe helpers the validator-fleet determinism gate is built on.
 
 const assert = require('assert');
@@ -18,7 +18,7 @@ const {
     PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
     CONSENSUS_STATUS_TOKENS, STATUS_ERROR_PREFIXES,
     checkConsensusRuntime, describeMismatch,
-} = require('../../src/consensus-runtime.js');
+} = require('../../src/consensus_runtime.js');
 
 describe('Consensus runtime pin', function () {
 

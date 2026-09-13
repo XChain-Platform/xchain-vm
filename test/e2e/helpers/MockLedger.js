@@ -31,7 +31,7 @@ const math = create(all, { number: 'BigNumber', precision: 64 });
 // host's shape rather than hand-rolling the read semantics, so a contract under
 // test meets the accessor the indexer's preload actually produces - including its
 // answer for a round that has scrolled out of the preloaded window.
-const { buildOracleAccessor } = require('../../../src/readonly-accessors.js');
+const { buildOracleAccessor } = require('../../../src/readonly_accessors.js');
 
 class MockLedger {
     constructor() {

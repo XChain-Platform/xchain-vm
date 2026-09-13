@@ -20,7 +20,7 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const cr = require('../../src/consensus-runtime');
+const cr = require('../../src/consensus_runtime');
 const vm = require('../../src/index');
 const lintCore = require('../../src/lint_core');
 const metering = require('../../src/metering');
@@ -309,7 +309,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // default-configured node's outcome; TIGHTENING it is a separate consensus
         // event (future flag-day + re-goldened baselines + atomic deploy).
         assert.strictEqual(vm.CONSENSUS_MAX_WALL_MS, 30000);
-        assert.strictEqual(require('../../src/consensus-wall-clock.js').CONSENSUS_MAX_WALL_MS,
+        assert.strictEqual(require('../../src/consensus_wall_clock.js').CONSENSUS_MAX_WALL_MS,
             vm.CONSENSUS_MAX_WALL_MS, 'enforcing module and export must be the same value');
         // The activation rides the ratified 2.0.0 flag-day, like its siblings.
         assert.strictEqual(vm.isConsensusWallClockActive('regtest', 0), true);
@@ -575,7 +575,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // gate) and index.js re-exports that same binding for the cross-service
         // parity suite. Pin both the value and the single-sourcing so a future
         // bump cannot leave the enforcer and the parity-tested export diverging.
-        const gatewayEmit = require('../../src/gateway-emit.js');
+        const gatewayEmit = require('../../src/gateway_emit.js');
         assert.strictEqual(vm.XCALL_MAX_HOPS, 2);
         assert.strictEqual(gatewayEmit.XCALL_MAX_HOPS, vm.XCALL_MAX_HOPS,
             'gateway-emit enforcer and index.js export must be the same value');

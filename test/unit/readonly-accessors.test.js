@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 //
-// Unit tests for src/readonly-accessors.js: turns plain serializable snapshots
+// Unit tests for src/readonly_accessors.js: turns plain serializable snapshots
 // (the out-of-process contract) into the synchronous accessor objects the gateway
 // expects, with backward-compatible passthrough of legacy accessor objects.
 
@@ -21,7 +21,7 @@ const {
     buildCrossChainAccessor,
     buildAttestationAccessor,
     resolveAccessors,
-} = require('../../src/readonly-accessors.js');
+} = require('../../src/readonly_accessors.js');
 
 describe('Read-only accessors', function () {
 

@@ -26,7 +26,7 @@ const { createVM, execute, GAS_SCHEDULE } = require('./helpers.js');
 // Direct module imports for unit-level regression
 const { meterCode, hasGasIdentifier } = require('../../src/metering.js');
 const { buildMathAPI } = require('../../src/math.js');
-const { buildEmitAPI } = require('../../src/gateway-emit.js');
+const { buildEmitAPI } = require('../../src/gateway_emit.js');
 const GasTracker = require('../../src/gas.js');
 const StateManager = require('../../src/state.js');
 const EmissionCollector = require('../../src/collector.js');

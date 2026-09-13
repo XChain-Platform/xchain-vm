@@ -24,7 +24,7 @@
 
 const crypto = require('crypto');
 const { ContractRevertError } = require('./errors.js');
-const { buildEmitAPI, buildRequestIdPreimage } = require('./gateway-emit.js');
+const { buildEmitAPI, buildRequestIdPreimage } = require('./gateway_emit.js');
 const { buildMathAPI } = require('./math.js');
 
 // contract.slash amount forms, pre- and post-activation.

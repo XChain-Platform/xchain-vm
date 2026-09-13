@@ -36,15 +36,15 @@ const ActionValidator   = require('./validator.js');
 const { buildGateway }  = require('./gateway.js');
 // Canonical coercion for the per-root discriminator threaded into the request_id /
 // call_id preimages (keeps a BATCH subcommand's composite form intact).
-const { normalizeRootDiscriminator } = require('./gateway-emit.js');
+const { normalizeRootDiscriminator } = require('./gateway_emit.js');
 const { stripGlobals }  = require('./sandbox.js');
 const { meterCode }     = require('./metering.js');
 const { validateSyntax, checkFloatWarnings } = require('./syntax.js');
 const { ContractRevertError, GasExhaustedError, HostFaultError } = require('./errors.js');
-const { resolveAccessors } = require('./readonly-accessors.js');
+const { resolveAccessors } = require('./readonly_accessors.js');
 // Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
-const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
+const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus_wall_clock.js');
 
 /**
  * Harness script that runs inside the isolate to assemble the xchain
@@ -1392,7 +1392,7 @@ const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;     // target-side ceilin
 // ENFORCES (emit.crossExecute's hop gate) and this module re-exports it, so a
 // future bump cannot leave the enforcer and the exported/parity-tested value
 // disagreeing. (gateway-emit.js has no require-cycle back into this file.)
-const XCALL_MAX_HOPS            = require('./gateway-emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
+const XCALL_MAX_HOPS            = require('./gateway_emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
 const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
 const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
 const XCALL_MAX_RETURN_BYTES    = PROTO.XCALL_MAX_RETURN_BYTES;
@@ -1963,7 +1963,7 @@ class XChainVM {
         this._executor = null;
         if (this.execution === 'subprocess') {
             // Lazy require to avoid loading child_process for in-process callers.
-            const ProcessExecutor = require('./process-executor.js');
+            const ProcessExecutor = require('./process_executor.js');
             this._executor = new ProcessExecutor(config);
         }
     }
@@ -3135,7 +3135,7 @@ module.exports.XCALL_MAX_DEADLINE_BLOCKS = XCALL_MAX_DEADLINE_BLOCKS;
 module.exports.XCALL_MAX_RETURN_BYTES    = XCALL_MAX_RETURN_BYTES;
 // Expose the pinned consensus runtime + checker so the indexer (and any
 // validator process bundling the VM) can gate the engine version it runs on.
-const consensusRuntime = require('./consensus-runtime.js');
+const consensusRuntime = require('./consensus_runtime.js');
 module.exports.CONSENSUS_RUNTIME = consensusRuntime.PINNED;
 module.exports.CONSENSUS_VERSION = consensusRuntime.CONSENSUS_VERSION;
 module.exports.CONSENSUS_STATUS_TOKENS = consensusRuntime.CONSENSUS_STATUS_TOKENS;

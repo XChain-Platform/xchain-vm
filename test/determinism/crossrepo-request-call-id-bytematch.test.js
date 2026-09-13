@@ -41,7 +41,7 @@ const fs     = require('fs');
 const path   = require('path');
 const { buildGateway } = require('../../src/gateway.js');
 const { buildEmitAPI, GOLDEN_VECTORS, normalizeRootDiscriminator,
-        buildRequestIdPreimage, buildCallIdPreimage } = require('../../src/gateway-emit.js');
+        buildRequestIdPreimage, buildCallIdPreimage } = require('../../src/gateway_emit.js');
 const GasTracker = require('../../src/gas.js');
 const EmissionCollector = require('../../src/collector.js');
 

@@ -30,9 +30,10 @@
  * track 8/9).
  *
  * This is the deployment-side mitigation for the documented, not-in-VM-
- * fixable `e.message` residual (see test/determinism/probe-error-message-
- * determinism.js): you cannot sanitize a value V8 sets internally, so you
- * instead PIN the engine that sets it and GATE every validator against the
+ * fixable `e.message` residual (see
+ * test/determinism/helpers/probe_error_message_determinism.js): you cannot
+ * sanitize a value V8 sets internally, so you instead PIN the engine that
+ * sets it and GATE every validator against the
  * pin. `checkConsensusRuntime()` powers that gate
  * (test/determinism/consensus-runtime-gate.test.js, in `ci`).
  *
@@ -187,7 +188,7 @@ function describeMismatch(result) {
         'than the rest of the fleet, which would FORK the chain:\n' +
         lines.join('\n') +
         `\nInstall the canonical runtime (${REFERENCE_NODE}, node:22-bookworm) ` +
-        'or, if the fleet is deliberately upgrading, re-pin src/consensus-runtime.js ' +
+        'or, if the fleet is deliberately upgrading, re-pin src/consensus_runtime.js ' +
         '+ regenerate the determinism manifests + coordinate an atomic fleet activation.'
     );
 }

@@ -26,7 +26,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const SRC = path.join(__dirname, '..', '..', 'src', 'vm-worker.js');
+const SRC = path.join(__dirname, '../../src/vm_worker.js');
 const source = fs.readFileSync(SRC, 'utf8').replace(/^#!.*\n/, '');
 
 describe('vm-worker (static contract)', function () {

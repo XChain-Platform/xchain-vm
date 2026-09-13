@@ -13,7 +13,7 @@
  **********************************************************************
  * XChain VM: Process Executor (parent side)
  *
- * Runs every contract execution in a forked child (src/vm-worker.js) that
+ * Runs every contract execution in a forked child (src/vm_worker.js) that
  * holds the real in-process VM. A contract that aborts V8 (e.g. a bulk
  * allocation that bypasses the isolate memory limit and triggers a
  * process-wide SIGABRT) kills only the child, never this (indexer) host.
@@ -41,9 +41,9 @@ const path = require('path');
 const { fork } = require('child_process');
 const { HostFaultError } = require('./errors.js');
 const { effectiveCeiling } = require('./gas.js');
-const { CONSENSUS_MAX_WALL_MS } = require('./consensus-wall-clock.js');
+const { CONSENSUS_MAX_WALL_MS } = require('./consensus_wall_clock.js');
 
-const WORKER_PATH = path.join(__dirname, 'vm-worker.js');
+const WORKER_PATH = path.join(__dirname, 'vm_worker.js');
 
 // Minimum spacing between respawn attempts once the executor is broken, so a
 // host that can never start a worker doesn't fork-spin. Each subsequent

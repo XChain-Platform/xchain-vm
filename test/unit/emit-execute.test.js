@@ -11,7 +11,7 @@
 // contact legal@dankest.llc.
 
 const assert = require('assert');
-const { buildEmitAPI } = require('../../src/gateway-emit.js');
+const { buildEmitAPI } = require('../../src/gateway_emit.js');
 const GasTracker = require('../../src/gas.js');
 const { effectiveCeiling } = require('../../src/gas.js');
 const EmissionCollector = require('../../src/collector.js');

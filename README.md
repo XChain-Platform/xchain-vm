@@ -147,7 +147,7 @@ returned different statuses **and** different `gasUsed` for the same execution
 contract checkpoint). A config file could fork the fleet.
 
 At/after the coordinated flag-day an execution therefore runs against
-`CONSENSUS_MAX_WALL_MS` (30000 ms, `src/consensus-wall-clock.js`) on every node,
+`CONSENSUS_MAX_WALL_MS` (30000 ms, `src/consensus_wall_clock.js`) on every node,
 whatever `limits.maxCpuTimeMs` says. Exceeding it is unchanged and
 deterministic: status `timeout: wall-clock safety net triggered`, `gasUsed`
 clamped to the execution's gas ceiling, no state changes, no emissions.

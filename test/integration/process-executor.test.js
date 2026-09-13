@@ -144,7 +144,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // (_sawReady=false, exactly what the watchdog callback now sets), then dispatch
     // the next request. It MUST queue and run on the respawn, never be host-terminated.
     it('F2: executor queues+recovers the next request after a worker death', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         const job = (ret) => ({ ...BASE, code: `module.exports = function(){ return '${ret}'; };` });
@@ -175,7 +175,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // runs would fork this node off the chain (a host fault is not a contract
     // property). The indexer turns the rejection into a halt-and-retry.
     it('host fault: a permanently-broken executor REJECTS with HostFaultError', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const { HostFaultError } = require('../../src/errors.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
@@ -194,7 +194,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     });
 
     it('host fault: a broken executor SELF-HEALS once the host recovers', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
@@ -219,7 +219,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // request that waits in the queue for many watchdog windows must still
     // run and succeed once the worker is dispatchable.
     it('a queued request never times out on queue wait (watchdog starts at dispatch)', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
@@ -254,7 +254,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // dispatched request on a frozen child resolves the deterministic
     // resource-failure clamp and the executor recovers for subsequent work.
     it('the dispatch-time watchdog still kills a hung worker (deterministic clamp)', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
@@ -282,7 +282,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // in-flight execution still RESOLVES a fabricated host-termination (every
     // validator sees the same poisoned-contract outcome); it must NOT reject.
     it('a single in-flight worker death still FABRICATES (resolves), not rejects', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
@@ -304,7 +304,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // with a local host fault, not resolve out_of_resource + a ceiling fee
     // for a contract the rest of the fleet ran normally.
     it('shutdown() REJECTS a never-dispatched queued execution with HostFaultError', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const { HostFaultError } = require('../../src/errors.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
@@ -338,7 +338,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // with the deterministic host-terminated result (every validator sees
     // the same poisoned-contract outcome for work that actually started).
     it('shutdown() still RESOLVES an in-flight (dispatched) execution with the host-terminated result', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
@@ -371,7 +371,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // HostFaultError -> _classifyError re-throw -> the worker's catch. Nothing is
     // stubbed, so a regression on either side of the IPC seam reddens this.
     it('a dispatched execution REJECTS on a host-local isolate-spawn failure (never out_of_resource)', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const { HostFaultError } = require('../../src/errors.js');
         const exec = new ProcessExecutor({
             gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING,
@@ -408,7 +408,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // _queue forever (no result, no exit, no watchdog: it was never dispatched),
     // hanging the block instead of halting it.
     it('a queued execution behind a host fault still dispatches (the slot is released)', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const { HostFaultError } = require('../../src/errors.js');
         const exec = new ProcessExecutor({
             gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING,
@@ -433,7 +433,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     // fired first, or the worker died in the same tick) must be a no-op, never a
     // second settle on a resolved promise.
     it('a hostfault for an unknown id is ignored', function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         try {
             exec._onMessage({ type: 'hostfault', id: 999999, reason: 'stale' });
@@ -456,7 +456,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     this.timeout(60000);
 
     it('concurrent execute() calls are dispatched one at a time and all complete', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
@@ -485,7 +485,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
     });
 
     it('a queued entry has no watchdog timer until it dispatches (queue wait never counts)', async function () {
-        const ProcessExecutor = require('../../src/process-executor.js');
+        const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
