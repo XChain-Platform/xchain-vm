@@ -253,7 +253,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // content-derived, so it stays byte-stable across nodes and reorgs
                 // (action_index advanced with injection timing and forked the PBFT).
                 // MUST byte-match the indexer's re-derivation in
-                // xchain-indexer/src/actions/attest.js (_parseRequest, EMITTER_PATH).
+                // xchain-indexer/src/actions/attest.js (parseRequest, EMITTER_PATH).
                 // Assembled by buildRequestIdPreimage (gateway-emit.js), which owns the
                 // per-field normalization for both preimage classes; raw readOnlyData
                 // values go in.

@@ -63,7 +63,7 @@ const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
 
 // The indexer's REAL preimage assembly, not a restatement of it.
 //
-// Attest._requestIdPreimageValues and Xcall._callIdPreimageValues are the exact
+// Attest.requestIdPreimageValues and Xcall.callIdPreimageValues are the exact
 // functions the handlers call before hashing (attest.js _parseRequest, xcall.js
 // _parseRequest); they are invoked here on a minimal receiver because the only
 // thing either reads off `this` is the node config the second one needs for
@@ -77,9 +77,9 @@ function loadIndexerDerivation() {
     const Xcall  = require(INDEXER_XCALL);
     return {
         requestIdPreimage: (data) =>
-            Attest.prototype._requestIdPreimageValues.call({}, data).join(':'),
+            Attest.prototype.requestIdPreimageValues.call({}, data).join(':'),
         callIdPreimage: (config, data) =>
-            Xcall.prototype._callIdPreimageValues.call({ config: config }, data).join(':')
+            Xcall.prototype.callIdPreimageValues.call({ config: config }, data).join(':')
     };
 }
 
@@ -249,7 +249,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
         });
 
         // Literal hexes, pinned identically in the indexer's own regression suite
-        // (xchain-indexer/test/unit/actions/batch-execute-attest.test.js) and checked
+        // (xchain-indexer/test/unit/actions/batch_execute_attest.test.js) and checked
         // for presence by bin/check-preimage-golden-parity.js. A one-sided edit to the
         // composite preimage reddens that side instead of forking the fleet quietly.
         it('golden vectors: the composite roots hash to the checked-in cross-repo hexes', function () {
@@ -359,7 +359,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
     // The VM half is buildRequestIdPreimage / buildCallIdPreimage, the exported
     // assembly gateway.js and crossExecute themselves call, so the matrix cannot
     // drift away from what the VM emits. The indexer half is loaded off the
-    // sibling checkout (Attest._requestIdPreimageValues, Xcall._callIdPreimageValues),
+    // sibling checkout (Attest.requestIdPreimageValues, Xcall.callIdPreimageValues),
     // so it reddens when the INDEXER's coercion moves. The previous version of this
     // block restated both formulas as local lambdas, which meant it could only ever
     // measure itself: an indexer-side edit left every row green.

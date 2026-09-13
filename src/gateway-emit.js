@@ -301,7 +301,7 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             // collide or replay across chains/networks. The target chain is
             // bound so the same logical call to two chains never collides.
             // MUST byte-match the indexer's re-derivation in
-            // xchain-indexer/src/actions/xcall.js (_parseRequest, EMITTER_PATH).
+            // xchain-indexer/src/actions/xcall.js (parseRequest, EMITTER_PATH).
             // The emitting EXECUTE's action_index is deliberately NOT in the preimage:
             // it shifts with the indexer's synthetic-action injection timing, so it is
             // non-deterministic across nodes / reorgs. The call-path replaces it as the
