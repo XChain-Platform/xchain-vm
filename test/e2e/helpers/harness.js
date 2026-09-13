@@ -201,7 +201,7 @@ class E2EHarness {
      */
     loadContract(name) {
         return fs.readFileSync(
-            path.join(__dirname, '..', 'contracts', name),
+            path.join(__dirname, '..', 'fixtures', 'contracts', name),
             'utf8'
         );
     }

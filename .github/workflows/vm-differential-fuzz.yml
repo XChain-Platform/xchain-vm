@@ -10,7 +10,7 @@
 #
 # The corpus is a pure function of DIFF_SEED, so each leg samples the SAME
 # inputs independently and only the output hashes are compared (see
-# test/fuzz/differential.js). Bump DIFF_CASES for a deeper sweep on demand.
+# test/fuzz/helpers/differential.js). Bump DIFF_CASES for a deeper sweep on demand.
 name: vm-differential-fuzz
 
 # Least privilege for the default GITHUB_TOKEN: every job here only reads the repo.
@@ -84,7 +84,7 @@ jobs:
 
       - name: Record differential manifest
         run: |
-          node test/fuzz/differential-run.js record \
+          node test/fuzz/helpers/differential_run.js record \
             --seed "$DIFF_SEED" --cases "$DIFF_CASES" \
             --out "differential.${{ matrix.leg }}.json"
 
@@ -125,7 +125,7 @@ jobs:
           for m in manifests/differential.*.json; do
             [ "$m" = "$REF" ] && continue
             echo "::group::compare $(basename "$m") vs reference"
-            node test/fuzz/differential-run.js compare "$REF" "$m" || status=1
+            node test/fuzz/helpers/differential_run.js compare "$REF" "$m" || status=1
             echo "::endgroup::"
           done
           if [ "$status" -ne 0 ]; then

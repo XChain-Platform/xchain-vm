@@ -14,7 +14,7 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { CONTRACT_HOST_FIXTURES } = require('./contract-host-fixtures.js');
+const { CONTRACT_HOST_FIXTURES } = require('./helpers/contract_host_fixtures.js');
 
 let XChainVM;
 try {
@@ -82,14 +82,14 @@ async function runTwice(vm, opts) {
     };
 
     it('should produce identical results for state_counter', async function() {
-        const code = fs.readFileSync(path.join(__dirname, '../contracts/state_counter.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/state_counter.js'), 'utf8');
         const opts = { ...baseOpts, code, method: 'increment', state: { counter: '5' } };
         const [r1, r2] = await runTwice(vm, opts);
         assert.strictEqual(hashResult(r1), hashResult(r2));
     });
 
     it('should produce identical results for simple_send', async function() {
-        const code = fs.readFileSync(path.join(__dirname, '../contracts/simple_send.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/simple_send.js'), 'utf8');
         const opts = { ...baseOpts, code, method: 'send', params: ['dest_addr', '100'],
                        state: { owner: 'addr1', token: 'TEST' } };
         const [r1, r2] = await runTwice(vm, opts);
@@ -97,7 +97,7 @@ async function runTwice(vm, opts) {
     });
 
     it('should produce identical results for amm_swap', async function() {
-        const code = fs.readFileSync(path.join(__dirname, '../contracts/amm_swap.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/amm_swap.js'), 'utf8');
         const opts = { ...baseOpts, code, method: 'swap', params: ['100', 'TOKENA'],
                        state: { tokenA: 'TOKENA', tokenB: 'TOKENB', reserveA: '10000', reserveB: '5000' } };
         const [r1, r2] = await runTwice(vm, opts);

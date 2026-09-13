@@ -24,7 +24,7 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require('../../fuzz/invariants');
+const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require('../../fuzz/helpers/invariants.js');
 
 // Re-export fuzz harness utilities
 const {
@@ -35,7 +35,7 @@ const {
     createVM,
     execute,
     hashResult
-} = require('../../fuzz/harness');
+} = require('../../fuzz/helpers/harness.js');
 
 /**
  * ProgrammableMock: fault-injectable accessor object.

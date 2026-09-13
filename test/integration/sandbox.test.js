@@ -155,7 +155,7 @@ function executeCode(vm, code) {
     });
 
     it('should run sandbox_escape.js contract', async function() {
-        const code = fs.readFileSync(path.join(__dirname, '../contracts/sandbox_escape.js'), 'utf8');
+        const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/sandbox_escape.js'), 'utf8');
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, true);
         for (const log of result.logs) {
