@@ -1,0 +1,47 @@
+Dead-code sweep: xchain-vm src/, taken before the structure pass moved anything.
+
+HOW. bin/reachability.js walks the require graph from three entry-point sets
+(runtime, tooling, test) plus the declared dynamic edge that the subprocess
+executor builds with a __dirname join, then asks every other checkout beside
+this one whether it names the path. A file outside all four reaches is the
+only shape that gets deleted.
+
+VERDICT: NOTHING IS DELETED. Every one of the 27 tracked src/*.js files is
+held by something. 21 sit in the runtime closure; the 6 that do not are the
+whole src/toolkit/ tree, and they are the repo's published authoring surface,
+reached from bin/xchain-foundry.js, bin/create-xchain-contract.js and the
+top-level toolkit.js entry point, and named by ten to twenty files in other
+checkouts each. Not dead, just not on the execution path.
+
+--- bin/reachability.js --siblings <tree root> ---
+src/*.js tracked:                    27
+runtime entry points:                bench/scenarios/cache.js, bench/scenarios/gateway.js, bench/scenarios/pipeline.js, bench/scenarios/soak.js, bench/scenarios/throughput.js, bin/lint.js, scripts/mutation-report.js, test/fuzz/differential-run.js, test/fuzz/run.js, test/mutation/stryker-xchain-vm-mutator/index.js
+tooling entry points:                5
+test entry points:                   207
+declared dynamic edges:              1
+reachable from runtime:              21
+NOT reachable from runtime:          6
+test-only:                           0
+unreferenced across the platform:    0
+
+files no runtime path in this repo reaches, and what else holds them:
+  src/toolkit/authoring.js                         bin/scripts, tests, required by bin/xchain-foundry.js, src/toolkit/index.js
+  src/toolkit/gate.js                              bin/scripts, tests, required by bin/xchain-foundry.js, src/toolkit/authoring.js, src/toolkit/index.js
+  src/toolkit/index.js                             bin/scripts, tests, required by bin/xchain-foundry.js, toolkit.js
+  src/toolkit/scaffold.js                          bin/scripts, tests, required by bin/create-xchain-contract.js, bin/xchain-foundry.js, src/toolkit/index.js
+  src/toolkit/simulator.js                         bin/scripts, tests, required by src/toolkit/index.js
+  src/toolkit/transpile.js                         bin/scripts, tests, required by bin/xchain-foundry.js, src/toolkit/authoring.js, src/toolkit/index.js, src/toolkit/simulator.js
+
+--- falsification: command grep -r over every sibling checkout plus the
+    surrounding tree's tooling, node_modules and .git excluded. The
+    tool-layer search honours ignore files and comes back falsely empty,
+    so the count below is the one that decides a deletion. ---
+src/toolkit/authoring.js   files naming it outside this repo and in: 20
+src/toolkit/gate.js        files naming it outside this repo and in: 20
+src/toolkit/index.js       files naming it outside this repo and in: 14
+src/toolkit/scaffold.js    files naming it outside this repo and in: 15
+src/toolkit/simulator.js   files naming it outside this repo and in: 17
+src/toolkit/transpile.js   files naming it outside this repo and in: 10
+
+sweep root: the tree holding these checkouts, 18 xchain-* directories plus
+the surrounding tooling and documentation directories.
