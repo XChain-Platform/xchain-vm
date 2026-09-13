@@ -195,6 +195,49 @@ module.exports = {
         } finally { console.warn = real; await pre.close(); await at.close(); }
     });
 
+    it('resolves banned-rest from the REST_PATTERN_METER flag-day, not unconditionally', async function() {
+        // The deploy gate omitted enforceBannedRest entirely, and syntax.js defaults
+        // every enforce* flag to ON, so a mainnet simulator pinned below the flag-day
+        // rejected a rest parameter the chain at that timestamp accepts. Both the
+        // execute-time re-lint (src/index.js) and the indexer deploy action resolve
+        // the flag from isRestPatternMeterActive; this pins the gate to the same
+        // predicate on both sides of the activation.
+        const XChainVM = require('../../src/index.js');
+        const GATE = XChainVM.REST_PATTERN_METER_GATE_BLOCK_TIME;
+        const REST = 'module.exports = { run: function(xchain, ...rest){ return String(rest.length); } };';
+        const pre = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { timestamp: GATE - 1 } });
+        const at  = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { timestamp: GATE } });
+        const real = console.warn;
+        console.warn = () => {};
+        try {
+            assert.strictEqual((await pre.deploy(REST)).deployGate.valid, true,
+                'one second below the flag-day the chain does not enforce banned-rest either');
+            const atGate = await at.deploy(REST);
+            assert.strictEqual(atGate.deployGate.valid, false,
+                'at the flag-day the chain rejects an unmeterable rest pattern at deploy');
+            assert.match(String(atGate.deployGate.error), /rest/i);
+        } finally { console.warn = real; await pre.close(); await at.close(); }
+    });
+
+    it('pins the exact deploy-gate option key set _deployGateVerdict builds', async function() {
+        // Twin of the execute() drift guard below. enforceBannedRest was missing from
+        // this set and nothing went red, because an omitted key reads as `true`
+        // rather than as an error. A flag added to the indexer's
+        // deploy call site and missed here must break this test, not stay invisible.
+        const EXPECTED = [
+            'enforceBannedAsync', 'enforceBannedGenerator', 'enforceBannedRest',
+            'enforceBannedWasm', 'enforceLintGlobalAlias', 'enforceLintHardening'
+        ].sort();
+        const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
+        const seen = [];
+        const real = sim.vm.validateSyntax.bind(sim.vm);
+        sim.vm.validateSyntax = (src, opts) => { seen.push(Object.keys(opts).sort()); return real(src, opts); };
+        try {
+            await sim.deploy('module.exports = function(){ return "x"; };');
+            assert.deepStrictEqual(seen[0], EXPECTED, 'deploy-gate option set drifted');
+        } finally { sim.vm.validateSyntax = real; await sim.close(); }
+    });
+
     it('runs a TypeScript contract via the strip step', async function() {
         const sim = new ContractSimulator();
         try {

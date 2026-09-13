@@ -516,13 +516,19 @@ class ContractSimulator {
      *
      * The gate is the indexer's, resolved at THIS simulator's epoch rather than
      * hardcoded on: xchain-indexer/src/actions/deploy.js checks the UTF-8 size cap
-     * and then calls vm.validateSyntax with five epoch-resolved ban flags. It reads
+     * and then calls vm.validateSyntax with six epoch-resolved ban flags. It reads
      * those flags from its own protocolChanges table and per-coin activation
      * modules; the VM's exported predicates are the twins index.js already uses for
      * the execute-time re-lint (see the flag map above isExecLintActive's caller),
      * so they resolve the same verdict without a second copy of the thresholds.
      * The two height-keyed flags take the CONFIGURED coin, matching deploy.js,
      * which reads its node's COIN rather than deriving one from the address.
+     *
+     * banned-rest is the sixth and rides the REST_PATTERN_METER block-time flag-day,
+     * so it resolves from isRestPatternMeterActive exactly as the execute-time
+     * re-lint does. Omitting the key is not neutral: syntax.js defaults every
+     * enforce* flag to ON, so a missing flag enforces a rule the chain has not
+     * activated and rejects a source a pre-flag-day mainnet block accepts.
      */
     _deployGateVerdict(src) {
         if (Buffer.byteLength(src, 'utf8') > this.limits.maxCodeSize)
@@ -536,7 +542,8 @@ class ContractSimulator {
                 enforceLintHardening:   XChainVM.isLintHardeningActive(this.network, time),
                 enforceBannedGenerator: pkg3,
                 enforceBannedWasm:      pkg3,
-                enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height)
+                enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
+                enforceBannedRest:      XChainVM.isRestPatternMeterActive(this.network, time)
             });
         } catch (e) {
             // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a

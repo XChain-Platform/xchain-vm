@@ -114,6 +114,43 @@ describe('Toolkit gate: contract identity (contract-meta)', function () {
         assert(g.advisories.some((e) => e.rule === 'contract-meta-undecidable'));
     });
 
+    // Two module.exports assignments: the isolate evaluates the LAST one, and a
+    // source-order walk cannot prove which that is. First-wins read the leading
+    // assignment, so the first source below reported valid metadata while the
+    // evaluated export carries none (a false accept the chain then refuses), and
+    // the reversed source reported 'absent' and BLOCKED a contract the chain
+    // accepts. Both must now advise instead of deciding.
+    it('advises when a source assigns module.exports more than once', function () {
+        const first = 'module.exports = { meta: ' + VALID_META + ', permissions: [] };\n' +
+            'module.exports = { permissions: [] };\n';
+        assert.deepStrictEqual(getExportedMeta(first), { status: 'undecidable' });
+        const g1 = runGate(first);
+        assert.strictEqual(g1.ok, true, 'an undecidable read must not block');
+        assert.strictEqual(metaErrors(g1).length, 0);
+        assert(g1.advisories.some((e) => e.rule === 'contract-meta-undecidable'));
+
+        const reversed = 'module.exports = { permissions: [] };\n' +
+            'module.exports = { meta: ' + VALID_META + ', permissions: [] };\n';
+        assert.deepStrictEqual(getExportedMeta(reversed), { status: 'undecidable' });
+        const g2 = runGate(reversed);
+        assert.strictEqual(g2.ok, true, 'the reversed order must not block either');
+        assert.strictEqual(metaErrors(g2).length, 0);
+    });
+
+    it('advises when the function-export form assigns <id>.meta more than once', function () {
+        const src = 'function c (xchain) { return 1; }\n' +
+            'c.meta = ' + VALID_META + ';\n' +
+            'c.meta = { name: "", description: "" };\n' +
+            'module.exports = c;\n';
+        assert.deepStrictEqual(getExportedMeta(src), { status: 'undecidable' });
+    });
+
+    it('still decides a single export assignment', function () {
+        const ok = 'module.exports = { meta: ' + VALID_META + ', permissions: [] };\n';
+        assert.strictEqual(getExportedMeta(ok).status, 'present');
+        assert.strictEqual(getExportedMeta('module.exports = { permissions: [] };\n').status, 'absent');
+    });
+
     it('advises on an export object using a spread', function () {
         const src = 'var base = { a: 1 };\nmodule.exports = { ...base, meta: ' + VALID_META + ' };\n';
         assert.deepStrictEqual(getExportedMeta(src), { status: 'undecidable' });

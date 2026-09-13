@@ -185,7 +185,9 @@ function getExportedMeta(source) {
     let exportObj = null;      // module.exports = { ... }
     let exportName = null;     // module.exports = someIdentifier
     let seenExport = false;
+    let exportAssignments = 0;           // every module.exports assignment, any scope
     const metaAssignments = new Map();   // identifier -> the node assigned to <id>.meta
+    const metaAssignmentCounts = new Map();
 
     walk.simple(ast, {
         AssignmentExpression(node) {
@@ -193,7 +195,9 @@ function getExportedMeta(source) {
             if (!l || l.type !== 'MemberExpression' || l.computed) return;
             if (!l.object || l.object.type !== 'Identifier' || !l.property) return;
             if (l.object.name === 'module' && l.property.name === 'exports') {
-                // First module.exports assignment wins, matching the SDK walk.
+                // First module.exports assignment wins; the count below is what
+                // decides whether that read may be trusted at all.
+                exportAssignments += 1;
                 if (seenExport) return;
                 seenExport = true;
                 if (node.right && node.right.type === 'ObjectExpression') exportObj = node.right;
@@ -201,11 +205,24 @@ function getExportedMeta(source) {
                 return;
             }
             // The function-export form (spec R1): `contract.meta = { ... }`.
-            if (l.property.name === 'meta' && !metaAssignments.has(l.object.name)) {
-                metaAssignments.set(l.object.name, node.right);
+            if (l.property.name === 'meta') {
+                metaAssignmentCounts.set(l.object.name, (metaAssignmentCounts.get(l.object.name) || 0) + 1);
+                if (!metaAssignments.has(l.object.name)) metaAssignments.set(l.object.name, node.right);
             }
         }
     });
+
+    // More than one export assignment: the isolate evaluates whichever one runs
+    // LAST, and a source-order walk cannot say which that is (an assignment may
+    // sit inside a function, a branch or a loop, and walk.simple visits all of
+    // them). So the static read proves nothing here and must say so. This is the
+    // contract stated above, not a new one: 'absent' is the single outcome that
+    // PROVES the chain will answer "meta required", and a first-wins guess can
+    // reach it from a source whose evaluated export carries perfectly good meta
+    // (blocking a deploy the chain accepts) or miss it on the reverse ordering
+    // (passing a deploy the chain refuses). Undecidable routes to an advisory, so
+    // the gate advises instead of deciding on evidence it does not have.
+    if (exportAssignments > 1) return { status: 'undecidable' };
 
     if (exportObj) {
         for (const p of exportObj.properties) {
@@ -219,6 +236,9 @@ function getExportedMeta(source) {
 
     if (exportName) {
         if (!metaAssignments.has(exportName)) return { status: 'absent' };
+        // Same reasoning one level down: `c.meta = {...}; c.meta = {...}` leaves the
+        // first read unprovable, so it advises rather than deciding.
+        if ((metaAssignmentCounts.get(exportName) || 0) > 1) return { status: 'undecidable' };
         const right = metaAssignments.get(exportName);
         if (!right || right.type !== 'ObjectExpression') return { status: 'undecidable' };
         return readMetaLiterals(right);
@@ -387,6 +407,5 @@ module.exports = {
     // Exported for the toolkit's own tests and for callers that want the identity
     // read without the whole gate; the SDK keeps its own copy of this walk.
     getExportedMeta,
-    isValidMetaText,
-    META_VERDICTS
+    isValidMetaText
 };
