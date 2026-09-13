@@ -35,6 +35,7 @@ const {
 const ITERATIONS = 50;
 const WARMUP     = 5;
 
+// Inline contracts that isolate single gateway method types
 const CONTRACTS = {
     context_getters: `
 module.exports = function(xchain) {
@@ -147,6 +148,7 @@ async function main() {
 
         const stats = collectStats(timings);
 
+        // Compute per-call overhead
         const perCallUs = (stats.mean / callsPerExec) * 1000;
         rows.push({
             label: name + ' (' + callsPerExec + ' calls)',

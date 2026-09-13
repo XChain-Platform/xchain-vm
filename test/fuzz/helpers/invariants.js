@@ -80,6 +80,7 @@ function checkStateLimits(result, limits) {
 }
 
 function checkNoPrototypePollution() {
+    // Object.prototype must be clean
     const ownKeys = Object.getOwnPropertyNames(Object.prototype);
     const expected = [
         'constructor', 'hasOwnProperty', 'isPrototypeOf',
@@ -92,6 +93,7 @@ function checkNoPrototypePollution() {
             'Object.prototype has unexpected property: ' + key);
     }
 
+    // Array.prototype.push must still work
     const arr = [];
     arr.push(1);
     assert.strictEqual(arr.length, 1, 'Array.prototype.push is broken');

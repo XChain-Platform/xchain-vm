@@ -61,6 +61,7 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
         if (global.gc) global.gc();
         tracker.snapshot('end');
 
+        // Check for stability
         const growthMB = tracker.getHeapGrowth() / (1024 * 1024);
         const tolerance = global.gc ? 10 : 20; // Tighter tolerance with deterministic GC
 

@@ -42,6 +42,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('counter.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:60' });
 
+            // Block N: increment to 1
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:60', method: 'increment',
                 params: [], caller: 'user1'
@@ -51,6 +52,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
             h.mineBlock();
 
+            // Block N+1: increment to 2 (reads persisted state)
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:60', method: 'increment',
                 params: [], caller: 'user1'
@@ -88,6 +90,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:61A' });
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:61B' });
 
+            // Increment A 10 times
             for (let i = 0; i < 10; i++) {
                 await h.execute({
                     contractAddress: 'C:BTC:61A', method: 'increment',
@@ -95,6 +98,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
                 });
             }
 
+            // Increment B 3 times
             for (let i = 0; i < 3; i++) {
                 await h.execute({
                     contractAddress: 'C:BTC:61B', method: 'increment',
@@ -106,6 +110,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:61A', 'counter', '10');
             assertContractState(h.ledger, 'C:BTC:61B', 'counter', '3');
 
+            // Read from each to verify
             const rA = await h.execute({
                 contractAddress: 'C:BTC:61A', method: 'getCount',
                 params: [], caller: 'user1'
@@ -201,6 +206,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             });
             assertReturnValue(r, '2');
 
+            // Verify history has all three operations
             const history = h.ledger.stateHistory['C:BTC:63'];
             const xHistory = history.filter(e => e.key === 'x');
             assert.strictEqual(xHistory.length, 3, 'Expected 3 history entries for key x');

@@ -90,6 +90,7 @@ async function main() {
     console.log('Node ' + process.version + ' | Mix: 70% light / 20% medium / 10% heavy');
     console.log('Blocks per size: ' + BLOCKS_PER_SIZE);
 
+    // Load contracts
     CONTRACTS.light.code  = loadContract('light.js');
     CONTRACTS.medium.code = loadContract('medium.js');
     CONTRACTS.heavy.code  = loadContract('heavy.js');
@@ -108,6 +109,7 @@ async function main() {
         const avgBlockTime = blockResults.reduce((s, r) => s + r.blockTime, 0) / BLOCKS_PER_SIZE;
         const avgOps = (size / (avgBlockTime / 1000)).toFixed(1);
         const allTimings = blockResults.flatMap(r => {
+            // Reconstruct from stats (use the per-contract stats from last block)
             return [];
         });
         const lastStats = blockResults[blockResults.length - 1].stats;
@@ -148,9 +150,11 @@ async function main() {
         });
     }
 
+    // Combined table
     printTable('Block Throughput (With Cache)', cachedRows);
     printTable('Block Throughput (Without Cache)', uncachedRows);
 
+    // Cache impact summary
     console.log('\n  Cache Impact (uncached / cached block time):');
     for (let i = 0; i < BLOCK_SIZES.length; i++) {
         const cached   = parseFloat(cachedRows[i].stats.blockTimeMs);

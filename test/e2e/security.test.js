@@ -52,6 +52,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             const returnVal = JSON.parse(result.returnValue);
             assert(Array.isArray(returnVal), 'Expected array of results');
 
+            // Every attempt should report "undefined" or "blocked"
             const dangerous = ['process', 'require', 'eval', 'Function',
                                'Date', 'setTimeout', 'fetch', 'Proxy',
                                'WeakRef', 'SharedArrayBuffer'];
@@ -222,6 +223,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:34B'
             });
 
+            // A should see its secret
             const rA = await h.execute({
                 contractAddress: 'C:BTC:34A', method: 'getSecret',
                 params: [], caller: 'user1'

@@ -38,6 +38,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
         h.seedBalance('user1', 'TEST', '500');
         h.seedBalance('user2', 'TEST', '0');
 
+        // Deploy token_sender contract
         const code = h.loadContract('token_sender.js');
         await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:1', params: ['TEST'] });
     });

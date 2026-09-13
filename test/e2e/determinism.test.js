@@ -70,6 +70,7 @@ function hashResult(result) {
                 hashes.push(hashResult(result));
             }
 
+            // All hashes must be identical
             for (let i = 1; i < hashes.length; i++) {
                 assert.strictEqual(hashes[i], hashes[0],
                     `Run ${i} produced different result hash: ${hashes[i]} vs ${hashes[0]}`);
@@ -167,6 +168,7 @@ function hashResult(result) {
                 };
             }
 
+            // Run simulation twice
             const sim1 = await runSimulation();
             const sim2 = await runSimulation();
 
@@ -174,6 +176,7 @@ function hashResult(result) {
             assert.deepStrictEqual(sim1.finalState, sim2.finalState,
                 'Final state should be identical after replay');
 
+            // Each block's result must match
             for (let i = 0; i < sim1.resultHashes.length; i++) {
                 assert.strictEqual(sim1.resultHashes[i], sim2.resultHashes[i],
                     `Block ${i} result hash differs between simulations`);

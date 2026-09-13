@@ -77,6 +77,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:40b'
             });
 
+            // Gas exhaust
             await hLow.execute({
                 contractAddress: 'C:BTC:40b', method: 'loop',
                 params: [], caller: 'deployer'
@@ -139,11 +140,13 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:41b'
             });
 
+            // OOM/timeout on first
             await h.execute({
                 contractAddress: 'C:BTC:41a', method: 'oom',
                 params: [], caller: 'user1'
             });
 
+            // Second contract should work fine
             const r = await h.execute({
                 contractAddress: 'C:BTC:41b', method: 'ok',
                 params: [], caller: 'user1'
@@ -156,6 +159,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
     // --- E2E-042: Wall-clock timeout ---
     describe('E2E-042: Wall-clock timeout', function() {
         it('should terminate on timeout', async function() {
+            // Use a very short timeout
             const hShort = new E2EHarness(XChainVM, {
                 gasCeiling: 100000000, // Very high gas so it won't gas-out first
                 limits: { maxCpuTimeMs: 500 }
@@ -279,6 +283,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:46'
             });
 
+            // First execution uses gas but succeeds
             const r1 = await hLow.execute({
                 contractAddress: 'C:BTC:46', method: 'work',
                 params: [], caller: 'deployer'

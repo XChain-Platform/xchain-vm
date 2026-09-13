@@ -17,6 +17,7 @@ module.exports = function(xchain) {
     for (var i = 0; i < count; i++) {
         xchain.state.set('key_' + i, 'value_' + i + '_data');
     }
+    // Read them all back
     var total = 0;
     for (var i = 0; i < count; i++) {
         var v = xchain.state.get('key_' + i);

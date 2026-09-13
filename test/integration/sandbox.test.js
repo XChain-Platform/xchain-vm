@@ -158,6 +158,7 @@ function executeCode(vm, code) {
         const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/sandbox_escape.js'), 'utf8');
         const result = await executeCode(vm, code);
         assert.strictEqual(result.success, true);
+        // All escape attempts should report blocked or undefined
         for (const log of result.logs) {
             assert(log.includes('undefined') || log.includes('blocked'),
                 'escape attempt should be blocked: ' + log);

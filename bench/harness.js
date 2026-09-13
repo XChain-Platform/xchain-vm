@@ -97,10 +97,12 @@ function loadContract(name) {
  * @returns {Promise<number[]>} Array of timings in ms
  */
 async function measure(fn, iterations, warmup = 5) {
+    // Warmup
     for (let i = 0; i < warmup; i++) {
         await fn(i);
     }
 
+    // Measured runs
     const timings = new Array(iterations);
     for (let i = 0; i < iterations; i++) {
         const start = performance.now();

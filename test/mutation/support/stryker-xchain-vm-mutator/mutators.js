@@ -91,6 +91,7 @@ function arrayElementDeletion(source, filename) {
                 const commaIdx = afterEl.indexOf(',');
                 if (commaIdx !== -1) {
                     removeEnd = el.end + commaIdx + 1;
+                    // Also consume whitespace after the comma
                     while (removeEnd < node.elements[i + 1].start &&
                            (source[removeEnd] === ' ' || source[removeEnd] === '\n' ||
                             source[removeEnd] === '\r' || source[removeEnd] === '\t')) {
@@ -333,6 +334,7 @@ function embeddedCodeMutation(source, filename) {
         { re: /(?:const|let|var)\s+(\w+)\s*=\s*`([\s\S]*?)`;/g, type: 'template' },
     ];
 
+    // Inner operators to apply inside embedded code
     const innerOperators = [
         { name: 'ArrayElementDeletion', fn: arrayElementDeletion },
         { name: 'GuardDeletion',        fn: guardDeletion },
@@ -341,6 +343,7 @@ function embeddedCodeMutation(source, filename) {
 
     for (const { re, type } of embeddedPatterns) {
         let match;
+        // Reset lastIndex for each pattern
         re.lastIndex = 0;
         while ((match = re.exec(source)) !== null) {
             const varName = match[1];
@@ -352,11 +355,13 @@ function embeddedCodeMutation(source, filename) {
             for (const op of innerOperators) {
                 const innerMutants = op.fn(embeddedCode, filename + ':' + varName);
                 for (const im of innerMutants) {
+                    // Reconstruct outer source with this mutation applied inside the string
                     const mutatedEmbedded = im.mutatedSource;
                     const mutatedOuter = source.slice(0, codeStartInOuter) +
                         mutatedEmbedded +
                         source.slice(codeStartInOuter + embeddedCode.length);
 
+                    // Adjust location to outer file coordinates
                     const linesBeforeEmbed = source.slice(0, codeStartInOuter).split('\n');
                     const embedStartLine = linesBeforeEmbed.length;
                     const adjustedLine = embedStartLine + im.location.start.line - 1;

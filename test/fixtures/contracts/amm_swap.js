@@ -69,6 +69,7 @@ module.exports = {
         xchain.state.set('reserveA', newReserveA);
         xchain.state.set('reserveB', newReserveB);
 
+        // Send output to caller
         xchain.emit.send({
             destination: xchain.getSourceAddress(),
             tick: outputToken,

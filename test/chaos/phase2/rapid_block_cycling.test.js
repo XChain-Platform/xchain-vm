@@ -107,6 +107,7 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
 
         vm.beginBlock();
 
+        // Execute same contract 5 times with different params
         for (let i = 0; i < 5; i++) {
             const result = await execute(vm, code, { params: [String(i)] });
             checkResultShape(result);

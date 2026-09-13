@@ -47,9 +47,11 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 params: ['TOKENA', 'TOKENB']
             });
 
+            // Deposit tokens to contract custody
             h.ledger.creditContractBalance('C:BTC:10', 'TOKENA', '10000');
             h.ledger.creditContractBalance('C:BTC:10', 'TOKENB', '10000');
 
+            // Add liquidity: 1000 TOKENA + 1000 TOKENB
             const addResult = await h.execute({
                 contractAddress: 'C:BTC:10', method: 'addLiquidity',
                 params: ['1000', '1000'], caller: 'deployer'
@@ -102,6 +104,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 params: ['user1', 'TEST', '1000', '10', '100']
             });
 
+            // Deposit tokens to contract custody
             h.ledger.creditContractBalance('C:BTC:11', 'TEST', '1000');
 
             const r1 = await h.execute({
@@ -124,6 +127,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert.strictEqual(r2.emittedActions[0].action, 'SEND');
             assert.strictEqual(r2.emittedActions[0].params.destination, 'user1');
 
+            // Verify claimed amount updated
             const claimed = h.ledger.getContractStateKey('C:BTC:11', 'claimed');
             assert(claimed !== '0', 'Claimed should be updated');
         });
@@ -154,6 +158,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 params: ['TEST']
             });
 
+            // Give contract custody tokens
             h.ledger.creditContractBalance('C:BTC:12', 'TEST', '500');
 
             const result = await h.execute({
@@ -178,6 +183,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             const code = h.loadContract('counter.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:13' });
 
+            // 5 increments across 5 blocks
             for (let i = 0; i < 5; i++) {
                 const r = await h.execute({
                     contractAddress: 'C:BTC:13', method: 'increment',
@@ -188,6 +194,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             }
             assertContractState(h.ledger, 'C:BTC:13', 'counter', '5');
 
+            // 2 decrements
             for (let i = 0; i < 2; i++) {
                 const r = await h.execute({
                     contractAddress: 'C:BTC:13', method: 'decrement',
