@@ -217,6 +217,7 @@ function guardDeletion(source, filename) {
         // Don't mutate if there's an else branch (more complex logic)
         if (node.alternate) return;
 
+        // Replace entire if statement with empty block
         const original = source.slice(node.start, node.end);
         const mutatedSource = source.slice(0, node.start) +
             '{ /* guard removed */ }' +
@@ -332,6 +333,7 @@ function embeddedCodeMutation(source, filename) {
     const embeddedPatterns = [
         // Template literal: const VARNAME = `...`;
         { re: /(?:const|let|var)\s+(\w+)\s*=\s*`([\s\S]*?)`;/g, type: 'template' },
+    // Single-quoted multiline (rare but possible via concatenation)
     ];
 
     // Inner operators to apply inside embedded code

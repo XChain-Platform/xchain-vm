@@ -107,6 +107,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             // Deposit tokens to contract custody
             h.ledger.creditContractBalance('C:BTC:11', 'TEST', '1000');
 
+            // Try to claim before cliff (still at block 1)
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:11', method: 'claim',
                 params: [], caller: 'user1'
@@ -205,6 +206,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             }
             assertContractState(h.ledger, 'C:BTC:13', 'counter', '3');
 
+            // Verify via contract read
             const r = await h.execute({
                 contractAddress: 'C:BTC:13', method: 'getCount',
                 params: [], caller: 'user1'

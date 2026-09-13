@@ -324,6 +324,7 @@ describe('[P3] Integration Regression', function() {
             });
             assert.strictEqual(init.success, true);
 
+            // Increment (using state from init)
             const state = {};
             for (const ch of init.stateChanges) state[ch.key] = ch.value;
 
@@ -359,6 +360,7 @@ describe('[P3] Integration Regression', function() {
             });
             assert.strictEqual(set.success, true);
 
+            // Build state from changes
             const state = {};
             for (const ch of set.stateChanges) state[ch.key] = ch.value;
 

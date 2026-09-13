@@ -106,6 +106,7 @@ async function main() {
         for (let b = 0; b < BLOCKS_PER_SIZE; b++) {
             blockResults.push(await benchmarkBlock(vm, size, true));
         }
+        // Average across blocks
         const avgBlockTime = blockResults.reduce((s, r) => s + r.blockTime, 0) / BLOCKS_PER_SIZE;
         const avgOps = (size / (avgBlockTime / 1000)).toFixed(1);
         const allTimings = blockResults.flatMap(r => {

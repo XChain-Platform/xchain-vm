@@ -50,6 +50,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertSuccess(r1);
             assertReturnValue(r1, '1');
 
+            // Advance block
             h.mineBlock();
 
             // Block N+1: increment to 2 (reads persisted state)
@@ -136,6 +137,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             });
             h.mineBlock();
 
+            // Block 2: increment to 2
             await h.execute({
                 contractAddress: 'C:BTC:62', method: 'increment',
                 params: [], caller: 'user1'
@@ -146,6 +148,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
             h.mineBlock();
 
+            // Block 3: increment to 3
             await h.execute({
                 contractAddress: 'C:BTC:62', method: 'increment',
                 params: [], caller: 'user1'
@@ -180,6 +183,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
                 deployer: 'deployer', contractAddress: 'C:BTC:63'
             });
 
+            // Step 1: set x = '1'
             await h.execute({
                 contractAddress: 'C:BTC:63', method: 'setKey',
                 params: ['1'], caller: 'user1'
@@ -187,6 +191,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:63', 'x', '1');
             h.mineBlock();
 
+            // Step 2: delete x
             await h.execute({
                 contractAddress: 'C:BTC:63', method: 'deleteKey',
                 params: [], caller: 'user1'
@@ -194,12 +199,14 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractStateDeleted(h.ledger, 'C:BTC:63', 'x');
             h.mineBlock();
 
+            // Step 3: set x = '2'
             await h.execute({
                 contractAddress: 'C:BTC:63', method: 'setKey',
                 params: ['2'], caller: 'user1'
             });
             assertContractState(h.ledger, 'C:BTC:63', 'x', '2');
 
+            // Verify via contract read
             const r = await h.execute({
                 contractAddress: 'C:BTC:63', method: 'getKey',
                 params: [], caller: 'user1'

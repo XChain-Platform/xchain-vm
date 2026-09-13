@@ -56,6 +56,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             h.seedBalance('C:BTC:1', 'TEST', '0');
             h.ledger.creditContractBalance('C:BTC:1', 'TEST', '1000');
 
+            // Execute send
             const result = await h.execute({
                 contractAddress: 'C:BTC:1', method: 'send',
                 params: ['user1', '50'], caller: 'deployer'
@@ -116,6 +117,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('multi_method.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:5' });
 
+            // Call setValue
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:5', method: 'setValue',
                 params: ['hello'], caller: 'deployer'
@@ -124,6 +126,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertReturnValue(r1, 'hello');
             assertContractState(h.ledger, 'C:BTC:5', 'value', 'hello');
 
+            // Call getValue
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:5', method: 'getValue',
                 params: [], caller: 'user1'
@@ -147,6 +150,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('multi_method.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:5c' });
 
+            // Owner can call onlyOwner
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:5c', method: 'onlyOwner',
                 params: [], caller: 'deployer'
@@ -154,6 +158,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertSuccess(r1);
             assertReturnValue(r1, 'authorized');
 
+            // Non-owner cannot
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:5c', method: 'onlyOwner',
                 params: [], caller: 'user1'

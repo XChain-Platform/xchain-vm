@@ -129,6 +129,7 @@ function main() {
     if (opts.dryRun) {
         console.log('[DRY RUN] Would test ' + allMutants.length + ' mutants. Exiting.');
 
+        // Still output the mutant list for inspection
         for (let i = 0; i < allMutants.length; i++) {
             const m = allMutants[i];
             console.log('  #' + (i + 1) + ' ' + m.file + ':' + m.location.start.line +

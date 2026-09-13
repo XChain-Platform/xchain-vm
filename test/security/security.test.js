@@ -680,6 +680,7 @@ function executeCode(vm, code, opts) {
         it('initial state with __proto__ key should not pollute prototype', function() {
             // When passing { '__proto__': 'injected' } as a literal, JS interprets
             // __proto__ as the prototype setter, so Object.entries won't see it.
+            // Verify the state store itself is prototype-free (no inherited keys).
             const sm = new StateManager({}, {
                 maxStateKeys: 100, maxStateValueSize: 65536, maxStateKeySize: 1024
             });
@@ -709,6 +710,7 @@ function executeCode(vm, code, opts) {
             const actions = ec.getActions();
             assert.strictEqual(actions.length, 1);
             assert.strictEqual(actions[0].params.__proto__, undefined);
+            // Verify normal params are preserved
             assert.strictEqual(actions[0].params.destination, 'addr1');
         });
 
@@ -1051,6 +1053,7 @@ function executeCode(vm, code, opts) {
     before(function() { vm = createVM(); });
 
     it('RISK-13a: sequential executions should not share state', async function() {
+        // First execution writes state
         const r1 = await executeCode(vm, `
             module.exports = function(xchain) {
                 xchain.state.set('leaked', 'secret');
@@ -1072,11 +1075,13 @@ function executeCode(vm, code, opts) {
     it('RISK-13b: compilation cache should not leak between contracts', async function() {
         vm.beginBlock();
         try {
+            // Execute contract A
             const r1 = await executeCode(vm, `
                 module.exports = function(xchain) { return 'contract_a'; };
             `, { contractAddress: 'C:BTC:A' });
             assert.strictEqual(r1.success, true);
 
+            // Execute contract B (different code)
             const r2 = await executeCode(vm, `
                 module.exports = function(xchain) { return 'contract_b'; };
             `, { contractAddress: 'C:BTC:B' });

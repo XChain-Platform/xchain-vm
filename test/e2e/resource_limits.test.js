@@ -83,6 +83,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 params: [], caller: 'deployer'
             });
 
+            // System should still work
             const r2 = await hLow.execute({
                 contractAddress: 'C:BTC:40b', method: 'ok',
                 params: [], caller: 'deployer'
@@ -291,6 +292,7 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertSuccess(r1);
             const gas1 = r1.gasUsed;
 
+            // Second execution should get a fresh gas budget (not cumulative)
             const r2 = await hLow.execute({
                 contractAddress: 'C:BTC:46', method: 'work',
                 params: [], caller: 'deployer'
