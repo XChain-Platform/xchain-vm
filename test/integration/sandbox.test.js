@@ -150,6 +150,10 @@ function executeCode(vm, code) {
             };
         `);
         assert.strictEqual(result.success, true);
+        // Either returns 'undefined' or 'blocked: ...'. Both are a pass: the
+        // binding may be absent from the isolate entirely, or present and
+        // neutered so reaching for it throws. What must never happen is the
+        // contract getting a working one back.
         const val = JSON.parse(result.returnValue);
         assert(val === 'undefined' || val.startsWith('blocked'), 'should be blocked: ' + val);
     });

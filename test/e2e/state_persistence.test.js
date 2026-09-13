@@ -131,6 +131,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             const code = h.loadContract('counter.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:62' });
 
+            // Block 1: increment to 1. Each block below leaves the counter at a
+            // different value, which is what makes the rollback visible: after
+            // the reorg the counter must read the pre-reorg block's value, not
+            // the one the orphaned block wrote.
             await h.execute({
                 contractAddress: 'C:BTC:62', method: 'increment',
                 params: [], caller: 'user1'

@@ -122,6 +122,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
         });
 
         it('should remain stable after OOM/timeout', async function() {
+            // Deploy two separate contracts: one that exhausts memory and one
+            // that is well behaved. The point is that the second still runs
+            // after the first has been killed, so an out-of-resource contract
+            // cannot take the rest of the block down with it.
             await h.deploy({
                 code: `module.exports = {
                     initialize: function(xchain) {},

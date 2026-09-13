@@ -17,6 +17,10 @@
 
 const assert = require('assert');
 
+// Loaded in a try so the suite SKIPS rather than fails where the native
+// isolate binding cannot load at all; the preflight suite is what turns a
+// genuinely broken binding into a loud failure, so a skip here is never the
+// only signal.
 let XChainVM;
 try {
     XChainVM = require('../../src/index.js');
