@@ -319,7 +319,7 @@ class ContractSimulator {
         this.rules = (opts.rules === 'scheduled') ? 'scheduled' : 'live';
         // Resolved per construction, never once at module load, so a process that
         // outlives a flag day picks the new rules up on its next simulator. Held on
-        // the instance because _warnIfPreGate measures against THIS simulator's live
+        // the instance because warnIfPreGate measures against THIS simulator's live
         // anchor rather than a module-wide one.
         this._liveBlockTime = liveBlockTime();
         const time0 = (this.rules === 'scheduled') ? SCHEDULED_BLOCK_TIME : this._liveBlockTime;
@@ -354,11 +354,11 @@ class ContractSimulator {
                 );
             }
         }
-        // One pre-flag-day warning per instance, not per call (see _warnIfPreGate).
+        // One pre-flag-day warning per instance, not per call (see warnIfPreGate).
         this._preGateWarned = false;
-        // Likewise for the height-gate warning (see _warnIfPreHeightGate).
+        // Likewise for the height-gate warning (see warnIfPreHeightGate).
         this._preHeightGateWarned = false;
-        // Likewise for the deploy-gate rejection warning (see _warnDeployGate).
+        // Likewise for the deploy-gate rejection warning (see warnDeployGate).
         this._deployGateWarned = false;
 
         // Read-only snapshots the author seeds.
@@ -527,7 +527,7 @@ class ContractSimulator {
      * no warning; against the max anchor that caller was told it predated a flag-day
      * it had in fact already passed.
      */
-    _warnIfPreGate() {
+    warnIfPreGate() {
         if (this._preGateWarned) return;
         const live = this._liveBlockTime;
         if (Number(this.block.timestamp) >= live) return;
@@ -553,7 +553,7 @@ class ContractSimulator {
      * gate from the explicit `null` unarmed sentinel, which must never warn.
      * Deliberate below-gate runs stay legal, so this warns rather than throwing.
      */
-    _warnIfPreHeightGate(contractAddress) {
+    warnIfPreHeightGate(contractAddress) {
         if (this._preHeightGateWarned) return;
         if (GENESIS_ACTIVE_NETWORKS.indexOf(this.network) !== -1) return;
 
@@ -612,7 +612,7 @@ class ContractSimulator {
      * enforce* flag to ON, so a missing flag enforces a rule the chain has not
      * activated and rejects a source a pre-flag-day mainnet block accepts.
      */
-    _deployGateVerdict(src) {
+    deployGateVerdict(src) {
         if (Buffer.byteLength(src, 'utf8') > this.limits.maxCodeSize)
             return { valid: false, error: 'exceeds max size' };
         const time   = Number(this.block.timestamp);
@@ -675,12 +675,12 @@ class ContractSimulator {
      * @returns {Promise<{contractIndex, contractAddress, initResult, deployGate}>}
      *          deployGate is the chain's deploy verdict, `{ valid: true }` or
      *          `{ valid: false, error }`. Advisory: a reject warns once and the
-     *          contract is still registered (see _deployGateVerdict).
+     *          contract is still registered (see deployGateVerdict).
      */
     async deploy(code, opts = {}) {
         const src = toContractJs(code, opts.filename || '');
-        const deployGate = this._deployGateVerdict(src);
-        if (deployGate.valid !== true) this._warnDeployGate(deployGate);
+        const deployGate = this.deployGateVerdict(src);
+        if (deployGate.valid !== true) this.warnDeployGate(deployGate);
         const index = (opts.contractIndex != null) ? Number(opts.contractIndex) : this._nextIndex;
         if (index >= this._nextIndex) this._nextIndex = index + 1;
         const address = opts.contractAddress || ('C:' + this.coin + ':' + index);
@@ -704,9 +704,9 @@ class ContractSimulator {
      * Warn once per simulator when the deploy gate rejects a source. Fires only on
      * a REJECT, so a clean contract keeps the simulator silent, and once per
      * instance for the same reason the two block-gate warnings are (see
-     * _warnIfPreGate): a per-call warning trains authors to ignore it.
+     * warnIfPreGate): a per-call warning trains authors to ignore it.
      */
-    _warnDeployGate(verdict) {
+    warnDeployGate(verdict) {
         if (this._deployGateWarned) return;
         this._deployGateWarned = true;
         if (verdict.valid === null) {
@@ -740,7 +740,7 @@ class ContractSimulator {
      * @returns {Promise<object>} the VM execute() result, unchanged.
      */
     async call(contractIndex, method = 'default', params = [], opts = {}) {
-        return this._execute(contractIndex, method, params, opts, null);
+        return this.execute(contractIndex, method, params, opts, null);
     }
 
     /**
@@ -764,7 +764,7 @@ class ContractSimulator {
             const v = action[k];
             return (v === undefined || v === null) ? '' : String(v);
         });
-        return this._execute(contractIndex, GUARD_METHOD, params, opts, {
+        return this.execute(contractIndex, GUARD_METHOD, params, opts, {
             isGuard: true,
             // A guard has no attestation-request surface (the gateway disables
             // attestation.request under isGuard), so the chain keeps its read
@@ -782,13 +782,13 @@ class ContractSimulator {
      * LAST so a mode owns the keys it pins; everything else stays exactly as
      * call() has always built it.
      */
-    async _execute(contractIndex, method, params, opts, modeOverrides) {
+    async execute(contractIndex, method, params, opts, modeOverrides) {
         const contract = this.contracts.get(Number(contractIndex));
         if (!contract) {
             throw new Error('no contract deployed at index ' + contractIndex);
         }
-        this._warnIfPreGate();
-        this._warnIfPreHeightGate(contract.address);
+        this.warnIfPreGate();
+        this.warnIfPreHeightGate(contract.address);
 
         const execOpts = {
             code: contract.code,

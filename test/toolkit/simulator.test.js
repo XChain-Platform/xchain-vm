@@ -219,7 +219,7 @@ module.exports = {
         } finally { console.warn = real; await pre.close(); await at.close(); }
     });
 
-    it('pins the exact deploy-gate option key set _deployGateVerdict builds', async function() {
+    it('pins the exact deploy-gate option key set deployGateVerdict builds', async function() {
         // Twin of the execute() drift guard below. enforceBannedRest was missing from
         // this set and nothing went red, because an omitted key reads as `true`
         // rather than as an error. A flag added to the indexer's

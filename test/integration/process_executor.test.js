@@ -240,7 +240,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 
             // Worker becomes dispatchable again → the contract must RUN.
             exec._sawReady = true;
-            exec._flush();
+            exec.flush();
             const r = await queued;
             assert.strictEqual(r.success, true,
                 'queue wait must never produce out_of_resource (fork risk): ' + r.error);
@@ -299,7 +299,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 
     // Finding #2716: shutdown() must not fabricate a billed result for a
     // queued (never-dispatched) execution. Only DISPATCHED work may resolve
-    // into a contract-visible outcome (see _onExit and the broken-latch
+    // into a contract-visible outcome (see onExit and the broken-latch
     // path); a queued entry never ran, so shutdown racing it must REJECT
     // with a local host fault, not resolve out_of_resource + a ceiling fee
     // for a contract the rest of the fleet ran normally.
@@ -360,15 +360,15 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
 
     // The DISPATCHED half of the halt-vs-fabricate rule, end to end through the
     // real worker. index.js raises HostFaultError when createIsolate() fails on
-    // THIS host (memory pressure, thread-creation failure) and _classifyError
+    // THIS host (memory pressure, thread-creation failure) and classifyError
     // re-throws it precisely so no verdict is written. Swallowing that into
-    // process.exit(1) makes _onExit commit
+    // process.exit(1) makes onExit commit
     // 'out_of_resource: execution host terminated' at gasUsed = ceiling for an
     // execution every healthy peer commits as a success -- a unilateral fork.
     //
     // maxMemory below isolated-vm's 8 MB floor makes `new ivm.Isolate` throw for
     // real, so the whole production path runs: isolate.js -> index.js:2192
-    // HostFaultError -> _classifyError re-throw -> the worker's catch. Nothing is
+    // HostFaultError -> classifyError re-throw -> the worker's catch. Nothing is
     // stubbed, so a regression on either side of the IPC seam reddens this.
     it('a dispatched execution REJECTS on a host-local isolate-spawn failure (never out_of_resource)', async function () {
         const ProcessExecutor = require('../../src/process_executor.js');
@@ -403,7 +403,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         }
     });
 
-    // The reject path must also free the dispatch slot. Without the _flush() in
+    // The reject path must also free the dispatch slot. Without the flush() in
     // the hostfault branch the queued entry behind the faulted one would sit in
     // _queue forever (no result, no exit, no watchdog: it was never dispatched),
     // hanging the block instead of halting it.
@@ -436,7 +436,7 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         const ProcessExecutor = require('../../src/process_executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         try {
-            exec._onMessage({ type: 'hostfault', id: 999999, reason: 'stale' });
+            exec.onMessage({ type: 'hostfault', id: 999999, reason: 'stale' });
             assert.strictEqual(exec._pending.size, 0);
         } finally {
             exec.shutdown();

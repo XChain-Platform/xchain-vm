@@ -99,23 +99,23 @@ process.on('message', (msg) => {
                 // A HostFaultError says THIS MACHINE cannot run the contract at all:
                 // index.js raises it when isolateManager.createIsolate() fails, and
                 // syntax.js raises it when the execute-time lint isolate cannot be
-                // spawned (reaching execute() through _getLintVerdict, outside its own
+                // spawned (reaching execute() through getLintVerdict, outside its own
                 // try block). Both are properties of this host's memory/thread budget,
                 // not of the contract, so every healthy peer commits a normal result
                 // for the same execution. Dying here handed the parent's crash clamp a
                 // dispatched entry, which resolved a committed
                 // 'out_of_resource: execution host terminated' at gasUsed = ceiling --
-                // a unilateral fork, and the exact laundering index.js:_classifyError
+                // a unilateral fork, and the exact laundering index.js:classifyError
                 // re-throws HostFaultError to prevent. Report it instead; the parent
                 // rejects the request so the caller HALTS and retries, which is the
                 // rule process_executor already enforces for queued and shutdown work.
                 // Tested with instanceof, never e.code or the message: an error that
                 // crossed the isolate boundary arrives as a plain host Error built from
                 // contract-controlled text, and a name/code match would let a contract
-                // spoof a chain-wide halt (same anti-spoof rule as _classifyError).
+                // spoof a chain-wide halt (same anti-spoof rule as classifyError).
                 //
                 // Every OTHER throw still dies into the parent's deterministic
-                // host-termination machinery (_onExit -> hostTerminatedResult), which
+                // host-termination machinery (onExit -> hostTerminatedResult), which
                 // clamps the request to its caller-funded ceiling identically on every
                 // validator, exactly as an in-isolate resource failure would.
                 if (e instanceof HostFaultError) {

@@ -142,7 +142,7 @@ const CONSENSUS_VERSION = '4';
 // (utility.vmFailureStatus). The whole resource-exhaustion family collapses to
 // 'out_of_resource' (the gas-vs-wallclock fork fix); adding/splitting a token
 // is a consensus change. STATUS_ERROR_PREFIXES documents the raw error prefixes
-// the VM's _classifyError (+ process_executor) can emit, which the indexer maps
+// the VM's classifyError (+ process_executor) can emit, which the indexer maps
 // into the tokens above; the cross-service parity test locks the mapping.
 // NOTE: 'out_of_gas' remains in STATUS_ERROR_PREFIXES as a raw prefix the VM
 // can still emit; the indexer's vmFailureStatus normalises it to 'out_of_resource',

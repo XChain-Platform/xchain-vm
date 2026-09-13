@@ -85,7 +85,7 @@ class ProcessExecutor {
         // Watchdog: belt over the isolate's own wall-clock budget in case the
         // child hangs (stuck isolate, native deadlock). Generous buffer above the
         // in-isolate timeout so the isolate's deterministic timeout wins normally.
-        // Started at DISPATCH (see _flush), so it bounds one contract's
+        // Started at DISPATCH (see flush), so it bounds one contract's
         // execution only, never queue wait, which varies per host.
         //
         // The floor is CONSENSUS_MAX_WALL_MS, not the node's maxCpuTimeMs: a gated
@@ -110,10 +110,10 @@ class ProcessExecutor {
         this._broken = false;        // host fault latch: worker can't start (recoverable)
         this._lastBrokenRetryAt = 0; // backoff gate for broken-state recovery probes
 
-        this._spawn();
+        this.spawn();
     }
 
-    _spawn() {
+    spawn() {
         if (this._shuttingDown) return;
         const child = fork(WORKER_PATH, [], {
             // Inherit stdio so the worker's console.error (e.g. [VM TIMEOUT]) is visible.
@@ -123,8 +123,8 @@ class ProcessExecutor {
         this._sawReady = false;
         this._spawnedAt = Date.now();
 
-        child.on('message', (msg) => this._onMessage(msg));
-        child.on('exit', (code, signal) => this._onExit(code, signal));
+        child.on('message', (msg) => this.onMessage(msg));
+        child.on('exit', (code, signal) => this.onExit(code, signal));
         child.on('error', () => { /* surfaced via 'exit' */ });
 
         // A child that hangs before 'ready' would otherwise stall the queue
@@ -151,7 +151,7 @@ class ProcessExecutor {
         catch (e) { return false; }
     }
 
-    _onMessage(msg) {
+    onMessage(msg) {
         if (!msg) return;
         if (msg.type === 'ready') {
             this._sawReady = true;
@@ -159,7 +159,7 @@ class ProcessExecutor {
             if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
             // A fresh worker is now dispatchable; send it any queued executions
             // (e.g. the contract that followed a crashed/killed one in this block).
-            this._flush();
+            this.flush();
             return;
         }
         if (msg.type === 'result') {
@@ -169,9 +169,9 @@ class ProcessExecutor {
             if (entry.timer) clearTimeout(entry.timer);
             entry.resolve(msg.result);
             // The in-flight slot is free again: dispatch the next queued entry
-            // (single-in-flight invariant; see _flush). Its watchdog starts
+            // (single-in-flight invariant; see flush). Its watchdog starts
             // NOW, at its own dispatch, never during its queue wait.
-            this._flush();
+            this.flush();
             return;
         }
         if (msg.type === 'hostfault') {
@@ -193,7 +193,7 @@ class ProcessExecutor {
             // entry, same as the result path. Deliberately NOT touching _broken or
             // _consecutiveSpawnFailures -- the worker started fine, so the
             // spawn-failure machinery has nothing to count.
-            this._flush();
+            this.flush();
         }
     }
 
@@ -203,7 +203,7 @@ class ProcessExecutor {
     // runs on a fresh, ready worker on every validator, instead of racing a dying
     // worker. Racing a dying worker would resolve it as a host-termination on some
     // nodes and run it on others, producing a divergent result and a fork.
-    _flush() {
+    flush() {
         // AT MOST ONE ENTRY IN FLIGHT (`_pending.size === 0` in the loop guard):
         // the worker (vm_worker.js) executes strictly sequentially, so if two
         // entries were dispatched together the 2nd's watchdog would start
@@ -231,16 +231,16 @@ class ProcessExecutor {
             // request that never dispatches is bounded by the worker readiness
             // timeout + spawn-failure machinery instead (HostFaultError →
             // halt and retry), which is a local fault, not a consensus result.
-            entry.timer = setTimeout(() => this._onWatchdog(entry.id), this._watchdogMs);
+            entry.timer = setTimeout(() => this.onWatchdog(entry.id), this._watchdogMs);
             this._pending.set(entry.id, { resolve: entry.resolve, reject: entry.reject, timer: entry.timer, ceiling: entry.ceiling });
         }
     }
 
     // Dispatched but unresponsive past the in-isolate timeout + buffer: the
     // worker is stuck (hung isolate, native deadlock). Kill it (triggers
-    // _onExit, then respawn) and resolve THIS request deterministically with
+    // onExit, then respawn) and resolve THIS request deterministically with
     // the same resource-failure clamp the in-isolate timeout would have produced.
-    _onWatchdog(id) {
+    onWatchdog(id) {
         const entry = this._pending.get(id);
         if (!entry) return;
         this._pending.delete(id);
@@ -252,14 +252,14 @@ class ProcessExecutor {
         if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
         // Mark the killed worker un-dispatchable NOW, synchronously, so the
         // NEXT execute() in this block queues until the respawn is 'ready'
-        // instead of racing the dying worker before _onExit fires (the
+        // instead of racing the dying worker before onExit fires (the
         // window that would otherwise host-terminate the next contract
         // nondeterministically). Safe vs the spawn-failure counter: the
-        // watchdog only fires long after spawn, past _onExit's <2s guard.
+        // watchdog only fires long after spawn, past onExit's <2s guard.
         this._sawReady = false;
     }
 
-    _onExit(code, signal) {
+    onExit(code, signal) {
         const child = this._child;
         this._child = null;
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
@@ -268,7 +268,7 @@ class ProcessExecutor {
         // here means the contract that was actually executing aborted the host. The
         // block must still advance. Queued (not-yet-dispatched) requests are left
         // intact: they never started, so they re-dispatch to the respawned worker
-        // (_flush on its 'ready') and run normally, identical on every validator.
+        // (flush on its 'ready') and run normally, identical on every validator.
         const kind = signal ? ('signal ' + signal) : ('exit ' + code);
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
@@ -297,7 +297,7 @@ class ProcessExecutor {
             this._queue = [];
             return;
         }
-        this._spawn();
+        this.spawn();
     }
 
     beginBlock() {
@@ -318,7 +318,7 @@ class ProcessExecutor {
             // recover on a backoff so a TRANSIENT fault self-heals without a
             // process restart: clear the latch and probe a fresh spawn, then let
             // the request queue normally. If the probe also fails the worker
-            // re-breaks and _onExit rejects the queued request (below); if it
+            // re-breaks and onExit rejects the queued request (below); if it
             // succeeds the request dispatches and runs. Within the backoff window
             // we reject immediately so a persistent fault doesn't fork-spin.
             const now = Date.now();
@@ -327,8 +327,8 @@ class ProcessExecutor {
             }
             this._lastBrokenRetryAt = now;
             this._broken = false;
-            this._spawn();
-            // fall through and queue; _flush dispatches once/if the probe is ready.
+            this.spawn();
+            // fall through and queue; flush dispatches once/if the probe is ready.
         }
         const id = this._nextId++;
         // Resolve the per-call ceiling NOW (same helper as the in-process path in
@@ -337,15 +337,15 @@ class ProcessExecutor {
         const ceiling = effectiveCeiling(opts && opts.gasCeiling, this._gasCeiling);
         return new Promise((resolve, reject) => {
             // No timer here: the watchdog starts when the request DISPATCHES
-            // (_flush), so queue wait (which differs per host) is never part
-            // of the bound. Queued requests are cleaned up by _onExit (broken
+            // (flush), so queue wait (which differs per host) is never part
+            // of the bound. Queued requests are cleaned up by onExit (broken
             // latch → HostFaultError) or shutdown().
             //
             // Accept into the queue, then dispatch only if a ready worker exists.
             // Never send to a worker that has not signaled 'ready' (a fresh or dying
             // one): that is the determinism-breaking race this fix closes.
             this._queue.push({ id, opts, resolve, reject, timer: null, ceiling });
-            this._flush();
+            this.flush();
         });
     }
 
@@ -362,7 +362,7 @@ class ProcessExecutor {
             // Queued (never-dispatched) requests must not resolve into a billed
             // contract outcome; they never ran. This is a LOCAL host fault, not
             // a consensus result, so reject with HostFaultError (same invariant
-            // enforced by _onExit and the broken-latch path above).
+            // enforced by onExit and the broken-latch path above).
             entry.reject(new HostFaultError('executor shutting down'));
         }
         this._queue = [];

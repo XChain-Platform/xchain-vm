@@ -92,7 +92,7 @@ const HARNESS_SOURCE = `
     var __stackDepth   = 0;
     var __stackPoison  = false;
     // The deterministic stack fault. Its message embeds "call stack" so the host
-    // classifier (index.js _classifyError) maps it to the frozen out_of_stack
+    // classifier (index.js classifyError) maps it to the frozen out_of_stack
     // status, exactly like a real native overflow.
     var __stackError = function() { return new Error('maximum call stack depth exceeded'); };
     // ----- end call-depth state -----
@@ -1903,7 +1903,7 @@ class XChainVM {
         //   Map<sha256(code):asyncBit:hardenBit:pkg3Bit:aliasBit, {valid, error?}>.
         // INVARIANT: the key carries the code digest plus EVERY consensus flag the
         // verdict depends on, with no count written down here that a new flag can
-        // falsify. Adding a flag to _getLintVerdict without adding its bit lets a warm
+        // falsify. Adding a flag to getLintVerdict without adding its bit lets a warm
         // node answer from a verdict computed under the other setting, which is the one
         // way this cache can reach consensus.
         // Shares the metering cache's sha256(code) key material (the digest is computed
@@ -2013,7 +2013,7 @@ class XChainVM {
      *        Omitting it recomputes the identical digest, so the key is unchanged.
      * @returns {string} metered source
      */
-    _getMeteredCode(code, specEvalOrder, meterCallSpread, meterRestPattern, codeHash) {
+    getMeteredCode(code, specEvalOrder, meterCallSpread, meterRestPattern, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0') +
             (meterRestPattern ? '1' : '0');
@@ -2058,10 +2058,10 @@ class XChainVM {
      * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
      * @param {boolean} enforceLintGlobalAlias - LINT_GLOBAL_ALIAS refinement (own gate)
      * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
-     * @param {string} [codeHash] - precomputed sha256(code) hex (see _getMeteredCode)
+     * @param {string} [codeHash] - precomputed sha256(code) hex (see getMeteredCode)
      * @returns {{valid: boolean, error?: string}}
      */
-    _getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, enforceBannedRest, codeHash) {
+    getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, enforceBannedRest, codeHash) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
@@ -2105,10 +2105,10 @@ class XChainVM {
      * verbatim, so historical blocks replay exactly as they were indexed and
      * non-consensus callers (benches, fuzzing, the toolkit simulator) keep their
      * tight budgets. Used both by execute() (the isolate timeout) and by
-     * _classifyError() (the elapsed-time corroboration threshold), so the two
+     * classifyError() (the elapsed-time corroboration threshold), so the two
      * can never disagree about what "timed out" means.
      */
-    _wallClockBudgetMs(opts) {
+    wallClockBudgetMs(opts) {
         const blockTime = opts && opts.blockContext && Number(opts.blockContext.timestamp);
         return resolveWallClockBudgetMs(
             isConsensusWallClockActive(opts && opts.network, blockTime),
@@ -2180,7 +2180,7 @@ class XChainVM {
             __psBlockTime >= BINARY_ALLOC_GATE_BLOCK_TIME;
         const emissionCollector = new EmissionCollector(this.limits.maxEmissions, emissionDeepStrip);
         const execContext       = { reverted: false };
-        // Host-observed corroboration signals for _classifyError (e9c3a80b):
+        // Host-observed corroboration signals for classifyError (e9c3a80b):
         // runStartNs is stamped (monotonic process.hrtime.bigint, NOT Date.now)
         // immediately before runSync so a claimed timeout is checked against
         // real elapsed time; a wall-clock/NTP step backward cannot make the
@@ -2195,7 +2195,7 @@ class XChainVM {
         const hostSignals       = {
             runStartNs: null,
             getIsolate: () => isolate,
-            wallBudgetMs: this._wallClockBudgetMs(opts)
+            wallBudgetMs: this.wallClockBudgetMs(opts)
         };
 
         let isolate = null;
@@ -2204,7 +2204,7 @@ class XChainVM {
         const __codeStr   = opts.code || '';
         const __codeBytes = Buffer.byteLength(__codeStr, 'utf8');
         if (__codeBytes > this.limits.maxCodeSize) {
-            return this._errorResult(gasTracker, emissionCollector,
+            return this.errorResult(gasTracker, emissionCollector,
                 'error: code size exceeds limit (' + this.limits.maxCodeSize + ' bytes)');
         }
         // Hash the source ONCE per execution and share the digest with both source-keyed
@@ -2245,12 +2245,12 @@ class XChainVM {
                 if (e instanceof GasExhaustedError) {
                     // Same clamp the general out_of_gas path applies: bill at most the
                     // ceiling so the fee can never exceed the caller's committed budget.
-                    return this._errorResult(gasTracker, emissionCollector,
+                    return this.errorResult(gasTracker, emissionCollector,
                         'out_of_gas: used ' + e.used + ' of ' + e.ceiling, gasTracker.ceiling);
                 }
                 throw e;
             }
-            const __lintVerdict = this._getLintVerdict(
+            const __lintVerdict = this.getLintVerdict(
                 __codeStr,
                 isAsyncSurfaceActive(opts.network, __lintBlockTime),
                 isLintHardeningActive(opts.network, __lintBlockTime),
@@ -2263,7 +2263,7 @@ class XChainVM {
                 // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus_runtime.js);
                 // the indexer collapses it to the generic failure token. The lint message is
                 // deterministic and path-free, so it is safe to surface verbatim.
-                return this._errorResult(gasTracker, emissionCollector,
+                return this.errorResult(gasTracker, emissionCollector,
                     'error: banned syntax: ' + __lintVerdict.error);
             }
         }
@@ -2274,7 +2274,7 @@ class XChainVM {
             // A failure to SPAWN the isolate is a fault of THIS host (memory
             // pressure, thread-creation failure, a native binding that loaded
             // but cannot create isolates), not a deterministic property of the
-            // contract, so it must never reach _classifyError and become one of
+            // contract, so it must never reach classifyError and become one of
             // the frozen STATUS_ERROR_PREFIXES the indexer collapses into a
             // committed consensus status: a healthy peer runs the contract
             // normally, so committing here forks. Raising the same
@@ -2393,7 +2393,7 @@ class XChainVM {
             );
 
             // Inject gateway methods as ivm.Reference objects
-            this._injectGateway(context, gateway);
+            this.injectGateway(context, gateway);
 
             // Inject __gas callback for metering. `units` is the number of
             // computation steps to charge: the AST meter passes 1 (control flow);
@@ -2521,10 +2521,10 @@ class XChainVM {
             const __meterRestPattern = isRestPatternMeterActive(opts.network, __moBlockTime);
             let meteredCode;
             try {
-                meteredCode = this._getMeteredCode(
+                meteredCode = this.getMeteredCode(
                     __codeStr, __specEvalOrder, __meterCallSpread, __meterRestPattern, __codeHash);
             } catch (e) {
-                return this._errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
+                return this.errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }
 
             // Compile the contract wrapper with the metered code injected as a string.
@@ -2569,7 +2569,7 @@ class XChainVM {
             try {
                 script = this.isolateManager.compileScript(isolate, fullSource, cachedData);
             } catch (e) {
-                return this._errorResult(gasTracker, emissionCollector, 'error: compilation failed: ' + e.message);
+                return this.errorResult(gasTracker, emissionCollector, 'error: compilation failed: ' + e.message);
             }
 
             // Store in compilation cache
@@ -2627,7 +2627,7 @@ class XChainVM {
                 }
             } catch (execError) {
                 // Classify the error
-                return this._classifyError(execError, gasTracker, emissionCollector, opts, execContext, hostSignals);
+                return this.classifyError(execError, gasTracker, emissionCollector, opts, execContext, hostSignals);
             } finally {
                 // Restore host stack-capture settings (see note above).
                 Error.stackTraceLimit = __hostStackLimit;
@@ -2643,7 +2643,7 @@ class XChainVM {
                 try {
                     this.actionValidator.validate(action);
                 } catch (e) {
-                    return this._errorResult(gasTracker, emissionCollector, 'error: invalid emission: ' + e.message);
+                    return this.errorResult(gasTracker, emissionCollector, 'error: invalid emission: ' + e.message);
                 }
             }
 
@@ -2660,7 +2660,7 @@ class XChainVM {
 
         } catch (outerError) {
             // Catch-all for unexpected errors
-            return this._classifyError(outerError, gasTracker, emissionCollector, opts, execContext, hostSignals);
+            return this.classifyError(outerError, gasTracker, emissionCollector, opts, execContext, hostSignals);
         } finally {
             if (isolate) this.isolateManager.dispose(isolate);
         }
@@ -2669,7 +2669,7 @@ class XChainVM {
     /**
      * Inject gateway methods into the isolate context as ivm.Reference objects.
      */
-    _injectGateway(context, gateway) {
+    injectGateway(context, gateway) {
         const g = context.global;
         // Bridge helper: wraps a host-side function so it can be called from the isolate.
         // Arguments arrive as a single JSON string; ALL non-null/undefined return values
@@ -2800,7 +2800,7 @@ class XChainVM {
      * Changing a prefix is a consensus change; guarded by the consensus-params
      * tests in both repos.
      */
-    _classifyError(error, gasTracker, emissionCollector, opts, execContext, hostSignals) {
+    classifyError(error, gasTracker, emissionCollector, opts, execContext, hostSignals) {
         // A host fault is not a contract outcome and has no classification here:
         // laundering one into a frozen status prefix commits a validator-local
         // verdict for an execution every healthy peer completes. Re-throw so the
@@ -2811,7 +2811,7 @@ class XChainVM {
         // spoofed into a halt.
         if (error instanceof HostFaultError) throw error;
         if (error instanceof ContractRevertError) {
-            return this._errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
+            return this.errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
         }
         if (error instanceof GasExhaustedError) {
             // Clamp the consensus-visible gasUsed to the ceiling. A single charge can
@@ -2823,7 +2823,7 @@ class XChainVM {
             // Clamp target is the TRACKER's ceiling (= the per-call reservation for a
             // cross-contract callee), never the constructor ceiling: a nested callee
             // billed at 1M against a 50k reservation would diverge the refund math.
-            return this._errorResult(gasTracker, emissionCollector,
+            return this.errorResult(gasTracker, emissionCollector,
                 'out_of_gas: used ' + error.used + ' of ' + error.ceiling, gasTracker.ceiling);
         }
         // Detect typed errors that lost their class crossing the isolate boundary.
@@ -2837,10 +2837,10 @@ class XChainVM {
                 // to prevent spoofing via try { xchain.revert('real') } catch(e) {}
                 // followed by throw new Error('\x03REVERT:fake')
                 const reason = execContext.revertReason || payload.substring(7);
-                return this._errorResult(gasTracker, emissionCollector, 'revert: ' + reason);
+                return this.errorResult(gasTracker, emissionCollector, 'revert: ' + reason);
             }
             if (payload.startsWith('GAS:') && gasTracker.used > gasTracker.ceiling) {
-                return this._errorResult(gasTracker, emissionCollector,
+                return this.errorResult(gasTracker, emissionCollector,
                     'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }
         }
@@ -2881,9 +2881,9 @@ class XChainVM {
             // classify it as a generic error with an unclamped gasUsed - the very
             // per-node divergence the bound exists to remove. Falls back to
             // re-resolving from opts when a caller (a unit test, a direct
-            // _classifyError call) supplied signals without a budget.
+            // classifyError call) supplied signals without a budget.
             const __wallBudgetMs = (hostSignals && hostSignals.wallBudgetMs != null)
-                ? hostSignals.wallBudgetMs : this._wallClockBudgetMs(opts);
+                ? hostSignals.wallBudgetMs : this.wallClockBudgetMs(opts);
             const legit = !__corroborate
                 || __isolateDisposed
                 || (hostSignals.runStartNs != null &&
@@ -2892,7 +2892,7 @@ class XChainVM {
                 // Wall-clock timeout (consensus risk). Log at ERROR level.
                 console.error('[VM TIMEOUT] Wall-clock safety net triggered. ' +
                     (opts ? 'contract=' + opts.contractAddress + ' method=' + opts.method : ''));
-                return this._errorResult(gasTracker, emissionCollector,
+                return this.errorResult(gasTracker, emissionCollector,
                     'timeout: wall-clock safety net triggered', gasTracker.ceiling);
             }
         }
@@ -2900,7 +2900,7 @@ class XChainVM {
         // flag (a catastrophic isolate OOM disposes the isolate).
         else if (msg.includes('out of memory') || msg.includes('Array buffer allocation failed')) {
             if (!__corroborate || __isolateDisposed) {
-                return this._errorResult(gasTracker, emissionCollector,
+                return this.errorResult(gasTracker, emissionCollector,
                     'out_of_memory: isolate memory limit exceeded', gasTracker.ceiling);
             }
         }
@@ -2916,20 +2916,20 @@ class XChainVM {
                 || (error instanceof RangeError) || (error && error.name === 'RangeError')
                 || msg === 'maximum call stack depth exceeded';
             if (legit) {
-                return this._errorResult(gasTracker, emissionCollector,
+                return this.errorResult(gasTracker, emissionCollector,
                     'out_of_stack: maximum call depth exceeded', gasTracker.ceiling);
             }
         }
         // Generic contract error: sanitize to prevent information leakage (RISK-15).
         // Strip stack traces, file paths, and internal details.
-        return this._errorResult(gasTracker, emissionCollector, 'error: ' + this._sanitizeError(msg));
+        return this.errorResult(gasTracker, emissionCollector, 'error: ' + this.sanitizeError(msg));
     }
 
     /**
      * Sanitize an error message to prevent information leakage.
      * Returns only the first line, strips file paths and stack traces.
      */
-    _sanitizeError(msg) {
+    sanitizeError(msg) {
         if (!msg) return 'unknown error';
         // Take only the first line
         const firstLine = msg.split('\n')[0];
@@ -2943,7 +2943,7 @@ class XChainVM {
      * Build a failure result. State changes and emissions are empty (atomicity).
      * Logs are preserved for debugging.
      */
-    _errorResult(gasTracker, emissionCollector, errorMsg, gasOverride) {
+    errorResult(gasTracker, emissionCollector, errorMsg, gasOverride) {
         return {
             success:        false,
             error:          errorMsg,

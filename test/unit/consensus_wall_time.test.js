@@ -96,17 +96,17 @@ describe('consensus wall-clock budget: the value and the resolver', function () 
         // The whole point: three nodes, three configs, ONE budget. A divergent
         // budget is a divergent status and a divergent gasUsed for the same shape.
         for (const knob of [1, 1500, 5000, 30000, 120000]) {
-            assert.strictEqual(makeVM(knob)._wallClockBudgetMs(GATED),
+            assert.strictEqual(makeVM(knob).wallClockBudgetMs(GATED),
                 wallClock.CONSENSUS_MAX_WALL_MS,
                 'node knob ' + knob + ' must not bind a consensus execution');
         }
     });
 
     it('an ungated execution still runs against the node knob (replay parity + non-consensus callers)', function () {
-        assert.strictEqual(makeVM(1500)._wallClockBudgetMs(UNGATED), 1500);
-        assert.strictEqual(makeVM(500)._wallClockBudgetMs({ network: 'mainnet' }), 500);
+        assert.strictEqual(makeVM(1500).wallClockBudgetMs(UNGATED), 1500);
+        assert.strictEqual(makeVM(500).wallClockBudgetMs({ network: 'mainnet' }), 500);
         // No opts at all (bench/simulator style call) is ungated, not a crash.
-        assert.strictEqual(makeVM(500)._wallClockBudgetMs(undefined), 500);
+        assert.strictEqual(makeVM(500).wallClockBudgetMs(undefined), 500);
     });
 
     it('the timeout classifier corroborates against the SAME budget the isolate enforced', function () {
@@ -121,21 +121,21 @@ describe('consensus wall-clock budget: the value and the resolver', function () 
         const signals = (over) => Object.assign({
             runStartNs: process.hrtime.bigint(),
             getIsolate: () => ({ isDisposed: false }),
-            wallBudgetMs: vm._wallClockBudgetMs(GATED)
+            wallBudgetMs: vm.wallClockBudgetMs(GATED)
         }, over);
 
         const elapsedPastBudget = signals({
             runStartNs: process.hrtime.bigint() -
                 BigInt(wallClock.CONSENSUS_MAX_WALL_MS + 5) * 1000000n
         });
-        const real = vm._classifyError(new Error('Script execution timed out.'), tracker,
+        const real = vm.classifyError(new Error('Script execution timed out.'), tracker,
             collector, GATED, { reverted: false }, elapsedPastBudget);
         assert.ok(real.error.startsWith('timeout:'), real.error);
         assert.strictEqual(real.gasUsed, CEILING, 'a timeout charges the ceiling on every node');
 
         // Corroboration still bites: a contract-authored lookalike message with no
         // elapsed wall clock behind it is NOT a timeout and keeps its real gasUsed.
-        const spoofed = vm._classifyError(new Error('Script execution timed out.'), tracker,
+        const spoofed = vm.classifyError(new Error('Script execution timed out.'), tracker,
             collector, GATED, { reverted: false }, signals());
         assert.ok(spoofed.error.startsWith('error: '), spoofed.error);
         assert.strictEqual(spoofed.gasUsed, 777);

@@ -11,7 +11,7 @@
 // contact legal@dankest.llc.
 //
 // e9c3a80b (flag-day Pkg 4): post-VM_LINT_HARDENING the resource
-// branches of _classifyError (timeout / out_of_memory / out_of_stack) require
+// branches of classifyError (timeout / out_of_memory / out_of_stack) require
 // a corroborating HOST signal before collapsing the status and clamping
 // gasUsed to the ceiling; an attacker-authored message substring alone routes
 // to the generic sanitized 'error:' classification with the real gasUsed.
@@ -32,7 +32,7 @@ const GAS_SCHEDULE = {
     VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
 };
 
-(XChainVM ? describe : describe.skip)('_classifyError host-signal corroboration (e9c3a80b)', function () {
+(XChainVM ? describe : describe.skip)('classifyError host-signal corroboration (e9c3a80b)', function () {
 
     const CEILING = 1000000;
     let vm;
@@ -55,7 +55,7 @@ const GAS_SCHEDULE = {
     }
 
     function classify(err, opts, hostSignals, used) {
-        return vm._classifyError(err, tracker(used == null ? 777 : used), collector,
+        return vm.classifyError(err, tracker(used == null ? 777 : used), collector,
             opts, { reverted: false }, hostSignals);
     }
 

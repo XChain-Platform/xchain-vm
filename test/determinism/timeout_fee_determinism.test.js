@@ -22,7 +22,7 @@
  * run repeatedly and must yield exactly ONE gasUsed value (== the ceiling).
  *
  * History: this was 2026-06-06's KNOWN-RED Finding B; it flipped green when
- * the deterministic clamp landed in src/index.js (_classifyError).
+ * the deterministic clamp landed in src/index.js (classifyError).
  ********************************************************************/
 // @ts-nocheck
 
@@ -79,7 +79,7 @@ describe('determinism: resource-termination gasUsed is clamped (fork-safe fee)',
                 `NON-DETERMINISTIC gasUsed on "${v.id}": ${seen.size} distinct values ` +
                 `${JSON.stringify([...seen])} across ${RUNS} runs (error="${lastError}"). ` +
                 `fee = gasUsed * GAS_PRICE → divergent fees → CHAIN FORK. ` +
-                `The clamp in src/index.js _classifyError regressed.`);
+                `The clamp in src/index.js classifyError regressed.`);
         });
     }
 });

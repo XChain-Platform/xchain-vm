@@ -12,7 +12,7 @@
 //
 // Metered-source cache. meterCode() is the most expensive step of a
 // warm execute; its output is a pure function of (code, specEvalOrder,
-// meterCallSpread), so _getMeteredCode() memoizes it keyed on sha256(code) plus
+// meterCallSpread), so getMeteredCode() memoizes it keyed on sha256(code) plus
 // the two gate bits. These tests exercise the cache directly (no isolate, so
 // they run on macOS where isolated-vm cannot dlopen): a hit must return the
 // EXACT bytes a fresh meterCode() produces, the flags must partition the cache,
@@ -43,14 +43,14 @@ describe('XChainVM metered-source cache', function () {
     it('starts empty and populates one entry on first meter', function () {
         const vm = new XChainVM(cfg());
         assert.strictEqual(vm._meteredCache.size, 0);
-        vm._getMeteredCode(CODE_A, false, false);
+        vm.getMeteredCode(CODE_A, false, false);
         assert.strictEqual(vm._meteredCache.size, 1);
     });
 
     it('returns byte-identical output to a fresh meterCode() call', function () {
         const vm = new XChainVM(cfg());
         for (const [eo, cs] of [[false, false], [true, false], [false, true], [true, true]]) {
-            const cached = vm._getMeteredCode(CODE_A, eo, cs);
+            const cached = vm.getMeteredCode(CODE_A, eo, cs);
             const fresh = meterCode(CODE_A, { specEvalOrder: eo, meterCallSpread: cs });
             assert.strictEqual(cached, fresh,
                 'cached metered source must equal fresh meterCode output for flags ' + eo + '/' + cs);
@@ -61,27 +61,27 @@ describe('XChainVM metered-source cache', function () {
         const vm = new XChainVM(cfg());
         // A hit keeps the cache flat AND returns the same reference the first miss
         // stored (re-metering would build and store a new string).
-        const first = vm._getMeteredCode(CODE_A, false, false);
+        const first = vm.getMeteredCode(CODE_A, false, false);
         assert.strictEqual(vm._meteredCache.size, 1);
-        const second = vm._getMeteredCode(CODE_A, false, false);
+        const second = vm.getMeteredCode(CODE_A, false, false);
         assert.strictEqual(vm._meteredCache.size, 1, 'a hit must not add a new entry');
         assert.strictEqual(second, first, 'a hit returns the stored (identical) string');
     });
 
     it('partitions the cache by each consensus gate flag', function () {
         const vm = new XChainVM(cfg());
-        vm._getMeteredCode(CODE_A, false, false);
-        vm._getMeteredCode(CODE_A, true, false);
-        vm._getMeteredCode(CODE_A, false, true);
-        vm._getMeteredCode(CODE_A, true, true);
+        vm.getMeteredCode(CODE_A, false, false);
+        vm.getMeteredCode(CODE_A, true, false);
+        vm.getMeteredCode(CODE_A, false, true);
+        vm.getMeteredCode(CODE_A, true, true);
         assert.strictEqual(vm._meteredCache.size, 4,
             'each distinct (specEvalOrder, meterCallSpread) pair is its own entry');
     });
 
     it('keys distinct sources to distinct entries', function () {
         const vm = new XChainVM(cfg());
-        const a = vm._getMeteredCode(CODE_A, false, false);
-        const b = vm._getMeteredCode(CODE_B, false, false);
+        const a = vm.getMeteredCode(CODE_A, false, false);
+        const b = vm.getMeteredCode(CODE_B, false, false);
         assert.strictEqual(vm._meteredCache.size, 2);
         assert.notStrictEqual(a, b);
     });
@@ -102,15 +102,15 @@ describe('XChainVM metered-source cache', function () {
             'module.exports = function(x){ return 2; };',
             'module.exports = function(x){ return 3; };'
         ];
-        vm._getMeteredCode(srcs[0], false, false);
-        vm._getMeteredCode(srcs[1], false, false);
+        vm.getMeteredCode(srcs[0], false, false);
+        vm.getMeteredCode(srcs[1], false, false);
         assert.strictEqual(vm._meteredCache.size, 2);
         // Third distinct source evicts srcs[0] (oldest), size stays at bound.
-        vm._getMeteredCode(srcs[2], false, false);
+        vm.getMeteredCode(srcs[2], false, false);
         assert.strictEqual(vm._meteredCache.size, 2, 'cache stays at its bound');
         // srcs[0] was evicted: fetching it re-meters (size stays 2, evicting srcs[1]),
         // and the returned value still equals a fresh meterCode() call (never stale).
-        const refetched = vm._getMeteredCode(srcs[0], false, false);
+        const refetched = vm.getMeteredCode(srcs[0], false, false);
         assert.strictEqual(refetched, meterCode(srcs[0], { specEvalOrder: false, meterCallSpread: false }));
         assert.strictEqual(vm._meteredCache.size, 2);
     });
@@ -118,14 +118,14 @@ describe('XChainVM metered-source cache', function () {
     it('propagates a metering failure and does NOT cache it', function () {
         const vm = new XChainVM(cfg());
         const bad = 'module.exports = function(x){ this is not valid js @@@ ';
-        assert.throws(() => vm._getMeteredCode(bad, false, false));
+        assert.throws(() => vm.getMeteredCode(bad, false, false));
         assert.strictEqual(vm._meteredCache.size, 0, 'a metering failure must not populate the cache');
     });
 
     it('cache persists across block boundaries (not cleared by endBlock)', function () {
         const vm = new XChainVM(cfg());
         vm.beginBlock();
-        vm._getMeteredCode(CODE_A, false, false);
+        vm.getMeteredCode(CODE_A, false, false);
         assert.strictEqual(vm._meteredCache.size, 1);
         vm.endBlock();
         // endBlock clears the per-block V8 cache but must leave the pure metered cache.

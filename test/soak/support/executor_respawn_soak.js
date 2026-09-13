@@ -113,7 +113,7 @@ async function main() {
     for (let i = 1; i <= CYCLES; i++) {
         // Model a REAL worker crash: a contract is in-flight (dispatched, IPC
         // round-trip pending) when the worker dies. We SIGKILL mid-flight, then
-        // await that execution. It resolves via _onExit to a deterministic
+        // await that execution. It resolves via onExit to a deterministic
         // host-terminated result and triggers the respawn synchronously.
         // A transient host fault (fork EAGAIN under load, a /proc read racing a
         // dying pid) must not abort a multi-day soak; count it and continue.

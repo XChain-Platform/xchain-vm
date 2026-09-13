@@ -114,7 +114,7 @@ function heightWarnings(lines) {
             // call is now re-linted against the bans live at that block, and the
             // re-lint's banned-wasm leg resolves through isPkg3SandboxActive, the same
             // per-coin height as the runtime strip (index.js, the four-flag block above
-            // _getLintVerdict). So at/after the Pkg-3 height the source is REJECTED
+            // getLintVerdict). So at/after the Pkg-3 height the source is REJECTED
             // before it runs instead of running against a stripped global. It is still a
             // per-height answer, still measured by executing, and still exactly the thing
             // a stale default would get wrong.
