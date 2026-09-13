@@ -116,7 +116,6 @@ function main() {
     console.log('Generated ' + allMutants.length + ' custom mutants across ' + files.length + ' file(s)');
     console.log('');
 
-    // Per-operator summary
     const opCounts = {};
     for (const m of allMutants) {
         opCounts[m.mutatorName] = (opCounts[m.mutatorName] || 0) + 1;
@@ -151,7 +150,6 @@ function main() {
     console.log('Baseline: PASSED');
     console.log('');
 
-    // Run each mutant
     const results = [];
     let killed = 0;
     let survived = 0;
@@ -163,7 +161,6 @@ function main() {
         const label = '[' + (i + 1) + '/' + allMutants.length + '] ' +
                       m.file + ':' + m.location.start.line + ' ' + m.mutatorName;
 
-        // Apply mutation
         try {
             fs.writeFileSync(m.absPath, m.mutatedSource, 'utf8');
         } catch (e) {
@@ -173,13 +170,10 @@ function main() {
             continue;
         }
 
-        // Run tests
         const testResult = runTests(opts.spec, opts.timeout);
 
-        // Restore original
         fs.writeFileSync(m.absPath, m.originalSource, 'utf8');
 
-        // Classify result
         let status;
         if (testResult.timedOut) {
             status = 'Timeout';
@@ -207,7 +201,6 @@ function main() {
     console.log('');
     console.log('');
 
-    // Summary
     const total = killed + survived + timedOut + errored;
     const score = total > 0 ? ((killed + timedOut) / total * 100) : 0;
 
@@ -221,7 +214,6 @@ function main() {
     console.log('Score:    ' + score.toFixed(1) + '%');
     console.log('');
 
-    // Print survived mutants
     const survivedMutants = results.filter(r => r.status === 'Survived');
     if (survivedMutants.length > 0) {
         console.log('Survived Mutations (test gaps):');
@@ -232,7 +224,6 @@ function main() {
         console.log('');
     }
 
-    // Write JSON output
     const outDir = path.dirname(OUTPUT_FILE);
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
@@ -244,7 +235,6 @@ function main() {
         files: {}
     };
 
-    // Group results by file
     for (const r of results) {
         if (!output.files[r.fileName]) {
             output.files[r.fileName] = { mutants: [] };

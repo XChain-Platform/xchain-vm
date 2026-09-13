@@ -38,7 +38,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
         h.seedBalance('user1', 'TEST', '500');
         h.seedBalance('user2', 'TEST', '0');
 
-        // Deploy token_sender contract
         const code = h.loadContract('token_sender.js');
         await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:1', params: ['TEST'] });
     });
@@ -55,7 +54,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
     // --- E2E-021: Contract-initiated withdrawal (SEND) ---
     describe('E2E-021: Contract-initiated SEND from custody', function() {
         it('should send tokens from contract custody to recipient', async function() {
-            // Deposit tokens to contract
             h.deposit('user1', 'C:BTC:1', 'TEST', '200');
 
             // Execute contract to SEND 50 TEST to user2
@@ -90,7 +88,6 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
     // --- E2E-023: Overdraw attempt ---
     describe('E2E-023: Overdraw attempt', function() {
         it('should fail when contract tries to SEND more than custody holds', async function() {
-            // Deposit only 100
             h.deposit('user1', 'C:BTC:1', 'TEST', '100');
 
             // Try to send 200. VM emits the SEND, but the mock indexer catches

@@ -97,12 +97,10 @@ function loadContract(name) {
  * @returns {Promise<number[]>} Array of timings in ms
  */
 async function measure(fn, iterations, warmup = 5) {
-    // Warmup
     for (let i = 0; i < warmup; i++) {
         await fn(i);
     }
 
-    // Measured runs
     const timings = new Array(iterations);
     for (let i = 0; i < iterations; i++) {
         const start = performance.now();
@@ -243,9 +241,9 @@ function printMemory(before, after) {
  * builds its own timing loop produces a number nothing else can be compared
  * against, which is the whole failure mode this module exists to prevent.
  *
- * There is deliberately no report writer here. An earlier one wrote a JSON
- * file for CI to read, nothing consumed it, and it went; the numbers are read
- * from the printed tables.
+ * There is deliberately no report writer here: nothing downstream consumes a
+ * machine-readable benchmark file, so the numbers are read from the printed
+ * tables and a writer would be output nobody reads.
  */
 module.exports = {
     GAS_SCHEDULE,

@@ -318,13 +318,11 @@ describe('[P3] Integration Regression', function() {
             `;
             assert.strictEqual(vm.validateSyntax(code).valid, true);
 
-            // Initialize
             const init = await execute(vm, code, {
                 method: 'initialize', caller: 'deployer'
             });
             assert.strictEqual(init.success, true);
 
-            // Increment (using state from init)
             const state = {};
             for (const ch of init.stateChanges) state[ch.key] = ch.value;
 
@@ -334,7 +332,6 @@ describe('[P3] Integration Regression', function() {
             assert.strictEqual(inc1.success, true);
             assert.strictEqual(JSON.parse(inc1.returnValue), '1');
 
-            // Increment again
             for (const ch of inc1.stateChanges) state[ch.key] = ch.value;
             const inc2 = await execute(vm, code, {
                 method: 'increment', caller: 'user2', state
@@ -354,17 +351,14 @@ describe('[P3] Integration Regression', function() {
                 }
             };`;
 
-            // Set
             const set = await execute(vm, code, {
                 method: 'set', params: ['key1', 'value1']
             });
             assert.strictEqual(set.success, true);
 
-            // Build state from changes
             const state = {};
             for (const ch of set.stateChanges) state[ch.key] = ch.value;
 
-            // Get
             const get = await execute(vm, code, {
                 method: 'get', params: ['key1'], state
             });
@@ -395,7 +389,6 @@ describe('[P3] Integration Regression', function() {
         before(function() { vm = createVM(); });
 
         it('should not leak state between executions', async function() {
-            // First execution sets state
             const r1 = await execute(vm, `
                 module.exports = function(xchain) {
                     xchain.state.set('secret', 'confidential');

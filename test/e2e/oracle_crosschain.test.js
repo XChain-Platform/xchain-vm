@@ -120,7 +120,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
     // --- E2E-092: Cross-chain attestation read ---
     describe('E2E-092: Cross-chain attestation', function() {
         it('should read attestation and branch on settlement status', async function() {
-            // Seed cross-chain data
             h.ledger.seedCrossChain('LTC', 42, { status: 'confirmed', settled: true });
             h.ledger.seedCrossChain('DOGE', 10, { status: 'pending', settled: false });
 
@@ -144,7 +143,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             });
             h.ledger.creditContractBalance('C:BTC:92', 'REWARD', '1000');
 
-            // Check settled attestation (LTC:42)
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:92', method: 'checkSettlement',
                 params: ['LTC', '42'], caller: 'user1'
@@ -155,7 +153,6 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assert.strictEqual(v1.status, 'confirmed');
             assert.strictEqual(r1.emittedActions.length, 1);
 
-            // Check unsettled attestation (DOGE:10)
             const r2 = await h.execute({
                 contractAddress: 'C:BTC:92', method: 'checkSettlement',
                 params: ['DOGE', '10'], caller: 'user1'

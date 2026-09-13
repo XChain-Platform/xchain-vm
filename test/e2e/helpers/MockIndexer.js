@@ -57,9 +57,7 @@ class MockIndexer {
         // The real indexer normalizes an emitted amount to the tick's decimals before
         // it hits the ledger; mirror that so custody reflects what a node would store.
         const quantity = this.ledger.normalizeToTick(tick, params.quantity);
-        // Debit from contract custody
         this.ledger.debitContractBalance(contractAddress, tick, quantity);
-        // Credit to destination
         this.ledger.creditBalance(destination, tick, quantity);
     }
 
@@ -73,7 +71,6 @@ class MockIndexer {
     _processMint(contractAddress, params) {
         const { tick } = params;
         const quantity = this.ledger.normalizeToTick(tick, params.quantity);
-        // Credit to contract custody
         this.ledger.creditContractBalance(contractAddress, tick, quantity);
     }
 

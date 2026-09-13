@@ -48,9 +48,7 @@ async function benchmarkMeteringStage() {
     for (const tier of TIERS) {
         const code = loadContract(tier.file);
         const timings = [];
-        // Warmup
         for (let i = 0; i < WARMUP; i++) meterCode(code);
-        // Measured
         for (let i = 0; i < ITERATIONS; i++) {
             const start = performance.now();
             meterCode(code);
@@ -157,7 +155,6 @@ async function main() {
     printTable('Execute: Cache Hit (warm)', warmRows);
     printTable('Stress Contracts', stressRows);
 
-    // Cache speedup summary
     console.log('\n  Cache Speedup (cold mean / warm mean):');
     for (let i = 0; i < TIERS.length; i++) {
         const cold = coldRows[i].stats.mean;

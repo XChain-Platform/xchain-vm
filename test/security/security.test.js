@@ -1053,7 +1053,6 @@ function executeCode(vm, code, opts) {
     before(function() { vm = createVM(); });
 
     it('RISK-13a: sequential executions should not share state', async function() {
-        // First execution writes state
         const r1 = await executeCode(vm, `
             module.exports = function(xchain) {
                 xchain.state.set('leaked', 'secret');
@@ -1075,13 +1074,11 @@ function executeCode(vm, code, opts) {
     it('RISK-13b: compilation cache should not leak between contracts', async function() {
         vm.beginBlock();
         try {
-            // Execute contract A
             const r1 = await executeCode(vm, `
                 module.exports = function(xchain) { return 'contract_a'; };
             `, { contractAddress: 'C:BTC:A' });
             assert.strictEqual(r1.success, true);
 
-            // Execute contract B (different code)
             const r2 = await executeCode(vm, `
                 module.exports = function(xchain) { return 'contract_b'; };
             `, { contractAddress: 'C:BTC:B' });

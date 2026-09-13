@@ -345,7 +345,6 @@ function embeddedCodeMutation(source, filename) {
 
     for (const { re, type } of embeddedPatterns) {
         let match;
-        // Reset lastIndex for each pattern
         re.lastIndex = 0;
         while ((match = re.exec(source)) !== null) {
             const varName = match[1];

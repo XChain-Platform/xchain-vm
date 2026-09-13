@@ -42,7 +42,6 @@ async function benchmarkHitRate(vm, baseCode, hitRate, label) {
     const blockTimings = [];
 
     for (let b = 0; b < BLOCKS; b++) {
-        // Prepare contracts for this block
         const uniqueCount  = Math.round(BLOCK_SIZE * (1 - hitRate));
         const repeatedCode = baseCode;
         const uniqueCodes  = [];

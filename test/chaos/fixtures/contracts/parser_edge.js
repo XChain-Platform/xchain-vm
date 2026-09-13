@@ -16,7 +16,6 @@ module.exports = {
     optionalChaining: function(xchain) {
         var params = xchain.getInputParams();
         var first = params[0];
-        // Optional chaining on array access
         var val = params.length > 1 ? params[1] : null;
         xchain.state.set('chained', val !== null && val !== undefined ? val : 'default');
         return xchain.state.get('chained');
@@ -24,7 +23,6 @@ module.exports = {
     nullishCoalescing: function(xchain) {
         var a = xchain.getInputParam(0);
         var b = xchain.getInputParam(1);
-        // Nullish coalescing
         var result = a !== null && a !== undefined ? a : (b !== null && b !== undefined ? b : 'fallback');
         return result;
     },

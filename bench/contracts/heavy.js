@@ -14,7 +14,6 @@
 // Simulates a complex multi-pool governance/treasury contract.
 module.exports = {
     default: function(xchain) {
-        // Read 10 state keys
         var totalStaked   = xchain.state.get('totalStaked')   || '0';
         var rewardPool    = xchain.state.get('rewardPool')    || '1000000';
         var lastUpdate    = xchain.state.get('lastUpdate')    || '0';
@@ -30,7 +29,6 @@ module.exports = {
         var height = xchain.getBlockHeight();
         var amount = xchain.getInputParam(0) || '5000';
 
-        // Math-heavy reward calculation
         var blocksSince = xchain.math.subtract(String(height), lastUpdate);
         var rewardRate  = xchain.math.divide(rewardPool, '100');
         var baseReward  = xchain.math.multiply(rewardRate, blocksSince);
@@ -39,18 +37,15 @@ module.exports = {
             ? xchain.math.divide(boosted, xchain.math.max(userCount, '1'))
             : '0';
 
-        // Fee calculation
         var fee = xchain.math.divide(xchain.math.multiply(amount, '3'), '1000');
         var netAmount = xchain.math.subtract(amount, fee);
 
-        // Compound interest approximation (3 iterations)
         var principal = netAmount;
         for (var i = 0; i < 3; i++) {
             var interest = xchain.math.divide(xchain.math.multiply(principal, '5'), '100');
             principal = xchain.math.add(principal, interest);
         }
 
-        // Write 12 state keys
         xchain.state.set('totalStaked', xchain.math.add(totalStaked, netAmount));
         xchain.state.set('rewardPool', xchain.math.subtract(rewardPool, perUser));
         xchain.state.set('lastUpdate', String(height));
@@ -64,7 +59,6 @@ module.exports = {
         xchain.state.set('treasury', xchain.math.add(treasury, fee));
         xchain.state.set('lastCaller', caller);
 
-        // 5 emissions
         xchain.emit.send({ destination: caller, tick: 'REWARD', quantity: perUser });
         xchain.emit.send({ destination: xchain.getContractAddress(), tick: 'STAKED', quantity: netAmount });
         xchain.emit.send({ destination: 'treasury_address', tick: 'FEE', quantity: fee });

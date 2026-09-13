@@ -82,7 +82,6 @@ class E2EHarness {
             return { success: false, error: 'code size exceeds limit' };
         }
 
-        // Store contract
         this.ledger.deployContract(contractAddress, code, deployer, this.ledger.blockHeight);
 
         // Run initialize method if the contract exports one
@@ -159,7 +158,6 @@ class E2EHarness {
         // Charge gas fee regardless of success/failure
         this.indexer.chargeGasFee(opts.caller, result.gasUsed);
 
-        // Log execution
         this._executionLog.push({
             contractAddress: opts.contractAddress,
             method: opts.method,

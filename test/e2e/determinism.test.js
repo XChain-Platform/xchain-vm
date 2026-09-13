@@ -168,7 +168,6 @@ function hashResult(result) {
                 };
             }
 
-            // Run simulation twice
             const sim1 = await runSimulation();
             const sim2 = await runSimulation();
 
