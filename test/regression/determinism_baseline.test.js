@@ -140,7 +140,7 @@ const REGEN = process.env.REGEN_DETERMINISM_BASELINE === '1';
 
 function optsFor(c) {
     const code = c.file
-        ? fs.readFileSync(path.join(__dirname, '../contracts/', c.file), 'utf8')
+        ? fs.readFileSync(path.join(__dirname, '../fixtures/contracts/', c.file), 'utf8')
         : c.code;
     return {
         ...baseOpts,
