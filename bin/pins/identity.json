@@ -5,20 +5,20 @@
   "note": "Declared, not graded: no tool, test or script in this repo reads this file, so a stale path or digest here fails nothing; the live parity gate is test/unit/lint_parity.test.js, which builds the sdk path itself. Every key, digest and sdkPath below is the AT1 record, unchanged; sdkPathAtOrigin records the sdk's spelling of the same file after its snake_case rename.",
   "algorithm": "sha256",
   "files": {
-    "src/lint-core.js": {
-      "canonical": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
+    "src/lint_core.js": {
+      "canonical": "2b6d98fc6c0cf3a3c37e1b9dcf473d8719ddc43022be00fbdcf5b50f374d9768",
       "vendoredInSdk": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },
     "src/metering.js": {
-      "canonical": "834552b7f6c1a86084def6b5a0094a0626a1ca078cf87208a94b01e532a3f101",
+      "canonical": "bcaaf2b3ad7c811c0fac868bb6be023da8977403f5f91218fa9b858b67c59a32",
       "vendoredInSdk": "834552b7f6c1a86084def6b5a0094a0626a1ca078cf87208a94b01e532a3f101",
       "sdkPath": "xchain-sdk/src/contract/metering.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/metering.js"
     },
-    "src/stripped-globals.js": {
-      "canonical": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
+    "src/stripped_globals.js": {
+      "canonical": "580f415bcb94f5c98012945ab30c120f13928a0f7390c2ee4fe2a081432255fb",
       "vendoredInSdk": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
       "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/stripped_globals.js"
