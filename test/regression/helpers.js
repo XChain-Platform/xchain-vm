@@ -46,7 +46,7 @@ const GAS_SCHEDULE = {
     VM_ATTEST_REQUEST:  5000,
     VM_EMISSION:        500,
     // Cross-chain call buckets; must match the production per-chain configs
-    // (xchain-indexer/src/configs/{BTC,LTC,DOGE}.js).
+    // (xchain-indexer/src/coins/{BTC,LTC,DOGE}.js).
     VM_XCALL_REQUEST:   2000,
     VM_XCALL_CALLBACK:  20000
 };

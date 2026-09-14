@@ -28,7 +28,7 @@ const GAS_SCHEDULE = {
     VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000,
     VM_EMISSION: 500,
     // Cross-chain call buckets. MUST match the production per-chain configs
-    // (xchain-indexer/src/configs/{BTC,LTC,DOGE}.js). gateway-emit.js carries
+    // (xchain-indexer/src/coins/{BTC,LTC,DOGE}.js). gateway-emit.js carries
     // identical fallback defaults, but the keys are pinned here explicitly so
     // the crossExecute baselines are computed against the production schedule.
     VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000

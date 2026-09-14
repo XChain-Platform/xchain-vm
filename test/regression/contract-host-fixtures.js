@@ -33,7 +33,7 @@
 // them silently drift.
 //
 // The accessor objects below are pure, deterministic stand-ins for the indexer's
-// real providers (xchain-indexer/src/db.js getContractStakeData() and the
+// real providers (xchain-indexer/src/db/contracts.js getContractStakeData() and the
 // attestation-response store). They return the same shapes the production
 // accessors return, so a change in gas charging, response serialisation, or
 // __gas injection around these call sites shifts the digest and fails CI

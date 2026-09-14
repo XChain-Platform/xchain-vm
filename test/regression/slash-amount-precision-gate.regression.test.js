@@ -17,7 +17,7 @@
  * 8-decimal ceiling the rest of the seam does not share: STAKE v3 bounds a stake's
  * precision by the token's own DECIMALS (xchain-indexer src/actions/stake.js) up to
  * MAX_TOKEN_DECIMALS 18 (xchain-indexer src/config.js:122), and slashContractStake
- * (xchain-indexer src/db.js) deliberately does its deduction arithmetic at that same
+ * (xchain-indexer src/db/contracts.js) deliberately does its deduction arithmetic at that same
  * per-token precision. So an exact partial ("graduated") slash of a 9-to-18-decimal
  * staked token could never be emitted: it threw at the gateway before the indexer
  * ever saw it, for exactly the tokens the documented any-token staking API accepts.
