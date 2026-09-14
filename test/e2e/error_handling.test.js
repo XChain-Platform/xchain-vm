@@ -27,15 +27,15 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
+let h;
+function resetHarness() {
+    h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+}
+
 (XChainVM ? describe : describe.skip)('E2E: Error Handling & Recovery', function() {
-
-    let h;
-
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
-    });
+    beforeEach(resetHarness);
 
     // --- E2E-050: Contract throws runtime error ---
     describe('E2E-050: Runtime error', function() {
@@ -62,6 +62,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:50', 'before', null);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Error Handling & Recovery', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-051: Contract calls xchain.revert() ---
     describe('E2E-051: xchain.revert()', function() {
@@ -89,6 +93,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:51', 'val', '0');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Error Handling & Recovery', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-052: xchain.require() failure ---
     describe('E2E-052: xchain.require() failure', function() {
@@ -112,6 +120,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assert.strictEqual(result.returnValue, null);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Error Handling & Recovery', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-053: Math error (division by zero) ---
     describe('E2E-053: Math division by zero', function() {
@@ -135,6 +147,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
                 'Expected math/revert error, got: ' + result.error);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Error Handling & Recovery', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-054: Execution after previous failure ---
     describe('E2E-054: Recovery after failure', function() {
@@ -162,6 +178,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:54', 'counter', '1');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Error Handling & Recovery', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-055: Compilation/metering failure ---
     describe('E2E-055: Metering failure on execute', function() {
