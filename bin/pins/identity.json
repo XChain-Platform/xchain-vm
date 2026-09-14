@@ -12,7 +12,7 @@
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },
     "src/metering.js": {
-      "canonical": "bcaaf2b3ad7c811c0fac868bb6be023da8977403f5f91218fa9b858b67c59a32",
+      "canonical": "e2493e09ab11b6328aee767934d7506a8948302cfef666f5e08b9cc5314cd8c1",
       "vendoredInSdk": "834552b7f6c1a86084def6b5a0094a0626a1ca078cf87208a94b01e532a3f101",
       "sdkPath": "xchain-sdk/src/contract/metering.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/metering.js"

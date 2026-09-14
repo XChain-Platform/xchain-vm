@@ -444,7 +444,7 @@ describe('Metering', function() {
         });
 
         it('rewrites a computed-member += concat to __setconcat', function() {
-            // obj[k] += "x", the computed member key path of _memberKey.
+            // obj[k] += "x", the computed member key path of memberKeyExpr.
             const metered = meterCode('obj[k] += "x";');
             assert(metered.includes('__setconcat('), 'computed member concat-assign → __setconcat');
         });
@@ -472,7 +472,7 @@ describe('Metering', function() {
         });
 
         it('rewrites object spread with a string-literal key', function() {
-            // non-computed Literal key → _lit(p.key.value) branch.
+            // non-computed Literal key → astLiteral(p.key.value) branch.
             const metered = meterCode('var o = {...base, "strkey": v};');
             assert(metered.includes('__objspread('), 'string-literal key handled');
         });
