@@ -56,6 +56,9 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
 
         checkNoPrototypePollution();
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Concurrent Isolate Exhaustion (Exp 5)', function() {
 
     it('CHAOS-502: concurrent results are isolated (no state bleed)', async function() {
         this.timeout(60000);
@@ -88,6 +91,9 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
             }
         }
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Concurrent Isolate Exhaustion (Exp 5)', function() {
 
     it('CHAOS-503: mixed success/failure concurrent executions', async function() {
         this.timeout(60000);
@@ -126,6 +132,9 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
         assert.strictEqual(successes, 5, 'Expected 5 successes, got ' + successes);
         assert.strictEqual(failures, 10, 'Expected 10 failures, got ' + failures);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Concurrent Isolate Exhaustion (Exp 5)', function() {
 
     it('CHAOS-504: concurrent executions with different contracts', async function() {
         this.timeout(60000);
