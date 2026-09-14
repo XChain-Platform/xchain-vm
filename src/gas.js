@@ -66,6 +66,11 @@ function effectiveCeiling(requested, configCeiling) {
 }
 
 class GasTracker {
+    // The key list and the ceiling resolver ride on the class itself, so the module
+    // has one export shape and `require('./gas.js').effectiveCeiling` still reads them.
+    static CANONICAL_GAS_KEYS = CANONICAL_GAS_KEYS;
+    static effectiveCeiling = effectiveCeiling;
+
     constructor(gasSchedule, gasCeiling) {
         // Validate schedule: all values must be non-negative integers
         for (const key in gasSchedule) {
@@ -115,5 +120,3 @@ class GasTracker {
 }
 
 module.exports = GasTracker;
-module.exports.CANONICAL_GAS_KEYS = CANONICAL_GAS_KEYS;
-module.exports.effectiveCeiling = effectiveCeiling;
