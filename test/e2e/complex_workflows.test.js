@@ -27,16 +27,16 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
+let h;
+function resetHarness() {
+    h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+    h.seedBalance('user2', 'XCHAIN', '1000000');
+}
+
 (XChainVM ? describe : describe.skip)('E2E: Complex Workflows', function() {
-
-    let h;
-
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
-        h.seedBalance('user2', 'XCHAIN', '1000000');
-    });
+    beforeEach(resetHarness);
 
     // --- E2E-010: AMM swap contract ---
     describe('E2E-010: AMM constant-product swap', function() {
@@ -92,6 +92,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertReverted(result, 'no liquidity');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Complex Workflows', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-011: Vesting contract with time-locked release ---
     describe('E2E-011: Vesting with time-locked release', function() {
@@ -146,6 +150,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertReverted(result, 'only beneficiary');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Complex Workflows', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-012: Contract emitting multiple action types ---
     describe('E2E-012: Multiple emission types in one execution', function() {
@@ -173,6 +181,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertBalance(h.ledger, 'user1', 'TEST', '100');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Complex Workflows', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-013: Sequential executions with cumulative state ---
     describe('E2E-013: Sequential counter increments across blocks', function() {
@@ -207,6 +219,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertReturnValue(r, '3');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Complex Workflows', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-014: Conditional logic branching ---
     describe('E2E-014: Conditional branching', function() {
