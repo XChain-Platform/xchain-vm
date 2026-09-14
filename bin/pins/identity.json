@@ -2,22 +2,26 @@
   "what": "Identity pin for the vendored contract-lint trio, taken before the structure pass moved anything.",
   "why": "lint-parity.test.js is the only gate holding the vm canonical and the sdk copy byte-identical: there is no sync script. A rename that re-vendors the trio must reproduce these digests under the new names, or the two linters have drifted.",
   "takenAt": "AT1, xchain-vm at 8570dea0983a0508aae29761440c5a936b180047",
+  "note": "Declared, not graded: no tool, test or script in this repo reads this file, so a stale path or digest here fails nothing; the live parity gate is test/unit/lint_parity.test.js, which builds the sdk path itself. Every key, digest and sdkPath below is the AT1 record, unchanged; sdkPathAtOrigin records the sdk's spelling of the same file after its snake_case rename.",
   "algorithm": "sha256",
   "files": {
     "src/lint-core.js": {
       "canonical": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
       "vendoredInSdk": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
-      "sdkPath": "xchain-sdk/src/contract/lint-core.js"
+      "sdkPath": "xchain-sdk/src/contract/lint-core.js",
+      "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },
     "src/metering.js": {
       "canonical": "834552b7f6c1a86084def6b5a0094a0626a1ca078cf87208a94b01e532a3f101",
       "vendoredInSdk": "834552b7f6c1a86084def6b5a0094a0626a1ca078cf87208a94b01e532a3f101",
-      "sdkPath": "xchain-sdk/src/contract/metering.js"
+      "sdkPath": "xchain-sdk/src/contract/metering.js",
+      "sdkPathAtOrigin": "xchain-sdk/src/contract/metering.js"
     },
     "src/stripped-globals.js": {
       "canonical": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
       "vendoredInSdk": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
-      "sdkPath": "xchain-sdk/src/contract/stripped-globals.js"
+      "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",
+      "sdkPathAtOrigin": "xchain-sdk/src/contract/stripped_globals.js"
     }
   }
 }
