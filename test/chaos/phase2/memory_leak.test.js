@@ -69,6 +69,9 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
             ' iterations (tolerance: ' + tolerance + 'MB)' +
             (global.gc ? '' : ' (run with --expose-gc for tighter bounds)'));
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Host Process Memory Leak (Exp 8)', function() {
 
     it('CHAOS-802: 500 executions with emissions show no leak', async function() {
         this.timeout(120000);
@@ -103,6 +106,9 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
             'Memory leak detected with emissions: grew ' +
             (tracker.getHeapGrowth() / (1024 * 1024)).toFixed(1) + 'MB');
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Host Process Memory Leak (Exp 8)', function() {
 
     it('CHAOS-803: 500 mixed success/failure executions show no leak', async function() {
         this.timeout(120000);
@@ -135,6 +141,9 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
             'Memory leak detected with mixed execution: grew ' +
             (tracker.getHeapGrowth() / (1024 * 1024)).toFixed(1) + 'MB');
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Host Process Memory Leak (Exp 8)', function() {
 
     it('CHAOS-804: block cycling does not leak compilation cache', async function() {
         this.timeout(120000);
