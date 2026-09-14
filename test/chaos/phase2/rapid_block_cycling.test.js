@@ -60,6 +60,9 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
         // VM still works after rapid cycling
         await chaosAssertions.assertRecovery(vm);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Rapid Block Cycling (Exp 9)', function() {
 
     it('CHAOS-903: endBlock clears cache completely', async function() {
         this.timeout(15000);
@@ -118,6 +121,9 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
 
         vm.endBlock();
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Rapid Block Cycling (Exp 9)', function() {
 
     it('CHAOS-906: execution without beginBlock (no cache) works', async function() {
         this.timeout(10000);
@@ -155,6 +161,9 @@ const { checkResultShape } = require('../../fuzz/helpers/invariants.js');
 
         await chaosAssertions.assertRecovery(vm);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Rapid Block Cycling (Exp 9)', function() {
 
     it('CHAOS-908: double endBlock does not crash', async function() {
         const vm = createVM();
