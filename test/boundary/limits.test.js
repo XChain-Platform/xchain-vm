@@ -87,6 +87,9 @@ function executeCode(vm, code, opts) {
         assert.strictEqual(result.success, false);
         assert(result.error.includes('emission limit'), 'should hit emission limit: ' + result.error);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Limits', function() {
 
     it('should hit state key limit', async function() {
         const vm = createVM({ maxStateKeys: 100 });
@@ -122,6 +125,9 @@ function executeCode(vm, code, opts) {
         assert.strictEqual(result.success, false);
         assert(result.gasUsed > 0, 'gas should be charged on failure');
     });
+});
+
+(XChainVM ? describe : describe.skip)('Limits', function() {
 
     it('should return empty state changes on failure', async function() {
         const vm = createVM();
