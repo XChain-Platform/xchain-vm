@@ -74,6 +74,9 @@ const memoryCliffCode = fs.readFileSync(
         // Recovery: simple contract should succeed
         await chaosAssertions.assertRecovery(vm);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Memory Cliff (Exp 1)', function() {
 
     it('CHAOS-104: repeated OOM events do not degrade VM', async function() {
         this.timeout(30000);
