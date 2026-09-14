@@ -27,15 +27,15 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
+let h;
+function resetHarness() {
+    h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+}
+
 (XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
-
-    let h;
-
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
-    });
+    beforeEach(resetHarness);
 
     // --- E2E-001: Deploy simple contract and execute ---
     describe('E2E-001: Deploy and execute simple contract', function() {
@@ -71,6 +71,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:1', 'sends', '1');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-002: Deploy with invalid syntax ---
     describe('E2E-002: Deploy with invalid syntax', function() {
@@ -85,6 +89,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assert.strictEqual(h.ledger.getContract('C:BTC:2'), null);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-003: Deploy exceeding code size limit ---
     describe('E2E-003: Deploy exceeding code size limit', function() {
@@ -97,6 +105,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assert.strictEqual(result.success, false);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-004: Execute non-existent contract ---
     describe('E2E-004: Execute non-existent contract', function() {
@@ -109,6 +121,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assert(result.error.includes('contract not found'));
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-005: Execute with method routing ---
     describe('E2E-005: Execute with method routing', function() {
@@ -142,7 +158,13 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             });
             assertFailed(result, 'unknown method');
         });
+    });
+});
 
+(XChainVM ? describe : describe.skip)('E2E: Deploy & Execute', function() {
+    beforeEach(resetHarness);
+
+    describe('E2E-005: Execute with method routing', function() {
         it('should enforce caller-based access control', async function() {
             const code = h.loadContract('multi_method.js');
             await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:5c' });
