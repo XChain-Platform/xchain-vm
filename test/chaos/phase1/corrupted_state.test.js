@@ -33,17 +33,17 @@ function buildDeepObject(depth) {
     return obj;
 }
 
-(XChainVM ? describe : describe.skip)('Chaos: Corrupted State Input (Exp 6)', function() {
+// Simple contract that reads and writes state
+const readerCode = `module.exports = function(xchain) {
+    var keys = [];
+    // Try to read known keys
+    var v1 = xchain.state.get('test_key');
+    if (v1 !== null) keys.push('test_key:' + JSON.stringify(v1));
+    xchain.state.set('new_key', 'new_value');
+    return keys.join(',');
+};`;
 
-    // Simple contract that reads and writes state
-    const readerCode = `module.exports = function(xchain) {
-        var keys = [];
-        // Try to read known keys
-        var v1 = xchain.state.get('test_key');
-        if (v1 !== null) keys.push('test_key:' + JSON.stringify(v1));
-        xchain.state.set('new_key', 'new_value');
-        return keys.join(',');
-    };`;
+(XChainVM ? describe : describe.skip)('Chaos: Corrupted State Input (Exp 6)', function() {
 
     it('CHAOS-601: null bytes in state keys', async function() {
         const vm = createVM();
@@ -82,6 +82,9 @@ function buildDeepObject(depth) {
         // Verify host Object.prototype is not polluted
         assert.strictEqual(({}).isAdmin, undefined, 'Object.prototype should not be polluted');
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Corrupted State Input (Exp 6)', function() {
 
     it('CHAOS-604: deeply nested state value (100 levels)', async function() {
         const vm = createVM();
@@ -132,6 +135,9 @@ function buildDeepObject(depth) {
         assert.strictEqual(result.success, false, 'Should fail over key limit');
         checkAtomicity(result);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Corrupted State Input (Exp 6)', function() {
 
     it('CHAOS-607: state value at exactly maxStateValueSize', async function() {
         const vm = createVM({ maxStateValueSize: 1024 });
@@ -173,6 +179,9 @@ function buildDeepObject(depth) {
         checkResultShape(result);
         assert.strictEqual(result.success, true, 'Empty state should work: ' + result.error);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Corrupted State Input (Exp 6)', function() {
 
     it('CHAOS-610: state with array values', async function() {
         const vm = createVM();
