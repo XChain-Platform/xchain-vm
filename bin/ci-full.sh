@@ -81,6 +81,20 @@ need_sib xchain-documentation xchain-indexer xchain-sdk xchain-contracts
 # the same way GitHub's run does.
 run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
 
+# --- identity pin (this gate only; no ci.yml job runs it) --------------------
+# bin/pins/identity.json holds the sha256 of the lint trio the sdk vendors.
+# bin/pin_identity.js re-hashes the tree against it and refuses a moved byte, a
+# dead path, or an entry dropped from or added to the set it declares. A
+# missing pin or tool fails the tier by name instead of reading as a pass.
+identity_pin_check() {
+  local f
+  for f in bin/pins/identity.json bin/pin_identity.js; do
+    if [ ! -f "$f" ]; then echo "ci:full: identity pin tier: $f is missing" >&2; return 1; fi
+  done
+  node bin/pin_identity.js --compare bin/pins/identity.json
+}
+run_tier "identity pin (vendored lint trio)" identity_pin_check
+
 # --- job: coverage (coverage:check, needs: ci) ------------------------------
 # Coverage ratchet: re-runs the unit suite under c8 and fails if line,
 # statement, branch, or function coverage drops below this repo's floor. The
