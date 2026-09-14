@@ -26,15 +26,37 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
-(XChainVM ? describe : describe.skip)('E2E: Oracle & Cross-Chain', function() {
+let h;
+function resetHarness() {
+    h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+}
 
-    let h;
-
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
+async function deployCrossChainContract() {
+    await h.deploy({
+        code: `module.exports = {
+            initialize: function(xchain) {},
+            checkSettlement: function(xchain) {
+                var chain = xchain.getInputParam(0);
+                var idx = parseInt(xchain.getInputParam(1));
+                var settled = xchain.crossChain.isSettled(chain, idx);
+                var attestation = xchain.crossChain.getAttestation(chain, idx);
+                xchain.log('chain:', chain, 'settled:', settled);
+                if (settled) {
+                    xchain.emit.send({ destination: xchain.getSourceAddress(), tick: 'REWARD', quantity: '10' });
+                    return { settled: true, status: attestation ? attestation.status : null };
+                }
+                return { settled: false };
+            }
+        };`,
+        deployer: 'deployer', contractAddress: 'C:BTC:92'
     });
+    h.ledger.creditContractBalance('C:BTC:92', 'REWARD', '1000');
+}
+
+(XChainVM ? describe : describe.skip)('E2E: Oracle & Cross-Chain', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-090: Oracle price read in contract ---
     describe('E2E-090: Oracle price conditional logic', function() {
@@ -79,6 +101,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assert.strictEqual(result.emittedActions.length, 0, 'No SEND below threshold');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Oracle & Cross-Chain', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-091: Oracle snapshot age check ---
     describe('E2E-091: Stale oracle data rejection', function() {
@@ -116,6 +142,10 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertSuccess(result);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Oracle & Cross-Chain', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-092: Cross-chain attestation read ---
     describe('E2E-092: Cross-chain attestation', function() {
@@ -123,25 +153,7 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             h.ledger.seedCrossChain('LTC', 42, { status: 'confirmed', settled: true });
             h.ledger.seedCrossChain('DOGE', 10, { status: 'pending', settled: false });
 
-            await h.deploy({
-                code: `module.exports = {
-                    initialize: function(xchain) {},
-                    checkSettlement: function(xchain) {
-                        var chain = xchain.getInputParam(0);
-                        var idx = parseInt(xchain.getInputParam(1));
-                        var settled = xchain.crossChain.isSettled(chain, idx);
-                        var attestation = xchain.crossChain.getAttestation(chain, idx);
-                        xchain.log('chain:', chain, 'settled:', settled);
-                        if (settled) {
-                            xchain.emit.send({ destination: xchain.getSourceAddress(), tick: 'REWARD', quantity: '10' });
-                            return { settled: true, status: attestation ? attestation.status : null };
-                        }
-                        return { settled: false };
-                    }
-                };`,
-                deployer: 'deployer', contractAddress: 'C:BTC:92'
-            });
-            h.ledger.creditContractBalance('C:BTC:92', 'REWARD', '1000');
+            await deployCrossChainContract();
 
             const r1 = await h.execute({
                 contractAddress: 'C:BTC:92', method: 'checkSettlement',
