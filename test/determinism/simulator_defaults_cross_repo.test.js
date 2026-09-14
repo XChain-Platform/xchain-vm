@@ -198,6 +198,9 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
         assert.strictEqual(DEFAULT_LIMITS.maxCpuTimeMs, CONSENSUS_MAX_WALL_MS,
             'the simulator wall budget no longer matches the consensus wall-clock constant');
     });
+});
+
+describe('toolkit simulator defaults agree with the chain that charges them', function () {
 
     for (const coin of COINS) {
         it('sibling xchain-indexer ' + coin + ' coin config charges the same gas', function () {
@@ -246,6 +249,9 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
                 'or move neither');
         });
     }
+});
+
+describe('toolkit simulator defaults agree with the chain that charges them', function () {
 
     it('sibling xchain-indexer actions/index.js enforces the same VM resource limits', function () {
         const rel  = path.join('xchain-indexer', 'src', 'actions', 'index.js');
@@ -261,6 +267,9 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
                 'chain no longer applies; move both, or move neither');
         }
     });
+});
+
+describe('toolkit simulator defaults agree with the chain that charges them', function () {
 
     // ---- the default block HEIGHT and the authority it comes from -------------
 
@@ -296,6 +305,9 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
         assert.strictEqual(
             new ContractSimulator({ network: 'mainnet', block: { height: 5 } }).block.height, 5);
     });
+});
+
+describe('toolkit simulator defaults agree with the chain that charges them', function () {
 
     it('sibling xchain-indexer pkg3 deploy twin carries the same activation heights', function () {
         // The height the simulator now defaults to IS this map, so the map is a
