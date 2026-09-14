@@ -26,15 +26,15 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
+let h;
+function resetHarness() {
+    h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '50000');
+}
+
 (XChainVM ? describe : describe.skip)('E2E: Gas Fees', function() {
-
-    let h;
-
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '50000');
-    });
+    beforeEach(resetHarness);
 
     // --- E2E-070: Gas fee deduction on success ---
     describe('E2E-070: Fee deduction on successful execution', function() {
@@ -83,6 +83,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert.strictEqual(credited, result.gasUsed);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Gas Fees', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-071: Gas fee deduction on failure ---
     describe('E2E-071: Fee deduction on failed execution', function() {
@@ -113,6 +117,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 'Balance should decrease even on failure');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Gas Fees', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-072: Gas costs for different operation types ---
     describe('E2E-072: Gas cost breakdown by operation type', function() {
@@ -149,6 +157,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 `Expected at least ${minExpectedGas} gas, got ${result.gasUsed}`);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Gas Fees', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-073: Deploy gas cost ---
     describe('E2E-073: Deploy charges gas', function() {
