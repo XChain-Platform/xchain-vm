@@ -21,7 +21,7 @@
  *
  * It is inert against today's consumer, and this fixture's sibling in the indexer
  * (test/unit/actions/execute.test.js, "consumes a delimiter-bearing token whole")
- * pins why: _processSlashEmission reads {contractIndex, pubkey, token, amount} by
+ * pins why: processSlashEmission reads {contractIndex, pubkey, token, amount} by
  * NAMED field and never pipe-splits, and SLASH never reaches the wire. The guard
  * is defense-in-depth for the day SLASH is joined field-by-field like EXECUTE's
  * METHOD_PARAMS, where an embedded '|' would shift the receiver's arity.

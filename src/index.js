@@ -1579,7 +1579,7 @@ function isRestPatternMeterActive(network, blockTime) {
 // Activation for the contract.slash `token` wire-delimiter guard. Every
 // other emit validator rejects a '|' in a field the indexer may pipe-join;
 // contract.slash never had that check. It is inert against today's consumer (SLASH
-// is internal-only and _processSlashEmission reads the params by named field), but
+// is internal-only and processSlashEmission reads the params by named field), but
 // a contract that slashes a '|'-bearing token currently SUCCEEDS and post-gate
 // THROWS, which is consensus-visible, so the guard is gated like the other 2.0.0
 // contract-era changes: testnet/regtest from genesis, mainnet at the shared

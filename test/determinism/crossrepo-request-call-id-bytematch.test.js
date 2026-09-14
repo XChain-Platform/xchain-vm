@@ -64,8 +64,8 @@ const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
 // The indexer's REAL preimage assembly, not a restatement of it.
 //
 // Attest.requestIdPreimageValues and Xcall.callIdPreimageValues are the exact
-// functions the handlers call before hashing (attest/index.js _parseRequest, xcall/index.js
-// _parseRequest); they are invoked here on a minimal receiver because the only
+// functions the handlers call before hashing (attest/index.js parseRequest, xcall/index.js
+// parseRequest); they are invoked here on a minimal receiver because the only
 // thing either reads off `this` is the node config the second one needs for
 // NETWORK/COIN. If a future edit makes them read more, this throws, which is a
 // loud failure rather than a quiet pass. That the handlers still call them, and
@@ -465,7 +465,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
 
         // The call_id carries the same two folded fields plus network/coin/target
         // chain, and its indexer half is a SECOND hand-written re-derivation
-        // (xcall/index.js _callIdPreimageValues). Driving both real implementations over
+        // (xcall/index.js callIdPreimageValues). Driving both real implementations over
         // the same rows is what makes an xcall/index.js-only coercion edit visible here.
         const vmCallPreimage = (root, callPath, contractIndex) =>
             buildCallIdPreimage({

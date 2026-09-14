@@ -333,12 +333,12 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                     throw new Error('contract.slash: token must be a non-empty string');
                 // Keep the wire delimiter out of the token field, matching
                 // emit.execute / attestation.request. Inert against today's consumer
-                // (SLASH is internal-only and the indexer's _processSlashEmission reads
+                // (SLASH is internal-only and the indexer's processSlashEmission reads
                 // {contractIndex, pubkey, token, amount} by NAMED field, never pipe-
                 // splitting), so this is defense-in-depth for the day SLASH is joined
                 // on-wire like EXECUTE's METHOD_PARAMS. Gated (host sets
                 // readOnlyData.slashTokenDelimGuardOn) because rejecting a call that
-                // used to emit successfully changes replay for historical blocks.
+                // emitted successfully before the gate changes replay for historical blocks.
                 if (readOnlyData.slashTokenDelimGuardOn && token.indexOf('|') !== -1)
                     throw new Error('contract.slash: token must not contain "|"');
                 // The 8-dp ceiling contradicted the rest of the seam.
