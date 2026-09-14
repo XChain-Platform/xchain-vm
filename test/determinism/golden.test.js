@@ -35,6 +35,30 @@ const { runAll, platformTag } = require('./helpers/runner.js');
 const { XChainVM } = require('../fuzz/helpers/harness.js');
 
 const MANIFEST_PATH = path.join(__dirname, './golden-manifest.json');
+let manifest;
+let live;
+let manifestLoad;
+
+async function loadGoldenManifest() {
+    if (!manifestLoad) {
+        manifestLoad = initializeGoldenManifest();
+    }
+    await manifestLoad;
+}
+
+async function initializeGoldenManifest() {
+    assert.ok(
+        fs.existsSync(MANIFEST_PATH),
+        'golden-manifest.json missing; generate it once with ' +
+        '`node test/determinism/helpers/generate_golden.js`'
+    );
+    manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+    const res = await runAll();
+    live = new Map(res.entries.map(e => [e.id, e]));
+    // eslint-disable-next-line no-console -- intentional test progress output
+    console.log(`        [determinism] verifying on ${platformTag()} ` +
+        `against manifest generated on ${manifest.generatedOn}`);
+}
 
 describe('determinism: golden-hash manifest', function () {
     this.timeout(60000);
@@ -52,22 +76,7 @@ describe('determinism: golden-hash manifest', function () {
         return;
     }
 
-    let manifest;
-    let live;
-
-    before(async function () {
-        assert.ok(
-            fs.existsSync(MANIFEST_PATH),
-            'golden-manifest.json missing; generate it once with ' +
-            '`node test/determinism/helpers/generate_golden.js`'
-        );
-        manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
-        const res = await runAll();
-        live = new Map(res.entries.map(e => [e.id, e]));
-        // eslint-disable-next-line no-console -- intentional test progress output
-        console.log(`        [determinism] verifying on ${platformTag()} ` +
-            `against manifest generated on ${manifest.generatedOn}`);
-    });
+    before(loadGoldenManifest);
 
     it('manifest covers every executed scenario (no silent drift in the corpus)', function () {
         const manifestIds = new Set(manifest.scenarios.map(s => s.id));
@@ -79,48 +88,60 @@ describe('determinism: golden-hash manifest', function () {
         assert.strictEqual(manifest.scenarios.length, live.size,
             'manifest scenario count differs from executed count');
     });
-
-    describe('invariant tier: MUST be byte-identical across all platforms', function () {
-        const invariants = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
-            .scenarios.filter(s => s.tier === 'invariant');
-        for (const sc of invariants) {
-            it(`${sc.id} reproduces committed hash`, function () {
-                const got = live.get(sc.id);
-                assert.ok(got, `scenario "${sc.id}" did not execute`);
-                assert.strictEqual(got.hash, sc.hash,
-                    `DETERMINISM BREAK on "${sc.id}": this platform produced a ` +
-                    `different consensus-visible result than the golden manifest. ` +
-                    `gasUsed manifest=${sc.gasUsed} live=${got.gasUsed}, ` +
-                    `error manifest=${JSON.stringify(sc.error)} live=${JSON.stringify(got.error)}. ` +
-                    `A validator on this platform would FORK the chain.`);
-            });
-        }
-    });
-
-    describe('resource tier: failure shape must stay deterministic', function () {
-        const resources = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
-            .scenarios.filter(s => s.tier === 'resource');
-        for (const sc of resources) {
-            it(`${sc.id} fails the same way (${sc.hazard ? 'hazard: ' + sc.hazard : 'bounded'})`, function () {
-                const got = live.get(sc.id);
-                assert.ok(got, `scenario "${sc.id}" did not execute`);
-                if (sc.hazard === 'memory-ceiling-nondeterminism') {
-                    // Memory ceilings legitimately fire at GC-timing-dependent
-                    // points. We require ONLY: the contract still fails cleanly
-                    // and contained (no success, no partial emissions/state).
-                    assert.strictEqual(got.success, false,
-                        `memory-bomb unexpectedly SUCCEEDED on this platform; ` +
-                        `the memory ceiling did not contain it`);
-                } else {
-                    // Gas/count-bounded ceilings ARE deterministic; hold them
-                    // to the same standard as invariants.
-                    assert.strictEqual(got.hash, sc.hash,
-                        `RESOURCE DETERMINISM BREAK on "${sc.id}": a gas/count ` +
-                        `ceiling produced a different result than the manifest ` +
-                        `(manifest gasUsed=${sc.gasUsed} live=${got.gasUsed}). ` +
-                        `Gas metering must be platform-independent.`);
-                }
-            });
-        }
-    });
 });
+
+if (XChainVM) {
+    describe('determinism: golden-hash manifest', function () {
+        this.timeout(60000);
+        before(loadGoldenManifest);
+
+        describe('invariant tier: MUST be byte-identical across all platforms', function () {
+            const invariants = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
+                .scenarios.filter(s => s.tier === 'invariant');
+            for (const sc of invariants) {
+                it(`${sc.id} reproduces committed hash`, function () {
+                    const got = live.get(sc.id);
+                    assert.ok(got, `scenario "${sc.id}" did not execute`);
+                    assert.strictEqual(got.hash, sc.hash,
+                        `DETERMINISM BREAK on "${sc.id}": this platform produced a ` +
+                        `different consensus-visible result than the golden manifest. ` +
+                        `gasUsed manifest=${sc.gasUsed} live=${got.gasUsed}, ` +
+                        `error manifest=${JSON.stringify(sc.error)} live=${JSON.stringify(got.error)}. ` +
+                        `A validator on this platform would FORK the chain.`);
+                });
+            }
+        });
+    });
+
+    describe('determinism: golden-hash manifest', function () {
+        this.timeout(60000);
+        before(loadGoldenManifest);
+
+        describe('resource tier: failure shape must stay deterministic', function () {
+            const resources = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
+                .scenarios.filter(s => s.tier === 'resource');
+            for (const sc of resources) {
+                it(`${sc.id} fails the same way (${sc.hazard ? 'hazard: ' + sc.hazard : 'bounded'})`, function () {
+                    const got = live.get(sc.id);
+                    assert.ok(got, `scenario "${sc.id}" did not execute`);
+                    if (sc.hazard === 'memory-ceiling-nondeterminism') {
+                        // Memory ceilings legitimately fire at GC-timing-dependent
+                        // points. We require ONLY: the contract still fails cleanly
+                        // and contained (no success, no partial emissions/state).
+                        assert.strictEqual(got.success, false,
+                            `memory-bomb unexpectedly SUCCEEDED on this platform; ` +
+                            `the memory ceiling did not contain it`);
+                    } else {
+                        // Gas/count-bounded ceilings ARE deterministic; hold them
+                        // to the same standard as invariants.
+                        assert.strictEqual(got.hash, sc.hash,
+                            `RESOURCE DETERMINISM BREAK on "${sc.id}": a gas/count ` +
+                            `ceiling produced a different result than the manifest ` +
+                            `(manifest gasUsed=${sc.gasUsed} live=${got.gasUsed}). ` +
+                            `Gas metering must be platform-independent.`);
+                    }
+                });
+            }
+        });
+    });
+}
