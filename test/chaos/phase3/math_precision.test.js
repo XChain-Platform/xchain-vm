@@ -78,6 +78,12 @@ const mathExtremeCode = fs.readFileSync(
         assert.strictEqual(result.success, false, '0/0 should fail');
         checkAtomicity(result);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Math Precision Boundary (Exp 10)', function() {
+
+    let vm;
+    before(function() { vm = createVM(); });
 
     it('CHAOS-1005: very large multiplication succeeds', async function() {
         // 100-digit * 100-digit: mathjs handles arbitrary precision
@@ -128,6 +134,12 @@ const mathExtremeCode = fs.readFileSync(
                 'Accumulated 1000 * 0.001 should be exactly 1, got: ' + val);
         }
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Math Precision Boundary (Exp 10)', function() {
+
+    let vm;
+    before(function() { vm = createVM(); });
 
     it('CHAOS-1008: negative numbers handled correctly', async function() {
         const result = await execute(vm, mathExtremeCode, {
@@ -167,6 +179,12 @@ const mathExtremeCode = fs.readFileSync(
                 'Slightly larger number should compare as greater');
         }
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Math Precision Boundary (Exp 10)', function() {
+
+    let vm;
+    before(function() { vm = createVM(); });
 
     it('CHAOS-1011: isZero with various zero representations', async function() {
         const zeros = ['0', '0.0', '0.00000000000', '-0'];
@@ -206,6 +224,12 @@ const mathExtremeCode = fs.readFileSync(
             checkAtomicity(result);
         }
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Math Precision Boundary (Exp 10)', function() {
+
+    let vm;
+    before(function() { vm = createVM(); });
 
     it('CHAOS-1014: non-numeric string input fails gracefully', async function() {
         const result = await execute(vm, mathExtremeCode, {
