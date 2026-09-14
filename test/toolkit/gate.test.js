@@ -42,7 +42,7 @@ describe('Toolkit gate: determinism + gas', function() {
     });
 
     // Deploy parity: code over MAX_CODE_SIZE is rejected on chain BEFORE the
-    // syntax gate (deploy.js Buffer.byteLength check), so the gate must FAIL
+    // syntax gate (deploy/index.js Buffer.byteLength check), so the gate must FAIL
     // it too even though `code-size` is deliberately not a CONSENSUS_RULE.
     it('blocks a contract one byte over MAX_CODE_SIZE (deploy parity)', function() {
         const g = runGate(padTo(MAX_CODE_SIZE + 1));

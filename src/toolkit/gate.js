@@ -41,7 +41,7 @@ const walk = require('acorn-walk');
 // It is gate-local (not a lint-core rule) because lint-core's CONSENSUS_RULES is
 // the frozen set the on-chain validateSyntax acts on, byte-vendored into the SDK
 // and pinned by a sha256 parity guard; the chain rejects a nameless contract in
-// deploy.js, not in validateSyntax, exactly as it rejects an oversized one. Same
+// deploy/index.js, not in validateSyntax, exactly as it rejects an oversized one. Same
 // layering as 'code-size' (spec decisions D22, D50).
 //
 // The detector is STATIC (acorn), while the chain evaluates `meta` by RUNNING the
@@ -374,9 +374,9 @@ function runGate(code) {
 
     // Deploy parity: the on-chain validator blocks on CONSENSUS_RULES (see
     // syntax.js validateSyntax) PLUS the code-size cap, which the indexer
-    // enforces by byte length BEFORE validateSyntax (deploy.js), so it is not
+    // enforces by byte length BEFORE validateSyntax (deploy/index.js), so it is not
     // itself a consensus rule but is still deploy-blocking, PLUS the contract
-    // identity rule, which deploy.js rejects after the manifest read once
+    // identity rule, which deploy/index.js rejects after the manifest read once
     // CONTRACT_META_REQUIRED is active. analyzeContract's other findings (e.g.
     // crossCallable-not-array, a runtime not a deploy failure) remain
     // non-blocking advisories.

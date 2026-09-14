@@ -336,7 +336,7 @@ try {
 
     // An isolate that cannot be SPAWNED is a fault of this machine, not a
     // property of the source. Reported as 'syntax error: ...' it became a
-    // committed 'invalid: CODE_ENCODING' on the consensus path (deploy.js)
+    // committed 'invalid: CODE_ENCODING' on the consensus path (deploy/index.js)
     // while healthy peers accepted the same contract, so the two failures must
     // stay distinguishable at the boundary they cross.
     describe('isolate-spawn host fault is not a syntax verdict', function() {

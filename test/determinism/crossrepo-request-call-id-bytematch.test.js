@@ -64,7 +64,7 @@ const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
 // The indexer's REAL preimage assembly, not a restatement of it.
 //
 // Attest.requestIdPreimageValues and Xcall.callIdPreimageValues are the exact
-// functions the handlers call before hashing (attest.js _parseRequest, xcall.js
+// functions the handlers call before hashing (attest/index.js _parseRequest, xcall/index.js
 // _parseRequest); they are invoked here on a minimal receiver because the only
 // thing either reads off `this` is the node config the second one needs for
 // NETWORK/COIN. If a future edit makes them read more, this throws, which is a
@@ -344,7 +344,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
     // The two sides agree, but they agree by applying DIFFERENT operations to the
     // same fields and landing on the same bytes. The VM folds contractIndex through
     // Number() and rootActionIndex through normalizeRootDiscriminator; the indexer
-    // bare-String()s both (attest.js, where CONTRACT_INDEX has additionally become a
+    // bare-String()s both (attest/index.js, where CONTRACT_INDEX has additionally become a
     // mathjs bignumber via util.setNumberFormats). Agreement therefore rests on an
     // unstated invariant about what the input domain contains, not on shared code.
     //
@@ -465,8 +465,8 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
 
         // The call_id carries the same two folded fields plus network/coin/target
         // chain, and its indexer half is a SECOND hand-written re-derivation
-        // (xcall.js _callIdPreimageValues). Driving both real implementations over
-        // the same rows is what makes an xcall.js-only coercion edit visible here.
+        // (xcall/index.js _callIdPreimageValues). Driving both real implementations over
+        // the same rows is what makes an xcall/index.js-only coercion edit visible here.
         const vmCallPreimage = (root, callPath, contractIndex) =>
             buildCallIdPreimage({
                 network:     COIN_CONFIG.NETWORK, sourceChain: COIN_CONFIG.COIN,

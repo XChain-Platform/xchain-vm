@@ -382,7 +382,7 @@ Contract Source Code
     |-- collector.js -> emittedActions, logs
     +-- gas.js -> gasUsed
     |
-  Return to indexer (execute.js)
+  Return to indexer (execute/index.js)
 ```
 
 ## Module Structure
@@ -424,10 +424,10 @@ xchain-vm/
 
 ## Integration
 
-The VM integrates with the XChain Indexer at `xchain-indexer/src/actions/execute.js`. The indexer instantiates a single `XChainVM` instance at startup and calls `vm.execute()` for each EXECUTE action and `vm.validateSyntax()` for each DEPLOY action.
+The VM integrates with the XChain Indexer at `xchain-indexer/src/actions/execute/index.js`. The indexer instantiates a single `XChainVM` instance at startup and calls `vm.execute()` for each EXECUTE action and `vm.validateSyntax()` for each DEPLOY action.
 
 ```javascript
-// In xchain-indexer/src/actions.js
+// In xchain-indexer/src/actions/index.js
 const XChainVM = require('xchain-vm');
 this.vm = new XChainVM({
     gasSchedule: this.config['GAS_SCHEDULE'],

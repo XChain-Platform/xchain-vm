@@ -58,7 +58,7 @@ const crypto = require('crypto');
 // before the flag day stays byte-identical. '.' appears in no other preimage
 // field and the field separator is ':', so the composite is one unambiguous token.
 // MUST byte-match the indexer's re-derivation, which stringifies the same value
-// (attest.js / xcall.js ROOT_ACTION_INDEX).
+// (attest/index.js / xcall/index.js ROOT_ACTION_INDEX).
 const ROOT_DISCRIMINATOR_COMPOSITE_RE = /^[0-9]+\.[0-9]+$/;
 function normalizeRootDiscriminator(value) {
     if (value === undefined || value === null) return '';
@@ -77,7 +77,7 @@ function normalizeRootDiscriminator(value) {
 // subcommand's composite '<TX_VOUT>.<position>' collapses ('3.10' -> 3.1) and
 // re-collides the roots it separates; contractIndex keeps its historical Number()
 // coercion. The indexer re-derives with a bare String() on every field
-// (attest.js/xcall.js), so the two sides agree over the input domain producers
+// (attest/index.js / xcall/index.js), so the two sides agree over the input domain producers
 // emit and not outside it; that edge is measured case by case in
 // test/determinism/crossrepo-request-call-id-bytematch.test.js.
 function buildRequestIdPreimage(fields) {
@@ -301,7 +301,7 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             // collide or replay across chains/networks. The target chain is
             // bound so the same logical call to two chains never collides.
             // MUST byte-match the indexer's re-derivation in
-            // xchain-indexer/src/actions/xcall.js (parseRequest, EMITTER_PATH).
+            // xchain-indexer/src/actions/xcall/index.js (parseRequest, EMITTER_PATH).
             // The emitting EXECUTE's action_index is deliberately NOT in the preimage:
             // it shifts with the indexer's synthetic-action injection timing, so it is
             // non-deterministic across nodes / reorgs. The call-path replaces it as the

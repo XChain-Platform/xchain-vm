@@ -1233,7 +1233,7 @@ const CONTRACT_WRAPPER = `
     // Type tags are surfaced (not just values) so the indexer can fail-closed on a
     // malformed manifest (e.g. permissions exported as a string, or a non-integer
     // maxTakeBps) rather than silently treating it as absent. All validation +
-    // rejection lives host-side (actions/deploy.js); the VM only reports faithfully.
+    // rejection lives host-side (actions/deploy/index.js); the VM only reports faithfully.
     if (__readManifest) {
         var __ce = (typeof contractExports === 'object' && contractExports !== null) ? contractExports : {};
 
@@ -1256,7 +1256,7 @@ const CONTRACT_WRAPPER = `
         // read is caught (meta may be a throwing getter) and a stringify that
         // yields undefined (a toJSON returning undefined) is normalised.
         //
-        // Reported faithfully; every verdict lives host-side (actions/deploy.js).
+        // Reported faithfully; every verdict lives host-side (actions/deploy/index.js).
         var __metaSrc = undefined;
         var __metaJson = null, __metaError = false, __metaOversize = false;
         try {
@@ -1287,7 +1287,7 @@ const CONTRACT_WRAPPER = `
             // assigned module.exports.initialize). The indexer uses this to reject a
             // DEPLOY that declares a constructor but supplies no CONSTRUCTOR_PARAMS,
             // gated on the DEPLOY_INIT_STRICT flag-day. Reported faithfully here;
-            // all verdict logic lives host-side in actions/deploy.js.
+            // all verdict logic lives host-side in actions/deploy/index.js.
             hasInitialize:   (typeof __ce.initialize === 'function'),
             metaType:        __metaType,
             metaJson:        __metaJson,
@@ -1351,7 +1351,7 @@ const MAX_CODE_SIZE = PROTO.MAX_CODE_SIZE;
 
 // Cross-contract call protocol constants. Vendored from ./protocol/constants.js
 // (VM_MAX_CALL_DEPTH / VM_MIN_CALL_GAS); the indexer re-validates both host-side
-// (xchain-indexer/src/actions/execute.js) so an older bundled VM cannot
+// (xchain-indexer/src/actions/execute/index.js) so an older bundled VM cannot
 // bypass them. Exported below for the cross-service regression suite.
 const MAX_CALL_DEPTH = PROTO.VM_MAX_CALL_DEPTH;
 const MIN_CALL_GAS   = PROTO.VM_MIN_CALL_GAS;
@@ -1385,7 +1385,7 @@ const MAX_STACK_DEPTH_MUSL = 256;
 
 // Cross-CHAIN call (XCALL) protocol constants. Canonical values:
 // xchain-documentation/protocol/constants.js; the indexer re-validates
-// host-side (execute.js processEmission + actions/xcall.js).
+// host-side (execute/index.js processEmission + actions/xcall/index.js).
 const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;     // = MIN_CALL_GAS
 const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;     // target-side ceiling cap (the run is fee-less on the target chain)
 // Single in-VM source of truth: gateway-emit.js declares the hop cap it
@@ -2219,7 +2219,7 @@ class XChainVM {
         //
         // The five flags are resolved by the SAME predicates the rest of the VM already
         // uses, which are the execution-side twins of the flags the indexer threads into
-        // deploy.js validateSyntax, so the execute-time verdict agrees with what a deploy
+        // deploy/index.js validateSyntax, so the execute-time verdict agrees with what a deploy
         // in this block would have produced:
         //   banned-async                    -> isAsyncSurfaceActive   (block time)
         //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
@@ -2967,7 +2967,7 @@ class XChainVM {
      * @param {object} [opts]
      * @param {boolean} [opts.enforceBannedAsync=true] - block async/await/Promise
      *        (CONSENSUS_RULES 'banned-async'). CONSENSUS-GATED on the indexer:
-     *        deploy.js passes the resolved VM_BANNED_ASYNC activation so a
+     *        deploy/index.js passes the resolved VM_BANNED_ASYNC activation so a
      *        from-genesis replay reproduces the historical accept-below verdict.
      *        Defaults to true for author-facing callers (SDK linter, unit tests).
      * @returns {{ valid: boolean, error?: string }}
@@ -2993,10 +2993,10 @@ class XChainVM {
      * depends only on the (immutable) contract code and the pinned runtime. Works
      * for constructor-less contracts, which vm.execute() never runs otherwise.
      *
-     * Returns the raw, typed manifest report; the indexer (actions/deploy.js) owns
+     * Returns the raw, typed manifest report; the indexer (actions/deploy/index.js) owns
      * all validation + fail-closed rejection. On a module-level throw, success is
      * false and the host treats the contract as declaring no manifest (today's
-     * behavior for a contract that only fails at first execute).
+     * behavior for a contract that only fails on its first execute).
      *
      * @param {string} code
      * @returns {Promise<{ success: boolean, manifest: object|null, error: string|null }>}

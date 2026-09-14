@@ -16,7 +16,7 @@
 // instantiating the module top-level (no method dispatch), so it works even for
 // constructor-less contracts. Type tags are reported (not just values) so the
 // indexer can fail-closed on a malformed manifest. The VM only reports faithfully;
-// all validation lives host-side (indexer actions/deploy.js).
+// all validation lives host-side (indexer actions/deploy/index.js).
 
 const assert = require('assert');
 

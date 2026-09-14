@@ -14,7 +14,7 @@
 //
 // The wrapper reports four fields beside the permissions manifest: metaType,
 // metaJson, metaError and metaOversize. It never judges: the seven verdict
-// strings live host-side in xchain-indexer/src/actions/deploy.js. These vectors
+// strings live host-side in xchain-indexer/src/actions/deploy/index.js. These vectors
 // pin the REPORT, one per shape the indexer has to tell apart, plus the
 // invariant the whole design rests on: reading meta can never make the manifest
 // read fail, because that would move the existing permissions verdicts.

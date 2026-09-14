@@ -359,7 +359,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     it('REST_PATTERN_METER_GATE_BLOCK_TIME matches the indexer REST_PATTERN_METER literal (cross-repo repin guard)', function () {
         // The VM constant and the indexer protocol_changes entry are the two halves of one
         // flag day: the VM gates the metering rewrite on it, the indexer gates the deploy
-        // rejection on it (deploy.js enforceBannedRest). A repin that edits one and misses
+        // rejection on it (deploy/index.js enforceBannedRest). A repin that edits one and misses
         // the other passes BOTH CIs and forks the fleet at activation. Same construction as
         // the six-gate CONTROLLER_GUARD guard below; skips only when the sibling repo is
         // not checked out (standalone clone), where the hard pin above still holds.

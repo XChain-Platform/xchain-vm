@@ -77,7 +77,7 @@
  *     worker to lose, so a contract that aborts the JS engine (bulk allocation
  *     past the isolate memory limit is the shape) takes the simulator's own
  *     process down and the author sees a crashed test run. The indexer runs
- *     execution: 'subprocess' (xchain-indexer/src/actions.js), where the same
+ *     execution: 'subprocess' (xchain-indexer/src/actions/index.js), where the same
  *     contract kills only the worker and the executor returns the deterministic
  *     `out_of_resource: execution host terminated (...)` with gasUsed at the
  *     ceiling (src/process-executor.js hostTerminatedResult). Pass
@@ -240,11 +240,11 @@ function defaultBlockHeight(coin, network) {
 const GUARD_GAS_CEILING = 200000;
 
 // Method name the indexer invokes on a token's bound controller contract
-// (xchain-indexer/src/actions/execute.js GUARD_METHOD).
+// (xchain-indexer/src/actions/execute/index.js GUARD_METHOD).
 const GUARD_METHOD = 'guard';
 
 // Positional, all-string guard inputs, in consensus order
-// (xchain-indexer/src/actions/execute.js runControllerGuard). Named here so
+// (xchain-indexer/src/actions/execute/index.js runControllerGuard). Named here so
 // callGuard cannot drift from the order the chain actually passes.
 const GUARD_PARAM_ORDER = Object.freeze([
     'actionType', 'from', 'to', 'tick', 'amount', 'price', 'proceedsTick'
@@ -597,13 +597,13 @@ class ContractSimulator {
      * would break those callers silently.
      *
      * The gate is the indexer's, resolved at THIS simulator's epoch rather than
-     * hardcoded on: xchain-indexer/src/actions/deploy.js checks the UTF-8 size cap
+     * hardcoded on: xchain-indexer/src/actions/deploy/index.js checks the UTF-8 size cap
      * and then calls vm.validateSyntax with six epoch-resolved ban flags. It reads
      * those flags from its own protocolChanges table and per-coin activation
      * modules; the VM's exported predicates are the twins index.js already uses for
      * the execute-time re-lint (see the flag map above isExecLintActive's caller),
      * so they resolve the same verdict without a second copy of the thresholds.
-     * The two height-keyed flags take the CONFIGURED coin, matching deploy.js,
+     * The two height-keyed flags take the CONFIGURED coin, matching deploy/index.js,
      * which reads its node's COIN rather than deriving one from the address.
      *
      * banned-rest is the sixth and rides the REST_PATTERN_METER block-time flag-day,
@@ -745,7 +745,7 @@ class ContractSimulator {
 
     /**
      * Run a token's bound controller contract in the mode the indexer runs it,
-     * mirroring runControllerGuard (xchain-indexer/src/actions/execute.js).
+     * mirroring runControllerGuard (xchain-indexer/src/actions/execute/index.js).
      *
      * Guard mode is a MODE, not a flag on call(), on purpose: under isGuard the
      * chain also passes attestationData null, callPath '' and a 5x smaller gas

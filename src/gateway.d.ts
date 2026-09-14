@@ -44,7 +44,7 @@
  * Token metadata as returned by `getTokenInfo`.
  *
  * Keys are UPPERCASE and two of them are NUMBERS, not strings: the map is built
- * by `buildVmBalancesAndTokenInfo` in `xchain-indexer/src/db.js` and handed to
+ * by `buildVmBalancesAndTokenInfo` in `xchain-indexer/src/db/index.js` and handed to
  * the contract untouched by `src/gateway.js`, so that builder is the authority
  * for both the casing and the value form. There is deliberately no index
  * signature: a lowercase or misspelled read (`info.decimals`) must be a type

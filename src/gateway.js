@@ -253,7 +253,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
                 // content-derived, so it stays byte-stable across nodes and reorgs
                 // (action_index advanced with injection timing and forked the PBFT).
                 // MUST byte-match the indexer's re-derivation in
-                // xchain-indexer/src/actions/attest.js (parseRequest, EMITTER_PATH).
+                // xchain-indexer/src/actions/attest/index.js (parseRequest, EMITTER_PATH).
                 // Assembled by buildRequestIdPreimage (gateway-emit.js), which owns the
                 // per-field normalization for both preimage classes; raw readOnlyData
                 // values go in.
@@ -292,7 +292,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
         },
 
         // Contract-targeted staking: readable + slashable from inside the contract being staked TO.
-        // The contractStakeData accessor is pre-loaded by execute.js for ONLY the currently-executing
+        // The contractStakeData accessor is pre-loaded by execute/index.js for ONLY the currently-executing
         // contract's stakes; a contract cannot read/slash stakes targeting another contract.
         contract: {
             // Returns the SUM of active stake amounts for (pubkey, token) on THIS contract.
@@ -323,7 +323,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             // (from readOnlyData) for defense-in-depth verification in the indexer handler.
             //
             // Slashed tokens are routed to the contract's slash_destination (locked at DEPLOY
-            // time, see deploy.js). Reaches both active stakes AND cooldown-queued balances
+            // time, see deploy/index.js). Reaches both active stakes AND cooldown-queued balances
             // per the plan; over-slash is silently capped at available balance.
             slash: (pubkey, token, amount) => {
                 gasTracker.charge(gasSchedule.VM_EMISSION);
