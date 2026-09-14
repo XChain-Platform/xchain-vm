@@ -95,6 +95,12 @@ const gatewayCallerCode = fs.readFileSync(
             'All emissions must be discarded on mid-execution fault');
         assert.strictEqual(result.stateChanges.length, 0);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Gateway Error Atomicity (Exp 3)', function() {
+
+    let vm;
+    before(function() { vm = createVM(); });
 
     it('CHAOS-304: crossChain throw mid-execution discards all changes', async function() {
         const provider = new ProgrammableCrossChainProvider();
@@ -136,6 +142,12 @@ const gatewayCallerCode = fs.readFileSync(
         assert(result.logs.length > 0, 'Logs should be preserved on failure');
         assert(result.logs[0].includes('before oracle call'));
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Gateway Error Atomicity (Exp 3)', function() {
+
+    let vm;
+    before(function() { vm = createVM(); });
 
     it('CHAOS-306: VM recovers after gateway fault', async function() {
         const mock = new ProgrammableMock();
