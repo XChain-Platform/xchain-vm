@@ -27,20 +27,20 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
+let h;
+async function resetHarness() {
+    h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'TEST', '500');
+    h.seedBalance('user2', 'TEST', '0');
+
+    const code = h.loadContract('token_sender.js');
+    await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:1', params: ['TEST'] });
+}
+
 (XChainVM ? describe : describe.skip)('E2E: Deposit & Withdraw', function() {
-
-    let h;
-
-    beforeEach(async function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'TEST', '500');
-        h.seedBalance('user2', 'TEST', '0');
-
-        const code = h.loadContract('token_sender.js');
-        await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:1', params: ['TEST'] });
-    });
+    beforeEach(resetHarness);
 
     // --- E2E-020: Deposit tokens to contract ---
     describe('E2E-020: Deposit tokens to contract', function() {
@@ -50,6 +50,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertContractBalance(h.ledger, 'C:BTC:1', 'TEST', '200');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Deposit & Withdraw', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-021: Contract-initiated withdrawal (SEND) ---
     describe('E2E-021: Contract-initiated SEND from custody', function() {
@@ -71,6 +75,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertBalance(h.ledger, 'user2', 'TEST', '50');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Deposit & Withdraw', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-022: WITHDRAW tokens from contract ---
     describe('E2E-022: Withdraw tokens from contract', function() {
@@ -84,6 +92,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertContractBalance(h.ledger, 'C:BTC:1', 'TEST', '100');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Deposit & Withdraw', function() {
+    beforeEach(resetHarness);
 
     // --- E2E-023: Overdraw attempt ---
     describe('E2E-023: Overdraw attempt', function() {
