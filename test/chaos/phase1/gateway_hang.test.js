@@ -86,6 +86,9 @@ const { checkResultShape, checkAtomicity } = require('../../fuzz/helpers/invaria
             checkAtomicity(result);
         }
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Gateway Callback Hang (Exp 2)', function() {
 
     it('CHAOS-203: multiple delayed calls accumulate but VM still completes', async function() {
         this.timeout(15000);
@@ -127,6 +130,9 @@ const { checkResultShape, checkAtomicity } = require('../../fuzz/helpers/invaria
         // Recovery
         await chaosAssertions.assertRecovery(vm);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Gateway Callback Hang (Exp 2)', function() {
 
     it('CHAOS-205: atomicity maintained when hang causes state+emission loss', async function() {
         this.timeout(15000);
