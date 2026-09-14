@@ -93,6 +93,9 @@ const { checkResultShape, checkAtomicity, checkNoPrototypePollution } = require(
             checkAtomicity(result);
         }
     });
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Sandbox Partial Failure (Exp 4)', function() {
 
     it('CHAOS-405: VM recovers after setup-phase failure', async function() {
         const vm = createVM();
