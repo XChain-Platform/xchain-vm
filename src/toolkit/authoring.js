@@ -131,6 +131,24 @@ function looksTypeScript(lang, requestedTs) {
     return !!requestedTs; // bare fence: honor what we asked for
 }
 
+function prepareAuthoringRun(opts) {
+    const complete = opts.complete;
+    if (typeof complete !== 'function') {
+        throw new Error('authorContract requires an injected `complete(messages)` function');
+    }
+    const gate = typeof opts.gate === 'function' ? opts.gate : runGate;
+    const maxRepairs = Number.isInteger(opts.maxRepairs) ? Math.max(0, opts.maxRepairs) : 2;
+    const requestedTs = !!opts.typescript;
+    const { messages } = buildAuthoringPrompt({
+        mode: opts.mode,
+        input: opts.input,
+        typescript: requestedTs,
+        name: opts.name,
+        description: opts.description
+    });
+    return { complete, gate, maxRepairs, requestedTs, transcript: messages.slice() };
+}
+
 /**
  * Author a contract with an injected LLM `complete`, validating and repairing
  * against the real deploy gate until clean or out of retries.
@@ -156,22 +174,7 @@ function looksTypeScript(lang, requestedTs) {
  *   transcript - [{ role, content }] of every message + model reply, for audit
  */
 async function authorContract(opts = {}) {
-    const complete = opts.complete;
-    if (typeof complete !== 'function') {
-        throw new Error('authorContract requires an injected `complete(messages)` function');
-    }
-    const gate = typeof opts.gate === 'function' ? opts.gate : runGate;
-    const maxRepairs = Number.isInteger(opts.maxRepairs) ? Math.max(0, opts.maxRepairs) : 2;
-    const requestedTs = !!opts.typescript;
-
-    const { messages } = buildAuthoringPrompt({
-        mode: opts.mode,
-        input: opts.input,
-        typescript: requestedTs,
-        name: opts.name,
-        description: opts.description
-    });
-    const transcript = messages.slice();
+    const { complete, gate, maxRepairs, requestedTs, transcript } = prepareAuthoringRun(opts);
 
     let attempts = 0;
     let last = { ok: false, code: null, contractJs: null, notes: '', gate: null };
