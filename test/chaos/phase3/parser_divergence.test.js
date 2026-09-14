@@ -29,197 +29,197 @@ const assert = require('assert');
 const { XChainVM, createVM, execute } = require('../helpers/harness.js');
 const { checkResultShape, checkAtomicity, checkGasCeiling } = require('../../fuzz/helpers/invariants.js');
 
-(XChainVM ? describe : describe.skip)('Chaos: Parser Divergence (Exp 7)', function() {
+// Each test case includes name, code, and expected behavior:
+// - expectSuccess: true (must succeed), false (must fail), null (either is fine)
+const PARSER_EDGE_CASES = [
+    {
+        name: 'arrow function in expression',
+        code: `module.exports = function(xchain) {
+            var fn = (x) => x + 1;
+            return String(fn(41));
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'arrow function with implicit return',
+        code: `module.exports = function(xchain) {
+            var add = (a, b) => a + b;
+            return String(add(1, 2));
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'template literal',
+        code: `module.exports = function(xchain) {
+            var name = 'world';
+            return \`hello \${name}\`;
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'destructuring assignment',
+        code: `module.exports = function(xchain) {
+            var arr = [1, 2, 3];
+            var [a, b, c] = arr;
+            return String(a + b + c);
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'destructuring with defaults',
+        code: `module.exports = function(xchain) {
+            var [a = 10, b = 20] = [1];
+            return String(a) + ':' + String(b);
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'object destructuring',
+        code: `module.exports = function(xchain) {
+            var obj = { x: 1, y: 2 };
+            var { x, y } = obj;
+            return String(x + y);
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'spread operator',
+        code: `module.exports = function(xchain) {
+            var a = [1, 2];
+            var b = [...a, 3, 4];
+            return String(b.length);
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'rest parameters',
+        code: `module.exports = function(xchain) {
+            function sum(...nums) {
+                var total = 0;
+                for (var i = 0; i < nums.length; i++) total += nums[i];
+                return total;
+            }
+            return String(sum(1, 2, 3));
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'computed property names',
+        code: `module.exports = function(xchain) {
+            var key = 'dynamic';
+            var obj = { [key]: 'value' };
+            return obj.dynamic;
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'for-of loop',
+        code: `module.exports = function(xchain) {
+            var arr = [1, 2, 3];
+            var sum = 0;
+            for (var x of arr) sum += x;
+            return String(sum);
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'class declaration',
+        code: `module.exports = function(xchain) {
+            class Counter {
+                constructor(n) { this.n = n; }
+                inc() { this.n++; return this; }
+                val() { return this.n; }
+            }
+            var c = new Counter(0);
+            c.inc().inc().inc();
+            return String(c.val());
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'async function (should fail: async is not useful in sync VM)',
+        code: `module.exports = async function(xchain) {
+            return 'async';
+        };`,
+        // async returns a Promise, not a value; may fail or return [object Promise]
+        expectSuccess: null
+    },
+    {
+        name: 'generator function',
+        code: `module.exports = function(xchain) {
+            function* gen() { yield 1; yield 2; yield 3; }
+            var sum = 0;
+            var g = gen();
+            var n = g.next();
+            while (!n.done) { sum += n.value; n = g.next(); }
+            return String(sum);
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'deeply nested ternary',
+        code: `module.exports = function(xchain) {
+            var x = 5;
+            var r = x > 10 ? 'a' : x > 5 ? 'b' : x > 3 ? 'c' : x > 1 ? 'd' : 'e';
+            return r;
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'labeled statement with break',
+        code: `module.exports = function(xchain) {
+            var found = -1;
+            outer: for (var i = 0; i < 3; i++) {
+                for (var j = 0; j < 3; j++) {
+                    if (i === 1 && j === 1) { found = i * 10 + j; break outer; }
+                }
+            }
+            return String(found);
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'switch with fall-through',
+        code: `module.exports = function(xchain) {
+            var x = 2, r = '';
+            switch(x) {
+                case 1: r += 'a';
+                case 2: r += 'b';
+                case 3: r += 'c'; break;
+                default: r += 'd';
+            }
+            return r;
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'try-catch-finally',
+        code: `module.exports = function(xchain) {
+            var r = '';
+            try {
+                r += 'try;';
+                throw new Error('test');
+            } catch(e) {
+                r += 'catch;';
+            } finally {
+                r += 'finally';
+            }
+            return r;
+        };`,
+        expectSuccess: true
+    },
+    {
+        name: 'deeply nested binary expression (metering injection at depth > 10)',
+        code: `module.exports = function(xchain) {
+            var a = 1;
+            var r = a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a;
+            return String(r);
+        };`,
+        expectSuccess: true
+    },
+];
 
-    // Each test case includes name, code, and expected behavior:
-    // - expectSuccess: true (must succeed), false (must fail), null (either is fine)
-    const PARSER_EDGE_CASES = [
-        {
-            name: 'arrow function in expression',
-            code: `module.exports = function(xchain) {
-                var fn = (x) => x + 1;
-                return String(fn(41));
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'arrow function with implicit return',
-            code: `module.exports = function(xchain) {
-                var add = (a, b) => a + b;
-                return String(add(1, 2));
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'template literal',
-            code: `module.exports = function(xchain) {
-                var name = 'world';
-                return \`hello \${name}\`;
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'destructuring assignment',
-            code: `module.exports = function(xchain) {
-                var arr = [1, 2, 3];
-                var [a, b, c] = arr;
-                return String(a + b + c);
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'destructuring with defaults',
-            code: `module.exports = function(xchain) {
-                var [a = 10, b = 20] = [1];
-                return String(a) + ':' + String(b);
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'object destructuring',
-            code: `module.exports = function(xchain) {
-                var obj = { x: 1, y: 2 };
-                var { x, y } = obj;
-                return String(x + y);
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'spread operator',
-            code: `module.exports = function(xchain) {
-                var a = [1, 2];
-                var b = [...a, 3, 4];
-                return String(b.length);
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'rest parameters',
-            code: `module.exports = function(xchain) {
-                function sum(...nums) {
-                    var total = 0;
-                    for (var i = 0; i < nums.length; i++) total += nums[i];
-                    return total;
-                }
-                return String(sum(1, 2, 3));
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'computed property names',
-            code: `module.exports = function(xchain) {
-                var key = 'dynamic';
-                var obj = { [key]: 'value' };
-                return obj.dynamic;
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'for-of loop',
-            code: `module.exports = function(xchain) {
-                var arr = [1, 2, 3];
-                var sum = 0;
-                for (var x of arr) sum += x;
-                return String(sum);
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'class declaration',
-            code: `module.exports = function(xchain) {
-                class Counter {
-                    constructor(n) { this.n = n; }
-                    inc() { this.n++; return this; }
-                    val() { return this.n; }
-                }
-                var c = new Counter(0);
-                c.inc().inc().inc();
-                return String(c.val());
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'async function (should fail: async is not useful in sync VM)',
-            code: `module.exports = async function(xchain) {
-                return 'async';
-            };`,
-            // async returns a Promise, not a value; may fail or return [object Promise]
-            expectSuccess: null
-        },
-        {
-            name: 'generator function',
-            code: `module.exports = function(xchain) {
-                function* gen() { yield 1; yield 2; yield 3; }
-                var sum = 0;
-                var g = gen();
-                var n = g.next();
-                while (!n.done) { sum += n.value; n = g.next(); }
-                return String(sum);
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'deeply nested ternary',
-            code: `module.exports = function(xchain) {
-                var x = 5;
-                var r = x > 10 ? 'a' : x > 5 ? 'b' : x > 3 ? 'c' : x > 1 ? 'd' : 'e';
-                return r;
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'labeled statement with break',
-            code: `module.exports = function(xchain) {
-                var found = -1;
-                outer: for (var i = 0; i < 3; i++) {
-                    for (var j = 0; j < 3; j++) {
-                        if (i === 1 && j === 1) { found = i * 10 + j; break outer; }
-                    }
-                }
-                return String(found);
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'switch with fall-through',
-            code: `module.exports = function(xchain) {
-                var x = 2, r = '';
-                switch(x) {
-                    case 1: r += 'a';
-                    case 2: r += 'b';
-                    case 3: r += 'c'; break;
-                    default: r += 'd';
-                }
-                return r;
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'try-catch-finally',
-            code: `module.exports = function(xchain) {
-                var r = '';
-                try {
-                    r += 'try;';
-                    throw new Error('test');
-                } catch(e) {
-                    r += 'catch;';
-                } finally {
-                    r += 'finally';
-                }
-                return r;
-            };`,
-            expectSuccess: true
-        },
-        {
-            name: 'deeply nested binary expression (metering injection at depth > 10)',
-            code: `module.exports = function(xchain) {
-                var a = 1;
-                var r = a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a;
-                return String(r);
-            };`,
-            expectSuccess: true
-        },
-    ];
+(XChainVM ? describe : describe.skip)('Chaos: Parser Divergence (Exp 7)', function() {
 
     for (const tc of PARSER_EDGE_CASES) {
         it('CHAOS-7xx: ' + tc.name, async function() {
@@ -248,6 +248,9 @@ const { checkResultShape, checkAtomicity, checkGasCeiling } = require('../../fuz
             checkGasCeiling(result, 100000);
         });
     }
+});
+
+(XChainVM ? describe : describe.skip)('Chaos: Parser Divergence (Exp 7)', function() {
 
     it('CHAOS-710: gas is charged for complex syntax constructs', async function() {
         this.timeout(10000);
