@@ -77,6 +77,9 @@ function hashResult(result) {
             }
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Determinism', function() {
 
     // --- E2E-081: Determinism with math operations ---
     describe('E2E-081: Math determinism', function() {
@@ -123,8 +126,10 @@ function hashResult(result) {
             assert.strictEqual(vals[0], '0.3', 'Expected 0.1 + 0.2 = "0.3"');
         });
     });
+});
 
-    // --- E2E-082: Determinism across block replay ---
+// --- E2E-082: Determinism across block replay ---
+(XChainVM ? describe : describe.skip)('E2E: Determinism', function() {
     describe('E2E-082: Block replay determinism', function() {
         it('should produce identical final state after replaying blocks', async function() {
             const code = `module.exports = {
