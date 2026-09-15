@@ -39,6 +39,12 @@ const { createVM, execute, XChainVM } = require('../fuzz/helpers/harness.js');
 
 const ABOVE = { height: 2, timestamp: 1900000000, hash: 'b' };
 const fn = (b) => `module.exports = function(xchain){ ${b} };`;
+let deployVM;
+
+function setupDeployVM() {
+    if (!XChainVM) this.skip();
+    if (!deployVM) deployVM = createVM();
+}
 
 (XChainVM ? describe : describe.skip)('gas-meter completeness: no unmetered CPU path (pass-5 lock)', function () {
     this.timeout(30000);
@@ -92,7 +98,7 @@ const fn = (b) => `module.exports = function(xchain){ ${b} };`;
 
 (XChainVM ? describe : describe.skip)('deploy-validation + runtime-strip completeness (pass-5 lock)', function () {
     let vm;
-    before(function () { if (!XChainVM) this.skip(); vm = createVM(); });
+    before(function () { setupDeployVM.call(this); vm = deployVM; });
     const deployRejects = (code) => {
         const r = vm.validateSyntax(code, { enforceBannedAsync: true });
         return r && r.valid === false;
@@ -117,6 +123,15 @@ const fn = (b) => `module.exports = function(xchain){ ${b} };`;
             assert.strictEqual(deployRejects(code), true);
         });
     }
+});
+
+(XChainVM ? describe : describe.skip)('deploy-validation + runtime-strip completeness (pass-5 lock)', function () {
+    let vm;
+    before(function () { setupDeployVM.call(this); vm = deployVM; });
+    const deployRejects = (code) => {
+        const r = vm.validateSyntax(code, { enforceBannedAsync: true });
+        return r && r.valid === false;
+    };
 
     const benign = {
         'string containing "10n"': `module.exports=function(){ return "value 10n"; };`,
@@ -131,6 +146,11 @@ const fn = (b) => `module.exports = function(xchain){ ${b} };`;
             assert.strictEqual(deployRejects(code), false);
         });
     }
+});
+
+(XChainVM ? describe : describe.skip)('deploy-validation + runtime-strip completeness (pass-5 lock)', function () {
+    let vm;
+    before(function () { setupDeployVM.call(this); vm = deployVM; });
 
     // Runtime-stripped non-deterministic / dangerous globals are undefined so a call
     // throws rather than returning a fleet-forking value.

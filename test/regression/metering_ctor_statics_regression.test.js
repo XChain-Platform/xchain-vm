@@ -51,23 +51,33 @@ const BEFORE = { height: 100, timestamp: GATE - 1, hash: 'pre' };
 // Collection-constructor metering rides the per-coin Pkg 3 HEIGHT gate, which is
 // active from genesis on regtest/testnet, so the network is what arms it here.
 const REGTEST = 'regtest';
+const OPTS = { blockContext: AT, network: REGTEST };
+let vm;
+
+function setupMeteringVM() {
+    vm = createVM();
+    vm.beginBlock();
+}
+
+function teardownMeteringVM() {
+    if (vm && vm.endBlock) vm.endBlock();
+}
+
+// Runs `expr` (a contract-source expression) inside the isolate and returns
+// its string value, failing the test with the VM error when it did not run.
+async function evalIn(expr, extraOpts) {
+    const code = 'module.exports = function(){ return String(' + expr + '); };';
+    const r = await execute(vm, code, Object.assign({ method: 'default', blockContext: AT }, extraOpts || {}));
+    assert.strictEqual(r.success, true, 'contract failed: ' + r.error);
+    // returnValue is JSON-encoded by the gateway.
+    return JSON.parse(r.returnValue);
+}
 
 (XChainVM ? describe : describe.skip)('metering constructor wrappers: statics + prototype chain (regression)', function () {
     this.timeout(30000);
 
-    let vm;
-    beforeEach(function () { vm = createVM(); vm.beginBlock(); });
-    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
-
-    // Runs `expr` (a contract-source expression) inside the isolate and returns
-    // its string value, failing the test with the VM error when it did not run.
-    async function evalIn(expr, extraOpts) {
-        const code = 'module.exports = function(){ return String(' + expr + '); };';
-        const r = await execute(vm, code, Object.assign({ method: 'default', blockContext: AT }, extraOpts || {}));
-        assert.strictEqual(r.success, true, 'contract failed: ' + r.error);
-        // returnValue is JSON-encoded by the gateway.
-        return JSON.parse(r.returnValue);
-    }
+    beforeEach(setupMeteringVM);
+    afterEach(teardownMeteringVM);
 
     describe('binary constructors (__meterBinaryCtor)', function () {
         it('the original OWN statics are own properties of the wrapper, with the original values', async function () {
@@ -89,6 +99,16 @@ const REGTEST = 'regtest';
             // name the wrapper (a derived buffer stays metered).
             assert.strictEqual(await evalIn('ArrayBuffer[Symbol.species] === ArrayBuffer'), 'true');
         });
+    });
+});
+
+(XChainVM ? describe : describe.skip)('metering constructor wrappers: statics + prototype chain (regression)', function () {
+    this.timeout(30000);
+
+    beforeEach(setupMeteringVM);
+    afterEach(teardownMeteringVM);
+
+    describe('binary constructors (__meterBinaryCtor)', function () {
 
         it('the wrapper inherits from what the ORIGINAL inherits from, so inherited statics still resolve', async function () {
             // Every typed-array constructor shares one %TypedArray% intrinsic. The
@@ -122,6 +142,16 @@ const REGTEST = 'regtest';
             assert.strictEqual(
                 await evalIn('Uint8Array.prototype === Object.getPrototypeOf(new Uint8Array(1))'), 'true');
         });
+    });
+});
+
+(XChainVM ? describe : describe.skip)('metering constructor wrappers: statics + prototype chain (regression)', function () {
+    this.timeout(30000);
+
+    beforeEach(setupMeteringVM);
+    afterEach(teardownMeteringVM);
+
+    describe('binary constructors (__meterBinaryCtor)', function () {
 
         it('instanceof and instance.constructor still route through the wrapper', async function () {
             assert.strictEqual(await evalIn('(new Uint8Array(2)) instanceof Uint8Array'), 'true');
@@ -149,10 +179,15 @@ const REGTEST = 'regtest';
             assert.ok(r.gasUsed < 50100, 'no NEW charge may have appeared, got ' + r.gasUsed);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('metering constructor wrappers: statics + prototype chain (regression)', function () {
+    this.timeout(30000);
+
+    beforeEach(setupMeteringVM);
+    afterEach(teardownMeteringVM);
 
     describe('collection constructors (__meterCollectionCtor)', function () {
-        const OPTS = { blockContext: AT, network: REGTEST };
-
         it('Symbol-keyed statics are carried across, and species names the wrapper', async function () {
             assert.strictEqual(
                 await evalIn('Object.getOwnPropertySymbols(Set).indexOf(Symbol.species) >= 0', OPTS), 'true');
@@ -179,6 +214,16 @@ const REGTEST = 'regtest';
             assert.strictEqual(
                 await evalIn('Set.prototype === Object.getPrototypeOf(new Set())', OPTS), 'true');
         });
+    });
+});
+
+(XChainVM ? describe : describe.skip)('metering constructor wrappers: statics + prototype chain (regression)', function () {
+    this.timeout(30000);
+
+    beforeEach(setupMeteringVM);
+    afterEach(teardownMeteringVM);
+
+    describe('collection constructors (__meterCollectionCtor)', function () {
 
         it('instanceof, constructor and construction still work through the wrappers', async function () {
             assert.strictEqual(await evalIn('(new Set([1, 2, 3])) instanceof Set', OPTS), 'true');

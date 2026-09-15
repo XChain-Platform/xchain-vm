@@ -60,19 +60,19 @@ const CLEAN_KEY_CODE = `module.exports = function(){
     return 'wrote';
 };`;
 
+let vm;
+// The shared harness execute() does not thread `network`, so the
+// network-aware case calls vm.execute directly with the same defaults.
+const run = (code, blockContext, network) => network
+    ? vm.execute({ code, state: {}, method: 'default', params: [],
+        caller: 'test_addr', contractAddress: 'C:BTC:1', blockContext, network })
+    : execute(vm, code, { method: 'default', blockContext });
+
 (XChainVM ? describe : describe.skip)('canonical string state-key activation gate regression', function () {
     this.timeout(30000);
 
-    let vm;
     beforeEach(function () { vm = createVM(); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
-
-    // The shared harness execute() does not thread `network`, so the
-    // network-aware case calls vm.execute directly with the same defaults.
-    const run = (code, blockContext, network) => network
-        ? vm.execute({ code, state: {}, method: 'default', params: [],
-            caller: 'test_addr', contractAddress: 'C:BTC:1', blockContext, network })
-        : execute(vm, code, { method: 'default', blockContext });
 
     it('the flag day is the pinned coordinated activation timestamp', function () {
         assert.strictEqual(GATE, 1786060800);
@@ -98,6 +98,13 @@ const CLEAN_KEY_CODE = `module.exports = function(){
         assert.strictEqual(res.stateChanges[0].value, 'str', 'last write wins on the canonical key');
         assert.strictEqual(JSON.parse(res.returnValue), 'str', 'get(1) must read the canonical \'1\' row');
     });
+});
+
+(XChainVM ? describe : describe.skip)('canonical string state-key activation gate regression', function () {
+    this.timeout(30000);
+
+    beforeEach(function () { vm = createVM(); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     it('mainnet below the flag day: an object key still writes (legacy, type-blind)', async function () {
         const res = await run(OBJECT_KEY_CODE, BEFORE);

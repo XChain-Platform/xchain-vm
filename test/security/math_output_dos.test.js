@@ -39,15 +39,14 @@ const CEILING = 1000000;
 const BELOW = { height: 100, timestamp: 1700000000, hash: 'abc' }; // < gate
 const ABOVE = { height: 200, timestamp: 1900000000, hash: 'def' }; // >= gate
 const fn = (body) => `module.exports = function(xchain){ ${body} };`;
+let vm;
+const run = (body, block) => execute(vm, fn(body), { method: 'default', blockContext: block });
 
 (XChainVM ? describe : describe.skip)('math output-size DoS guard (F-MO)', function () {
     this.timeout(30000);
 
-    let vm;
     beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
-
-    const run = (body, block) => execute(vm, fn(body), { method: 'default', blockContext: block });
 
     // ---- Below the gate: unmetered (legacy behaviour preserved for replay) ----
     it('below the gate, a small pow still returns its full string (replay preserved)', async function () {
@@ -74,6 +73,13 @@ const fn = (body) => `module.exports = function(xchain){ ${body} };`;
             assert.ok(Date.now() - t0 < 1000, 'must fail before the allocation (got ' + (Date.now() - t0) + 'ms)');
         });
     }
+});
+
+(XChainVM ? describe : describe.skip)('math output-size DoS guard (F-MO)', function () {
+    this.timeout(30000);
+
+    beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     // ---- Above the gate: the gas fault cannot be swallowed and resumed ----
     it('above the gate, catching the pow out_of_gas in a loop still terminates out_of_gas', async function () {

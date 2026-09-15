@@ -23,10 +23,13 @@
 const assert = require('assert');
 const { createVM, execute, assertResultShape } = require('./helpers/harness.js');
 
-describe('[P0] Smoke Regression', function() {
+let vm;
+function setupSmokeVM() {
+    if (!vm) vm = createVM();
+}
 
-    let vm;
-    before(function() { vm = createVM(); });
+describe('[P0] Smoke Regression', function() {
+    before(setupSmokeVM);
 
     // VM lifecycle
     describe('VM instantiation', function() {
@@ -68,6 +71,10 @@ describe('[P0] Smoke Regression', function() {
             assertResultShape(r);
         });
     });
+});
+
+describe('[P0] Smoke Regression', function() {
+    before(setupSmokeVM);
 
     // Method dispatch
     describe('Method dispatch', function() {
@@ -115,6 +122,10 @@ describe('[P0] Smoke Regression', function() {
             assert.strictEqual(v.c, 'ctx_addr');
         });
     });
+});
+
+describe('[P0] Smoke Regression', function() {
+    before(setupSmokeVM);
 
     // Deterministic math
     describe('Deterministic math', function() {

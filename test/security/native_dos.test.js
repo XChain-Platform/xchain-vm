@@ -74,6 +74,12 @@ function execute(vm, code, opts) {
 }
 
 const fn = (body) => `module.exports = function(){ ${body} };`;
+let asyncSurfaceVM;
+
+function setupAsyncSurfaceVM() {
+    if (!XChainVM) this.skip();
+    if (!asyncSurfaceVM) asyncSurfaceVM = createVM();
+}
 
 describe('Native-op DoS: banned literals (deploy-time)', function () {
     let vm;
@@ -123,7 +129,7 @@ describe('Native-op DoS: banned literals (deploy-time)', function () {
 
 describe('Async surface banned (deploy-time): async/await/Promise', function () {
     let vm;
-    before(function () { if (!XChainVM) this.skip(); vm = createVM(); });
+    before(function () { setupAsyncSurfaceVM.call(this); vm = asyncSurfaceVM; });
 
     it('rejects an async function export', function () {
         const r = vm.validateSyntax('module.exports = { m: async function(x){ return 1; } };');
@@ -162,6 +168,11 @@ describe('Async surface banned (deploy-time): async/await/Promise', function () 
     it('does not false-positive on the string "Promise" or "async"', function () {
         assert.strictEqual(vm.validateSyntax(fn("return 'async' + 'Promise';")).valid, true);
     });
+});
+
+describe('Async surface banned (deploy-time): async/await/Promise', function () {
+    let vm;
+    before(function () { setupAsyncSurfaceVM.call(this); vm = asyncSurfaceVM; });
 
     it('Promise is undefined inside the sandbox at runtime', async function () {
         // The runtime strip needs a venue where the async-surface flag-day is live but the

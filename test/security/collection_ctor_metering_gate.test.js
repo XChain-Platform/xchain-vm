@@ -44,19 +44,19 @@ const oneSet = `module.exports = function(xchain){ var a=[]; for(var i=0;i<500;i
 // blow the 500k ceiling -> deterministic out_of_gas.
 const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000;i++){a.push(i);} for(var r=0;r<2000;r++){ var s=new Set(a); } return 'done'; };`;
 
+const runAt = (code, height, network, coin, ceiling) => {
+    const vm = createVM({ gasCeiling: ceiling || 1000000 });
+    vm.beginBlock();
+    return execute(vm, code, {
+        method: 'default',
+        blockContext: { height, timestamp: TS, hash: 'h' },
+        network,
+        contractAddress: 'C:' + (coin || 'BTC') + ':1',
+    }).then((r) => { vm.endBlock(); return r; });
+};
+
 (XChainVM ? describe : describe.skip)('Set/Map ctor metering: per-coin Pkg 3 height gate', function () {
     this.timeout(30000);
-
-    const runAt = (code, height, network, coin, ceiling) => {
-        const vm = createVM({ gasCeiling: ceiling || 1000000 });
-        vm.beginBlock();
-        return execute(vm, code, {
-            method: 'default',
-            blockContext: { height, timestamp: TS, hash: 'h' },
-            network,
-            contractAddress: 'C:' + (coin || 'BTC') + ':1',
-        }).then((r) => { vm.endBlock(); return r; });
-    };
 
     it('below the BTC gate (960999): Set ctor is UNMETERED (baseline gasUsed)', async function () {
         const r = await runAt(oneSet, 960999, 'mainnet', 'BTC');
@@ -75,6 +75,10 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
         assert.strictEqual(at.gasUsed - below.gasUsed, 500,
             'the charge is exactly the 500-element source length');
     });
+});
+
+(XChainVM ? describe : describe.skip)('Set/Map ctor metering: per-coin Pkg 3 height gate', function () {
+    this.timeout(30000);
 
     // CHANGED, and the change is deliberate.
     //
@@ -114,6 +118,10 @@ const setLoop = `module.exports = function(xchain){ var a=[]; for(var i=0;i<1000
         assert.strictEqual(r.success, false, 'metered loop must exhaust gas: ' + JSON.stringify(r.returnValue));
         assert.match(r.error, /^out_of_gas:|^out_of_resource:/, r.error);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Set/Map ctor metering: per-coin Pkg 3 height gate', function () {
+    this.timeout(30000);
 
     // ---- Per-coin: LTC/DOGE stay unmetered at a bare BTC 961000 ----
     it('LTC mainnet at 961000: Set ctor still unmetered (per-coin fix)', async function () {

@@ -97,6 +97,14 @@ const run = (vm, code, blockContext, network) =>
         assert.strictEqual(isActive('mainnet', undefined), false);
         assert.strictEqual(isActive(undefined, NaN), false);
     });
+});
+
+(XChainVM ? describe : describe.skip)('contract.slash amount precision activation gate (regression)', function () {
+    this.timeout(30000);
+
+    let vm;
+    beforeEach(function () { vm = createVM(); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     it('mainnet below the flag day: a 9-dp amount still THROWS (historical behavior preserved)', async function () {
         const res = await run(vm, slashCode(AMOUNT_9DP), BEFORE);
@@ -133,6 +141,14 @@ const run = (vm, code, blockContext, network) =>
         assert.strictEqual(res.success, true, 'regtest must accept from genesis: ' + res.error);
         assert.strictEqual(res.emittedActions[0].params.amount, AMOUNT_18DP);
     });
+});
+
+(XChainVM ? describe : describe.skip)('contract.slash amount precision activation gate (regression)', function () {
+    this.timeout(30000);
+
+    let vm;
+    beforeEach(function () { vm = createVM(); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     it('19 dp is past the token ceiling and is rejected on BOTH sides of the gate', async function () {
         const lo = await run(vm, slashCode(AMOUNT_19DP), BEFORE);

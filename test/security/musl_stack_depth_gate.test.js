@@ -56,28 +56,28 @@ const H_AT    = 961000;
 const H_JUST_BELOW = 960999;
 
 const fn = (body) => `module.exports = function(xchain){ ${body} };`;
+let vm;
+
+// network defaults to 'mainnet': every case below that omits it is exercising the
+// per-coin mainnet HEIGHT boundary (H_BELOW / H_JUST_BELOW / H_AT), and the gate
+// predicate resolves an unrecognized or absent network to inactive, so the network
+// has to be named for the height to mean anything. The testnet/regtest cases pass
+// theirs explicitly.
+const run = (body, block, network) =>
+    execute(vm, fn(body), { method: 'default', blockContext: block, network: network || 'mainnet' });
+
+// Depth 300 sits between MAX_STACK_DEPTH_MUSL (256) and MAX_STACK_DEPTH (512):
+// legal below the height gate, over-depth at/after it.
+const SPINE_300 = `var a=1;for(var i=0;i<300;i++){a=[a];}`;
+const SPINE_200 = `var a=1;for(var i=0;i<200;i++){a=[a];}`;
+// Recursion helper: r(n) recurses n frames deep.
+const RECURSE = `function r(n){ if(n<=0){ return 0; } return 1+r(n-1); }`;
 
 (XChainVM ? describe : describe.skip)('musl-safe recursion-bound HEIGHT gate', function () {
     this.timeout(30000);
 
-    let vm;
     beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
-
-    // network defaults to 'mainnet': every case below that omits it is exercising the
-    // per-coin mainnet HEIGHT boundary (H_BELOW / H_JUST_BELOW / H_AT), and the gate
-    // predicate resolves an unrecognized or absent network to inactive, so the network
-    // has to be named for the height to mean anything. The testnet/regtest cases pass
-    // theirs explicitly.
-    const run = (body, block, network) =>
-        execute(vm, fn(body), { method: 'default', blockContext: block, network: network || 'mainnet' });
-
-    // Depth 300 sits between MAX_STACK_DEPTH_MUSL (256) and MAX_STACK_DEPTH (512):
-    // legal below the height gate, over-depth at/after it.
-    const SPINE_300 = `var a=1;for(var i=0;i<300;i++){a=[a];}`;
-    const SPINE_200 = `var a=1;for(var i=0;i<200;i++){a=[a];}`;
-    // Recursion helper: r(n) recurses n frames deep.
-    const RECURSE = `function r(n){ if(n<=0){ return 0; } return 1+r(n-1); }`;
 
     // ---- Native JSON sinks: an ACTIVE guard is clamped to the musl-safe bound even
     //      below the height gate, so the two flag-days cannot order into a fork ----
@@ -114,6 +114,13 @@ const fn = (body) => `module.exports = function(xchain){ ${body} };`;
         assert.strictEqual(r.success, true, r.error);
         assert.strictEqual(JSON.parse(r.returnValue), 300);
     });
+});
+
+(XChainVM ? describe : describe.skip)('musl-safe recursion-bound HEIGHT gate', function () {
+    this.timeout(30000);
+
+    beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     // ---- Native JSON sinks: at/after the height gate, the 256 bound poisons ----
     it('at the height gate, a 300-deep JSON.stringify is a deterministic out_of_stack (bound is 256)', async function () {
@@ -139,6 +146,13 @@ const fn = (body) => `module.exports = function(xchain){ ${body} };`;
         assert.strictEqual(r.success, true, r.error);
         assert.strictEqual(JSON.parse(r.returnValue), 'ok');
     });
+});
+
+(XChainVM ? describe : describe.skip)('musl-safe recursion-bound HEIGHT gate', function () {
+    this.timeout(30000);
+
+    beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     // ---- Intra-contract recursion guard (ungated by time): the HEIGHT gate alone
     //      moves it, proven with a PRE-F-NR timestamp. ----
@@ -173,6 +187,13 @@ const fn = (body) => `module.exports = function(xchain){ ${body} };`;
         assert.strictEqual(at.success, false, 'height 961000 must drop to the 256 bound');
         assert.match(at.error, /^out_of_stack:/, at.error);
     });
+});
+
+(XChainVM ? describe : describe.skip)('musl-safe recursion-bound HEIGHT gate', function () {
+    this.timeout(30000);
+
+    beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
     // ---- testnet/regtest activate from genesis (no pre-activation history) ----
     for (const network of ['testnet', 'regtest']) {

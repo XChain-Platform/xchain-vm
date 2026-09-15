@@ -24,10 +24,27 @@ const assert = require('assert');
 const crypto = require('crypto');
 const { createVM, execute, executeNTimes, assertAtomicFailure } = require('./helpers/harness.js');
 
-describe('[P1] Security Regression', function() {
+let vm;
+function setupSecurityVM() {
+    if (!vm) vm = createVM();
+}
 
-    let vm;
-    before(function() { vm = createVM(); });
+function hashResult(result) {
+    const normalized = {
+        success: result.success,
+        error: result.error,
+        gasUsed: result.gasUsed,
+        returnValue: result.returnValue,
+        stateChanges: [...result.stateChanges].sort((a, b) => a.key.localeCompare(b.key)),
+        stateDeletes: [...result.stateDeletes].sort(),
+        emittedActions: result.emittedActions,
+        logs: result.logs
+    };
+    return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+describe('[P1] Security Regression', function() {
+    before(setupSecurityVM);
 
     // SANDBOX ESCAPE VECTORS
     describe('Sandbox escape prevention', function() {
@@ -54,6 +71,13 @@ describe('[P1] Security Regression', function() {
             assert.strictEqual(r.success, true);
             assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
         });
+    });
+});
+
+describe('[P1] Security Regression', function() {
+    before(setupSecurityVM);
+
+    describe('Sandbox escape prevention', function() {
 
         it('should block constructor.constructor escape', async function() {
             const r = await execute(vm, `
@@ -94,6 +118,13 @@ describe('[P1] Security Regression', function() {
             const v = JSON.parse(r.returnValue);
             assert(v === 'undefined' || v === 'blocked');
         });
+    });
+});
+
+describe('[P1] Security Regression', function() {
+    before(setupSecurityVM);
+
+    describe('Sandbox escape prevention', function() {
 
         it('should block Function constructor', async function() {
             const r = await execute(vm, `
@@ -141,6 +172,13 @@ describe('[P1] Security Regression', function() {
             const v = JSON.parse(r.returnValue);
             assert(v === 'frozen' || v === 'undefined');
         });
+    });
+});
+
+describe('[P1] Security Regression', function() {
+    before(setupSecurityVM);
+
+    describe('Sandbox escape prevention', function() {
 
         it('should not affect host process', async function() {
             // Attempt host-affecting operations and PROVE they were neutralized
@@ -158,6 +196,10 @@ describe('[P1] Security Regression', function() {
                 'both host-affecting attempts must throw inside the sandbox');
         });
     });
+});
+
+describe('[P1] Security Regression', function() {
+    before(setupSecurityVM);
 
     // GAS METERING BYPASS PREVENTION
     describe('Gas metering bypass prevention', function() {
@@ -190,6 +232,10 @@ describe('[P1] Security Regression', function() {
             assert(res.error.includes('__gas'));
         });
     });
+});
+
+describe('[P1] Security Regression', function() {
+    before(setupSecurityVM);
 
     // ERROR ATOMICITY
     describe('Error atomicity', function() {
@@ -243,23 +289,13 @@ describe('[P1] Security Regression', function() {
             assert(r.logs.length > 0, 'logs must survive gas exhaustion');
         });
     });
+});
+
+describe('[P1] Security Regression', function() {
+    before(setupSecurityVM);
 
     // DETERMINISM
     describe('Determinism', function() {
-
-        function hashResult(result) {
-            const normalized = {
-                success: result.success,
-                error: result.error,
-                gasUsed: result.gasUsed,
-                returnValue: result.returnValue,
-                stateChanges: [...result.stateChanges].sort((a, b) => a.key.localeCompare(b.key)),
-                stateDeletes: [...result.stateDeletes].sort(),
-                emittedActions: result.emittedActions,
-                logs: result.logs
-            };
-            return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
-        }
 
         it('should produce identical results across 3 runs (stateful)', async function() {
             const code = `module.exports = function(xchain) {
