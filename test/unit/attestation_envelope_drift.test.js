@@ -40,8 +40,13 @@ const path   = require('path');
 const { buildGateway }  = require('../../src/gateway.js');
 const EmissionCollector = require('../../src/collector.js');
 
-const REGISTRY_FILE = path.join(__dirname, '..', '..', '..', 'xchain-indexer',
-                                'src', 'attestation', 'providerRegistry.js');
+// The indexer renamed its registry to snake_case; the camelCase name is what an
+// indexer origin from before that rename carries, so the first of the two that
+// exists is read, and a checkout with neither reports the snake_case path.
+const REGISTRY_FILE = ['provider_registry.js', 'providerRegistry.js']
+    .map((name) => path.join(__dirname, '..', '..', '..', 'xchain-indexer', 'src', 'attestation', name))
+    .find((p) => fs.existsSync(p)) ||
+    path.join(__dirname, '..', '..', '..', 'xchain-indexer', 'src', 'attestation', 'provider_registry.js');
 
 // VM-side literals under guard (gateway.js attestation.request).
 const VM_PAYLOAD_CAP     = 8192;
