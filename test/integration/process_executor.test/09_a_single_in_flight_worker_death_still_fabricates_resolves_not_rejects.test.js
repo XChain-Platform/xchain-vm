@@ -1,0 +1,48 @@
+/*********************************************************************
+ *
+ * Copyright © 2025–2026 Dankest, LLC
+ * Based on XChain Platform by Dankest, LLC – https://dankest.llc
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * This file is part of XChain Platform. Licensed under the GNU Affero
+ * General Public License v3.0 or later; see LICENSE.md. A commercial
+ * license (without AGPL source-disclosure terms) is available -
+ * contact legal@dankest.llc.
+ *
+ **********************************************************************
+ * Out-of-process executor: the host-abort containment fix.
+ *
+ * Verifies that subprocess execution: (1) produces results identical to
+ * in-process for normal contracts, (2) survives a contract that aborts the
+ * V8 host process (the Array(1e8).fill bug) by returning a deterministic
+ * resource failure and respawning, (3) carries plain-data snapshots across
+ * the IPC boundary.
+ ********************************************************************/
+// @ts-nocheck
+
+
+const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAVE_IVM } = require('./support/executor_setup.js');
+
+    // The deterministic case is UNCHANGED: a single worker death during an
+    // in-flight execution still RESOLVES a fabricated host-termination (every
+    // validator sees the same poisoned-contract outcome); it must NOT reject.
+(HAVE_IVM ? describe : describe.skip)('process_executor: out-of-process execution', function () {
+    this.timeout(60000);
+
+    it('a single in-flight worker death still FABRICATES (resolves), not rejects', async function () {
+        const ProcessExecutor = require('../../../src/process_executor.js');
+        const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
+        exec.beginBlock();
+        try {
+            await exec.execute({ ...BASE, code: `module.exports = function(){ return 1; };` }); // ensure ready
+            const inFlight = exec.execute({ ...BASE, code: `module.exports = function(){ return 2; };` });
+            if (exec._child) exec._child.kill('SIGKILL'); // crash mid-flight (not _broken)
+            const r = await inFlight;
+            assert.strictEqual(r.success, false, 'in-flight crash should resolve a host-termination');
+            assert.strictEqual(r.gasUsed, GAS_CEILING, 'fabricated result clamps gasUsed to the ceiling');
+        } finally {
+            await exec.shutdown();
+        }
+    });
+});

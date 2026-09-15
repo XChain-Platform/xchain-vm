@@ -22,7 +22,7 @@
 // @ts-nocheck
 
 
-const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAVE_IVM } = require('./process_executor.test/support/executor_setup.js');
+const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAVE_IVM } = require('./support/executor_setup.js');
 
 (HAVE_IVM ? describe : describe.skip)('process_executor: out-of-process execution', function () {
     this.timeout(60000);
@@ -32,28 +32,15 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
         if (vm) { await vm.shutdown(); vm = null; }
     });
 
-    it('runs a normal contract and matches in-process output', async function () {
-        const code = `module.exports = function(xchain){
-            xchain.state.set('n', xchain.math.add(xchain.state.get('n') || '0', '5'));
-            xchain.emit.send({ destination: 'D', tick: 'TEST', quantity: '5' });
-            return 'ok';
-        };`;
-        const inproc = makeVM('in-process');
-        inproc.beginBlock();
-        const a = await inproc.execute({ ...BASE, code, state: { n: '37' } });
-        inproc.endBlock();
-
+    it('carries plain-data snapshots (oracle) across IPC', async function () {
         vm = makeVM('subprocess');
         vm.beginBlock();
-        const b = await vm.execute({ ...BASE, code, state: { n: '37' } });
-        vm.endBlock();
-
-        assert.strictEqual(b.success, true, 'subprocess run should succeed: ' + b.error);
-        // Compare via the consensus-equality function (sha256 of the normalized,
-        // JSON-serialized result): the same hash the golden manifest uses. This
-        // is prototype-agnostic, which is correct: consensus sees the JSON form,
-        // not the in-memory object's prototype.
-        assert.strictEqual(hashResult(b), hashResult(a),
-            'subprocess output must be consensus-identical to in-process');
+        const code = `module.exports = function(xchain){ return xchain.oracle.getPrice('BTC/USD'); };`;
+        const r = await vm.execute({
+            ...BASE, code,
+            oracleData: { snapshotAge: 3, prices: { 'BTC/USD': '65000.00' }, rounds: {} }
+        });
+        assert.strictEqual(r.success, true, r.error);
+        assert.strictEqual(r.returnValue, '"65000.00"', 'oracle snapshot should resolve over IPC');
     });
 });
