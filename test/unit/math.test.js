@@ -13,10 +13,9 @@
 const assert = require('assert');
 const { buildMathAPI } = require('../../src/math.js');
 const { ContractRevertError } = require('../../src/errors.js');
+const math = buildMathAPI();
 
 describe('Math API', function() {
-
-    const math = buildMathAPI();
 
     describe('arithmetic', function() {
         it('should add correctly', function() {
@@ -53,6 +52,9 @@ describe('Math API', function() {
             assert.strictEqual(math.subtract('3', '10'), '-7');
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('comparison', function() {
         it('should compare correctly', function() {
@@ -71,6 +73,9 @@ describe('Math API', function() {
             assert.strictEqual(math.eq('5', '6'), false);
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('utility', function() {
         it('should compute min/max', function() {
@@ -88,6 +93,9 @@ describe('Math API', function() {
             assert.strictEqual(math.isZero('1'), false);
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('transcendental (deterministic bignumber)', function() {
         it('should compute exact integer square roots', function() {
@@ -140,6 +148,9 @@ describe('Math API', function() {
             assert.throws(() => math.pow('-2', '0.5'), ContractRevertError);
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('error handling', function() {
         it('should throw ContractRevertError on division by zero', function() {
@@ -163,6 +174,9 @@ describe('Math API', function() {
             }
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('string I/O', function() {
         it('should accept string inputs and return strings', function() {
@@ -175,6 +189,9 @@ describe('Math API', function() {
             assert.strictEqual(math.add('1e2', '0'), '100');
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('extended edge cases', function() {
         it('should not produce negative zero', function() {
@@ -230,6 +247,9 @@ describe('Math API', function() {
             assert.strictEqual(result, '100000000000000000000');
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('input length guard (MAX_MATH_INPUT_LENGTH)', function() {
         it('should throw ContractRevertError when input exceeds 256 chars', function() {
@@ -249,6 +269,9 @@ describe('Math API', function() {
             assert.throws(() => math.subtract('1', longNum), ContractRevertError);
         });
     });
+});
+
+describe('Math API', function() {
 
     describe('min/max both branch orderings', function() {
         it('min should return a when a <= b', function() {

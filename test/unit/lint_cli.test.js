@@ -66,6 +66,24 @@ function padTo(code, bytes) {
     return code + '\n// ' + 'x'.repeat(pad);
 }
 
+function createLintDir() {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'xchain-lint-cli-'));
+}
+
+function removeLintDir(dir) {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
+}
+
+function runCli(args) {
+    try {
+        const stdout = execFileSync(process.execPath, [LINT_BIN, ...args],
+            { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        return { status: 0, stdout };
+    } catch (e) {
+        return { status: e.status, stdout: e.stdout || '', stderr: e.stderr || '' };
+    }
+}
+
 (lintFile ? describe : describe.skip)('lint CLI (bin/lint.js) deploy parity', function () {
     this.timeout(60000);
 
@@ -75,8 +93,8 @@ function padTo(code, bytes) {
         fs.writeFileSync(p, code);
         return p;
     };
-    before(function () { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xchain-lint-cli-')); });
-    after(function () { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {} });
+    before(function () { dir = createLintDir(); });
+    after(function () { removeLintDir(dir); });
 
     describe('lintFile()', function () {
         it('good contract: ok=true, no errors', function () {
@@ -103,6 +121,22 @@ function padTo(code, bytes) {
             assert.strictEqual(r.ok, true, JSON.stringify(r.errors));
             assert.ok(r.warnings.length >= 1, 'float must warn');
         });
+    });
+});
+
+(lintFile ? describe : describe.skip)('lint CLI (bin/lint.js) deploy parity', function () {
+    this.timeout(60000);
+
+    let dir;
+    const write = (name, code) => {
+        const p = path.join(dir, name);
+        fs.writeFileSync(p, code);
+        return p;
+    };
+    before(function () { dir = createLintDir(); });
+    after(function () { removeLintDir(dir); });
+
+    describe('lintFile()', function () {
 
         it('V8-only step-1 failure is surfaced as a blocking syntax error (reconciliation branch)', function () {
             const r = lintFile(write('v8only.js', V8_ONLY_CODE));
@@ -135,18 +169,21 @@ function padTo(code, bytes) {
             assert.strictEqual(r.errors.length, 0);
         });
     });
+});
+
+(lintFile ? describe : describe.skip)('lint CLI (bin/lint.js) deploy parity', function () {
+    this.timeout(60000);
+
+    let dir;
+    const write = (name, code) => {
+        const p = path.join(dir, name);
+        fs.writeFileSync(p, code);
+        return p;
+    };
+    before(function () { dir = createLintDir(); });
+    after(function () { removeLintDir(dir); });
 
     describe('CLI process level (exit codes + output)', function () {
-        const runCli = (args) => {
-            try {
-                const stdout = execFileSync(process.execPath, [LINT_BIN, ...args],
-                    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-                return { status: 0, stdout };
-            } catch (e) {
-                return { status: e.status, stdout: e.stdout || '', stderr: e.stderr || '' };
-            }
-        };
-
         it('clean file → exit 0 and ✓', function () {
             const p = write('cli-good.js', GOOD_CODE);
             const r = runCli([p]);
@@ -172,6 +209,22 @@ function padTo(code, bytes) {
             const r = runCli([]);
             assert.strictEqual(r.status, 2);
         });
+    });
+});
+
+(lintFile ? describe : describe.skip)('lint CLI (bin/lint.js) deploy parity', function () {
+    this.timeout(60000);
+
+    let dir;
+    const write = (name, code) => {
+        const p = path.join(dir, name);
+        fs.writeFileSync(p, code);
+        return p;
+    };
+    before(function () { dir = createLintDir(); });
+    after(function () { removeLintDir(dir); });
+
+    describe('CLI process level (exit codes + output)', function () {
 
         // The gate's contract is 'exit 0 = all clean'. A quoted glob that matches
         // nothing (a renamed directory in a CI script) used to expand to [] and

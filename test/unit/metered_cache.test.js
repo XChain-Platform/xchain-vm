@@ -77,6 +77,9 @@ describe('XChainVM metered-source cache', function () {
         assert.strictEqual(vm._meteredCache.size, 4,
             'each distinct (specEvalOrder, meterCallSpread) pair is its own entry');
     });
+});
+
+describe('XChainVM metered-source cache', function () {
 
     it('keys distinct sources to distinct entries', function () {
         const vm = new XChainVM(cfg());

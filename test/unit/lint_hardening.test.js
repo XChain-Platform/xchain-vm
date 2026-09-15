@@ -64,6 +64,9 @@ describe('VM_LINT_HARDENING lint rules', function () {
             assert.deepStrictEqual(hits, [{ op: '**', line: 2 }]);
         });
     });
+});
+
+describe('VM_LINT_HARDENING lint rules', function () {
 
     describe('5bff4687: reserved CONTRACT_WRAPPER control bindings', function () {
         for (const name of RESERVED_CONTROL_BINDINGS) {
@@ -83,6 +86,9 @@ describe('VM_LINT_HARDENING lint rules', function () {
             assert.ok(firstError(code));
         });
     });
+});
+
+describe('VM_LINT_HARDENING lint rules', function () {
 
     describe('71002d13: BANNED_MATH_MEMBERS derived from the SAFE_MATH complement', function () {
         it('SAFE_MATH_MEMBERS matches the frozen golden whitelist', function () {
@@ -127,6 +133,9 @@ describe('VM_LINT_HARDENING lint rules', function () {
             }
         });
     });
+});
+
+describe('VM_LINT_HARDENING lint rules', function () {
 
     describe('8fa7043e: dynamic import() rejection', function () {
         const code = 'module.exports = function(x) { var p = import("fs"); return 1; };';
@@ -141,6 +150,9 @@ describe('VM_LINT_HARDENING lint rules', function () {
             assert.strictEqual(firstError(code, { hardened: false }), null);
         });
     });
+});
+
+describe('VM_LINT_HARDENING lint rules', function () {
 
     describe('efc8c624: shorthand { Promise } residual (locked-in rejection)', function () {
         // Acorn materializes distinct key/value nodes for a shorthand property,
@@ -166,6 +178,9 @@ describe('VM_LINT_HARDENING lint rules', function () {
             assert.deepStrictEqual(findBannedAsync(ok, false), []);
         });
     });
+});
+
+describe('VM_LINT_HARDENING lint rules', function () {
 
     describe('c3dbbed1: shadowed-local Promise relaxation', function () {
         const cases = {
@@ -205,6 +220,9 @@ describe('VM_LINT_HARDENING lint rules', function () {
             assert.strictEqual(findBannedAsync(code, true).length, 1);
         });
     });
+});
+
+describe('VM_LINT_HARDENING lint rules', function () {
 
     describe('gating surface', function () {
         it('lintSource defaults to hardened (author-facing callers always see the rules)', function () {

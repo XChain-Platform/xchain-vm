@@ -112,6 +112,9 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             });
         }
     });
+});
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('banned-wasm: alias spellings of the global WebAssembly', function () {
         for (const [label, code] of Object.entries(WASM_ALIASES)) {
@@ -129,6 +132,9 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             });
         }
     });
+});
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('banned-math: alias spellings of the global Math', function () {
         for (const [label, code] of Object.entries(MATH_ALIASES)) {
@@ -167,6 +173,9 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
                 findBannedMathCalls('module.exports = function(){ return this.Math.floor(1.5); };', true, true), []);
         });
     });
+});
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('pre-epoch spellings are unchanged in BOTH modes', function () {
         // These already blocked before the epoch, so the gate must not accidentally
@@ -195,6 +204,9 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             });
         }
     });
+});
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('clean contracts stay clean under the epoch', function () {
         const clean = {
@@ -211,6 +223,9 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             });
         }
     });
+});
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('lintSource default is author-facing ON', function () {
         it('defaults globalAlias to true (SDK linter / CLI see the tighter rule)', function () {
@@ -219,6 +234,9 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             assert.strictEqual(err.rule, 'banned-wasm');
         });
     });
+});
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('validateSyntax gate (isolated-vm; Node 22)', function () {
         before(function () {
@@ -258,6 +276,9 @@ describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm 
             assert.strictEqual(r.valid, false, 'the single-hop global read must still block');
         });
     });
+});
+
+describe('LINT_GLOBAL_ALIAS: aliased global reads in banned-async / banned-wasm / banned-math', function () {
 
     describe('LINT_GLOBAL_ALIAS_ACTIVATION (per-coin height epoch)', function () {
         before(function () {

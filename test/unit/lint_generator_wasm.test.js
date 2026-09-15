@@ -54,6 +54,9 @@ describe('Pkg 3 deploy-lint: banned-generator + banned-wasm', function () {
             assert.ok(CONSENSUS_RULES.has('banned-wasm'), 'banned-wasm must be a consensus rule');
         });
     });
+});
+
+describe('Pkg 3 deploy-lint: banned-generator + banned-wasm', function () {
 
     describe('banned-generator (29912bd8): detector + lintSource', function () {
         const cases = {
@@ -102,6 +105,9 @@ describe('Pkg 3 deploy-lint: banned-generator + banned-wasm', function () {
             assert.ok(e.message.includes('__stackDepth') && e.message.includes('out_of_stack'), e.message);
         });
     });
+});
+
+describe('Pkg 3 deploy-lint: banned-generator + banned-wasm', function () {
 
     describe('banned-wasm (75190596 deploy half): detector + lintSource', function () {
         const flagged = {
@@ -141,6 +147,9 @@ describe('Pkg 3 deploy-lint: banned-generator + banned-wasm', function () {
             assert.deepStrictEqual(findBannedWasm('var a = 1;\nvar b = WebAssembly;'), [{ line: 2 }]);
         });
     });
+});
+
+describe('Pkg 3 deploy-lint: banned-generator + banned-wasm', function () {
 
     describe('validateSyntax toggles (both sides; mirror enforceBannedAsync)', function () {
         const GEN  = 'module.exports = function(x){ return 1; }; function* g(){ yield 1; }';

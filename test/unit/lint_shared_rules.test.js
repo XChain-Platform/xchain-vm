@@ -55,14 +55,13 @@ try { stripGlobalsMod = require('../../src/sandbox.js'); } catch (e) { /* no iso
 
 const VALID = 'function init(){ return 1; }';
 const rules = (findings) => findings.map((f) => f.rule);
+const sized = (bytes) => VALID + '\n//' + 'x'.repeat(Math.max(0, bytes - VALID.length - 3));
 
 describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('2668: code-size is enforced by lintSource, not only by the CLI', function () {
         // A body of ASCII filler that parses; padded with a comment so the size
         // is the only thing wrong with it.
-        const sized = (bytes) => VALID + '\n//' + 'x'.repeat(Math.max(0, bytes - VALID.length - 3));
-
         it('a contract at exactly MAX_CODE_SIZE lints clean', function () {
             const code = sized(MAX_CODE_SIZE);
             assert.strictEqual(codeSizeBytes(code), MAX_CODE_SIZE);
@@ -89,6 +88,12 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
             // in the indexer, on CODE_ENCODING.
             assert.strictEqual(validateSyntax(sized(MAX_CODE_SIZE + 1)).valid, true);
         });
+    });
+});
+
+describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+
+    describe('2668: code-size is enforced by lintSource, not only by the CLI', function () {
 
         it('codeSizeBytes matches Buffer.byteLength utf8 (the on-chain measurement)', function () {
             const cases = ['', 'abc', 'é', '😀', '\ud800', 'a\udc00b', '日本語', VALID];
@@ -119,6 +124,9 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
             assert.strictEqual(errs[0].rule, 'code-size', out);
         });
     });
+});
+
+describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('2669: sandbox-neutered prototype methods are linted', function () {
         it('flags the regex-coercing methods as warnings, not errors', function () {
@@ -173,6 +181,9 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
                 'lint_core mirror drifted from the sandbox neuter list');
         });
     });
+});
+
+describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
 
     // The sandbox deletes 24 globals so every validator computes the same result,
     // and the shipped templates document that strip as their reason to exist
@@ -227,6 +238,12 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
                 .warnings.filter((x) => x.rule === 'banned-stripped-global');
             assert.strictEqual(sh.length, 1, 'shorthand { Date } reads the global and must be flagged');
         });
+    });
+});
+
+describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+
+    describe('sandbox-stripped globals are linted (banned-stripped-global)', function () {
 
         it('does not double-report the two names that already carry an error rule', function () {
             // Promise and WebAssembly are the ONLY consensus-GATED entries in the
@@ -255,6 +272,12 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
         it('a clean contract produces no banned-stripped-global noise', function () {
             assert.ok(!rules(lintSource(VALID).warnings).includes('banned-stripped-global'));
         });
+    });
+});
+
+describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+
+    describe('sandbox-stripped globals are linted (banned-stripped-global)', function () {
 
         // ONE definition of the strip set lives in src/stripped_globals.js. A
         // hand-copied literal in sandbox.js, lint_core.js or toolkit/authoring.js
@@ -291,6 +314,12 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
                     path.basename(file) + ' must require the shared strip-set module');
             }
         });
+    });
+});
+
+describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+
+    describe('sandbox-stripped globals are linted (banned-stripped-global)', function () {
 
         it('the shared set still equals what the sandbox actually deletes', function () {
             // Defence in depth for the require above: sandbox.js interpolates the
@@ -312,6 +341,9 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
                 'only the consensus-gated entries may be held out of the advisory set');
         });
     });
+});
+
+describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('2670: the reserved-identifier rule covers all of RESERVED_IDENTIFIERS', function () {
         it('has twelve names spanning both hazard classes', function () {
