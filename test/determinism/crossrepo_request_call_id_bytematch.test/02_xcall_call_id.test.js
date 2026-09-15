@@ -39,11 +39,11 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs     = require('fs');
 const path   = require('path');
-const { buildGateway } = require('../../src/gateway.js');
+const { buildGateway } = require('../../../src/gateway.js');
 const { buildEmitAPI, GOLDEN_VECTORS, normalizeRootDiscriminator,
-        buildRequestIdPreimage, buildCallIdPreimage } = require('../../src/gateway_emit.js');
-const GasTracker = require('../../src/gas.js');
-const EmissionCollector = require('../../src/collector.js');
+        buildRequestIdPreimage, buildCallIdPreimage } = require('../../../src/gateway_emit.js');
+const GasTracker = require('../../../src/gas.js');
+const EmissionCollector = require('../../../src/collector.js');
 
 // Repo root by walking up to the nearest package.json rather than counting '..'
 // hops, so moving this file does not silently point the sibling load at nothing.
@@ -134,58 +134,84 @@ function vmCallId({ network, txHash, rootActionIndex, callPath, contractIndex, t
     });
 }
 
+const CASES = [
+    { name: 'root execution (empty call-path)', callPath: '',      rootActionIndex: 100 },
+    { name: 'first-level nested emission',      callPath: '0',     rootActionIndex: 100 },
+    { name: 'deep call-path',                   callPath: '1>0>3', rootActionIndex: 250 }
+];
+
 describe('cross-repo request_id / call_id byte-match (consensus-critical) @regression', function () {
-
-    const CASES = [
-        { name: 'root execution (empty call-path)', callPath: '',      rootActionIndex: 100 },
-        { name: 'first-level nested emission',      callPath: '0',     rootActionIndex: 100 },
-        { name: 'deep call-path',                   callPath: '1>0>3', rootActionIndex: 250 }
-    ];
-
-    describe('ATTEST request_id', function () {
+    describe('XCALL call_id', function () {
         for (const c of CASES) {
             it('VM matches the indexer formula (' + c.name + ')', function () {
-                const txHash = 'abc123', contractIndex = 7;
-                const vm = vmRequestId({ txHash, rootActionIndex: c.rootActionIndex, callPath: c.callPath, contractIndex });
-                const idx = indexerRequestId(txHash, c.rootActionIndex, c.callPath, contractIndex, 0);
-                assert.strictEqual(vm, idx, 'VM and indexer request_id diverged for ' + c.name);
+                const network = 'regtest', coin = 'BTC', txHash = 'f'.repeat(64);
+                const contractIndex = 42, targetChain = 'DOGE';
+                const vm = vmCallId({ network, txHash, rootActionIndex: c.rootActionIndex, callPath: c.callPath, contractIndex, targetChain });
+                // sourceChain in the VM preimage is the COIN the emit API is bound to;
+                // gateway_emit derives it from contractAddress/config; here it equals coin.
+                const idx = indexerCallId(network, coin, txHash, c.rootActionIndex, contractIndex, c.callPath, 0, targetChain);
+                assert.strictEqual(vm, idx, 'VM and indexer call_id diverged for ' + c.name);
             });
         }
 
-        it('two nested runs of the same contract derive DISTINCT request_ids (no collision)', function () {
-            const a = vmRequestId({ txHash: 'abc123', rootActionIndex: 100, callPath: '0', contractIndex: 7 });
-            const b = vmRequestId({ txHash: 'abc123', rootActionIndex: 100, callPath: '1', contractIndex: 7 });
-            assert.notStrictEqual(a, b);
+        it('two nested runs of the same contract derive DISTINCT call_ids (d631c28 regression)', function () {
+            const base = { network: 'regtest', txHash: 'f'.repeat(64), contractIndex: 42, targetChain: 'DOGE', rootActionIndex: 100 };
+            const a = vmCallId(Object.assign({}, base, { callPath: '0' }));
+            const b = vmCallId(Object.assign({}, base, { callPath: '1' }));
+            assert.notStrictEqual(a, b, 'same-contract nested runs must not collide');
         });
 
-        // #4244: two forest roots under one tx (a top-level EXECUTE and a controller guard) each
-        // seed callPath '' and may target the same contract; only the root discriminator
-        // distinguishes them. Without it both derive the identical request_id.
-        it('two forest roots under one tx (same call-path, differing root) derive DISTINCT request_ids (#4244)', function () {
-            const a = vmRequestId({ txHash: 'abc123', rootActionIndex: 100, callPath: '', contractIndex: 7 });
-            const b = vmRequestId({ txHash: 'abc123', rootActionIndex: 101, callPath: '', contractIndex: 7 });
-            assert.notStrictEqual(a, b, 'top-level EXECUTE vs controller guard under one tx must not collide');
+        // #4244 twin: two forest roots under one tx, same call-path, differing only by root.
+        it('two forest roots under one tx (same call-path, differing root) derive DISTINCT call_ids (#4244)', function () {
+            const base = { network: 'regtest', txHash: 'f'.repeat(64), contractIndex: 42, targetChain: 'DOGE', callPath: '' };
+            const a = vmCallId(Object.assign({}, base, { rootActionIndex: 100 }));
+            const b = vmCallId(Object.assign({}, base, { rootActionIndex: 101 }));
+            assert.notStrictEqual(a, b, 'two forest roots must not collide on call_id');
         });
+    });
+});
 
+describe('cross-repo request_id / call_id byte-match (consensus-critical) @regression', function () {
+    describe('XCALL call_id', function () {
         // Golden-vector assertion: pins the exact preimage formula against a checked-in
         // expected hex so a lockstep edit to both inline lambdas (masking the fork) still
-        // fails. The same vector is asserted in xchain-indexer attest.test.js.
+        // fails. The same vector is asserted in xchain-indexer xcall.test.js.
         it('golden vector: VM derivation matches checked-in expected hex', function () {
-            const v = GOLDEN_VECTORS.requestId;
+            const v = GOLDEN_VECTORS.callId;
             const i = v.input;
-            const got = vmRequestId({
+            const got = vmCallId({
+                network:         i.network,
                 txHash:          i.txHash,
                 rootActionIndex: i.rootActionIndex,
                 callPath:        i.emitterPath,
-                contractIndex:   i.contractIndex
+                contractIndex:   i.contractIndex,
+                targetChain:     i.targetChain
             });
             assert.strictEqual(got, v.expected,
-                'request_id golden vector mismatch: preimage formula changed without updating GOLDEN_VECTORS');
-            // Also verify the inline indexer lambda produces the same expected value,
-            // so a drift in the lambda is caught here rather than masked.
-            const idx = indexerRequestId(i.txHash, i.rootActionIndex, i.emitterPath, i.contractIndex, i.emitterPosition);
+                'call_id golden vector mismatch: preimage formula changed without updating GOLDEN_VECTORS');
+            // Also verify the inline indexer lambda produces the same expected value.
+            const idx = indexerCallId(i.network, i.coin, i.txHash, i.rootActionIndex, i.contractIndex, i.emitterPath, i.emitterPosition, i.targetChain);
             assert.strictEqual(idx, v.expected,
-                'indexer inline lambda diverged from GOLDEN_VECTORS.requestId.expected');
+                'indexer inline lambda diverged from GOLDEN_VECTORS.callId.expected');
+        });
+
+        // The hex pins catch a field skew only as an opaque hash difference.
+        // Naming the count makes a dropped or added field read as what it is. The
+        // indexer declares the same eight names in
+        // xchain-indexer/src/actions/xcall/index.js
+        // (CALL_ID_PREIMAGE_FIELDS), pinned against this order by
+        // bin/check-preimage-golden-parity.js.
+        it('golden vector: the call_id preimage carries exactly eight fields', function () {
+            const i = GOLDEN_VECTORS.callId.input;
+            // No golden value contains the ':' separator, so the split count is the
+            // structural field count.
+            const preimage = [i.network, i.coin, i.txHash, i.rootActionIndex,
+                              i.contractIndex, i.emitterPath, i.emitterPosition,
+                              i.targetChain].map(String).join(':');
+            assert.strictEqual(preimage.split(':').length, 8,
+                'call_id preimage field count changed; the indexer must change in lockstep');
+            assert.strictEqual(crypto.createHash('sha256').update(preimage).digest('hex'),
+                GOLDEN_VECTORS.callId.expected);
         });
     });
 });
