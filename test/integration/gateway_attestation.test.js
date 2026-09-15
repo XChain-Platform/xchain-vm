@@ -67,13 +67,11 @@ function baseExecOpts(extra) {
     }, extra || {});
 }
 
-(XChainVM ? describe : describe.skip)('Gateway: attestation namespace', function () {
-
-    let vm;
-    before(function () { vm = createVM(); });
-
-    describe('request()', function () {
-
+let vm;
+function setupVM() {
+    if (!vm) vm = createVM();
+}
+function requestShapeCases() {
         it('returns a 64-char hex request_id and charges at least VM_ATTEST_REQUEST + VM_EMISSION', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -94,7 +92,6 @@ function baseExecOpts(extra) {
             assert(result.gasUsed >= GAS_SCHEDULE.VM_ATTEST_REQUEST + GAS_SCHEDULE.VM_EMISSION,
                 'gas should include at least the attestation+emission charges, got ' + result.gasUsed);
         });
-
         it('queues an ATTEST v0 (request) emission with the expected shape', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -125,7 +122,8 @@ function baseExecOpts(extra) {
             assert.strictEqual(emission.params.feeTick, '');
             assert.strictEqual(emission.params.feeAmount, '');
         });
-
+}
+function requestFeeCases() {
         it('carries feeTick/feeAmount into the emission when provided (E1 paid attestations)', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -143,7 +141,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(emission.params.feeTick, 'XCHAIN');
             assert.strictEqual(emission.params.feeAmount, '2.5');
         });
-
         it('rejects a feeAmount with more than 8 decimal places', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -154,7 +151,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(String(result.error), /feeAmount must be a non-negative decimal/);
         });
-
         it('rejects feeAmount > 0 without a feeTick', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -165,7 +161,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(String(result.error), /feeTick is required when feeAmount > 0/);
         });
-
         it('rejects a pipe character in feeTick (wire-format injection guard)', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -176,7 +171,8 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(String(result.error), /must not contain/);
         });
-
+}
+function requestIdentityCases() {
         it('produces distinct request_ids for two emissions in the same tx', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -190,7 +186,6 @@ function baseExecOpts(extra) {
             assert.notStrictEqual(a, b, 'two emissions in same tx must produce distinct request_ids');
             assert.strictEqual(result.emittedActions.length, 2);
         });
-
         it('produces distinct request_ids across two different tx_hashes', async function () {
             const code = `module.exports = function(xchain) {
                 return xchain.attestation.request('http_get', 'https://example.com/c', 'cb', [], { redundancy: 1 });
@@ -202,7 +197,6 @@ function baseExecOpts(extra) {
             assert.notStrictEqual(JSON.parse(r1.returnValue), JSON.parse(r2.returnValue),
                 'request_ids must diverge when tx_hash differs');
         });
-
         it('contractIndex=0 yields a request_id distinct from an omitted contractIndex', async function () {
             // Regression: contractIndex 0 (the first contract in a block) must not
             // collapse to the same preimage as an absent contractIndex. A falsy
@@ -222,7 +216,8 @@ function baseExecOpts(extra) {
                 'contractIndex=0 must not collide with an omitted contractIndex'
             );
         });
-
+}
+function requestLimitCases() {
         it('rejects redundancy values outside {1,3,5}', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -232,7 +227,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /redundancy must be 1, 3, or 5/);
         });
-
         it('rejects requestPayload over 8192 bytes', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -243,7 +237,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /requestPayload exceeds 8192 bytes/);
         });
-
         it('rejects callbackParams over 1024 bytes when JSON-stringified', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -255,7 +248,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /callbackParams JSON exceeds 1024 bytes/);
         });
-
         it('rejects callbackMethod over 64 bytes', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -266,7 +258,8 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /callbackMethod must be/);
         });
-
+}
+function requestByteLimitCases() {
         // The limit is BYTES, not characters: a multibyte name under the 64-char
         // count but over 64 UTF-8 bytes must still be rejected (regression for the
         // chars-vs-bytes mismatch: providerId/callbackMethod were checking .length
@@ -281,7 +274,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /callbackMethod must be/);
         });
-
         it('rejects a multibyte providerId that is <= 32 chars but > 32 bytes', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -292,7 +284,6 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /providerId must be/);
         });
-
         it('rejects deadlineBlocks outside [1, 100]', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -302,7 +293,9 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, false);
             assert.match(result.error || '', /deadlineBlocks must be an integer in \[1, 100\]/);
         });
+}
 
+function requestDeadlineCases() {
         // Regression: a per-provider deadline window narrower than the global
         // [1, 100] cap must be enforced at call time. Without injection, an
         // `llm` request (window 20) with deadlineBlocks 50 passed VM validation,
@@ -353,10 +346,9 @@ function baseExecOpts(extra) {
             assert.strictEqual(result.success, true, 'without injection only the global cap applies: ' + result.error);
             assert.strictEqual(result.emittedActions.length, 1);
         });
-    });
+}
 
-    describe('getResponse()', function () {
-
+function responseCases() {
         it('returns null for an unknown request_id without throwing', async function () {
             const result = await vm.execute(baseExecOpts({
                 code: `module.exports = function(xchain) {
@@ -390,5 +382,19 @@ function baseExecOpts(extra) {
             assert.strictEqual(returned.payload, '{"score":7}');
             assert.strictEqual(returned.providerId, 'http_get');
         });
-    });
+}
+
+(XChainVM ? describe : describe.skip)('Gateway: attestation namespace', function () {
+    before(setupVM);
+    describe('request()', requestShapeCases);
+    describe('request()', requestFeeCases);
+    describe('request()', requestIdentityCases);
+    describe('request()', requestLimitCases);
+    describe('request()', requestByteLimitCases);
+    describe('request()', requestDeadlineCases);
+});
+
+(XChainVM ? describe : describe.skip)('Gateway: attestation namespace', function () {
+    before(setupVM);
+    describe('getResponse()', responseCases);
 });

@@ -72,6 +72,16 @@ const AT     = { height: 100, timestamp: GATE,     hash: 'at'  };
         assert.ok(lo.gasUsed < 50000, 'below the flag day the byte charge must be absent, got ' + lo.gasUsed);
         assert.ok(hi.gasUsed > lo.gasUsed, 'gasUsed must differ across the gate (' + lo.gasUsed + ' vs ' + hi.gasUsed + ')');
     });
+});
+
+(XChainVM ? describe : describe.skip)('binary-alloc metering activation gate (regression)', function () {
+    this.timeout(30000);
+
+    let vm;
+    beforeEach(function () { vm = createVM(); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
+
+    const run = (code, blockContext) => execute(vm, code, { method: 'default', blockContext });
 
     it('(c) an allocation that out_of_gas-reverts AT the flag day SUCCEEDS below it (opposite outcomes)', async function () {
         // 2 MiB: above the 1,000,000 gas ceiling once charged by byte length, but

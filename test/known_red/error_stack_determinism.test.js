@@ -80,6 +80,10 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
         assert.strictEqual(o.limit, 0, `stackTraceLimit must stay 0, got ${o.limit}`);
         assert.strictEqual(o.stack, '', `stack must stay empty even after tamper attempt, got ${JSON.stringify(o.stack)}`);
     });
+});
+
+describe('Error.stack must be neutered (was KNOWN-RED)', function () {
+    this.timeout(30000);
 
     // Stack-OVERFLOW path. Deep recursion used to surface as a contract-catchable
     // RangeError whose stack text (captured host-side via the __gas/applySync
@@ -104,6 +108,10 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
         assert(!/\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/-]+\.js|node:internal|index\.js:|harness\.js:|cjs\/loader/.test(r.error || ''),
             `out_of_stack fault leaks host paths: ${r.error}`);
     });
+});
+
+describe('Error.stack must be neutered (was KNOWN-RED)', function () {
+    this.timeout(30000);
 
     // DOCUMENTED RESIDUAL: not in-VM fixable, mitigated by a consensus parameter.
     // Native throws set e.message as a V8 own property; it cannot be intercepted

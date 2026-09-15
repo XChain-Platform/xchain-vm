@@ -106,6 +106,15 @@ try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
         assert.strictEqual(r3.returnValue, '"block2"');
         vm.endBlock();
     });
+});
+
+(HAVE_IVM ? describe : describe.skip)('subprocess coverage harness: worker isolate-execution paths', function () {
+    this.timeout(60000);
+
+    let vm;
+    afterEach(async function () {
+        if (vm) { await vm.shutdown(); vm = null; }
+    });
 
     it('covers the worker revert/failure path (still a normal worker result)', async function () {
         vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS, execution: 'subprocess' });

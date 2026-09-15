@@ -51,6 +51,16 @@ async function run(code) {
     return r;
 }
 
+async function runDefault(code) {
+    const vm = createVM({ maxCpuTimeMs: CPU_MS }); // default 1,000,000 gas ceiling
+    if (typeof vm.beginBlock === 'function') vm.beginBlock();
+    const t0 = process.hrtime.bigint();
+    const r = await execute(vm, wrap(code), { method: 'default' });
+    const wallMs = Number(process.hrtime.bigint() - t0) / 1e6;
+    if (typeof vm.endBlock === 'function') vm.endBlock();
+    return { r, wallMs };
+}
+
 function assertGasBounded(id, r) {
     assert(
         r.success === false && /out_of_gas/.test(r.error || ''),
@@ -123,6 +133,10 @@ describe('Object statics must be size-metered (was KNOWN-RED)', function () {
             );
         });
     }
+});
+
+describe('Object statics must be size-metered (was KNOWN-RED)', function () {
+    this.timeout(120000);
 
     // Syntax-level allocators (G4): the metering pass rewrites these into the
     // harness helpers (__concat/__tmpl/__arrspread/__objspread), so a loop that
@@ -173,16 +187,6 @@ describe('Object statics must be size-metered (was KNOWN-RED)', function () {
 describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {
     this.timeout(60000);
 
-    async function runDefault(code) {
-        const vm = createVM({ maxCpuTimeMs: CPU_MS }); // default 1,000,000 gas ceiling
-        if (typeof vm.beginBlock === 'function') vm.beginBlock();
-        const t0 = process.hrtime.bigint();
-        const r = await execute(vm, wrap(code), { method: 'default' });
-        const wallMs = Number(process.hrtime.bigint() - t0) / 1e6;
-        if (typeof vm.endBlock === 'function') vm.endBlock();
-        return { r, wallMs };
-    }
-
     // The metering pass rewrites + / += into __concat and template literals into
     // __tmpl, charging by bytes grown beyond the largest operand, so doubling a
     // string trips out_of_gas instead of building megabytes for ~tens of gas.
@@ -220,6 +224,10 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
         assert.strictEqual(r.returnValue, '"sum_4950"');
         assert(r.gasUsed < 10000, `numeric +/small strings must stay cheap, got ${r.gasUsed}`);
     });
+});
+
+describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {
+    this.timeout(60000);
 
     // ---- item #6: member-lhs += and tagged-template residuals are now gas-bound ----
     // Before the __setconcat / __tmpltag[m] fix these escaped the byte meter: a
@@ -244,6 +252,10 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
             );
         });
     }
+});
+
+describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {
+    this.timeout(60000);
 
     // Correctness guards: the rewrites must preserve JS semantics exactly.
     it('member += evaluates object + computed key + rhs exactly once', async function () {

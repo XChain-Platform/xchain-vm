@@ -48,10 +48,13 @@ const BASE = {
     blockContext: { height: 100, timestamp: 1700000000, hash: 'abc' }
 };
 
-(XChainVM ? describe : describe.skip)('emit.crossExecute in-isolate', function() {
+let vm;
+function setupVM() {
+    if (!vm) vm = createVM();
+}
 
-    let vm;
-    before(function() { vm = createVM(); });
+(XChainVM ? describe : describe.skip)('emit.crossExecute in-isolate', function() {
+    before(setupVM);
 
     it('emits an XCALL action, charges the full pre-pay, and returns the call_id to the contract', async function() {
         const code = `
@@ -93,6 +96,10 @@ const BASE = {
         assert.match(JSON.parse(r.returnValue), /^caught:.*must differ/);
         assert.strictEqual(r.emittedActions.length, 0);
     });
+});
+
+(XChainVM ? describe : describe.skip)('emit.crossExecute in-isolate', function() {
+    before(setupVM);
 
     it('getCrossHops() reports the host-threaded hop count and gates further calls', async function() {
         const code = `
@@ -130,6 +137,10 @@ const BASE = {
         assert.deepStrictEqual(done, { status: 'ok', payload: '"7"' });
         assert.strictEqual(pending, null);
     });
+});
+
+(XChainVM ? describe : describe.skip)('emit.crossExecute in-isolate', function() {
+    before(setupVM);
 
     describe('crossCallable allowlist gate (injected executions)', function() {
         const TARGET = `

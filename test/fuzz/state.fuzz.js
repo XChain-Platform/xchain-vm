@@ -27,11 +27,14 @@ const {
     largeValueContractArb, initialStateArb
 } = require('./helpers/generators/state.js');
 
+let vm;
+function setupVM() {
+    if (!vm) vm = createVM();
+}
+
 (XChainVM ? describe : describe.skip)('Fuzz: State', function() {
     this.timeout(120000);
-    let vm;
-
-    before(function() { vm = createVM(); });
+    before(setupVM);
 
     it('adversarial key/value pairs never crash the VM', async function() {
         await fc.assert(fc.asyncProperty(stateContractArb, async (code) => {
@@ -75,6 +78,11 @@ const {
         const r2 = await execute(vm, infContract);
         assert.strictEqual(r2.success, false, 'Infinity value should fail');
     });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: State', function() {
+    this.timeout(120000);
+    before(setupVM);
 
     it('keys exceeding maxStateKeySize are rejected', async function() {
         const longKey = 'k'.repeat(DEFAULT_LIMITS.maxStateKeySize + 1);
@@ -116,6 +124,11 @@ const {
             }
         }), FC_OPTIONS);
     });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: State', function() {
+    this.timeout(120000);
+    before(setupVM);
 
     it('prototype-poisoning keys do not pollute host', async function() {
         const poisonKeys = ['__proto__', 'constructor', 'hasOwnProperty', 'toString'];

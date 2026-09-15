@@ -47,10 +47,13 @@ const BASE = {
     blockContext: { height: 100, timestamp: 1700000000, hash: 'abc' }
 };
 
-(XChainVM ? describe : describe.skip)('emit.execute in-isolate', function() {
+let vm;
+function setupVM() {
+    if (!vm) vm = createVM();
+}
 
-    let vm;
-    before(function() { vm = createVM(); });
+(XChainVM ? describe : describe.skip)('emit.execute in-isolate', function() {
+    before(setupVM);
 
     it('should emit an EXECUTE action and charge the reservation', async function() {
         const result = await vm.execute(Object.assign({}, BASE, {
@@ -87,6 +90,10 @@ const BASE = {
         assert.strictEqual(result.success, true);
         assert.strictEqual(JSON.parse(result.returnValue), 2);
     });
+});
+
+(XChainVM ? describe : describe.skip)('emit.execute in-isolate', function() {
+    before(setupVM);
 
     it('emit.execute at max depth should fail the execution deterministically', async function() {
         const result = await vm.execute(Object.assign({}, BASE, {
@@ -127,6 +134,10 @@ const BASE = {
         // Clamped to the PER-CALL ceiling, never the 1M constructor ceiling
         assert.strictEqual(result.gasUsed, 10000);
     });
+});
+
+(XChainVM ? describe : describe.skip)('emit.execute in-isolate', function() {
+    before(setupVM);
 
     it('per-call gasCeiling should not affect a run that fits within it', async function() {
         const result = await vm.execute(Object.assign({}, BASE, {

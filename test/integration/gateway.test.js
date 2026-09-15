@@ -36,10 +36,13 @@ function createVM() {
     });
 }
 
-(XChainVM ? describe : describe.skip)('Gateway', function() {
+let vm;
+function setupVM() {
+    if (!vm) vm = createVM();
+}
 
-    let vm;
-    before(function() { vm = createVM(); });
+(XChainVM ? describe : describe.skip)('Gateway', function() {
+    before(setupVM);
 
     describe('context accessors', function() {
         it('should provide block height', async function() {
@@ -97,6 +100,10 @@ function createVM() {
             assert.strictEqual(JSON.parse(result.returnValue), 'b');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('Gateway', function() {
+    before(setupVM);
 
     describe('state operations', function() {
         it('should read/write state', async function() {
@@ -125,7 +132,13 @@ function createVM() {
             assert.strictEqual(result.success, true);
             assert.strictEqual(JSON.parse(result.returnValue), 'hello');
         });
+    });
+});
 
+(XChainVM ? describe : describe.skip)('Gateway', function() {
+    before(setupVM);
+
+    describe('state operations', function() {
         it('should delete state', async function() {
             const result = await vm.execute({
                 code: `module.exports = function(xchain) {
@@ -157,6 +170,10 @@ function createVM() {
             assert.strictEqual(val.hasNot, false);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('Gateway', function() {
+    before(setupVM);
 
     describe('emit', function() {
         it('should queue SEND emission', async function() {
@@ -202,6 +219,10 @@ function createVM() {
             assert.strictEqual(JSON.parse(result.returnValue), '300');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('Gateway', function() {
+    before(setupVM);
 
     describe('control flow', function() {
         it('should handle xchain.revert()', async function() {
@@ -246,6 +267,10 @@ function createVM() {
             assert.strictEqual(JSON.parse(result.returnValue), 'passed');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('Gateway', function() {
+    before(setupVM);
 
     describe('logging', function() {
         it('should collect logs', async function() {
@@ -279,6 +304,10 @@ function createVM() {
             assert.strictEqual(result.logs[0], 'before revert');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('Gateway', function() {
+    before(setupVM);
 
     describe('method routing', function() {
         it('should call named method on object export', async function() {
