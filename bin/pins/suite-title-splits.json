@@ -10,5 +10,67 @@
       "test/unit/big_suite/writes.test.js"
     ]
   },
-  "splits": {}
+  "splits": {
+    "test/boundary/boundary.test.js": [
+      "test/boundary/boundary.test.js",
+      "test/boundary/boundary.test/01_boundary_state_management.test.js",
+      "test/boundary/boundary.test/02_boundary_emission_limits.test.js",
+      "test/boundary/boundary.test/03_boundary_emission_limits_integration.test.js",
+      "test/boundary/boundary.test/04_boundary_log_limits.test.js",
+      "test/boundary/boundary.test/05_boundary_log_limits_integration.test.js",
+      "test/boundary/boundary.test/06_boundary_return_value_truncation.test.js",
+      "test/boundary/boundary.test/07_boundary_math_operations.test.js",
+      "test/boundary/boundary.test/08_boundary_metering.test.js",
+      "test/boundary/boundary.test/09_boundary_sandbox_escapes.test.js",
+      "test/boundary/boundary.test/10_boundary_gateway_parameters.test.js",
+      "test/boundary/boundary.test/11_boundary_emit_action_fields.test.js",
+      "test/boundary/boundary.test/12_boundary_compound_interactions.test.js",
+      "test/boundary/boundary.test/13_boundary_determinism.test.js"
+    ],
+    "test/determinism/consensus_params.test.js": [
+      "test/determinism/consensus_params.test.js",
+      "test/determinism/consensus_params.test/01_consensus_parameters_are_frozen_track_8_guard.test.js"
+    ],
+    "test/determinism/crossrepo_request_call_id_bytematch.test.js": [
+      "test/determinism/crossrepo_request_call_id_bytematch.test.js",
+      "test/determinism/crossrepo_request_call_id_bytematch.test/01_batch_subcommand_roots_composite_discriminator.test.js",
+      "test/determinism/crossrepo_request_call_id_bytematch.test/02_xcall_call_id.test.js",
+      "test/determinism/crossrepo_request_call_id_bytematch.test/03_per_field_normalization_domain_vm_folds_indexer_stringifies.test.js"
+    ],
+    "test/integration/index.test.js": [
+      "test/integration/index.test.js",
+      "test/integration/index.test/01_atomicity.test.js",
+      "test/integration/index.test/02_return_value.test.js",
+      "test/integration/index.test/03_method_routing.test.js",
+      "test/integration/index.test/04_error_classification.test.js",
+      "test/integration/index.test/05_context_accessors_extended.test.js",
+      "test/integration/index.test/06_get_balance_get_token_info.test.js",
+      "test/integration/index.test/07_oracle.test.js",
+      "test/integration/index.test/08_cross_chain.test.js",
+      "test/integration/index.test/09_logging_extended.test.js",
+      "test/integration/index.test/10_compilation_cache.test.js",
+      "test/integration/index.test/11_default_config.test.js",
+      "test/integration/index.test/12_validate_syntax.test.js",
+      "test/integration/index.test/13_check_float_warnings.test.js",
+      "test/integration/index.test/14_emit_all_16_action_types_integration.test.js"
+    ],
+    "test/integration/process_executor.test.js": [
+      "test/integration/process_executor.test.js",
+      "test/integration/process_executor.test/01_contains_a_host_aborting_contract_and_keeps_serving_respawn.test.js",
+      "test/integration/process_executor.test/02_carries_plain_data_snapshots_oracle_across_ipc.test.js",
+      "test/integration/process_executor.test/03_survives_several_aborting_contracts_in_a_row_without_leaking.test.js",
+      "test/integration/process_executor.test/04_f2_executor_queues_recovers_the_next_request_after_a_worker_death.test.js",
+      "test/integration/process_executor.test/05_host_fault_a_permanently_broken_executor_rejects_with_host_fault_error.test.js",
+      "test/integration/process_executor.test/06_host_fault_a_broken_executor_self_heals_once_the_host_recovers.test.js",
+      "test/integration/process_executor.test/07_a_queued_request_never_times_out_on_queue_wait_watchdog_starts_at_dispatch.test.js",
+      "test/integration/process_executor.test/08_the_dispatch_time_watchdog_still_kills_a_hung_worker_deterministic_clamp.test.js",
+      "test/integration/process_executor.test/09_a_single_in_flight_worker_death_still_fabricates_resolves_not_rejects.test.js",
+      "test/integration/process_executor.test/10_shutdown_rejects_a_never_dispatched_queued_execution_with_host_fault_error.test.js",
+      "test/integration/process_executor.test/11_shutdown_still_resolves_an_in_flight_dispatched_execution_with_the_host_terminated_result.test.js",
+      "test/integration/process_executor.test/12_a_dispatched_execution_rejects_on_a_host_local_isolate_spawn_failure_never_out_of_resource.test.js",
+      "test/integration/process_executor.test/13_a_queued_execution_behind_a_host_fault_still_dispatches_the_slot_is_released.test.js",
+      "test/integration/process_executor.test/14_a_hostfault_for_an_unknown_id_is_ignored.test.js",
+      "test/integration/process_executor.test/15_process_executor_single_in_flight_dispatch_invariant.test.js"
+    ]
+  }
 }
