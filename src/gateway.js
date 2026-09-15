@@ -113,7 +113,7 @@ function buildAttestationAPI(gasTracker, emissionCollector, readOnlyData, gasSch
                 // 8192), so it says nothing about the named provider's own
                 // envelope. It does not cover a smaller provider, and today that
                 // gap is live: http_get's max_request_bytes is 2048
-                // (xchain-indexer providerRegistry.js), so a 2049..8192-byte
+                // (xchain-indexer provider_registry.js), so a 2049..8192-byte
                 // http_get payload passes every check here, is charged
                 // VM_ATTEST_REQUEST gas, lands on-chain, and is rejected
                 // host-side as 'invalid: REQUEST_PAYLOAD (exceeds provider max)'
