@@ -11,22 +11,7 @@
 // contact legal@dankest.llc.
 
 const assert = require('assert');
-const { buildEmitAPI } = require('../../src/gateway_emit.js');
-const GasTracker = require('../../src/gas.js');
-const EmissionCollector = require('../../src/collector.js');
-
-const SCHEDULE = {
-    VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
-    VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000,
-    VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
-};
-
-function createEmitAPI() {
-    const gasTracker = new GasTracker(SCHEDULE, 1000000);
-    const collector = new EmissionCollector(50);
-    const emit = buildEmitAPI(gasTracker, collector, SCHEDULE);
-    return { emit, gasTracker, collector };
-}
+const { createEmitAPI, SCHEDULE } = require('./gateway_emit.test/helpers/emit.js');
 
 describe('Emit API', function() {
 
@@ -57,7 +42,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.send({ destination: 'a', tick: 'T' }), /quantity/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('destroy', function() {
         it('should queue DESTROY with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -75,7 +62,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.destroy({ tick: 'T' }), /quantity/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('issue', function() {
         it('should queue ISSUE with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -88,7 +77,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.issue({}), /tick/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('mint', function() {
         it('should queue MINT with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -106,7 +97,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.mint({ tick: 'T' }), /quantity/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('order', function() {
         it('should queue ORDER with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -124,7 +117,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.order({ giveAmount: '100' }), /getAmount/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('dispenser', function() {
         it('should queue DISPENSER with any params', function() {
             const { emit, collector } = createEmitAPI();
@@ -138,7 +133,9 @@ describe('Emit API', function() {
             assert.strictEqual(collector.getActions()[0].action, 'DISPENSER');
         });
     });
+});
 
+describe('Emit API', function() {
     describe('dividend', function() {
         it('should queue DIVIDEND with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -161,7 +158,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.dividend({ tick: 'T', dividendTick: 'DT' }), /quantity/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('airdrop', function() {
         it('should queue AIRDROP with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -184,7 +183,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.airdrop({ tick: 'T', quantity: '10' }), /listActionIndex/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('callback', function() {
         it('should queue CALLBACK with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -197,7 +198,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.callback({}), /tick/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('file', function() {
         it('should queue FILE with any params', function() {
             const { emit, collector } = createEmitAPI();
@@ -211,7 +214,9 @@ describe('Emit API', function() {
             assert.strictEqual(collector.getActions()[0].action, 'FILE');
         });
     });
+});
 
+describe('Emit API', function() {
     describe('list', function() {
         it('should queue LIST with any params', function() {
             const { emit, collector } = createEmitAPI();
@@ -219,7 +224,9 @@ describe('Emit API', function() {
             assert.strictEqual(collector.getActions()[0].action, 'LIST');
         });
     });
+});
 
+describe('Emit API', function() {
     describe('coinpay', function() {
         it('should queue COINPAY with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -232,7 +239,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.coinpay({}), /orderMatchActionIndex/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('sweep', function() {
         it('should queue SWEEP with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -245,7 +254,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.sweep({}), /destination/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('link', function() {
         it('should queue LINK with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -273,7 +284,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.link({ coin1: 'B', coin1ActionIndex: 1, coin2: 'D' }), /coin2ActionIndex/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('broadcast', function() {
         it('should queue BROADCAST with any params', function() {
             const { emit, collector } = createEmitAPI();
@@ -281,7 +294,9 @@ describe('Emit API', function() {
             assert.strictEqual(collector.getActions()[0].action, 'BROADCAST');
         });
     });
+});
 
+describe('Emit API', function() {
     describe('message', function() {
         it('should queue MESSAGE with valid params', function() {
             const { emit, collector } = createEmitAPI();
@@ -294,7 +309,9 @@ describe('Emit API', function() {
             assert.throws(() => emit.message({ body: 'hello' }), /destination/);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('gas charging', function() {
         it('should charge VM_EMISSION gas per emit call', function() {
             const { emit, gasTracker } = createEmitAPI();
@@ -319,7 +336,9 @@ describe('Emit API', function() {
             assert.strictEqual(gasTracker.getUsed(), SCHEDULE.VM_EMISSION);
         });
     });
+});
 
+describe('Emit API', function() {
     describe('params handling', function() {
         it('should reject non-object params', function() {
             const { emit } = createEmitAPI();
@@ -343,108 +362,6 @@ describe('Emit API', function() {
             emit.send(params);
             params.quantity = '999';
             assert.strictEqual(collector.getActions()[0].params.quantity, '1');
-        });
-    });
-
-    describe('non-object params default branch (dispenser / file / list / broadcast)', function() {
-        it('dispenser: non-object params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.dispenser('not an object');
-            assert.strictEqual(collector.getActions()[0].action, 'DISPENSER');
-        });
-
-        it('dispenser: null params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.dispenser(null);
-            assert.strictEqual(collector.getActions()[0].action, 'DISPENSER');
-        });
-
-        it('file: non-object params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.file(42);
-            assert.strictEqual(collector.getActions()[0].action, 'FILE');
-        });
-
-        it('file: null params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.file(null);
-            assert.strictEqual(collector.getActions()[0].action, 'FILE');
-        });
-
-        it('list: non-object params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.list('bad');
-            assert.strictEqual(collector.getActions()[0].action, 'LIST');
-        });
-
-        it('list: null params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.list(null);
-            assert.strictEqual(collector.getActions()[0].action, 'LIST');
-        });
-
-        it('broadcast: non-object params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.broadcast(true);
-            assert.strictEqual(collector.getActions()[0].action, 'BROADCAST');
-        });
-
-        it('broadcast: null params defaults to {}', function() {
-            const { emit, collector } = createEmitAPI();
-            emit.broadcast(null);
-            assert.strictEqual(collector.getActions()[0].action, 'BROADCAST');
-        });
-    });
-
-    describe('type validation throws (validateTypes)', function() {
-        it('send: should throw on non-string destination', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.send({ destination: 123, tick: 'T', quantity: '1' }), /destination must be a string/);
-        });
-
-        it('send: should throw on non-string tick', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.send({ destination: 'a', tick: 99, quantity: '1' }), /tick must be a string/);
-        });
-
-        it('send: should throw on non-string quantity', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.send({ destination: 'a', tick: 'T', quantity: 100 }), /quantity must be a string/);
-        });
-
-        it('destroy: should throw on non-string tick', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.destroy({ tick: 5, quantity: '1' }), /tick must be a string/);
-        });
-
-        it('order: should throw on non-string giveAmount', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.order({ giveAmount: 100, getAmount: '50' }), /giveAmount must be a string/);
-        });
-
-        it('order: should throw on non-string getAmount', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.order({ giveAmount: '100', getAmount: 50 }), /getAmount must be a string/);
-        });
-
-        it('sweep: should throw on non-string destination', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.sweep({ destination: 99 }), /destination must be a string/);
-        });
-
-        it('link: should throw on non-string coin1', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.link({ coin1: 42, coin1ActionIndex: 1, coin2: 'D', coin2ActionIndex: 2 }), /coin1 must be a string/);
-        });
-
-        it('link: should throw on non-string coin2', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.link({ coin1: 'B', coin1ActionIndex: 1, coin2: 99, coin2ActionIndex: 2 }), /coin2 must be a string/);
-        });
-
-        it('message: should throw on non-string destination', function() {
-            const { emit } = createEmitAPI();
-            assert.throws(() => emit.message({ destination: 42 }), /destination must be a string/);
         });
     });
 });
