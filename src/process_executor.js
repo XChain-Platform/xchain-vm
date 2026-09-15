@@ -138,13 +138,13 @@ class ProcessExecutor {
         }, WORKER_READY_TIMEOUT_MS);
 
         // Initialize the worker's VM.
-        this._send({ type: 'init', config: this._config });
+        this.send({ type: 'init', config: this._config });
         // A respawn mid-block must restore the worker's block state (cache only;
         // correctness holds without it, but keep behavior consistent).
-        if (this._inBlock) this._send({ type: 'beginBlock' });
+        if (this._inBlock) this.send({ type: 'beginBlock' });
     }
 
-    _send(msg) {
+    send(msg) {
         const child = this._child;
         if (!child || !child.connected) return false;
         try { child.send(msg); return true; }
@@ -220,7 +220,7 @@ class ProcessExecutor {
         while (this._queue.length && this._pending.size === 0 &&
                this._child && this._sawReady && this._child.connected) {
             const entry = this._queue[0];
-            if (!this._send({ type: 'execute', id: entry.id, opts: entry.opts })) break;
+            if (!this.send({ type: 'execute', id: entry.id, opts: entry.opts })) break;
             this._queue.shift();
             // Watchdog starts at DISPATCH, not acceptance. The timeout must
             // bound ONE contract's execution: started at acceptance it also
@@ -302,12 +302,12 @@ class ProcessExecutor {
 
     beginBlock() {
         this._inBlock = true;
-        this._send({ type: 'beginBlock' });
+        this.send({ type: 'beginBlock' });
     }
 
     endBlock() {
         this._inBlock = false;
-        this._send({ type: 'endBlock' });
+        this.send({ type: 'endBlock' });
     }
 
     execute(opts) {
