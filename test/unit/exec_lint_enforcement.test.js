@@ -109,7 +109,10 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             assert.strictEqual(vm._lintVerdictCache.size, 0);
         });
     });
+});
 
+describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
+    this.timeout(30000);
     describe('at/after the activation (mainnet from genesis, and the pre-launch nets)', function () {
 
         it('rejects a banned-generator contract on MAINNET once the rule itself is in force', async function () {
@@ -141,7 +144,12 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             assert.strictEqual(vm._lintVerdictCache.size, 1,
                 'the execute-time re-lint must have run at mainnet height 0');
         });
+    });
+});
 
+describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
+    this.timeout(30000);
+    describe('at/after the activation (mainnet from genesis, and the pre-launch nets)', function () {
         it('rejects a banned-generator contract deterministically', async function () {
             const vm = newVm();
             const res = await vm.execute(runOpts({ code: GENERATOR, network: 'regtest' }));
@@ -175,7 +183,10 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             assert.strictEqual(JSON.parse(res.returnValue), 3);
         });
     });
+});
 
+describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
+    this.timeout(30000);
     describe('lint gas is metered', function () {
 
         it('charges VM_COMPUTATION per EXEC_LINT_GAS_BYTES_PER_UNIT bytes of source', async function () {
@@ -223,7 +234,10 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             assert.strictEqual(warm.gasUsed, cold.gasUsed);
         });
     });
+});
 
+describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
+    this.timeout(30000);
     describe('verdict cache keyed by the metering sha256 key', function () {
 
         it('returns the verdict a fresh validateSyntax call produces', function () {
@@ -264,7 +278,12 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             assert.strictEqual(vm.getLintVerdict(RESTPARAM, true, true, true, true, false).valid, true);
             assert.strictEqual(vm.getLintVerdict(RESTPARAM, true, true, true, true, true).valid, false);
         });
+    });
+});
 
+describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
+    this.timeout(30000);
+    describe('verdict cache keyed by the metering sha256 key', function () {
         it('accepts the shared sha256 digest and keys identically to computing it itself', function () {
             const crypto = require('crypto');
             const vm = newVm();
@@ -285,7 +304,10 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             assert.strictEqual(vm.getLintVerdict(CLEAN, true, true, true, true, true).valid, true);
         });
     });
+});
 
+describe('execute-time consensus source-lint enforcement @regression @tier1', function () {
+    this.timeout(30000);
     describe('activation resolver', function () {
 
         it('mainnet is armed at genesis for every coin', function () {

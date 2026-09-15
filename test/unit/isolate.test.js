@@ -20,10 +20,9 @@ try {
     console.log('Skipping isolate tests (isolated-vm not available):', e);
 }
 
+const LIMITS = { maxMemory: 8 };
+
 (IsolateManager && ivm ? describe : describe.skip)('IsolateManager', function() {
-
-    const LIMITS = { maxMemory: 8 };
-
     describe('createIsolate', function() {
         it('should return isolate and context', function() {
             const mgr = new IsolateManager(LIMITS);
@@ -42,7 +41,9 @@ try {
             mgr.dispose(isolate);
         });
     });
+});
 
+(IsolateManager && ivm ? describe : describe.skip)('IsolateManager', function() {
     describe('createThrowawayIsolate', function() {
         it('should return an isolate', function() {
             const mgr = new IsolateManager(LIMITS);
@@ -76,7 +77,9 @@ try {
             }
         });
     });
+});
 
+(IsolateManager && ivm ? describe : describe.skip)('IsolateManager', function() {
     describe('compileScript', function() {
         it('should compile valid code', function() {
             const mgr = new IsolateManager(LIMITS);
@@ -112,7 +115,9 @@ try {
             mgr.dispose(isolate);
         });
     });
+});
 
+(IsolateManager && ivm ? describe : describe.skip)('IsolateManager', function() {
     describe('getCachedData', function() {
         it('should return cached data if supported', function() {
             const mgr = new IsolateManager(LIMITS);
@@ -164,7 +169,9 @@ try {
             mgr.dispose(iso2);
         });
     });
+});
 
+(IsolateManager && ivm ? describe : describe.skip)('IsolateManager', function() {
     describe('dispose', function() {
         it('should dispose an isolate without error', function() {
             const mgr = new IsolateManager(LIMITS);

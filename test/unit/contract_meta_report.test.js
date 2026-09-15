@@ -38,10 +38,9 @@ const GAS_SCHEDULE = {
 // The cap the wrapper enforces, in UTF-16 code units of the serialised meta.
 const META_JSON_MAX_CHARS = 4096;
 
-(XChainVM ? describe : describe.skip)('readManifest contract-meta report', function () {
-
-    let vm;
-    before(function () {
+let vm;
+function setupVm() {
+    if (!vm) {
         vm = new XChainVM({
             gasSchedule: GAS_SCHEDULE,
             gasCeiling: 1000000,
@@ -50,16 +49,20 @@ const META_JSON_MAX_CHARS = 4096;
                 maxStateKeys: 10000, maxStateValueSize: 65536, maxCodeSize: 65536
             }
         });
-    });
-
-    // Every vector reads a manifest and asserts on manifest fields, so the read
-    // itself succeeding is part of every assertion.
-    async function report(code) {
-        const res = await vm.readManifest(code);
-        assert.strictEqual(res.success, true, 'manifest read must succeed: ' + res.error);
-        assert.ok(res.manifest, 'manifest must be present');
-        return res.manifest;
     }
+}
+
+// Every vector reads a manifest and asserts on manifest fields, so the read
+// itself succeeding is part of every assertion.
+async function report(code) {
+    const res = await vm.readManifest(code);
+    assert.strictEqual(res.success, true, 'manifest read must succeed: ' + res.error);
+    assert.ok(res.manifest, 'manifest must be present');
+    return res.manifest;
+}
+
+(XChainVM ? describe : describe.skip)('readManifest contract-meta report', function () {
+    before(setupVm);
 
     it('reports an object meta with its serialised bytes', async function () {
         const code = "module.exports = { meta: { name: 'Escrow', description: 'Two-party escrow with an arbiter', version: '1.0.0' }, permissions: ['SEND'] };";
@@ -113,7 +116,10 @@ const META_JSON_MAX_CHARS = 4096;
         assert.strictEqual(m.metaJson, null);
         assert.strictEqual(m.metaError, false);
     });
+});
 
+(XChainVM ? describe : describe.skip)('readManifest contract-meta report', function () {
+    before(setupVm);
     it('reports metaError for a Date (it serialises to a string, not an object)', async function () {
         // Date is stripped from the sandbox global scope, so the vector builds the
         // same shape the check is about: an object whose toJSON yields a string.
@@ -155,7 +161,10 @@ const META_JSON_MAX_CHARS = 4096;
         assert.strictEqual(m.metaError, true);
         assert.strictEqual(m.metaJson, null);
     });
+});
 
+(XChainVM ? describe : describe.skip)('readManifest contract-meta report', function () {
+    before(setupVm);
     it('reports metaOversize and drops the bytes for a meta over the cap', async function () {
         const code = "module.exports = { meta: { name: 'Fat', description: 'x'.repeat(5000) } };";
         const m = await report(code);
@@ -199,7 +208,10 @@ const META_JSON_MAX_CHARS = 4096;
         assert.strictEqual(m.metaError, false);
         assert.strictEqual(m.metaOversize, false);
     });
+});
 
+(XChainVM ? describe : describe.skip)('readManifest contract-meta report', function () {
+    before(setupVm);
     it('does NOT read meta off a function export for permissions (that verdict must not move)', async function () {
         // __ce stays object-only: a function export's permissions are invisible today
         // and stay invisible, even though its meta is now read.

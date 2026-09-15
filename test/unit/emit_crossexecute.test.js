@@ -89,7 +89,9 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
             assert.doesNotThrow(() => v.validate({ action: 'XCALL', params: {} }));
         });
     });
+});
 
+describe('emit.crossExecute (cross-chain contract call)', function() {
     describe('call_id derivation (consensus-critical)', function() {
         it('byte-matches sha256(network:chain:txHash:rootActionIndex:contractIndex:callPath:emissionIndex:targetChain)', function() {
             const { emit } = createEmitAPI();
@@ -135,7 +137,9 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
             assert.notStrictEqual(a, b);
         });
     });
+});
 
+describe('emit.crossExecute (cross-chain contract call)', function() {
     describe('hop gate', function() {
         it('allows hop 1 (user-originated context) and hop 2 (injected/callback context)', function() {
             assert.doesNotThrow(() => createEmitAPI({ crossHops: 0 }).emit.crossExecute(GOOD));
@@ -148,7 +152,9 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
             assert.strictEqual(gasTracker.getUsed(), 0);
         });
     });
+});
 
+describe('emit.crossExecute (cross-chain contract call)', function() {
     describe('validation matrix', function() {
         const reject = (overrides, re, ctx) => {
             const { emit, gasTracker } = createEmitAPI(ctx);
@@ -186,7 +192,9 @@ describe('emit.crossExecute (cross-chain contract call)', function() {
             assert.deepStrictEqual(collector.getActions()[0].params.callbackParams, ['7', 'true']);
         });
     });
+});
 
+describe('emit.crossExecute (cross-chain contract call)', function() {
     describe('crossChain.getCallResult accessor (snapshot-backed)', function() {
         it('returns { status, payload } for a terminal call and null while in flight', function() {
             const acc = buildCrossChainAccessor({

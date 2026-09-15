@@ -14,19 +14,18 @@ const assert = require('assert');
 const GasTracker = require('../../src/gas.js');
 const { GasExhaustedError } = require('../../src/errors.js');
 
+const SCHEDULE = {
+    VM_COMPUTATION:    1,
+    VM_STATE_READ:     100,
+    VM_STATE_WRITE:    200,
+    VM_STATE_DELETE:   100,
+    VM_ORACLE_READ:    100,
+    VM_CROSSCHAIN_READ: 100,
+    VM_ATTEST_REQUEST: 5000,
+    VM_EMISSION:       500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
+};
+
 describe('GasTracker', function() {
-
-    const SCHEDULE = {
-        VM_COMPUTATION:    1,
-        VM_STATE_READ:     100,
-        VM_STATE_WRITE:    200,
-        VM_STATE_DELETE:   100,
-        VM_ORACLE_READ:    100,
-        VM_CROSSCHAIN_READ: 100,
-        VM_ATTEST_REQUEST: 5000,
-        VM_EMISSION:       500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
-    };
-
     it('should start with 0 gas used', function() {
         const tracker = new GasTracker(SCHEDULE, 1000);
         assert.strictEqual(tracker.getUsed(), 0);
@@ -66,7 +65,9 @@ describe('GasTracker', function() {
             assert.strictEqual(e.ceiling, 100);
         }
     });
+});
 
+describe('GasTracker', function() {
     it('should charge computation gas', function() {
         const tracker = new GasTracker(SCHEDULE, 1000);
         tracker.chargeComputation();
@@ -124,7 +125,9 @@ describe('GasTracker', function() {
         const tracker = new GasTracker(SCHEDULE, 1000);
         assert.throws(() => tracker.charge(NaN), /non-negative finite number/);
     });
+});
 
+describe('GasTracker', function() {
     it('should reject an Infinity gas charge', function() {
         const tracker = new GasTracker(SCHEDULE, 1000);
         assert.throws(() => tracker.charge(Infinity), /non-negative finite number/);
@@ -168,7 +171,9 @@ describe('GasTracker', function() {
         delete incomplete.VM_ATTEST_REQUEST;
         assert.throws(() => new GasTracker(incomplete, 1000), /missing required key: VM_ATTEST_REQUEST/);
     });
+});
 
+describe('GasTracker', function() {
     it('should reject a schedule missing any canonical key in constructor', function() {
         for (const key of GasTracker.CANONICAL_GAS_KEYS) {
             const incomplete = { ...SCHEDULE };

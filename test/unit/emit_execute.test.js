@@ -71,7 +71,9 @@ describe('emit.execute (cross-contract call)', function() {
             assert.strictEqual(gasTracker.getUsed(), 100000);
         });
     });
+});
 
+describe('emit.execute (cross-contract call)', function() {
     describe('validation', function() {
         it('should fail on missing contractIndex / method / gasLimit', function() {
             const { emit } = createEmitAPI();
@@ -123,7 +125,9 @@ describe('emit.execute (cross-contract call)', function() {
             assert.throws(() => emit.execute(Object.assign({}, GOOD, { gasLimit: 29800 })), /exceeds remaining gas/);
         });
     });
+});
 
+describe('emit.execute (cross-contract call)', function() {
     describe('depth gate', function() {
         it('should throw at max call depth before charging any gas', function() {
             const { emit, gasTracker } = createEmitAPI({ callDepth: 4, maxCallDepth: 4, minCallGas: 5000 });
@@ -143,14 +147,18 @@ describe('emit.execute (cross-contract call)', function() {
             assert.strictEqual(collector.getActions().length, 1);
         });
     });
+});
 
+describe('emit.execute (cross-contract call)', function() {
     describe('ActionValidator', function() {
         it('should accept EXECUTE emissions', function() {
             const v = new ActionValidator();
             assert.strictEqual(v.validate({ action: 'EXECUTE', params: GOOD }), true);
         });
     });
+});
 
+describe('emit.execute (cross-contract call)', function() {
     describe('effectiveCeiling', function() {
         it('should honor a positive integer below the config ceiling', function() {
             assert.strictEqual(effectiveCeiling(50000, 1000000), 50000);

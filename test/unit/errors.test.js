@@ -48,7 +48,9 @@ describe('Error Classes', function() {
             assert.strictEqual(err.message, '');
         });
     });
+});
 
+describe('Error Classes', function() {
     describe('GasExhaustedError', function() {
         it('should be an instance of Error', function() {
             const err = new GasExhaustedError(1500, 1000);
@@ -80,7 +82,9 @@ describe('Error Classes', function() {
             assert(typeof err.stack === 'string');
         });
     });
+});
 
+describe('Error Classes', function() {
     describe('HostFaultError', function() {
         it('should be an instance of Error', function() {
             const err = new HostFaultError();

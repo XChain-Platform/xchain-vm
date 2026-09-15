@@ -53,6 +53,24 @@ describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
         assert.ok(CONSENSUS_RULES.has('banned-rest'));
     });
 
+    it('a rest inside an OBJECT pattern is seen at all (acorn-walk blind spot)', function () {
+        // acorn-walk's ObjectPattern base descends straight into a rest property's
+        // ARGUMENT and never visits the RestElement, and CatchClause inherits that gap
+        // through its param. A walk.ancestor-based detector therefore reports ZERO hits
+        // for both of these while happily flagging the array-pattern equivalents, which
+        // reads as "the rule works". Pin the two shapes that expose it.
+        assert.strictEqual(findBannedRest('var {a: {...c}} = o;').length, 1,
+            'object-pattern nested rest must be visible');
+        assert.strictEqual(findBannedRest('try { f(); } catch ({...e}) { g(e); }').length, 1,
+            'catch-clause object rest must be visible');
+    });
+
+    it('a syntactically invalid source yields no hits (the parse error is reported elsewhere)', function () {
+        assert.deepStrictEqual(findBannedRest('function ('), []);
+    });
+});
+
+describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
     describe('UNMETERABLE rest positions are flagged', function () {
         const cases = {
             'function-declaration rest param': ['function f(...a){ return a.length; }', 'rest parameter'],
@@ -82,7 +100,9 @@ describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
             });
         }
     });
+});
 
+describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
     describe('METERABLE rest positions are NOT flagged (they are charged instead)', function () {
         const ok = [
             'var [x, ...c] = a;',
@@ -102,7 +122,9 @@ describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
             });
         }
     });
+});
 
+describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
     describe('non-rest code is untouched', function () {
         for (const code of ['var [x, y] = a;', 'var {k, j} = o;', 'var b = [...a, 3];',
             'var m = {...base, k: 1};', 'f(...x);', 'function f(a, b){ return a + b; }']) {
@@ -111,23 +133,9 @@ describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
             });
         }
     });
+});
 
-    it('a rest inside an OBJECT pattern is seen at all (acorn-walk blind spot)', function () {
-        // acorn-walk's ObjectPattern base descends straight into a rest property's
-        // ARGUMENT and never visits the RestElement, and CatchClause inherits that gap
-        // through its param. A walk.ancestor-based detector therefore reports ZERO hits
-        // for both of these while happily flagging the array-pattern equivalents, which
-        // reads as "the rule works". Pin the two shapes that expose it.
-        assert.strictEqual(findBannedRest('var {a: {...c}} = o;').length, 1,
-            'object-pattern nested rest must be visible');
-        assert.strictEqual(findBannedRest('try { f(); } catch ({...e}) { g(e); }').length, 1,
-            'catch-clause object rest must be visible');
-    });
-
-    it('a syntactically invalid source yields no hits (the parse error is reported elsewhere)', function () {
-        assert.deepStrictEqual(findBannedRest('function ('), []);
-    });
-
+describe('REST_PATTERN_METER deploy-lint: banned-rest', function () {
     (validateSyntax ? describe : describe.skip)('validateSyntax gating (enforceBannedRest)', function () {
         const BAD = 'module.exports = function(){ function s(...n){ return n.length; } return s(1,2); };';
 
