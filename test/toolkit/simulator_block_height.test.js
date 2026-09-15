@@ -100,6 +100,10 @@ function heightWarnings(lines) {
         const pinned = new ContractSimulator({ network: 'mainnet', block: { height: 7 } });
         assert.strictEqual(pinned.block.height, 7);
     });
+});
+
+(ContractSimulator ? describe : describe.skip)('toolkit: simulator default block height', function () {
+    this.timeout(30000);
 
     it('runs the post-activation rule set by default on mainnet', async function () {
         const armed = XChainVM.PKG3_SANDBOX_ACTIVATION['BTC:mainnet'];
@@ -153,6 +157,10 @@ function heightWarnings(lines) {
             await preGate.close();
         }
     });
+});
+
+(ContractSimulator ? describe : describe.skip)('toolkit: simulator default block height', function () {
+    this.timeout(30000);
 
     it('warns once when an author pins a pre-activation height', async function () {
         const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { height: 1 } });

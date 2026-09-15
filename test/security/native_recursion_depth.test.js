@@ -78,6 +78,16 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
             assert.strictEqual(r.gasUsed, CEILING, 'resource-fault gasUsed clamps to the ceiling (fee-bounded, hashed)');
         });
     }
+});
+
+(XChainVM ? describe : describe.skip)('native-recursion structural-depth guard (F-NR)', function () {
+    this.timeout(30000);
+
+    let vm;
+    beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
+
+    const run = (body, block) => execute(vm, fn(body), { method: 'default', blockContext: block });
 
     // ---- Above the gate: an aliased DAG that unfolds exponentially is a
     //      deterministic out_of_gas (bounded, not a hang), not a host-timing race. ----
@@ -117,6 +127,16 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
         assert.strictEqual(over.success, false);
         assert.match(over.error, /^out_of_stack:/, over.error);
     });
+});
+
+(XChainVM ? describe : describe.skip)('native-recursion structural-depth guard (F-NR)', function () {
+    this.timeout(30000);
+
+    let vm;
+    beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
+
+    const run = (body, block) => execute(vm, fn(body), { method: 'default', blockContext: block });
 
     // ---- Deserialization half of the same fork class: JSON.parse (2715) ----
     //
@@ -149,6 +169,16 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
             assert.strictEqual(r.gasUsed, CEILING, 'resource-fault gasUsed clamps to the ceiling (fee-bounded, hashed)');
         });
     }
+});
+
+(XChainVM ? describe : describe.skip)('native-recursion structural-depth guard (F-NR)', function () {
+    this.timeout(30000);
+
+    let vm;
+    beforeEach(function () { vm = createVM({ maxCpuTimeMs: 8000, gasCeiling: CEILING }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
+
+    const run = (body, block) => execute(vm, fn(body), { method: 'default', blockContext: block });
 
     it('above the gate, brackets INSIDE a JSON string literal are data, not nesting (no false poison)', async function () {
         const r = await run(`var t='"'+'['.repeat(50000)+'"';return JSON.parse(t).length;`, ABOVE);

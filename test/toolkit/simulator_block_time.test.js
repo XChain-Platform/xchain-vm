@@ -123,6 +123,10 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
         assert.strictEqual(liveBlockTime(oldest - 1), 1786060800,
             'no elapsed gate falls back to the ratified 2.0.0 flag-day, never to 0');
     });
+});
+
+(ContractSimulator ? describe : describe.skip)('toolkit: simulator default block time', function () {
+    this.timeout(30000);
 
     it('seeds a default-constructed simulator with that block time', function () {
         const sim = new ContractSimulator();
@@ -161,6 +165,10 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
         assert.strictEqual(live.block.timestamp, PRE_GATE_TIME);
         assert.strictEqual(sched.block.timestamp, PRE_GATE_TIME);
     });
+});
+
+(ContractSimulator ? describe : describe.skip)('toolkit: simulator default block time', function () {
+    this.timeout(30000);
 
     // The parity the finding is about, asserted on the rule itself rather than on a
     // gas number: the default must resolve the rest-pattern gate exactly as a live
@@ -207,6 +215,10 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
                 (restEnforcedNow ? 'rejects' : 'accepts') + ' it');
         } finally { console.warn = real; await sim.close(); }
     });
+});
+
+(ContractSimulator ? describe : describe.skip)('toolkit: simulator default block time', function () {
+    this.timeout(30000);
 
     it('still honours an explicit pre-flag-day block override', function () {
         const sim = new ContractSimulator({ block: { timestamp: PRE_GATE_TIME } });

@@ -32,32 +32,36 @@ const GAS_SCHEDULE = {
     VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
 };
 
-(XChainVM ? describe : describe.skip)('classifyError host-signal corroboration (e9c3a80b)', function () {
+const CEILING = 1000000;
+let vm;
 
-    const CEILING = 1000000;
-    let vm;
-    before(function () {
+function initializeVM() {
+    if (!vm) {
         vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: CEILING, execution: 'in-process' });
-    });
-
-    function tracker(used) {
-        return { used, ceiling: CEILING, getUsed: () => used };
     }
-    const collector = { getLogs: () => [] };
-    const HARDENED = { network: 'regtest', contractAddress: 'C', method: 'm' };
-    const LEGACY   = { network: 'mainnet', contractAddress: 'C', method: 'm' };
+}
 
-    function signals(over) {
-        return Object.assign({
-            runStartNs: process.hrtime.bigint(),
-            getIsolate: () => ({ isDisposed: false })
-        }, over);
-    }
+function tracker(used) {
+    return { used, ceiling: CEILING, getUsed: () => used };
+}
+const collector = { getLogs: () => [] };
+const HARDENED = { network: 'regtest', contractAddress: 'C', method: 'm' };
+const LEGACY   = { network: 'mainnet', contractAddress: 'C', method: 'm' };
 
-    function classify(err, opts, hostSignals, used) {
-        return vm.classifyError(err, tracker(used == null ? 777 : used), collector,
-            opts, { reverted: false }, hostSignals);
-    }
+function signals(over) {
+    return Object.assign({
+        runStartNs: process.hrtime.bigint(),
+        getIsolate: () => ({ isDisposed: false })
+    }, over);
+}
+
+function classify(err, opts, hostSignals, used) {
+    return vm.classifyError(err, tracker(used == null ? 777 : used), collector,
+        opts, { reverted: false }, hostSignals);
+}
+
+(XChainVM ? describe : describe.skip)('classifyError host-signal corroboration (e9c3a80b)', function () {
+    before(initializeVM);
 
     describe('post-gate (hardened)', function () {
         it('rejects a spoofed timeout message (no wall-clock, isolate alive) -> generic error, real gasUsed', function () {
@@ -107,6 +111,10 @@ const GAS_SCHEDULE = {
             assert.ok(r.error.startsWith('error: '), r.error);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('classifyError host-signal corroboration (e9c3a80b)', function () {
+    before(initializeVM);
 
     describe('pre-gate (legacy replay parity)', function () {
         it('keeps message-only timeout classification below the flag-day', function () {

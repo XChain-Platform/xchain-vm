@@ -55,19 +55,19 @@ const objRest = (n) => `module.exports = function(){
     return t;
 };`;
 
+function runAt(code, timestamp, ceiling) {
+    const vm = createVM({ gasCeiling: ceiling || 50000000, maxCpuTimeMs: 20000, maxMemory: 128 });
+    vm.beginBlock();
+    return execute(vm, code, {
+        method: 'default',
+        network: 'mainnet',
+        blockContext: { height: 100, timestamp, hash: 'h' },
+        contractAddress: 'C:BTC:1'
+    }).then((r) => { vm.endBlock(); return r; });
+}
+
 (XChainVM ? describe : describe.skip)('destructuring-rest metering: REST_PATTERN_METER gate', function () {
     this.timeout(60000);
-
-    const runAt = (code, timestamp, ceiling) => {
-        const vm = createVM({ gasCeiling: ceiling || 50000000, maxCpuTimeMs: 20000, maxMemory: 128 });
-        vm.beginBlock();
-        return execute(vm, code, {
-            method: 'default',
-            network: 'mainnet',
-            blockContext: { height: 100, timestamp, hash: 'h' },
-            contractAddress: 'C:BTC:1'
-        }).then((r) => { vm.endBlock(); return r; });
-    };
 
     // ---- array rest -------------------------------------------------------
     it('below the gate: 50 copies of a 20000-element source cost ~nothing (the bug)', async function () {
@@ -105,6 +105,10 @@ const objRest = (n) => `module.exports = function(){
         assert.strictEqual(legacy.success, true,
             'pre-gate the same loop must still succeed (byte-identical replay): ' + legacy.error);
     });
+});
+
+(XChainVM ? describe : describe.skip)('destructuring-rest metering: REST_PATTERN_METER gate', function () {
+    this.timeout(60000);
 
     // ---- object rest ------------------------------------------------------
     it('below the gate: 50 own-key copies of a 20000-key source cost ~nothing (the bug)', async function () {
@@ -156,6 +160,10 @@ const objRest = (n) => `module.exports = function(){
         assert.strictEqual(at.gasUsed, below.gasUsed,
             'a rest-less destructure must not be metered (or a lazy source would be over-drained)');
     });
+});
+
+(XChainVM ? describe : describe.skip)('destructuring-rest metering: REST_PATTERN_METER gate', function () {
+    this.timeout(60000);
 
     // ---- semantics --------------------------------------------------------
     it('at the gate: the rest bindings still hold exactly what they held before', async function () {

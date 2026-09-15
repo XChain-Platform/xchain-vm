@@ -100,7 +100,9 @@ function exec(vm, code, opts) {
             assert(result.gasUsed > 0, 'should have consumed gas');
         });
     });
+});
 
+(XChainVM ? describe : describe.skip)('Smoke Tests', function() {
     describe('S4: Multi-method dispatch', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -140,7 +142,9 @@ function exec(vm, code, opts) {
             assert.strictEqual(result.emittedActions[0].params.quantity, '500');
         });
     });
+});
 
+(XChainVM ? describe : describe.skip)('Smoke Tests', function() {
     describe('S6: Gateway context accessors', function() {
         let vm;
         before(function() { vm = createVM(); });
@@ -178,7 +182,9 @@ function exec(vm, code, opts) {
             assert.strictEqual(JSON.parse(result.returnValue), '3');
         });
     });
+});
 
+(XChainVM ? describe : describe.skip)('Smoke Tests', function() {
     // S8: Syntax Validation
     describe('S8: Syntax validation', function() {
         let vm;

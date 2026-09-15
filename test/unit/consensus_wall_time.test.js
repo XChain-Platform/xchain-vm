@@ -36,6 +36,23 @@ const GAS_SCHEDULE = {
 // The ratified 2.0.0 flag-day this gate rides (BINARY_ALLOC_GATE_BLOCK_TIME).
 const FLAG_DAY = 1786060800;
 
+const CEILING = 1000000;
+
+function makeVM(maxCpuTimeMs) {
+    return new XChainVM({
+        gasSchedule: GAS_SCHEDULE,
+        gasCeiling: CEILING,
+        execution: 'in-process',
+        limits: {
+            maxCpuTimeMs: maxCpuTimeMs, maxMemory: 8, maxEmissions: 50,
+            maxStateKeys: 10000, maxStateValueSize: 65536, maxCodeSize: 65536
+        }
+    });
+}
+
+const GATED   = { network: 'regtest', blockContext: { height: 1, timestamp: 1700000000, hash: 'h' } };
+const UNGATED = { network: 'mainnet', blockContext: { height: 1, timestamp: FLAG_DAY - 1, hash: 'h' } };
+
 describe('consensus wall-clock budget: the value and the resolver', function () {
 
     it('CONSENSUS_MAX_WALL_MS is the pinned protocol budget (a divergent value forks the fleet)', function () {
@@ -74,24 +91,6 @@ describe('consensus wall-clock budget: the value and the resolver', function () 
 });
 
 (XChainVM ? describe : describe.skip)('consensus wall-clock budget: the enforcing path', function () {
-
-    const CEILING = 1000000;
-
-    function makeVM(maxCpuTimeMs) {
-        return new XChainVM({
-            gasSchedule: GAS_SCHEDULE,
-            gasCeiling: CEILING,
-            execution: 'in-process',
-            limits: {
-                maxCpuTimeMs: maxCpuTimeMs, maxMemory: 8, maxEmissions: 50,
-                maxStateKeys: 10000, maxStateValueSize: 65536, maxCodeSize: 65536
-            }
-        });
-    }
-
-    const GATED   = { network: 'regtest', blockContext: { height: 1, timestamp: 1700000000, hash: 'h' } };
-    const UNGATED = { network: 'mainnet', blockContext: { height: 1, timestamp: FLAG_DAY - 1, hash: 'h' } };
-
     it('a gated execution runs against the protocol budget, whatever the node configured', function () {
         // The whole point: three nodes, three configs, ONE budget. A divergent
         // budget is a divergent status and a divergent gasUsed for the same shape.
@@ -140,7 +139,9 @@ describe('consensus wall-clock budget: the value and the resolver', function () 
         assert.ok(spoofed.error.startsWith('error: '), spoofed.error);
         assert.strictEqual(spoofed.gasUsed, 777);
     });
+});
 
+(XChainVM ? describe : describe.skip)('consensus wall-clock budget: the enforcing path', function () {
     it('end to end: the SAME node config times the contract out ungated and completes it gated', async function () {
         // The falsifiable pair. One VM, one contract, one 1 ms knob: below the gate
         // the knob binds and the execution dies on the wall-clock net; at/after the

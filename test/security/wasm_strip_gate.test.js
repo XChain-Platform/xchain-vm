@@ -42,6 +42,12 @@ const typeofWasm = `module.exports = function(xchain){ return typeof WebAssembly
 // Above the gate, even reaching for a member must throw (global is absent).
 const useWasm = `module.exports = function(xchain){ try { return typeof WebAssembly.instantiate; } catch (e) { return 'THROWN'; } };`;
 
+const expectLintRejectsWasm = (r) => {
+    assert.strictEqual(r.success, false, 'the re-lint must reject the stored source at the gate');
+    assert.ok(r.error.startsWith('error: banned syntax: '), r.error);
+    assert.ok(/WebAssembly/.test(r.error), r.error);
+};
+
 (XChainVM ? describe : describe.skip)('WebAssembly strip: per-coin Pkg 3 height gate', function () {
     this.timeout(30000);
 
@@ -68,12 +74,6 @@ const useWasm = `module.exports = function(xchain){ try { return typeof WebAssem
     // stored source against it before any isolate exists. The strip underneath is the
     // defence-in-depth layer and is pinned directly in test/unit/sandbox.test.js; through
     // execute() the observable verdict at the gate is the lint's.
-    const expectLintRejectsWasm = (r) => {
-        assert.strictEqual(r.success, false, 'the re-lint must reject the stored source at the gate');
-        assert.ok(r.error.startsWith('error: banned syntax: '), r.error);
-        assert.ok(/WebAssembly/.test(r.error), r.error);
-    };
-
     it('at the BTC gate (961000), a WebAssembly-referencing contract is rejected at execute', async function () {
         expectLintRejectsWasm(await run(typeofWasm, 961000, 'mainnet', 'BTC'));
     });
@@ -87,6 +87,22 @@ const useWasm = `module.exports = function(xchain){ try { return typeof WebAssem
         assert.strictEqual(r.success, true, r.error);
         assert.strictEqual(JSON.parse(r.returnValue), 'function');
     });
+});
+
+(XChainVM ? describe : describe.skip)('WebAssembly strip: per-coin Pkg 3 height gate', function () {
+    this.timeout(30000);
+
+    let vm;
+    beforeEach(function () { vm = createVM({ gasCeiling: 1000000 }); vm.beginBlock(); });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
+
+    const run = (code, height, network, coin) =>
+        execute(vm, code, {
+            method: 'default',
+            blockContext: { height, timestamp: TS, hash: 'h' },
+            network,
+            contractAddress: 'C:' + (coin || 'BTC') + ':1',
+        });
 
     // ---- Per-coin: LTC/DOGE stay present at a bare BTC 961000; strip at their own heights ----
     it('LTC mainnet at 961000 keeps WebAssembly present (per-coin fix: not a bare BTC gate)', async function () {

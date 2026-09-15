@@ -63,7 +63,9 @@ describe('EmissionCollector', function() {
         // No pollution leaked onto the global Object prototype.
         assert.strictEqual(({}).polluted, undefined);
     });
+});
 
+describe('EmissionCollector', function() {
     it('should collect logs', function() {
         const ec = new EmissionCollector(50);
         ec.addLog('hello world');
@@ -119,7 +121,9 @@ describe('EmissionCollector', function() {
         assert.strictEqual(ec.getLogs()[0].length, 1024);
         assert(!ec.getLogs()[0].includes('truncated'));
     });
+});
 
+describe('EmissionCollector', function() {
     it('should truncate message of 1025 bytes', function() {
         const ec = new EmissionCollector(50);
         const msg = 'x'.repeat(1025);

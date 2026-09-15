@@ -105,7 +105,9 @@ describe('Toolkit gate: contract identity (contract-meta)', function () {
         assert.strictEqual(adv.length, 1, 'the undecidable read must surface as an advisory');
         assert(/evaluates meta at deploy/.test(adv[0].message));
     });
+});
 
+describe('Toolkit gate: contract identity (contract-meta)', function () {
     it('advises on an anonymous function export (no literal export shape to read)', function () {
         // The historic single-entry shape: the chain reads meta off the evaluated
         // module, and a static walk cannot see a property that is never assigned.
@@ -155,7 +157,9 @@ describe('Toolkit gate: contract identity (contract-meta)', function () {
         const src = 'var base = { a: 1 };\nmodule.exports = { ...base, meta: ' + VALID_META + ' };\n';
         assert.deepStrictEqual(getExportedMeta(src), { status: 'undecidable' });
     });
+});
 
+describe('Toolkit gate: contract identity (contract-meta)', function () {
     describe('the text grammar, through the gate', function () {
         // The invisible code points are written as \u escapes INSIDE the contract
         // source string, so acorn decodes them into the literal exactly as an
@@ -198,7 +202,11 @@ describe('Toolkit gate: contract identity (contract-meta)', function () {
             assert.strictEqual(nameLf.ok, false);
             assert(metaErrors(nameLf).some((e) => e.message === NAME_BAD));
         });
+    });
+});
 
+describe('Toolkit gate: contract identity (contract-meta)', function () {
+    describe('the text grammar, through the gate', function () {
         it('accepts a multi-byte name inside the byte cap and refuses it past it', function () {
             // 21 three-byte code points = 63 bytes; 22 = 66, over the 64-byte cap,
             // which is what proves the cap is bytes and not characters.
@@ -229,7 +237,11 @@ describe('Toolkit gate: contract identity (contract-meta)', function () {
             assert.strictEqual(read.name, null, 'a computed value has no literal to report');
             assert.strictEqual(read.description, 'A description.');
         });
+    });
+});
 
+describe('Toolkit gate: contract identity (contract-meta)', function () {
+    describe('the text grammar, through the gate', function () {
         it('advises on a computed description and on a computed version', function () {
             for (const [field, meta] of [
                 ['description', '{ name: "Escrow", description: DESC }'],
@@ -258,7 +270,9 @@ describe('Toolkit gate: contract identity (contract-meta)', function () {
             assert(g.advisories.some((e) => e.rule === 'contract-meta-undecidable'));
         });
     });
+});
 
+describe('Toolkit gate: contract identity (contract-meta)', function () {
     describe('isValidMetaText', function () {
         const wide = '你';
 
