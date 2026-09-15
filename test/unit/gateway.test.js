@@ -17,78 +17,9 @@
 
 const assert = require('assert');
 const crypto = require('crypto');
-const { buildGateway } = require('../../src/gateway.js');
-const { ContractRevertError } = require('../../src/errors.js');
-
-const SCHEDULE = {
-    VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
-    VM_STATE_DELETE: 100, VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100,
-    VM_ATTEST_REQUEST: 5000, VM_EMISSION: 500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
-};
-
-// Recording fakes: let each test assert exact gas charges and captured emissions
-// without depending on GasTracker/EmissionCollector internals.
-function mkGas() {
-    return { charges: [], charge(n) { this.charges.push(n); }, total() { return this.charges.reduce((a, b) => a + b, 0); } };
-}
-function mkState() {
-    const m = new Map();
-    return {
-        store: m,
-        get: (k) => m.get(k),
-        has: (k) => m.has(k),
-        set: (k, v) => m.set(k, v),
-        delete: (k) => m.delete(k),
-    };
-}
-function mkCollector() {
-    return {
-        actions: [],
-        logs: [],
-        logFull: false,
-        add(action, params) { this.actions.push({ action, params }); },
-        addLog(msg) { this.logs.push(msg); },
-        isLogFull() { return this.logFull; },
-        getLogCount() { return this.logs.length; },
-    };
-}
-
-function baseReadOnly(overrides = {}) {
-    return Object.assign({
-        caller: 'caller_addr',
-        contractAddress: 'contract_addr',
-        contractIndex: 7,
-        txHash: 'abc123',
-        params: ['p0', 'p1'],
-        blockContext: { height: 100, timestamp: 1234567890, hash: 'blockhash' },
-        balances: { addrA: { TOK: '500' } },
-        tokenInfo: { TOK: { supply: '1000' } },
-        oracleData: {
-            getPrice: (pair) => (pair === 'BTC/USD' ? '60000' : null),
-            getPriceAtRound: (pair, round) => `${pair}@${round}`,
-            getSnapshotAge: () => 3,
-        },
-        crossChainData: {
-            getAttestation: (chain, idx) => `att:${chain}:${idx}`,
-            isSettled: (chain, idx) => true,
-        },
-        attestationData: { getResponse: (id) => ({ id, result: 'ok' }) },
-        contractStakeData: {
-            getStake: (pubkey, token) => '42',
-            getTotalStaked: (token) => '100',
-            getStakers: (token) => [{ pubkey: 'p', amount: '42' }],
-        },
-        providerDeadlines: { llm: 20 },
-    }, overrides);
-}
-
-function build(overrides = {}, execContext = { reverted: false }) {
-    const gas = mkGas();
-    const state = mkState();
-    const collector = mkCollector();
-    const gw = buildGateway(gas, state, collector, baseReadOnly(overrides), SCHEDULE, execContext);
-    return { gw, gas, state, collector, execContext };
-}
+const {
+    SCHEDULE, mkGas, mkState, mkCollector, baseReadOnly, build, buildGateway,
+} = require('./gateway.test/helpers/gateway.js');
 
 describe('Gateway (host-function surface)', function () {
 
@@ -119,7 +50,9 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(gw.getInputParamCount(), 2);
         });
     });
+});
 
+describe('Gateway (host-function surface)', function () {
     describe('ledger queries (VM_STATE_READ)', function () {
         it('getBalance returns the balance and charges a read', function () {
             const { gw, gas } = build();
@@ -141,7 +74,9 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(build({ tokenInfo: null }).gw.getTokenInfo('TOK'), null);
         });
     });
+});
 
+describe('Gateway (host-function surface)', function () {
     describe('state (metered, delegates to stateManager)', function () {
         it('get/has/set/delete delegate and charge the right gas', function () {
             const { gw, gas, state } = build();
@@ -156,7 +91,9 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(gw.state.has('k'), false);
         });
     });
+});
 
+describe('Gateway (host-function surface)', function () {
     describe('oracle (metered)', function () {
         it('getPrice / getPriceAtRound delegate and charge a read', function () {
             const { gw, gas } = build();
@@ -176,7 +113,9 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(gas.charges.length, 0);
         });
     });
+});
 
+describe('Gateway (host-function surface)', function () {
     describe('crossChain (metered)', function () {
         it('getAttestation / isSettled delegate and charge a read', function () {
             const { gw, gas } = build();
@@ -190,7 +129,9 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(gw.crossChain.isSettled('LTC', 9), false);
         });
     });
+});
 
+describe('Gateway (host-function surface)', function () {
     describe('attestation.request', function () {
         it('emits ATTEST and returns a deterministic request_id', function () {
             const { gw, collector, gas } = build();
@@ -248,7 +189,11 @@ describe('Gateway (host-function surface)', function () {
             const id = gw.attestation.request('llm', 'p', 'cb', []);
             assert.strictEqual(id, crypto.createHash('sha256').update('abc123::2>0:7:0').digest('hex'));
         });
+    });
+});
 
+describe('Gateway (host-function surface)', function () {
+    describe('attestation.request', function () {
         const bad = [
             ['providerId not a string', () => build().gw.attestation.request(1, 'p', 'cb', []), /providerId/],
             ['providerId empty', () => build().gw.attestation.request('', 'p', 'cb', []), /providerId/],
@@ -291,7 +236,9 @@ describe('Gateway (host-function surface)', function () {
                 () => build({ providerDeadlines: null }).gw.attestation.request('llm', 'p', 'cb', [], { deadlineBlocks: 50 }));
         });
     });
+});
 
+describe('Gateway (host-function surface)', function () {
     describe('attestation.getResponse', function () {
         it('returns the stored response and charges a read', function () {
             const { gw, gas } = build();
@@ -303,7 +250,9 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(build({ attestationData: null }).gw.attestation.getResponse('rid'), null);
         });
     });
+});
 
+describe('Gateway (host-function surface)', function () {
     describe('contract staking (read)', function () {
         it('getStake / getTotalStaked / getStakers delegate with a read charge', function () {
             const { gw, gas } = build();
@@ -324,131 +273,6 @@ describe('Gateway (host-function surface)', function () {
             assert.strictEqual(gw.contract.getStake('p', 2), '0');
             assert.strictEqual(gw.contract.getTotalStaked(2), '0');
             assert.deepStrictEqual(gw.contract.getStakers(2), []);
-        });
-    });
-
-    describe('contract.slash', function () {
-        const PUB = 'a'.repeat(64);
-        it('emits a SLASH carrying the contractIndex and charges an emission', function () {
-            const { gw, gas, collector } = build();
-            gw.contract.slash(PUB, 'TOK', '10.5');
-            assert.strictEqual(collector.actions.length, 1);
-            assert.deepStrictEqual(collector.actions[0], {
-                action: 'SLASH',
-                params: { contractIndex: 7, pubkey: PUB, token: 'TOK', amount: '10.5' },
-            });
-            assert.ok(gas.charges.includes(SCHEDULE.VM_EMISSION));
-        });
-        it('rejects bad pubkey, token, and amount', function () {
-            const { gw } = build();
-            assert.throws(() => gw.contract.slash('short', 'TOK', '1'), /pubkey must be a 64-hex string/);
-            assert.throws(() => gw.contract.slash(PUB, '', '1'), /token must be a non-empty string/);
-            // 9 dp is the PRE-activation ceiling only; the gate-on half is pinned below.
-            assert.throws(() => gw.contract.slash(PUB, 'TOK', '1.123456789'), /amount must be a positive decimal/);
-            assert.throws(() => gw.contract.slash(PUB, 'TOK', 'abc'), /amount must be a positive decimal/);
-        });
-
-        // The 8-dp ceiling contradicted the stake side of the seam (STAKE v3
-        // admits a token's own DECIMALS, up to MAX_TOKEN_DECIMALS 18, and
-        // slashContractStake deducts at that precision), so a graduated slash of a
-        // high-precision token could never be emitted. Widening it ACCEPTS a call that
-        // used to throw, which is consensus-visible, so the host gates it; both sides
-        // are pinned here.
-        it('accepts up to 18 fractional digits when the precision gate is on', function () {
-            const { gw, collector } = build({ slashAmountPrecisionOn: true });
-            gw.contract.slash(PUB, 'TOK', '100.123456789012345678');
-            assert.strictEqual(collector.actions.length, 1);
-            assert.strictEqual(collector.actions[0].params.amount, '100.123456789012345678',
-                'the amount must reach the emission byte-identical, never re-rounded');
-            // 19 dp is past the token ceiling and stays rejected on both sides.
-            assert.throws(() => gw.contract.slash(PUB, 'TOK', '1.1234567890123456789'),
-                /amount must be a positive decimal/);
-        });
-
-        it('keeps the 8-dp ceiling below the precision gate (replay parity)', function () {
-            const { gw, collector } = build({ slashAmountPrecisionOn: false });
-            assert.throws(() => gw.contract.slash(PUB, 'TOK', '100.123456789012345678'),
-                /amount must be a positive decimal/);
-            assert.strictEqual(collector.actions.length, 0, 'a rejected slash must emit nothing');
-            gw.contract.slash(PUB, 'TOK', '100.12345678');
-            assert.strictEqual(collector.actions[0].params.amount, '100.12345678');
-        });
-
-        // The '|' guard is consensus-visible (a call that used to emit now
-        // throws), so the host gates it; both sides of the gate are pinned here.
-        it('rejects a token carrying the wire delimiter when the gate is on', function () {
-            const { gw, collector } = build({ slashTokenDelimGuardOn: true });
-            assert.throws(() => gw.contract.slash(PUB, 'TO|K', '1'), /token must not contain "\|"/);
-            assert.throws(() => gw.contract.slash(PUB, '|', '1'), /token must not contain "\|"/);
-            assert.throws(() => gw.contract.slash(PUB, 'TOK|', '1'), /token must not contain "\|"/);
-            assert.strictEqual(collector.actions.length, 0, 'a rejected slash must emit nothing');
-            // A delimiter-free token is unaffected by the gate.
-            gw.contract.slash(PUB, 'TOK', '1');
-            assert.strictEqual(collector.actions.length, 1);
-            assert.strictEqual(collector.actions[0].params.token, 'TOK');
-        });
-
-        it('emits a delimiter-bearing token unchanged below the gate (replay parity)', function () {
-            const { gw, collector } = build({ slashTokenDelimGuardOn: false });
-            gw.contract.slash(PUB, 'TO|K', '1');
-            assert.deepStrictEqual(collector.actions[0], {
-                action: 'SLASH',
-                params: { contractIndex: 7, pubkey: PUB, token: 'TO|K', amount: '1' },
-            });
-        });
-
-        it('charges the emission before the delimiter check (anti-spam ordering)', function () {
-            const { gw, gas } = build({ slashTokenDelimGuardOn: true });
-            assert.throws(() => gw.contract.slash(PUB, 'TO|K', '1'), /must not contain/);
-            assert.ok(gas.charges.includes(SCHEDULE.VM_EMISSION),
-                'a rejected slash still costs the emission charge, like the other validators');
-        });
-    });
-
-    describe('control flow', function () {
-        it('revert throws ContractRevertError and records the reason', function () {
-            const { gw, execContext } = build();
-            assert.throws(() => gw.revert('nope'), (e) => e instanceof ContractRevertError && /nope/.test(e.message));
-            assert.strictEqual(execContext.reverted, true);
-            assert.strictEqual(execContext.revertReason, 'nope');
-        });
-        it('revert defaults the reason and tolerates a missing execContext', function () {
-            assert.throws(() => build().gw.revert(), /reverted/);
-            const gw = buildGateway(mkGas(), mkState(), mkCollector(), baseReadOnly(), SCHEDULE, undefined);
-            assert.throws(() => gw.revert('x'), ContractRevertError);
-        });
-        it('require passes a true condition and throws on false', function () {
-            const { gw, execContext } = build();
-            assert.doesNotThrow(() => gw.require(true, 'ok'));
-            assert.throws(() => gw.require(false, 'bad'), (e) => e instanceof ContractRevertError && /bad/.test(e.message));
-            assert.strictEqual(execContext.revertReason, 'bad');
-        });
-        it('require defaults the reason and tolerates a missing execContext', function () {
-            assert.throws(() => build().gw.require(false), /requirement failed/);
-            const gw = buildGateway(mkGas(), mkState(), mkCollector(), baseReadOnly(), SCHEDULE, undefined);
-            assert.throws(() => gw.require(0, 'x'), ContractRevertError);
-        });
-    });
-
-    describe('logging', function () {
-        it('log stringifies and joins args; counters reflect collector', function () {
-            const { gw, collector } = build();
-            gw.log('a', 1, { x: 2 });
-            assert.strictEqual(collector.logs.length, 1);
-            assert.strictEqual(collector.logs[0], 'a 1 [object Object]');
-            assert.strictEqual(gw.getLogCount(), 1);
-            assert.strictEqual(gw.isLogFull(), false);
-            collector.logFull = true;
-            assert.strictEqual(gw.isLogFull(), true);
-        });
-    });
-
-    describe('composed APIs are wired in', function () {
-        it('exposes emit and math sub-APIs', function () {
-            const { gw } = build();
-            assert.strictEqual(typeof gw.emit, 'object');
-            assert.strictEqual(typeof gw.emit.send, 'function');
-            assert.strictEqual(typeof gw.math, 'object');
         });
     });
 });
