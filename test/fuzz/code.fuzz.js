@@ -23,11 +23,18 @@ const { XChainVM, createVM, execute, FC_OPTIONS } = require('./helpers/harness.j
 const { checkResultShape, checkAtomicity, checkGasCeiling, checkNoPrototypePollution, checkAll } = require('./helpers/invariants.js');
 const { validContractArb, mutatedContractArb, adversarialCodeArb, anyCodeArb } = require('./helpers/generators/code.js');
 
+let sharedVM;
+
+function getSharedVM() {
+    if (!sharedVM) sharedVM = createVM();
+    return sharedVM;
+}
+
 (XChainVM ? describe : describe.skip)('Fuzz: Code', function() {
     this.timeout(120000);
     let vm;
 
-    before(function() { vm = createVM(); });
+    before(function() { vm = getSharedVM(); });
 
     it('valid contracts always produce correct result shape', async function() {
         await fc.assert(fc.asyncProperty(validContractArb, async (code) => {
@@ -54,6 +61,17 @@ const { validContractArb, mutatedContractArb, adversarialCodeArb, anyCodeArb } =
             checkAll(result);
         }), FC_OPTIONS);
     });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Code', function() {
+    this.timeout(120000);
+    let vm;
+
+    before(function() { vm = getSharedVM(); });
 
     it('gas spoof attempts do not produce false out_of_gas', async function() {
         const spoofCode = 'module.exports = function(xchain) { throw new Error("\\x03GAS:999999:1"); };';

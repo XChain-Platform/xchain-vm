@@ -60,14 +60,20 @@ function firstDivergences(divs, n) {
     return divs.slice(0, n).map(d => '  - ' + d.detail).join('\n');
 }
 
+let corpusParamsLogged = false;
+
+function logCorpusParams() {
+    if (corpusParamsLogged) return;
+    // eslint-disable-next-line no-console -- record the corpus params so a red run is reproducible
+    console.log(`        [differential] seed=${SEED} cases=${DIFF_CASES}` +
+        (process.env.DIFF_SEED ? ' (pinned via DIFF_SEED)' : ' (default seed)'));
+    corpusParamsLogged = true;
+}
+
 (XChainVM ? describe : describe.skip)('Fuzz: Differential execution', function () {
     this.timeout(180000);
 
-    before(function () {
-        // eslint-disable-next-line no-console -- record the corpus params so a red run is reproducible
-        console.log(`        [differential] seed=${SEED} cases=${DIFF_CASES}` +
-            (process.env.DIFF_SEED ? ' (pinned via DIFF_SEED)' : ' (default seed)'));
-    });
+    before(function () { logCorpusParams(); });
 
     it('the corpus is a pure function of the seed (identical across two builds)', function () {
         const a = buildCorpus({ seed: SEED, cases: DIFF_CASES });
@@ -97,6 +103,12 @@ function firstDivergences(divs, n) {
             `seed replay diverged on ${divs.length} case(s) - the corpus is not deterministic:\n` +
             firstDivergences(divs, 10));
     });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Differential execution', function () {
+    this.timeout(180000);
+
+    before(function () { logCorpusParams(); });
 
     it('in-process and subprocess execution agree on every case', async function () {
         const corpus = buildCorpus({ seed: SEED, cases: DIFF_CASES });

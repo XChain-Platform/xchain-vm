@@ -28,11 +28,18 @@ const {
     extraFieldEmitArb, multiEmitContractArb, emitContractArb
 } = require('./helpers/generators/emission.js');
 
+let sharedVM;
+
+function getSharedVM() {
+    if (!sharedVM) sharedVM = createVM();
+    return sharedVM;
+}
+
 (XChainVM ? describe : describe.skip)('Fuzz: Emissions', function() {
     this.timeout(120000);
     let vm;
 
-    before(function() { vm = createVM(); });
+    before(function() { vm = getSharedVM(); });
 
     it('valid emit params always succeed with exactly 1 action', async function() {
         await fc.assert(fc.asyncProperty(validEmitContractArb, async (code) => {
@@ -66,6 +73,17 @@ const {
         }), FC_OPTIONS);
     });
 
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Emissions', function() {
+    this.timeout(120000);
+    let vm;
+
+    before(function() { vm = getSharedVM(); });
+
     it('extra fields in params are preserved but do not break invariants', async function() {
         await fc.assert(fc.asyncProperty(extraFieldEmitArb, async (code) => {
             const result = await execute(vm, code);
@@ -96,6 +114,17 @@ const {
         assert.strictEqual(overResult.success, false, 'Emit over limit should fail');
         checkAtomicity(overResult);
     });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Emissions', function() {
+    this.timeout(120000);
+    let vm;
+
+    before(function() { vm = getSharedVM(); });
 
     it('all 16 action types are correctly labeled', async function() {
         for (const method of EMIT_METHODS) {

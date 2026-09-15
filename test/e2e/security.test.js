@@ -27,15 +27,51 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
-(XChainVM ? describe : describe.skip)('E2E: Security Enforcement', function() {
+function createHarness() {
+    const h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+    return h;
+}
 
+async function executeHostStateProbe(h) {
+    // Execute a contract that writes to global-like patterns
+    await h.deploy({
+        code: `module.exports = function(xchain) {
+            // Try to leak data via various mechanisms
+            try { globalThis.__leaked = 'secret'; } catch(e) {}
+            return 'done';
+        };`,
+        deployer: 'deployer', contractAddress: 'C:BTC:30b'
+    });
+
+    await h.execute({
+        contractAddress: 'C:BTC:30b', method: 'default',
+        params: [], caller: 'user1'
+    });
+
+    // Second execution should not see the leaked value
+    await h.deploy({
+        code: `module.exports = function(xchain) {
+            try {
+                return typeof globalThis.__leaked;
+            } catch(e) {
+                return 'blocked';
+            }
+        };`,
+        deployer: 'deployer', contractAddress: 'C:BTC:30c'
+    });
+
+    return h.execute({
+        contractAddress: 'C:BTC:30c', method: 'default',
+        params: [], caller: 'user1'
+    });
+}
+
+(XChainVM ? describe : describe.skip)('E2E: Security Enforcement', function() {
     let h;
 
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
-    });
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-030: Sandbox escape attempts ---
     describe('E2E-030: Sandbox escape battery', function() {
@@ -65,45 +101,23 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
                 );
             }
         });
+    });
 
+    describe('E2E-030: Sandbox escape battery', function() {
         it('should not leak host state between executions', async function() {
-            // Execute a contract that writes to global-like patterns
-            await h.deploy({
-                code: `module.exports = function(xchain) {
-                    // Try to leak data via various mechanisms
-                    try { globalThis.__leaked = 'secret'; } catch(e) {}
-                    return 'done';
-                };`,
-                deployer: 'deployer', contractAddress: 'C:BTC:30b'
-            });
-
-            await h.execute({
-                contractAddress: 'C:BTC:30b', method: 'default',
-                params: [], caller: 'user1'
-            });
-
-            // Second execution should not see the leaked value
-            await h.deploy({
-                code: `module.exports = function(xchain) {
-                    try {
-                        return typeof globalThis.__leaked;
-                    } catch(e) {
-                        return 'blocked';
-                    }
-                };`,
-                deployer: 'deployer', contractAddress: 'C:BTC:30c'
-            });
-
-            const r2 = await h.execute({
-                contractAddress: 'C:BTC:30c', method: 'default',
-                params: [], caller: 'user1'
-            });
+            const r2 = await executeHostStateProbe(h);
             assertSuccess(r2);
             const val = JSON.parse(r2.returnValue);
             assert(val === 'undefined' || val === 'blocked',
                 `Expected no leaked state, got: ${val}`);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Security Enforcement', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-031: Non-deterministic API usage ---
     describe('E2E-031: Non-deterministic APIs blocked', function() {
@@ -155,6 +169,12 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Security Enforcement', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-032: Gas identifier injection ---
     describe('E2E-032: Reserved __gas identifier', function() {
@@ -164,6 +184,12 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert(result.error.includes('__gas'), 'Expected __gas rejection, got: ' + result.error);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Security Enforcement', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-033: Invalid emission params ---
     describe('E2E-033: Invalid emission rejected', function() {
@@ -201,6 +227,12 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertFailed(r);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Security Enforcement', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-034: Cross-contract state interference ---
     describe('E2E-034: Cross-contract state isolation', function() {

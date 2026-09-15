@@ -27,15 +27,51 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
-(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+function createHarness() {
+    const h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+    return h;
+}
 
-    let h;
-
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
+async function executeHealthyContractAfterExhaustion(h) {
+    // Deploy two separate contracts: one that exhausts memory and one
+    // that is well behaved. The point is that the second still runs
+    // after the first has been killed, so an out-of-resource contract
+    // cannot take the rest of the block down with it.
+    await h.deploy({
+        code: `module.exports = {
+            initialize: function(xchain) {},
+            oom: function(xchain) {
+                var arr = [];
+                while (true) { arr.push(new Array(100000)); }
+            }
+        };`,
+        deployer: 'deployer', contractAddress: 'C:BTC:41a'
     });
+
+    await h.deploy({
+        code: `module.exports = {
+            initialize: function(xchain) {},
+            ok: function(xchain) { return 'still alive'; }
+        };`,
+        deployer: 'deployer', contractAddress: 'C:BTC:41b'
+    });
+
+    await h.execute({
+        contractAddress: 'C:BTC:41a', method: 'oom',
+        params: [], caller: 'user1'
+    });
+
+    // Second contract should work fine
+    return h.execute({
+        contractAddress: 'C:BTC:41b', method: 'ok',
+        params: [], caller: 'user1'
+    });
+}
+
+(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+    beforeEach(function() { createHarness(); });
 
     // --- E2E-040: Gas exhaustion ---
     describe('E2E-040: Gas exhaustion (infinite loop)', function() {
@@ -91,6 +127,12 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertReturnValue(r2, 'stable');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-041: Memory exhaustion ---
     describe('E2E-041: Memory exhaustion (OOM)', function() {
@@ -119,45 +161,19 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert.strictEqual(result.stateChanges.length, 0);
             assert.strictEqual(result.emittedActions.length, 0);
         });
+    });
 
+    describe('E2E-041: Memory exhaustion (OOM)', function() {
         it('should remain stable after OOM/timeout', async function() {
-            // Deploy two separate contracts: one that exhausts memory and one
-            // that is well behaved. The point is that the second still runs
-            // after the first has been killed, so an out-of-resource contract
-            // cannot take the rest of the block down with it.
-            await h.deploy({
-                code: `module.exports = {
-                    initialize: function(xchain) {},
-                    oom: function(xchain) {
-                        var arr = [];
-                        while (true) { arr.push(new Array(100000)); }
-                    }
-                };`,
-                deployer: 'deployer', contractAddress: 'C:BTC:41a'
-            });
-
-            await h.deploy({
-                code: `module.exports = {
-                    initialize: function(xchain) {},
-                    ok: function(xchain) { return 'still alive'; }
-                };`,
-                deployer: 'deployer', contractAddress: 'C:BTC:41b'
-            });
-
-            await h.execute({
-                contractAddress: 'C:BTC:41a', method: 'oom',
-                params: [], caller: 'user1'
-            });
-
-            // Second contract should work fine
-            const r = await h.execute({
-                contractAddress: 'C:BTC:41b', method: 'ok',
-                params: [], caller: 'user1'
-            });
+            const r = await executeHealthyContractAfterExhaustion(h);
             assertSuccess(r);
             assertReturnValue(r, 'still alive');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+    beforeEach(function() { createHarness(); });
 
     // --- E2E-042: Wall-clock timeout ---
     describe('E2E-042: Wall-clock timeout', function() {
@@ -192,6 +208,12 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             );
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-043: Emission flood ---
     describe('E2E-043: Emission flood (>50 actions)', function() {
@@ -217,6 +239,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert.strictEqual(result.emittedActions.length, 0);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+    beforeEach(function() { createHarness(); });
 
     // --- E2E-044: State key flood ---
     describe('E2E-044: State key flood (>10000 keys)', function() {
@@ -244,6 +270,12 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assert.strictEqual(result.stateChanges.length, 0, 'State changes should be discarded');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-045: State value size exceeded ---
     describe('E2E-045: Oversized state value', function() {
@@ -267,6 +299,10 @@ catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
             assertFailed(result);
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Resource Limits', function() {
+    beforeEach(function() { createHarness(); });
 
     // --- E2E-046: Sequential resource reset ---
     describe('E2E-046: Gas resets between executions', function() {

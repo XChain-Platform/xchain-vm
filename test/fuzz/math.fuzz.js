@@ -27,11 +27,18 @@ const {
     safeNumericStringArb, buildMathContract
 } = require('./helpers/generators/math.js');
 
+let sharedVM;
+
+function getSharedVM() {
+    if (!sharedVM) sharedVM = createVM();
+    return sharedVM;
+}
+
 (XChainVM ? describe : describe.skip)('Fuzz: Math', function() {
     this.timeout(120000);
     let vm;
 
-    before(function() { vm = createVM(); });
+    before(function() { vm = getSharedVM(); });
 
     it('any math input produces a valid result shape', async function() {
         await fc.assert(fc.asyncProperty(mathContractArb, async (code) => {
@@ -51,6 +58,17 @@ const {
                 'Error should mention math error, got: ' + result.error);
         }), FC_OPTIONS);
     });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Math', function() {
+    this.timeout(120000);
+    let vm;
+
+    before(function() { vm = getSharedVM(); });
 
     it('add is commutative for valid inputs', async function() {
         await fc.assert(fc.asyncProperty(
@@ -91,6 +109,17 @@ const {
             }
         ), FC_OPTIONS);
     });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Math', function() {
+    this.timeout(120000);
+    let vm;
+
+    before(function() { vm = getSharedVM(); });
 
     it('compare is antisymmetric for valid inputs', async function() {
         await fc.assert(fc.asyncProperty(
@@ -134,6 +163,17 @@ const {
             }
         ), FC_OPTIONS);
     });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Math', function() {
+    this.timeout(120000);
+    let vm;
+
+    before(function() { vm = getSharedVM(); });
 
     it('add(a, 0) equals a for integer strings', async function() {
         await fc.assert(fc.asyncProperty(

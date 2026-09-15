@@ -40,11 +40,18 @@ const PARAM_ACCESS_CONTRACT = `module.exports = function(xchain) {
     return results;
 };`;
 
+let sharedVM;
+
+function getSharedVM() {
+    if (!sharedVM) sharedVM = createVM();
+    return sharedVM;
+}
+
 (XChainVM ? describe : describe.skip)('Fuzz: Arguments', function() {
     this.timeout(120000);
     let vm;
 
-    before(function() { vm = createVM(); });
+    before(function() { vm = getSharedVM(); });
 
     it('any params array produces a well-shaped result', async function() {
         await fc.assert(fc.asyncProperty(mixedParamsArb, async (params) => {
@@ -70,6 +77,17 @@ const PARAM_ACCESS_CONTRACT = `module.exports = function(xchain) {
             }
         }), FC_OPTIONS);
     });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Arguments', function() {
+    this.timeout(120000);
+    let vm;
+
+    before(function() { vm = getSharedVM(); });
 
     it('protocol markers in params do not corrupt results', async function() {
         await fc.assert(fc.asyncProperty(adversarialParamsArb, async (params) => {

@@ -58,6 +58,14 @@ const { initialStateArb } = require('./helpers/generators/state.js');
         }), FC_OPTIONS);
     });
 
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Determinism', function() {
+    this.timeout(120000);
+
     it('gas usage is identical across runs', async function() {
         await fc.assert(fc.asyncProperty(anyCodeArb, async (code) => {
             const vm1 = createVM();
@@ -89,6 +97,14 @@ const { initialStateArb } = require('./helpers/generators/state.js');
             }
         ), FC_OPTIONS);
     });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Determinism', function() {
+    this.timeout(120000);
 
     it('initial state variations are deterministic', async function() {
         await fc.assert(fc.asyncProperty(initialStateArb, async (state) => {

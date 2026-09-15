@@ -26,15 +26,17 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
 
-(XChainVM ? describe : describe.skip)('E2E: State Persistence & Isolation', function() {
+function createHarness() {
+    const h = new E2EHarness(XChainVM);
+    h.seedBalance('deployer', 'XCHAIN', '1000000');
+    h.seedBalance('user1', 'XCHAIN', '1000000');
+    return h;
+}
 
+(XChainVM ? describe : describe.skip)('E2E: State Persistence & Isolation', function() {
     let h;
 
-    beforeEach(function() {
-        h = new E2EHarness(XChainVM);
-        h.seedBalance('deployer', 'XCHAIN', '1000000');
-        h.seedBalance('user1', 'XCHAIN', '1000000');
-    });
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-060: State persists across blocks ---
     describe('E2E-060: State persists across blocks', function() {
@@ -80,6 +82,12 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertReturnValue(r, '5');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: State Persistence & Isolation', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-061: State isolation between contracts ---
     describe('E2E-061: State isolation between contracts', function() {
@@ -118,6 +126,12 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertReturnValue(rB, '3');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: State Persistence & Isolation', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-062: State rollback on reorg ---
     describe('E2E-062: State rollback on reorg', function() {
@@ -159,6 +173,12 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assertContractState(h.ledger, 'C:BTC:62', 'counter', '1');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: State Persistence & Isolation', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-063: Delete-then-set cycle ---
     describe('E2E-063: Delete-then-set cycle', function() {
@@ -211,6 +231,12 @@ catch (e) { console.log('Skipping E2E tests: isolated-vm not available'); }
             assert.strictEqual(xHistory.length, 3, 'Expected 3 history entries for key x');
         });
     });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: State Persistence & Isolation', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
 
     // --- E2E-064: State dirty tracking ---
     describe('E2E-064: State dirty tracking', function() {

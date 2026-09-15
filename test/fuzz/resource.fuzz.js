@@ -102,40 +102,13 @@ const MEMORY_EXHAUSTION_ATTEMPTS = [
             'Error should mention gas: ' + result.error);
     });
 
-    describe('metering bypass attempts', function() {
-        let tightVM;
-        before(function() { tightVM = createVM({ gasCeiling: 5000 }); });
-
-        for (let i = 0; i < METERING_BYPASS_ATTEMPTS.length; i++) {
-            it('bypass attempt #' + (i + 1) + ' is caught', async function() {
-                const code = METERING_BYPASS_ATTEMPTS[i];
-                const start = Date.now();
-                const result = await execute(tightVM, code);
-                const elapsed = Date.now() - start;
-                checkResultShape(result);
-                checkAtomicity(result);
-                // Must terminate (not hang). Covered by mocha timeout, but also check wall-clock
-                assert(elapsed < 10000, 'Bypass attempt hung for ' + elapsed + 'ms');
-                // Gas used should not wildly exceed ceiling
-                checkGasCeiling(result, 5000);
-            });
-        }
+    after(function() {
+        checkNoPrototypePollution();
     });
+});
 
-    describe('memory exhaustion attempts', function() {
-        let smallMemVM;
-        before(function() { smallMemVM = createVM({ maxMemory: 8 }); });
-
-        for (let i = 0; i < MEMORY_EXHAUSTION_ATTEMPTS.length; i++) {
-            it('memory bomb #' + (i + 1) + ' terminates gracefully', async function() {
-                const code = MEMORY_EXHAUSTION_ATTEMPTS[i];
-                const result = await execute(smallMemVM, code);
-                checkResultShape(result);
-                checkAtomicity(result);
-                checkNoPrototypePollution();
-            });
-        }
-    });
+(XChainVM ? describe : describe.skip)('Fuzz: Resource Exhaustion', function() {
+    this.timeout(120000);
 
     it('deep recursion is caught', async function() {
         const vm = createVM({ gasCeiling: 50000 });
@@ -179,6 +152,57 @@ const MEMORY_EXHAUSTION_ATTEMPTS = [
         checkResultShape(result);
         assert.strictEqual(result.success, false);
         assert(elapsed < 5000, 'try/catch loop took ' + elapsed + 'ms');
+    });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Resource Exhaustion', function() {
+    this.timeout(120000);
+
+    describe('metering bypass attempts', function() {
+        let tightVM;
+        before(function() { tightVM = createVM({ gasCeiling: 5000 }); });
+
+        for (let i = 0; i < METERING_BYPASS_ATTEMPTS.length; i++) {
+            it('bypass attempt #' + (i + 1) + ' is caught', async function() {
+                const code = METERING_BYPASS_ATTEMPTS[i];
+                const start = Date.now();
+                const result = await execute(tightVM, code);
+                const elapsed = Date.now() - start;
+                checkResultShape(result);
+                checkAtomicity(result);
+                // Must terminate (not hang). Covered by mocha timeout, but also check wall-clock
+                assert(elapsed < 10000, 'Bypass attempt hung for ' + elapsed + 'ms');
+                // Gas used should not wildly exceed ceiling
+                checkGasCeiling(result, 5000);
+            });
+        }
+    });
+
+    after(function() {
+        checkNoPrototypePollution();
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Resource Exhaustion', function() {
+    this.timeout(120000);
+
+    describe('memory exhaustion attempts', function() {
+        let smallMemVM;
+        before(function() { smallMemVM = createVM({ maxMemory: 8 }); });
+
+        for (let i = 0; i < MEMORY_EXHAUSTION_ATTEMPTS.length; i++) {
+            it('memory bomb #' + (i + 1) + ' terminates gracefully', async function() {
+                const code = MEMORY_EXHAUSTION_ATTEMPTS[i];
+                const result = await execute(smallMemVM, code);
+                checkResultShape(result);
+                checkAtomicity(result);
+                checkNoPrototypePollution();
+            });
+        }
     });
 
     after(function() {
