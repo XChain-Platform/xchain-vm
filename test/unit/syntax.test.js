@@ -22,25 +22,21 @@ try {
 }
 
 (validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
-
     describe('validateSyntax', function() {
         it('should accept valid code', function() {
             const result = validateSyntax('var x = 1;');
             assert.strictEqual(result.valid, true);
         });
-
         it('should reject syntax errors', function() {
             const result = validateSyntax('function { invalid }');
             assert.strictEqual(result.valid, false);
             assert(result.error.includes('syntax error'), result.error);
         });
-
         it('should reject __gas identifier', function() {
             const result = validateSyntax('var __gas = 1;');
             assert.strictEqual(result.valid, false);
             assert(result.error.includes('__gas'), result.error);
         });
-
         it('should reject the allocator metering helpers as reserved', function() {
             for (const id of ['__concat', '__setconcat', '__tmpl', '__tmpltag', '__tmpltagm', '__arrspread', '__objspread', '__objspreadmeter']) {
                 const result = validateSyntax('var x = ' + id + ';');
@@ -48,7 +44,6 @@ try {
                 assert(result.error.includes(id), result.error);
             }
         });
-
         it('should reject the call-depth metering hooks as reserved', function() {
             for (const id of ['__depth_enter', '__depth_exit']) {
                 const result = validateSyntax('var x = ' + id + ';');
@@ -56,12 +51,10 @@ try {
                 assert(result.error.includes(id), result.error);
             }
         });
-
         it('should accept ES2020 features', function() {
             const result = validateSyntax('var x = a?.b ?? "default";');
             assert.strictEqual(result.valid, true);
         });
-
         it('should accept complex contract code', function() {
             const code = `
                 module.exports = {
@@ -81,10 +74,11 @@ try {
             assert.strictEqual(result.valid, true);
         });
     });
+});
 
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
     describe('banned transcendental Math.* (blocking)', function() {
         const banned = ['sqrt', 'pow', 'log', 'log2', 'log10'];
-
         banned.forEach(function(name) {
             it('should reject Math.' + name + ' (dotted form)', function() {
                 const result = validateSyntax('var x = Math.' + name + '(2, 3);');
@@ -92,84 +86,78 @@ try {
                 assert(result.error.includes('Math.' + name), result.error);
                 assert(result.error.includes('xchain.math.' + name), result.error);
             });
-
             it('should reject Math[\'' + name + '\'] (computed form)', function() {
                 const result = validateSyntax("var x = Math['" + name + "'](2);");
                 assert.strictEqual(result.valid, false);
                 assert(result.error.includes('Math.' + name), result.error);
             });
         });
-
         it('should report the line number of the banned call', function() {
             const result = validateSyntax('var a = 1;\nvar b = Math.sqrt(4);');
             assert.strictEqual(result.valid, false);
             assert(result.error.includes('line 2'), result.error);
         });
-
         it('should still allow retained Math members (floor/abs/min/max)', function() {
             assert.strictEqual(validateSyntax('var x = Math.floor(1.5);').valid, true);
             assert.strictEqual(validateSyntax('var x = Math.abs(-3);').valid, true);
             assert.strictEqual(validateSyntax('var x = Math.max(1, 2);').valid, true);
             assert.strictEqual(validateSyntax('var x = Math.PI;').valid, true);
         });
+    });
+});
 
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
+    describe('banned transcendental Math.* (blocking)', function() {
         it('should not reject a property named like a banned member on another object', function() {
             const result = validateSyntax('var obj = { pow: function(){} }; obj.pow();');
             assert.strictEqual(result.valid, true);
         });
-
         it('should not reject the string "Math.pow"', function() {
             const result = validateSyntax('var x = "Math.pow";');
             assert.strictEqual(result.valid, true);
         });
-
         it('should reject Math[`pow`] (no-substitution template-literal key)', function() {
             const result = validateSyntax('var x = Math[`pow`](2, 3);');
             assert.strictEqual(result.valid, false);
             assert(result.error.includes('Math.pow'), result.error);
         });
-
         it('should reject globalThis.Math.pow (globalThis-qualified dotted form)', function() {
             const result = validateSyntax('var x = globalThis.Math.pow(2, 3);');
             assert.strictEqual(result.valid, false);
             assert(result.error.includes('Math.pow'), result.error);
         });
-
         it("should reject globalThis['Math'].sqrt (globalThis-qualified computed form)", function() {
             const result = validateSyntax("var x = globalThis['Math'].sqrt(4);");
             assert.strictEqual(result.valid, false);
             assert(result.error.includes('Math.sqrt'), result.error);
         });
-
         it('should not reject a variable-computed Math[x] access (out of scope, no data-flow analysis)', function() {
             const result = validateSyntax('var x = "pow"; var y = Math[x](2, 3);');
             assert.strictEqual(result.valid, true);
         });
     });
+});
 
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
     describe('checkFloatWarnings', function() {
         it('should warn on decimal literals', function() {
             const warnings = checkFloatWarnings('var x = 0.1;');
             assert.strictEqual(warnings.length, 1);
             assert(warnings[0].includes('0.1'), warnings[0]);
         });
-
         it('should not warn on integer literals', function() {
             const warnings = checkFloatWarnings('var x = 42;');
             assert.strictEqual(warnings.length, 0);
         });
-
         it('should not warn on string decimals', function() {
             const warnings = checkFloatWarnings('var x = "0.1";');
             assert.strictEqual(warnings.length, 0);
         });
-
         it('should report line numbers', function() {
             const warnings = checkFloatWarnings('var x = 1;\nvar y = 3.14;');
             assert.strictEqual(warnings.length, 1);
             assert(warnings[0].includes('line 2'), warnings[0]);
         });
-
         it('should report multiple float literals', function() {
             const warnings = checkFloatWarnings('var x = 0.1;\nvar y = 0.2;\nvar z = 0.3;');
             assert.strictEqual(warnings.length, 3);
@@ -180,7 +168,9 @@ try {
             assert.strictEqual(warnings.length, 0);
         });
     });
+});
 
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
     describe('validateSyntax (extended)', function() {
         it('should accept empty function body', function() {
             const result = validateSyntax('function foo() {}');
@@ -235,7 +225,9 @@ try {
             assert.strictEqual(result.valid, true);
         });
     });
+});
 
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
     describe('banned literals (BigInt + RegExp)', function() {
         it('should reject a BigInt literal', function() {
             const result = validateSyntax('var x = 1n;');
@@ -289,7 +281,9 @@ try {
             assert(result.error.includes('backtrack'), result.error);
         });
     });
+});
 
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
     describe('acorn metering-pass reject path', function() {
         it('should reject code that V8 accepts but acorn cannot meter', function() {
             // The acorn-based metering pass (meterCode) only supports up to ES2020.
@@ -333,12 +327,14 @@ try {
             assert.strictEqual(result.length, 0);
         });
     });
+});
 
-    // An isolate that cannot be SPAWNED is a fault of this machine, not a
-    // property of the source. Reported as 'syntax error: ...' it became a
-    // committed 'invalid: CODE_ENCODING' on the consensus path (deploy/index.js)
-    // while healthy peers accepted the same contract, so the two failures must
-    // stay distinguishable at the boundary they cross.
+// An isolate that cannot be SPAWNED is a fault of this machine, not a
+// property of the source. Reported as 'syntax error: ...' it became a
+// committed 'invalid: CODE_ENCODING' on the consensus path (deploy/index.js)
+// while healthy peers accepted the same contract, so the two failures must
+// stay distinguishable at the boundary they cross.
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
     describe('isolate-spawn host fault is not a syntax verdict', function() {
         const { HostFaultError } = require('../../src/errors.js');
         // The real isolated-vm export is frozen and carries Isolate off its
@@ -390,7 +386,11 @@ try {
                 }
             });
         });
+    });
+});
 
+(validateSyntax ? describe : describe.skip)('Syntax Validation', function() {
+    describe('isolate-spawn host fault is not a syntax verdict', function() {
         it('still reports a real compile failure as a syntax error', function() {
             const result = validateSyntax('function { invalid }');
             assert.strictEqual(result.valid, false);

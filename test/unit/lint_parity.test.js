@@ -109,7 +109,9 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
             });
         }
     });
+});
 
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     describe('Move 2 rules NEVER change the deploy verdict (parity invariant)', function () {
         // The critical guarantee: lint_core gained a new ERROR rule
         // (crossCallable-not-array) and several warnings, but validateSyntax (the
@@ -149,26 +151,28 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
             assert.strictEqual(validateSyntax(FLOAT_FIXTURE).valid, true);
         });
     });
+});
 
+const haveTemplates = fs.existsSync(CONTRACTS_DIR);
+const dirs = haveTemplates
+    ? fs.readdirSync(CONTRACTS_DIR, { withFileTypes: true })
+        .filter(d => d.isDirectory() && fs.existsSync(path.join(CONTRACTS_DIR, d.name, d.name + '.js')))
+        .map(d => d.name)
+    : [];
+
+// The templates predicate above is <name>/<name>.js, and patterns/ holds no
+// patterns/patterns.js, so every shipped pattern source fell out of this gate.
+// They are deployable source all the same: bin/xchain-contracts.js lists,
+// scaffolds and lints them, so a rule tightened HERE has to redden HERE rather
+// than wait for the next xchain-contracts CI run to notice. Same discovery rule
+// listAvailable() uses, so a sixth pattern is picked up without an allowlist.
+const PATTERNS_DIR = path.join(CONTRACTS_DIR, 'patterns');
+const patterns = fs.existsSync(PATTERNS_DIR)
+    ? fs.readdirSync(PATTERNS_DIR).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort()
+    : [];
+
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     describe('every shipped contract source (<name>/<name>.js templates AND patterns/*.js) passes the authoritative validator', function () {
-        const haveTemplates = fs.existsSync(CONTRACTS_DIR);
-        const dirs = haveTemplates
-            ? fs.readdirSync(CONTRACTS_DIR, { withFileTypes: true })
-                .filter(d => d.isDirectory() && fs.existsSync(path.join(CONTRACTS_DIR, d.name, d.name + '.js')))
-                .map(d => d.name)
-            : [];
-
-        // The templates predicate above is <name>/<name>.js, and patterns/ holds no
-        // patterns/patterns.js, so every shipped pattern source fell out of this gate.
-        // They are deployable source all the same: bin/xchain-contracts.js lists,
-        // scaffolds and lints them, so a rule tightened HERE has to redden HERE rather
-        // than wait for the next xchain-contracts CI run to notice. Same discovery rule
-        // listAvailable() uses, so a sixth pattern is picked up without an allowlist.
-        const PATTERNS_DIR = path.join(CONTRACTS_DIR, 'patterns');
-        const patterns = fs.existsSync(PATTERNS_DIR)
-            ? fs.readdirSync(PATTERNS_DIR).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort()
-            : [];
-
         if (!haveTemplates || dirs.length === 0) {
             it('xchain-contracts templates present', function () {
                 // Hard-fails under XCHAIN_REQUIRE_SIBLINGS=1 (the sibling-providing
@@ -183,7 +187,13 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                     assert.strictEqual(v.valid, true, name + ' rejected: ' + (v.error || ''));
                 });
             }
+        }
+    });
+});
 
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
+    describe('every shipped contract source (<name>/<name>.js templates AND patterns/*.js) passes the authoritative validator', function () {
+        if (haveTemplates && dirs.length > 0) {
             // An empty pattern set would add zero cases and still print green, which is
             // the same false green the sibling gate above exists to break.
             it('pattern-source discovery finds the shipped patterns/*.js set', function () {
@@ -200,7 +210,13 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                     assert.strictEqual(v.valid, true, 'patterns/' + f + ' rejected: ' + (v.error || ''));
                 });
             }
+        }
+    });
+});
 
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
+    describe('every shipped contract source (<name>/<name>.js templates AND patterns/*.js) passes the authoritative validator', function () {
+        if (haveTemplates && dirs.length > 0) {
             // The shipped templates advertise the sandbox strip as their reason to
             // exist ("a contract CANNOT fetch a URL directly: the VM sandbox strips
             // fetch, Date, timers ... instead the contract ASKS the network to read
@@ -227,7 +243,13 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                         '; the sandbox deletes it, so this pattern throws at runtime');
                 });
             }
+        }
+    });
+});
 
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
+    describe('every shipped contract source (<name>/<name>.js templates AND patterns/*.js) passes the authoritative validator', function () {
+        if (haveTemplates && dirs.length > 0) {
             // The sandbox's OTHER neutering half, same argument as the block above:
             // sandbox.js redefines each STRIPPED_PROTO_METHOD_NAMES entry to
             // undefined, so a shipped source that calls one throws TypeError on its
@@ -257,5 +279,4 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
             }
         }
     });
-
 });

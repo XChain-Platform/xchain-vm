@@ -68,7 +68,9 @@ describe('Toolkit gate: determinism + gas', function() {
         assert.strictEqual(g.ok, false);
         assert(g.errors.some(e => e.rule === 'banned-literal'));
     });
+});
 
+describe('Toolkit gate: determinism + gas', function() {
     it('blocks async surface (nondeterministic microtask timing)', function() {
         const g = runGate('module.exports = async function(xchain) { return 1; };');
         assert.strictEqual(g.ok, false);
