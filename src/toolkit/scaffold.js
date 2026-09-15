@@ -86,10 +86,8 @@ module.exports = {
 `;
 }
 
-// The same contract in TypeScript. Types (the local interface + the parameter
-// annotations) are ERASED by the toolkit's type-strip step, so the VM sees the
-// identical JS above. Only erasable TS is used (no enums / namespaces / decorators).
-function contractTs() {
+// Builds the TypeScript gateway declarations separately to keep the contract body readable.
+function contractTsTypes() {
     return `// SPDX-License-Identifier: MIT
 //
 // __NAME__: an XChain counter contract in TypeScript (scaffolded by xchain-foundry).
@@ -118,7 +116,14 @@ interface XChain {
     require(cond: boolean, reason: string): void;
 }
 
-module.exports = {
+`;
+}
+
+// The same contract in TypeScript. Types (the local interface + the parameter
+// annotations) are ERASED by the toolkit's type-strip step, so the VM sees the
+// identical JS above. Only erasable TS is used (no enums / namespaces / decorators).
+function contractTs() {
+    return contractTsTypes() + `module.exports = {
 
     // Contract identity. REQUIRED on chain (see the JS scaffold); edit the
     // description before deploying.
@@ -161,10 +166,8 @@ module.exports = {
 `;
 }
 
-// Simulator-driven Mocha test. Skips (does not fail) when isolated-vm cannot
-// load on the host, matching the VM's own smoke-suite convention, so the file
-// is safe to `npm test` anywhere and runs for real on Node-22 Linux.
-function testJs(name, contractFile) {
+// Builds the simulator test setup separately so the behavioral cases remain easy to scan.
+function testJsSetup(name, contractFile) {
     return `// ${name} contract test: driven by the xchain-foundry local simulator.
 const assert = require('assert');
 const fs = require('fs');
@@ -184,7 +187,14 @@ try {
 const CONTRACT = fs.readFileSync(path.join(__dirname, '..', 'contracts', '${contractFile}'), 'utf8');
 const IS_TS = '${contractFile}'.endsWith('.ts');
 
-(ContractSimulator ? describe : describe.skip)('${name}', function() {
+`;
+}
+
+// Simulator-driven Mocha test. Skips (does not fail) when isolated-vm cannot
+// load on the host, matching the VM's own smoke-suite convention, so the file
+// is safe to `npm test` anywhere and runs for real on Node-22 Linux.
+function testJs(name, contractFile) {
+    return testJsSetup(name, contractFile) + `(ContractSimulator ? describe : describe.skip)('${name}', function() {
     this.timeout(30000);
     let sim, addr;
 
