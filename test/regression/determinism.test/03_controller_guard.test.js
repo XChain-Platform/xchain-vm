@@ -12,12 +12,10 @@
 
 const assert = require('assert');
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 
 let XChainVM;
 try {
-    XChainVM = require('../../src/index.js');
+    XChainVM = require('../../../src/index.js');
 } catch (e) {
     console.log('Skipping determinism tests, isolated-vm not available:', e);
 }
@@ -80,50 +78,35 @@ const baseOpts = {
     let vm;
     before(function() { vm = createVM(); });
 
-    it('should produce identical results for state_counter', async function() {
-        const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/state_counter.js'), 'utf8');
-        const opts = { ...baseOpts, code, method: 'increment', state: { counter: '5' } };
-        const [r1, r2] = await runTwice(vm, opts);
-        assert.strictEqual(hashResult(r1), hashResult(r2));
-    });
+    // Fix 3910: controller-guard execution path (isGuard=true) determinism.
+    // runControllerGuard writes a parent contract_executions row; the guard's
+    // gasUsed, emission set, and basePosition offset are live consensus inputs
+    // that must be identical across runs. isGuard also disables attestation
+    // and cross-chain calls; those rejections must be deterministic too.
 
-    it('should produce identical results for simple_send', async function() {
-        const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/simple_send.js'), 'utf8');
-        const opts = { ...baseOpts, code, method: 'send', params: ['dest_addr', '100'],
-                       state: { owner: 'addr1', token: 'TEST' } };
-        const [r1, r2] = await runTwice(vm, opts);
-        assert.strictEqual(hashResult(r1), hashResult(r2));
-    });
-
-    it('should produce identical results for amm_swap', async function() {
-        const code = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/amm_swap.js'), 'utf8');
-        const opts = { ...baseOpts, code, method: 'swap', params: ['100', 'TOKENA'],
-                       state: { tokenA: 'TOKENA', tokenB: 'TOKENB', reserveA: '10000', reserveB: '5000' } };
-        const [r1, r2] = await runTwice(vm, opts);
-        assert.strictEqual(hashResult(r1), hashResult(r2));
-    });
-
-    it('should produce identical gas usage', async function() {
+    it('should produce identical results for guard: allow with emit.send', async function() {
+        // A guard that returns a value (allow) and emits a send (royalty split
+        // pattern). Both gasUsed and the emitted action must be identical.
         const code = `module.exports = function(xchain) {
-            for (var i = 0; i < 10; i++) {
-                xchain.state.set('key_' + i, String(i));
-            }
-            return 'done';
+            xchain.emit.send({ destination: 'royalty_addr', tick: 'TOKENX', quantity: '10' });
+            return 'allow';
         };`;
-        const opts = { ...baseOpts, code };
+        const opts = { ...baseOpts, code, state: {}, isGuard: true };
         const [r1, r2] = await runTwice(vm, opts);
-        assert.strictEqual(r1.gasUsed, r2.gasUsed);
+        assert.strictEqual(hashResult(r1), hashResult(r2));
+        assert.strictEqual(r1.success, true);
+        assert.strictEqual(r1.emittedActions.length, 1);
     });
 
-    it('should produce identical failure results', async function() {
+    it('should produce identical results for guard: deny via revert', async function() {
         const code = `module.exports = function(xchain) {
-            xchain.state.set('before', 'revert');
-            xchain.revert('test failure');
+            xchain.revert('transfer blocked by policy');
         };`;
-        const opts = { ...baseOpts, code };
+        const opts = { ...baseOpts, code, state: {}, isGuard: true };
         const [r1, r2] = await runTwice(vm, opts);
         assert.strictEqual(hashResult(r1), hashResult(r2));
         assert.strictEqual(r1.success, false);
+        assert.ok(r1.error.startsWith('revert:'));
     });
 });
 
@@ -132,28 +115,34 @@ const baseOpts = {
     let vm;
     before(function() { vm = createVM(); });
 
-    it('should produce identical results for math operations', async function() {
+    it('should produce identical results for guard: attestation.request blocked deterministically', async function() {
+        // A guard attempting attestation.request must receive a deterministic
+        // throw (not a silent skip), so the error is pinned.
         const code = `module.exports = function(xchain) {
-            var a = xchain.math.divide('1', '3');
-            var b = xchain.math.multiply(a, '3');
-            var c = xchain.math.subtract(b, '1');
-            return { a: a, b: b, c: c };
+            return xchain.attestation.request('provider', 'payload', 'cb', [], {});
         };`;
-        const opts = { ...baseOpts, code };
+        const opts = { ...baseOpts, code, state: {}, isGuard: true, txHash: 'abc', contractIndex: 1 };
+        const [r1, r2] = await runTwice(vm, opts);
+        assert.strictEqual(hashResult(r1), hashResult(r2));
+        assert.strictEqual(r1.success, false);
+        assert.ok(r1.error.includes('not available to a controller guard'),
+            'expected guard attestation rejection, got: ' + r1.error);
+    });
+
+    it('should produce identical results for guard: state read + conditional emit', async function() {
+        // Multi-guard basePosition scenario: a guard that reads state and
+        // conditionally emits. Both branches must be internally deterministic.
+        const code = `module.exports = function(xchain) {
+            var owner = xchain.state.get('owner');
+            if (owner === 'addr1') {
+                xchain.emit.send({ destination: 'treasury', tick: 'TOKENX', quantity: '5' });
+                return 'allow';
+            }
+            xchain.revert('not the owner');
+        };`;
+        const opts = { ...baseOpts, code, state: { owner: 'addr1' }, isGuard: true };
         const [r1, r2] = await runTwice(vm, opts);
         assert.strictEqual(hashResult(r1), hashResult(r2));
         assert.strictEqual(r1.success, true);
-    });
-
-    it('should produce identical results for emit operations', async function() {
-        const code = `module.exports = function(xchain) {
-            xchain.emit.send({ destination: 'addr1', tick: 'T', quantity: '100' });
-            xchain.emit.send({ destination: 'addr2', tick: 'T', quantity: '200' });
-            return 'done';
-        };`;
-        const opts = { ...baseOpts, code };
-        const [r1, r2] = await runTwice(vm, opts);
-        assert.strictEqual(hashResult(r1), hashResult(r2));
-        assert.strictEqual(r1.emittedActions.length, 2);
     });
 });
