@@ -37,16 +37,15 @@ const GAS_SCHEDULE = {
 // but a pre-gate deploy could carry it, so the WRAPPER must starve it too.
 const PEEK = 'module.exports = { peek: function(x) { return String(typeof __methodName) + ":" + String(typeof __isCrossCall); } };';
 
+function run(vm, network, timestamp) {
+    return vm.execute({
+        code: PEEK, state: {}, method: 'peek', params: [],
+        caller: 'addr', contractAddress: 'C:BTC:TEST', network,
+        blockContext: { height: 1, timestamp, hash: 'h' }
+    });
+}
+
 (XChainVM ? describe : describe.skip)('CONTRACT_WRAPPER control-binding closure move (5bff4687)', function () {
-
-    function run(vm, network, timestamp) {
-        return vm.execute({
-            code: PEEK, state: {}, method: 'peek', params: [],
-            caller: 'addr', contractAddress: 'C:BTC:TEST', network,
-            blockContext: { height: 1, timestamp, hash: 'h' }
-        });
-    }
-
     let vm;
     beforeEach(function () {
         vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000, execution: 'in-process' });
@@ -71,6 +70,15 @@ const PEEK = 'module.exports = { peek: function(x) { return String(typeof __meth
             assert.ok(res.error.includes('__methodName'), res.error);
         }
     });
+});
+
+(XChainVM ? describe : describe.skip)('CONTRACT_WRAPPER control-binding closure move (5bff4687)', function () {
+    let vm;
+    beforeEach(function () {
+        vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000, execution: 'in-process' });
+        vm.beginBlock();
+    });
+    afterEach(function () { vm.endBlock(); });
 
     // The wrapper-starvation pin, and it needs a venue where the stored source actually
     // REACHES the wrapper: post-VM_LINT_HARDENING by block time, but with the
@@ -91,6 +99,15 @@ const PEEK = 'module.exports = { peek: function(x) { return String(typeof __meth
         assert.strictEqual(res.success, true, res.error);
         assert.strictEqual(JSON.parse(res.returnValue), 'undefined:undefined');
     });
+});
+
+(XChainVM ? describe : describe.skip)('CONTRACT_WRAPPER control-binding closure move (5bff4687)', function () {
+    let vm;
+    beforeEach(function () {
+        vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000, execution: 'in-process' });
+        vm.beginBlock();
+    });
+    afterEach(function () { vm.endBlock(); });
 
     it('pre-gate (mainnet below the flag-day): legacy visibility preserved for replay parity', async function () {
         const res = await run(vm, 'mainnet', 1786060799);

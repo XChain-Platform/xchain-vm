@@ -45,10 +45,15 @@ function createVM() {
     });
 }
 
+let vm;
+function getVM() {
+    if (!vm) vm = createVM();
+    return vm;
+}
+
 (XChainVM ? describe : describe.skip)('readManifest (Phase E)', function () {
 
-    let vm;
-    before(function () { vm = createVM(); });
+    before(function () { vm = getVM(); });
 
     it('surfaces a declared permissions array + maxTakeBps', async function () {
         const code = "module.exports = { permissions: ['SEND','ISSUE'], maxTakeBps: 250, guard: function(){} };";
@@ -80,6 +85,11 @@ function createVM() {
         assert.strictEqual(res.success, true);
         assert.strictEqual(res.manifest.hasInitialize, false);
     });
+});
+
+(XChainVM ? describe : describe.skip)('readManifest (Phase E)', function () {
+
+    before(function () { vm = getVM(); });
 
     it('reports BARE contracts (no manifest exports) as undefined-typed, not as a restriction', async function () {
         const code = "module.exports = { guard: function(){} };";
@@ -119,6 +129,11 @@ function createVM() {
         assert.strictEqual(res.manifest.maxTakeBps, 2.5);
         assert.strictEqual(res.manifest.maxTakeBpsType, 'number');
     });
+});
+
+(XChainVM ? describe : describe.skip)('readManifest (Phase E)', function () {
+
+    before(function () { vm = getVM(); });
 
     it('is deterministic: identical code yields an identical manifest', async function () {
         const code = "module.exports = { permissions: ['SEND'], maxTakeBps: 100, guard: function(){} };";

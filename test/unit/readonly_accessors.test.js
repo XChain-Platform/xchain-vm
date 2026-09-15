@@ -58,6 +58,12 @@ describe('Read-only accessors', function () {
             assert.strictEqual(r.price, null, 'the price is genuinely unknown, not zero');
             assert.strictEqual(r.roundNumber, 99);
         });
+    });
+});
+
+describe('Read-only accessors', function () {
+
+    describe('buildOracleAccessor', function () {
         it('still answers null for a missing round AT or ABOVE the floor', function () {
             // The other half: inside the window the snapshot is authoritative, so an
             // absent round really never existed and a void guard should still fire.
@@ -85,6 +91,9 @@ describe('Read-only accessors', function () {
             assert.strictEqual(buildOracleAccessor({}).getSnapshotAge(), Number.MAX_SAFE_INTEGER);
         });
     });
+});
+
+describe('Read-only accessors', function () {
 
     describe('buildContractStakeAccessor', function () {
         it('returns null for a null snapshot', function () {
@@ -132,6 +141,9 @@ describe('Read-only accessors', function () {
             assert.strictEqual(a.isSettled('LTC', 10), false);
         });
     });
+});
+
+describe('Read-only accessors', function () {
 
     describe('buildAttestationAccessor', function () {
         it('returns null for a null snapshot', function () {
@@ -172,6 +184,9 @@ describe('Read-only accessors', function () {
             assert.strictEqual(a.getResponse('rid'), null);
         });
     });
+});
+
+describe('Read-only accessors', function () {
 
     describe('resolveAccessors', function () {
         it('resolves all four fields, mixing snapshots and nulls', function () {

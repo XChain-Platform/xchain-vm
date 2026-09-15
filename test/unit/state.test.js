@@ -13,12 +13,12 @@
 const assert = require('assert');
 const StateManager = require('../../src/state.js');
 
-describe('StateManager', function() {
+const LIMITS = {
+    maxStateKeys:      10,
+    maxStateValueSize: 1024
+};
 
-    const LIMITS = {
-        maxStateKeys:      10,
-        maxStateValueSize: 1024
-    };
+describe('StateManager', function() {
 
     it('should read initial state', function() {
         const sm = new StateManager({ foo: 'bar' }, LIMITS);
@@ -61,6 +61,9 @@ describe('StateManager', function() {
         assert.strictEqual(sm.get('x'), '2');
         assert.strictEqual(sm.has('x'), true);
     });
+});
+
+describe('StateManager', function() {
 
     it('should has() return correct values', function() {
         const sm = new StateManager({ x: '1' }, LIMITS);
@@ -108,6 +111,9 @@ describe('StateManager', function() {
         const sm = new StateManager({}, LIMITS);
         assert.throws(() => sm.set('key', null), /null or undefined/);
     });
+});
+
+describe('StateManager', function() {
 
     it('should reject undefined values', function() {
         const sm = new StateManager({}, LIMITS);
@@ -147,6 +153,9 @@ describe('StateManager', function() {
         sm.set('obj', { a: 1, b: [2, 3] });
         assert.deepStrictEqual(sm.get('obj'), { a: 1, b: [2, 3] });
     });
+});
+
+describe('StateManager', function() {
 
     it('should filter null initial state values', function() {
         const sm = new StateManager({ good: 'yes', bad: null, ugly: undefined }, LIMITS);
@@ -185,6 +194,9 @@ describe('StateManager', function() {
         sm.set('key', '12345678');
         assert.strictEqual(sm.get('key'), '12345678');
     });
+});
+
+describe('StateManager', function() {
 
     it('should reject value one byte over maxStateValueSize', function() {
         const sm = new StateManager({}, { ...LIMITS, maxStateValueSize: 10 });
@@ -224,6 +236,9 @@ describe('StateManager', function() {
         sm.set('list', [1, 2, 3]);
         assert.deepStrictEqual(sm.get('list'), [1, 2, 3]);
     });
+});
+
+describe('StateManager', function() {
 
     it('should maintain key count after repeated delete-set on same key', function() {
         const sm = new StateManager({}, { ...LIMITS, maxStateKeys: 2 });
@@ -262,6 +277,9 @@ describe('StateManager', function() {
         sm.set('a'.repeat(16), 'value');
         assert.strictEqual(sm.get('a'.repeat(16)), 'value');
     });
+});
+
+describe('StateManager', function() {
 
     it('should reject oversized key on delete', function() {
         const sm = new StateManager({}, { ...LIMITS, maxStateKeySize: 16 });

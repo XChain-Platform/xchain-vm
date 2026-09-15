@@ -13,15 +13,15 @@
 const assert = require('assert');
 const ActionValidator = require('../../src/validator.js');
 
+// Bind to the production allow-list (not a hand-maintained copy) so every allowed
+// action gets a positive-acceptance assertion and a removal from the production Set
+// can never pass unnoticed (#5152: the old mirror had drifted, omitting XCALL).
+const ALLOWED_ACTIONS = [...ActionValidator.ALLOWED_ACTIONS];
+
 describe('ActionValidator', function() {
 
     let validator;
     beforeEach(function() { validator = new ActionValidator(); });
-
-    // Bind to the production allow-list (not a hand-maintained copy) so every allowed
-    // action gets a positive-acceptance assertion and a removal from the production Set
-    // can never pass unnoticed (#5152: the old mirror had drifted, omitting XCALL).
-    const ALLOWED_ACTIONS = [...ActionValidator.ALLOWED_ACTIONS];
 
     describe('allowed actions', function() {
         it('every production-allowed action is covered (mirror is bound, not copied)', function() {
@@ -35,6 +35,12 @@ describe('ActionValidator', function() {
             });
         }
     });
+});
+
+describe('ActionValidator', function() {
+
+    let validator;
+    beforeEach(function() { validator = new ActionValidator(); });
 
     describe('unknown actions', function() {
         it('should reject unknown action type', function() {
@@ -67,6 +73,12 @@ describe('ActionValidator', function() {
                 /unknown emission action/);
         });
     });
+});
+
+describe('ActionValidator', function() {
+
+    let validator;
+    beforeEach(function() { validator = new ActionValidator(); });
 
     describe('params validation', function() {
         it('should reject null params', function() {

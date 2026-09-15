@@ -117,7 +117,6 @@ const FORBIDDEN_SAFE_MATH = [
                 new Set(STRIPPED_GLOBAL_NAMES).size, STRIPPED_GLOBAL_NAMES.length);
         });
     });
-
     describe('STRIPPED_PROTO_METHODS', function() {
         it('is a frozen array', function() {
             assert(Array.isArray(STRIPPED_PROTO_METHODS));
@@ -142,7 +141,9 @@ const FORBIDDEN_SAFE_MATH = [
             }
         });
     });
+});
 
+(sandbox ? describe : describe.skip)('sandbox: frozen consensus lists', function() {
     describe('NEUTERED_PROTO_CONSTRUCTORS', function() {
         it('is a frozen array', function() {
             assert(Array.isArray(NEUTERED_PROTO_CONSTRUCTORS));
@@ -162,7 +163,6 @@ const FORBIDDEN_SAFE_MATH = [
                 [...EXPECTED_NEUTERED_CTORS].sort());
         });
     });
-
     describe('SAFE_MATH_MEMBERS', function() {
         it('is a frozen array', function() {
             assert(Array.isArray(SAFE_MATH_MEMBERS));
@@ -196,19 +196,19 @@ const FORBIDDEN_SAFE_MATH = [
 // binding, so the Promise-gating branch logic is exercised directly. This kills
 // mutants on the `stripPromise` ternary and the `!== 'Promise'` filter.
 
-(sandbox ? describe : describe.skip)('sandbox: stripGlobals name selection', function() {
+function captureToDelete(opts) {
+    let captured = null;
+    const mockIsolate = {
+        compileScriptSync(src) { captured = src; return { runSync() {} }; }
+    };
+    stripGlobals(mockIsolate, {}, opts);
+    assert(captured, 'stripGlobals should have compiled a strip script');
+    const m = captured.match(/const toDelete = (\[[\s\S]*?\]);/);
+    assert(m, 'strip script should embed a toDelete array literal');
+    return JSON.parse(m[1]);
+}
 
-    function captureToDelete(opts) {
-        let captured = null;
-        const mockIsolate = {
-            compileScriptSync(src) { captured = src; return { runSync() {} }; }
-        };
-        stripGlobals(mockIsolate, {}, opts);
-        assert(captured, 'stripGlobals should have compiled a strip script');
-        const m = captured.match(/const toDelete = (\[[\s\S]*?\]);/);
-        assert(m, 'strip script should embed a toDelete array literal');
-        return JSON.parse(m[1]);
-    }
+(sandbox ? describe : describe.skip)('sandbox: stripGlobals name selection', function() {
 
     it('compiles and runs the strip script exactly once', function() {
         let compiled = 0, ran = 0;
@@ -246,6 +246,9 @@ const FORBIDDEN_SAFE_MATH = [
         assert(captureToDelete(undefined).includes('queueMicrotask'));
         assert(captureToDelete({ stripPromise: true }).includes('queueMicrotask'));
     });
+});
+
+(sandbox ? describe : describe.skip)('sandbox: stripGlobals name selection', function() {
 
     // WebAssembly is a second gated entry (flag-day Pkg 3): left in place
     // by default, stripped only when stripWasm is true, exactly like Promise.
@@ -284,22 +287,22 @@ const FORBIDDEN_SAFE_MATH = [
 //
 // Requires the native binding, so guarded on ivm availability (macOS skips).
 
+// Run `expr` inside a fresh, stripped isolate and return its value.
+function evalStripped(expr, opts) {
+    const mgr = new IsolateManager({ maxMemory: 8 });
+    const { isolate, context } = mgr.createIsolate();
+    try {
+        stripGlobals(isolate, context, opts);
+        return isolate.compileScriptSync(expr).runSync(context);
+    } finally {
+        mgr.dispose(isolate);
+    }
+}
+
 (sandbox && ivm && IsolateManager ? describe : describe.skip)(
     'sandbox: strip enforced inside a live isolate', function() {
 
     this.timeout(30000);
-
-    // Run `expr` inside a fresh, stripped isolate and return its value.
-    function evalStripped(expr, opts) {
-        const mgr = new IsolateManager({ maxMemory: 8 });
-        const { isolate, context } = mgr.createIsolate();
-        try {
-            stripGlobals(isolate, context, opts);
-            return isolate.compileScriptSync(expr).runSync(context);
-        } finally {
-            mgr.dispose(isolate);
-        }
-    }
 
     it('removes every ungated global in the strip list (Promise + WebAssembly are gated)', function() {
         const names = EXPECTED_GLOBAL_NAMES.filter((n) => n !== 'Promise' && n !== 'WebAssembly');
@@ -326,7 +329,6 @@ const FORBIDDEN_SAFE_MATH = [
         assert.strictEqual(evalStripped('typeof globalThis.Function'), 'undefined');
         assert.strictEqual(evalStripped('typeof globalThis.RegExp'), 'undefined');
     });
-
     it('neuters .constructor on every built-in prototype', function() {
         const out = evalStripped(
             '[({}).constructor, [].constructor, "".constructor, (0).constructor, (true).constructor]' +
@@ -349,6 +351,12 @@ const FORBIDDEN_SAFE_MATH = [
         assert.strictEqual(evalStripped('typeof "abc".localeCompare'), 'undefined');
         assert.strictEqual(evalStripped('typeof (5).toLocaleString'), 'undefined');
     });
+});
+
+(sandbox && ivm && IsolateManager ? describe : describe.skip)(
+    'sandbox: strip enforced inside a live isolate', function() {
+
+    this.timeout(30000);
 
     it('replaces Math with a frozen deterministic subset', function() {
         assert.strictEqual(evalStripped('Object.isFrozen(Math)'), true);
@@ -373,7 +381,6 @@ const FORBIDDEN_SAFE_MATH = [
             '(function(){try{ Object.create({}, {x:{value:1}}); return "allowed"; }' +
             'catch(e){ return "rejected"; }})()'), 'rejected');
     });
-
     it('removes console, process and require', function() {
         assert.strictEqual(evalStripped('typeof globalThis.console'), 'undefined');
         assert.strictEqual(evalStripped('typeof globalThis.process'), 'undefined');
