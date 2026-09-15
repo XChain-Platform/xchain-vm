@@ -15,29 +15,15 @@
  *
  * Each emit method validates basic parameter shape, charges gas,
  * and queues the action. Full validation happens in the indexer.
+ *
+ * The same-chain emits and the shared parameter checks live in
+ * gateway_emit/; this file keeps the cross-chain call, the id preimage
+ * builders and their golden vectors.
  ********************************************************************/
 // @ts-nocheck
 
-function validateRequired(params, fields) {
-    if (typeof params !== 'object' || params === null)
-        throw new Error('emit params must be an object');
-    for (const field of fields) {
-        if (params[field] === undefined || params[field] === null)
-            throw new Error('emit: missing required field: ' + field);
-    }
-}
-
-// Type validation for common emission fields.
-// Catches misuse early before reaching the indexer.
-function validateTypes(params, typeSpec) {
-    for (const [field, type] of Object.entries(typeSpec)) {
-        if (params[field] !== undefined && params[field] !== null) {
-            if (typeof params[field] !== type)
-                throw new Error('emit: field ' + field + ' must be a ' + type + ', got ' + typeof params[field]);
-        }
-    }
-}
-
+const { validateRequired } = require('./gateway_emit/param_validation.js');
+const { buildExecuteEmit, buildTokenEmits, buildAccountEmits, buildGovernanceEmits } = require('./gateway_emit/same_chain.js');
 const crypto = require('crypto');
 
 // Canonical form of the per-root discriminator that enters the ATTEST request_id
@@ -141,88 +127,32 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     const isGuard      = Boolean(ctx.isGuard);
 
     return {
-        // Cross-contract call (deferred). Queues an EXECUTE on another (or the
-        // same) contract, run by the indexer AFTER this method completes, inside
-        // the same atomicity scope. No return value; a callee that must respond
-        // calls back via its own emit.execute (callback pattern).
-        //
-        // Gas: charges VM_EMISSION + gasLimit NOW, out of THIS run's budget.
-        // The reservation is what the callee runs against (its gas ceiling), so
-        // total work per top-level EXECUTE can never exceed the caller's own
-        // ceiling regardless of call-tree shape. Unused reservation is refunded
-        // at the top-level fee settlement (indexer-side).
-        execute: (params) => {
-            validateRequired(params, ['contractIndex', 'method', 'gasLimit']);
-            // Depth gate first: a contract at the max depth gets a deterministic
-            // throw before any gas is reserved.
-            if (callDepth + 1 > maxCallDepth)
-                throw new Error('emit.execute: max call depth ' + maxCallDepth + ' reached');
+        ...buildExecuteEmit(gasTracker, emissionCollector, gasSchedule, callDepth, maxCallDepth, minCallGas),
+        ...buildCrossExecuteEmit(gasTracker, emissionCollector, gasSchedule, ctx, crossHops, isGuard),
+        ...buildTokenEmits(charge, emissionCollector),
+        ...buildAccountEmits(charge, emissionCollector),
+        ...buildGovernanceEmits(charge, emissionCollector)
+    };
+}
 
-            // contractIndex: positive integer (number or numeric string)
-            const idx = Number(params.contractIndex);
-            if (!Number.isInteger(idx) || idx <= 0 || idx > Number.MAX_SAFE_INTEGER)
-                throw new Error('emit.execute: contractIndex must be a positive integer');
-
-            // method: non-empty string, <= 64 bytes, no wire delimiter
-            const method = params.method;
-            if (typeof method !== 'string' || method.length === 0 || Buffer.byteLength(method, 'utf8') > 64)
-                throw new Error('emit.execute: method must be a non-empty string (max 64 bytes)');
-            if (method.indexOf('|') !== -1)
-                throw new Error('emit.execute: method must not contain "|"');
-
-            // params: optional array of delimiter-free strings. The indexer joins
-            // them with "|" into METHOD_PARAMS (the positional EXECUTE format), so
-            // an embedded "|" would shift the callee's argument arity.
-            const args = params.params === undefined || params.params === null ? [] : params.params;
-            if (!Array.isArray(args))
-                throw new Error('emit.execute: params must be an array of strings');
-            if (args.length > 32)
-                throw new Error('emit.execute: params exceeds 32 entries');
-            for (const a of args) {
-                if (typeof a !== 'string')
-                    throw new Error('emit.execute: params entries must be strings');
-                if (Buffer.byteLength(a, 'utf8') > 1024)
-                    throw new Error('emit.execute: params entry exceeds 1024 bytes');
-                if (a.indexOf('|') !== -1)
-                    throw new Error('emit.execute: params entries must not contain "|"');
-            }
-
-            // gasLimit: integer reservation, bounded below by the protocol minimum
-            // (bounds tree fan-out) and above by THIS run's remaining gas, so the
-            // explicit error fires before the reservation could trip the ceiling.
-            const gasLimit = params.gasLimit;
-            if (!Number.isInteger(gasLimit) || gasLimit < minCallGas)
-                throw new Error('emit.execute: gasLimit must be an integer >= ' + minCallGas);
-            const remaining = gasTracker.ceiling - gasTracker.used;
-            if (gasLimit + gasSchedule.VM_EMISSION > remaining)
-                throw new Error('emit.execute: gasLimit ' + gasLimit + ' exceeds remaining gas ' + remaining);
-
-            // Reserve: emission cost + the callee's entire budget, charged here.
-            gasTracker.charge(gasSchedule.VM_EMISSION + gasLimit);
-            emissionCollector.add('EXECUTE', {
-                contractIndex: idx,
-                method:        method,
-                params:        args,
-                gasLimit:      gasLimit
-            });
-        },
-
-        // Cross-CHAIN contract call (deferred, slow). Queues an XCALL request
-        // that the validator federation relays to the target chain after this
-        // chain's confirmation depth (design async; typically minutes to tens of
-        // minutes). The outcome ALWAYS arrives via callbackMethod(call_id,
-        // target_chain, status, return_payload, ...callbackParams); if no
-        // result lands before deadlineBlocks, a deterministic 'expired'
-        // callback fires instead. The target method must be in the target
-        // contract's exported `crossCallable` allowlist. No value moves.
-        //
-        // Gas: pre-pays VM_EMISSION + the request bucket + the remote ceiling
-        // (gasLimit) + the fixed callback bucket, all charged NOW out of this
-        // run's budget. The remote side runs fee-less against gasLimit; there
-        // is NO refund of unused remote gas in v1 (over-provisioning is the
-        // caller's cost).
-        //
-        // Returns the deterministic call_id.
+// Cross-CHAIN contract call (deferred, slow). Queues an XCALL request
+// that the validator federation relays to the target chain after this
+// chain's confirmation depth (design async; typically minutes to tens of
+// minutes). The outcome ALWAYS arrives via callbackMethod(call_id,
+// target_chain, status, return_payload, ...callbackParams); if no
+// result lands before deadlineBlocks, a deterministic 'expired'
+// callback fires instead. The target method must be in the target
+// contract's exported `crossCallable` allowlist. No value moves.
+//
+// Gas: pre-pays VM_EMISSION + the request bucket + the remote ceiling
+// (gasLimit) + the fixed callback bucket, all charged NOW out of this
+// run's budget. The remote side runs fee-less against gasLimit; there
+// is NO refund of unused remote gas in v1 (over-provisioning is the
+// caller's cost).
+//
+// Returns the deterministic call_id.
+function buildCrossExecuteEmit(gasTracker, emissionCollector, gasSchedule, ctx, crossHops, isGuard) {
+    return {
         crossExecute: (params) => {
             if (isGuard)
                 throw new Error('emit.crossExecute: not available to a controller guard');
@@ -243,86 +173,10 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
             if (targetChain === sourceChain)
                 throw new Error('emit.crossExecute: targetChain must differ from this chain (use emit.execute for same-chain calls)');
 
-            const idx = Number(params.contractIndex);
-            if (!Number.isInteger(idx) || idx <= 0 || idx > Number.MAX_SAFE_INTEGER)
-                throw new Error('emit.crossExecute: contractIndex must be a positive integer');
-
-            const method = params.method;
-            if (typeof method !== 'string' || method.length === 0 || Buffer.byteLength(method, 'utf8') > 64)
-                throw new Error('emit.crossExecute: method must be a non-empty string (max 64 bytes)');
-            if (method.indexOf('|') !== -1)
-                throw new Error('emit.crossExecute: method must not contain "|"');
-
-            const args = params.params === undefined || params.params === null ? [] : params.params;
-            if (!Array.isArray(args) || args.length > 32)
-                throw new Error('emit.crossExecute: params must be an array of <= 32 strings');
-            for (const a of args) {
-                if (typeof a !== 'string' || Buffer.byteLength(a, 'utf8') > 1024)
-                    throw new Error('emit.crossExecute: params entries must be strings (max 1024 bytes)');
-                if (a.indexOf('|') !== -1)
-                    throw new Error('emit.crossExecute: params entries must not contain "|"');
-            }
-
-            const callbackMethod = params.callbackMethod;
-            if (typeof callbackMethod !== 'string' || callbackMethod.length === 0 || Buffer.byteLength(callbackMethod, 'utf8') > 64)
-                throw new Error('emit.crossExecute: callbackMethod must be a non-empty string (max 64 bytes)');
-            if (callbackMethod.indexOf('|') !== -1)
-                throw new Error('emit.crossExecute: callbackMethod must not contain "|"');
-
-            const cbParams = params.callbackParams === undefined || params.callbackParams === null ? [] : params.callbackParams;
-            if (!Array.isArray(cbParams))
-                throw new Error('emit.crossExecute: callbackParams must be an array');
-            let cbJson;
-            try { cbJson = JSON.stringify(cbParams.map(String)); }
-            catch (e) { throw new Error('emit.crossExecute: callbackParams must be JSON-serializable'); }
-            if (Buffer.byteLength(cbJson, 'utf8') > 1024)
-                throw new Error('emit.crossExecute: callbackParams JSON exceeds 1024 bytes');
-
-            const deadlineBlocks = params.deadlineBlocks !== undefined ? Number(params.deadlineBlocks) : XCALL_DEFAULT_DEADLINE;
-            if (!Number.isInteger(deadlineBlocks) || deadlineBlocks < XCALL_MIN_DEADLINE_BLOCKS || deadlineBlocks > XCALL_MAX_DEADLINE_BLOCKS)
-                throw new Error('emit.crossExecute: deadlineBlocks must be an integer in [' +
-                    XCALL_MIN_DEADLINE_BLOCKS + ', ' + XCALL_MAX_DEADLINE_BLOCKS + ']');
-
-            // gasLimit bounds: the remote run is fee-less on its chain, so the
-            // cap is much tighter than the same-chain 1M ceiling.
-            const gasLimit = params.gasLimit;
-            if (!Number.isInteger(gasLimit) || gasLimit < XCALL_MIN_GAS || gasLimit > XCALL_MAX_GAS)
-                throw new Error('emit.crossExecute: gasLimit must be an integer in [' + XCALL_MIN_GAS + ', ' + XCALL_MAX_GAS + ']');
-
-            const totalCharge = gasSchedule.VM_EMISSION + gasSchedule.VM_XCALL_REQUEST + gasLimit + gasSchedule.VM_XCALL_CALLBACK;
-            const remaining = gasTracker.ceiling - gasTracker.used;
-            if (totalCharge > remaining)
-                throw new Error('emit.crossExecute: total charge ' + totalCharge + ' exceeds remaining gas ' + remaining);
-
-            // Deterministic call_id, derived BEFORE pushing the emission so it
-            // reflects the current emission index. Network + source chain are
-            // bound into the preimage (unlike the attestation request_id)
-            // because BTC-family chains share tx-hash space; a call must never
-            // collide or replay across chains/networks. The target chain is
-            // bound so the same logical call to two chains never collides.
-            // MUST byte-match the indexer's re-derivation in
-            // xchain-indexer/src/actions/xcall/index.js (parseRequest, EMITTER_PATH).
-            // The emitting EXECUTE's action_index is deliberately NOT in the preimage:
-            // it shifts with the indexer's synthetic-action injection timing, so it is
-            // non-deterministic across nodes / reorgs. The call-path replaces it as the
-            // disambiguator. (tx_hash, contract_index, emission_index) alone are NOT
-            // unique because emission_index is per-execution; two nested runs of the
-            // SAME contract each emitting their first call would collide. The call-path
-            // uniquely names this execution in the call tree and is content-derived.
-            // Assembled by the canonical builder above (raw ctx values in, folds
-            // applied there once) so the formula is not restated at this site.
-            const emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
-            const preimage = buildCallIdPreimage({
-                network:         ctx.network,
-                sourceChain:     sourceChain,
-                txHash:          ctx.txHash,
-                rootActionIndex: ctx.rootActionIndex,
-                contractIndex:   ctx.contractIndex,
-                callPath:        ctx.callPath,
-                emissionIndex:   emissionIndex,
-                targetChain:     targetChain
-            });
-            const callId = crypto.createHash('sha256').update(preimage).digest('hex');
+            const { idx, method, args } = validateXcallCallee(params);
+            const { callbackMethod, cbParams } = validateXcallCallback(params);
+            const { deadlineBlocks, gasLimit, totalCharge } = validateXcallBudget(params, gasTracker, gasSchedule);
+            const callId = deriveXcallCallId(ctx, sourceChain, targetChain, emissionCollector);
 
             gasTracker.charge(totalCharge);
             emissionCollector.add('XCALL', {
@@ -339,118 +193,109 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
                 // deliberately NOT taken from the VM.
             });
             return callId;
-        },
-        send: (params) => {
-            charge();
-            validateRequired(params, ['destination', 'tick', 'quantity']);
-            validateTypes(params, { destination: 'string', tick: 'string', quantity: 'string' });
-            emissionCollector.add('SEND', params);
-        },
-        destroy: (params) => {
-            charge();
-            validateRequired(params, ['tick', 'quantity']);
-            validateTypes(params, { tick: 'string', quantity: 'string' });
-            emissionCollector.add('DESTROY', params);
-        },
-        issue: (params) => {
-            charge();
-            validateRequired(params, ['tick']);
-            validateTypes(params, { tick: 'string' });
-            emissionCollector.add('ISSUE', params);
-        },
-        mint: (params) => {
-            charge();
-            validateRequired(params, ['tick', 'quantity']);
-            validateTypes(params, { tick: 'string', quantity: 'string' });
-            emissionCollector.add('MINT', params);
-        },
-        order: (params) => {
-            charge();
-            validateRequired(params, ['giveAmount', 'getAmount']);
-            validateTypes(params, { giveAmount: 'string', getAmount: 'string' });
-            emissionCollector.add('ORDER', params);
-        },
-        dispenser: (params) => {
-            charge();
-            if (typeof params !== 'object' || params === null) params = {};
-            emissionCollector.add('DISPENSER', params);
-        },
-        dividend: (params) => {
-            charge();
-            validateRequired(params, ['tick', 'dividendTick', 'quantity']);
-            validateTypes(params, { tick: 'string', dividendTick: 'string', quantity: 'string' });
-            emissionCollector.add('DIVIDEND', params);
-        },
-        airdrop: (params) => {
-            charge();
-            validateRequired(params, ['tick', 'quantity', 'listActionIndex']);
-            validateTypes(params, { tick: 'string', quantity: 'string' });
-            emissionCollector.add('AIRDROP', params);
-        },
-        callback: (params) => {
-            charge();
-            validateRequired(params, ['tick']);
-            validateTypes(params, { tick: 'string' });
-            emissionCollector.add('CALLBACK', params);
-        },
-        file: (params) => {
-            charge();
-            if (typeof params !== 'object' || params === null) params = {};
-            emissionCollector.add('FILE', params);
-        },
-        list: (params) => {
-            charge();
-            if (typeof params !== 'object' || params === null) params = {};
-            emissionCollector.add('LIST', params);
-        },
-        coinpay: (params) => {
-            charge();
-            validateRequired(params, ['orderMatchActionIndex']);
-            emissionCollector.add('COINPAY', params);
-        },
-        sweep: (params) => {
-            charge();
-            validateRequired(params, ['destination']);
-            validateTypes(params, { destination: 'string' });
-            emissionCollector.add('SWEEP', params);
-        },
-        link: (params) => {
-            charge();
-            validateRequired(params, ['coin1', 'coin1ActionIndex', 'coin2', 'coin2ActionIndex']);
-            validateTypes(params, { coin1: 'string', coin2: 'string' });
-            emissionCollector.add('LINK', params);
-        },
-        broadcast: (params) => {
-            charge();
-            if (typeof params !== 'object' || params === null) params = {};
-            emissionCollector.add('BROADCAST', params);
-        },
-        message: (params) => {
-            charge();
-            validateRequired(params, ['destination']);
-            validateTypes(params, { destination: 'string' });
-            emissionCollector.add('MESSAGE', params);
-        },
-        // Governance: a contract acts as its own poll actor. version 0 = create a
-        // poll, version 1 = cast a ballot; v2 (finalize) and v3 (delegation) are not
-        // contract-emittable (Section 16). The contract is the SOURCE, so hold-to-
-        // create / hold-to-vote and any deposit/gas_escrow apply to its own balance.
-        vote: (params) => {
-            charge();
-            if (typeof params !== 'object' || params === null) params = {};
-            let version = Number(params.version);
-            if (version === 1) {
-                validateRequired(params, ['pollRef', 'ballot']);
-                validateTypes(params, { ballot: 'string' });
-            } else if (version === 0) {
-                validateRequired(params, ['tick', 'endBlock', 'options']);
-                validateTypes(params, { tick: 'string', options: 'string' });
-            } else {
-                throw new Error('emit.vote: version must be 0 (create) or 1 (ballot)');
-            }
-            emissionCollector.add('VOTE', params);
         }
     };
+}
+
+// Callee checks for emit.crossExecute, in the order they throw: the target
+// contract index, the method name, then the delimiter-free string params.
+function validateXcallCallee(params) {
+    const idx = Number(params.contractIndex);
+    if (!Number.isInteger(idx) || idx <= 0 || idx > Number.MAX_SAFE_INTEGER)
+        throw new Error('emit.crossExecute: contractIndex must be a positive integer');
+
+    const method = params.method;
+    if (typeof method !== 'string' || method.length === 0 || Buffer.byteLength(method, 'utf8') > 64)
+        throw new Error('emit.crossExecute: method must be a non-empty string (max 64 bytes)');
+    if (method.indexOf('|') !== -1)
+        throw new Error('emit.crossExecute: method must not contain "|"');
+
+    const args = params.params === undefined || params.params === null ? [] : params.params;
+    if (!Array.isArray(args) || args.length > 32)
+        throw new Error('emit.crossExecute: params must be an array of <= 32 strings');
+    for (const a of args) {
+        if (typeof a !== 'string' || Buffer.byteLength(a, 'utf8') > 1024)
+            throw new Error('emit.crossExecute: params entries must be strings (max 1024 bytes)');
+        if (a.indexOf('|') !== -1)
+            throw new Error('emit.crossExecute: params entries must not contain "|"');
+    }
+    return { idx, method, args };
+}
+
+// Callback checks for emit.crossExecute: a bounded, delimiter-free method
+// name and a parameter array whose stringified JSON fits in 1024 bytes.
+function validateXcallCallback(params) {
+    const callbackMethod = params.callbackMethod;
+    if (typeof callbackMethod !== 'string' || callbackMethod.length === 0 || Buffer.byteLength(callbackMethod, 'utf8') > 64)
+        throw new Error('emit.crossExecute: callbackMethod must be a non-empty string (max 64 bytes)');
+    if (callbackMethod.indexOf('|') !== -1)
+        throw new Error('emit.crossExecute: callbackMethod must not contain "|"');
+
+    const cbParams = params.callbackParams === undefined || params.callbackParams === null ? [] : params.callbackParams;
+    if (!Array.isArray(cbParams))
+        throw new Error('emit.crossExecute: callbackParams must be an array');
+    let cbJson;
+    try { cbJson = JSON.stringify(cbParams.map(String)); }
+    catch (e) { throw new Error('emit.crossExecute: callbackParams must be JSON-serializable'); }
+    if (Buffer.byteLength(cbJson, 'utf8') > 1024)
+        throw new Error('emit.crossExecute: callbackParams JSON exceeds 1024 bytes');
+    return { callbackMethod, cbParams };
+}
+
+// Deadline window, remote gas ceiling and the total pre-paid charge for
+// emit.crossExecute, which must fit in THIS run's remaining gas.
+function validateXcallBudget(params, gasTracker, gasSchedule) {
+    const deadlineBlocks = params.deadlineBlocks !== undefined ? Number(params.deadlineBlocks) : XCALL_DEFAULT_DEADLINE;
+    if (!Number.isInteger(deadlineBlocks) || deadlineBlocks < XCALL_MIN_DEADLINE_BLOCKS || deadlineBlocks > XCALL_MAX_DEADLINE_BLOCKS)
+        throw new Error('emit.crossExecute: deadlineBlocks must be an integer in [' +
+            XCALL_MIN_DEADLINE_BLOCKS + ', ' + XCALL_MAX_DEADLINE_BLOCKS + ']');
+
+    // gasLimit bounds: the remote run is fee-less on its chain, so the
+    // cap is much tighter than the same-chain 1M ceiling.
+    const gasLimit = params.gasLimit;
+    if (!Number.isInteger(gasLimit) || gasLimit < XCALL_MIN_GAS || gasLimit > XCALL_MAX_GAS)
+        throw new Error('emit.crossExecute: gasLimit must be an integer in [' + XCALL_MIN_GAS + ', ' + XCALL_MAX_GAS + ']');
+
+    const totalCharge = gasSchedule.VM_EMISSION + gasSchedule.VM_XCALL_REQUEST + gasLimit + gasSchedule.VM_XCALL_CALLBACK;
+    const remaining = gasTracker.ceiling - gasTracker.used;
+    if (totalCharge > remaining)
+        throw new Error('emit.crossExecute: total charge ' + totalCharge + ' exceeds remaining gas ' + remaining);
+    return { deadlineBlocks, gasLimit, totalCharge };
+}
+
+// The deterministic call_id for one emit.crossExecute, read at the current
+// emission index.
+function deriveXcallCallId(ctx, sourceChain, targetChain, emissionCollector) {
+    // Deterministic call_id, derived BEFORE pushing the emission so it
+    // reflects the current emission index. Network + source chain are
+    // bound into the preimage (unlike the attestation request_id)
+    // because BTC-family chains share tx-hash space; a call must never
+    // collide or replay across chains/networks. The target chain is
+    // bound so the same logical call to two chains never collides.
+    // MUST byte-match the indexer's re-derivation in
+    // xchain-indexer/src/actions/xcall/index.js (parseRequest, EMITTER_PATH).
+    // The emitting EXECUTE's action_index is deliberately NOT in the preimage:
+    // it shifts with the indexer's synthetic-action injection timing, so it is
+    // non-deterministic across nodes / reorgs. The call-path replaces it as the
+    // disambiguator. (tx_hash, contract_index, emission_index) alone are NOT
+    // unique because emission_index is per-execution; two nested runs of the
+    // SAME contract each emitting their first call would collide. The call-path
+    // uniquely names this execution in the call tree and is content-derived.
+    // Assembled by the canonical builder above (raw ctx values in, folds
+    // applied there once) so the formula is not restated at this site.
+    const emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
+    const preimage = buildCallIdPreimage({
+        network:         ctx.network,
+        sourceChain:     sourceChain,
+        txHash:          ctx.txHash,
+        rootActionIndex: ctx.rootActionIndex,
+        contractIndex:   ctx.contractIndex,
+        callPath:        ctx.callPath,
+        emissionIndex:   emissionIndex,
+        targetChain:     targetChain
+    });
+    const callId = crypto.createHash('sha256').update(preimage).digest('hex');
+    return callId;
 }
 
 // Checked-in golden vectors for the ATTEST request_id and XCALL call_id preimage
