@@ -78,7 +78,7 @@
     "test:chaos:phase3": "mocha --timeout 60000 'test/preflight.test.js' 'test/chaos/phase3/**/*.test.js'",
     "mutation": "stryker run test/mutation/stryker.config.json",
     "mutation:critical": "stryker run test/mutation/stryker.config.json --mutate 'src/gas.js,src/sandbox.js,src/metering.js,src/index.js'",
-    "mutation:high": "stryker run test/mutation/stryker.config.json --mutate 'src/gateway.js,src/gateway_emit.js,src/state.js,src/math.js'",
+    "mutation:high": "stryker run test/mutation/stryker.config.json --mutate 'src/gateway.js,src/gateway_emit.js,src/state.js,src/math.js,src/gateway/*.js,src/gateway_emit/*.js'",
     "mutation:medium": "stryker run test/mutation/stryker.config.json --mutate 'src/collector.js,src/validator.js,src/syntax.js'",
     "mutation:quick": "stryker run test/mutation/stryker.config.json --mutate 'src/gas.js,src/collector.js,src/errors.js,src/validator.js' --concurrency 2",
     "mutation:custom": "node test/mutation/support/stryker-xchain-vm-mutator/index.js",
