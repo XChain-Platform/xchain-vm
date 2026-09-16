@@ -1696,7 +1696,8 @@ function pkg3CoinFromAddress(contractAddress) {
 // (legacy, byte-identical below).
 //
 // Resolve on the network actually passed, not a hardcoded ':mainnet'. The indexer's
-// deploy-half twin (xchain-indexer/src/vm_deploy_lint_pkg3_activation.js) keys on
+// deploy-half twin (registry row `vm_deploy_lint_pkg3_activation.VM_DEPLOY_LINT_PKG3_ACTIVATION`
+// in xchain-indexer/src/protocol_changes/gates_3.js) keys on
 // '<COIN>:<network>' and resolves an unrecognized network to OFF, and the two halves
 // are documented as one gate that must never open a window where a wasm-referencing
 // contract deploys clean but has WebAssembly stripped from under it at execution.
@@ -1746,9 +1747,9 @@ function isPkg3SandboxActive(network, coin, blockHeight) {
 // mainnet carries 0 contracts, 0 DEPLOY and 0 EXECUTE actions (measured 2026-09-09), so
 // there is no stored source for the re-lint to reject and no execution whose gas the lint
 // charge could move. A from-genesis OLD-vs-ON replay witness per chain is the proof. The
-// height lives here AND in the xchain-indexer twin
-// (xchain-indexer/src/vm_exec_lint_activation.js), which the consensus-params suites in
-// both repos pin to equality. Arming one side alone forks.
+// height lives here AND in the xchain-indexer twin (registry row
+// `vm_exec_lint_activation.VM_EXEC_LINT_ACTIVATION` in xchain-indexer/src/protocol_changes/gates_3.js),
+// which the consensus-params suites in both repos pin to equality. Arming one side alone forks.
 const EXEC_LINT_ACTIVATION = Object.freeze({
     'BTC:mainnet':  0,   // ARMED at genesis by the 2026-09-09 ruling: identity on the indexed mainnet history (0 contracts, 0 DEPLOY, 0 EXECUTE, measured 2026-09-09)
     'LTC:mainnet':  0,
@@ -1788,8 +1789,9 @@ const EXEC_LINT_ACTIVATION = Object.freeze({
 // height. This one qualifies: mainnet carries 0 contracts and 0 DEPLOY actions (measured
 // 2026-09-09), so there is no accepted deploy verdict the widened rules could
 // retroactively reverse. A from-genesis OLD-vs-ON replay witness per chain is the proof.
-// The height lives here AND in the xchain-indexer twin
-// (xchain-indexer/src/vm_lint_global_alias_activation.js), which the consensus-params
+// The height lives here AND in the xchain-indexer twin (registry row
+// `vm_lint_global_alias_activation.VM_LINT_GLOBAL_ALIAS_ACTIVATION` in
+// xchain-indexer/src/protocol_changes/gates_3.js), which the consensus-params
 // suites in both repos pin to equality. Arming one side alone forks.
 const LINT_GLOBAL_ALIAS_ACTIVATION = Object.freeze({
     'BTC:mainnet':  0,   // ARMED at genesis by the 2026-09-09 ruling: identity on the indexed mainnet history (0 contracts, 0 DEPLOY, measured 2026-09-09)
@@ -1825,8 +1827,9 @@ const EXEC_LINT_GAS_BYTES_PER_UNIT = 256;
 // unrecognized network, an unresolvable coin, a non-finite height, or an UNARMED
 // (null) per-coin entry all resolve to inactive (legacy, byte-identical below).
 //
-// Keyed on the network actually passed, matching the indexer twin
-// (xchain-indexer/src/vm_exec_lint_activation.js) and isPkg3SandboxActive above.
+// Keyed on the network actually passed, matching the indexer twin (registry row
+// `vm_exec_lint_activation.VM_EXEC_LINT_ACTIVATION` in xchain-indexer/src/protocol_changes/gates_3.js)
+// and isPkg3SandboxActive above.
 function isExecLintActive(network, coin, blockHeight) {
     if (network === 'testnet' || network === 'regtest') return true;
     const b = Number(blockHeight);
@@ -3060,7 +3063,8 @@ module.exports.isExecLintActive = isExecLintActive;
 module.exports.EXEC_LINT_GAS_BYTES_PER_UNIT = EXEC_LINT_GAS_BYTES_PER_UNIT;
 // Lint global-alias refinement (sloppy-mode `this` + the globalThis self-reference chain
 // counted as global reads by banned-async / banned-wasm): the per-coin activation-height
-// map and its resolver. Twinned with xchain-indexer/src/vm_lint_global_alias_activation.js
+// map and its resolver. Twinned with the xchain-indexer registry row
+// `vm_lint_global_alias_activation.VM_LINT_GLOBAL_ALIAS_ACTIVATION` (src/protocol_changes/gates_3.js)
 // and pinned to equality by the consensus-params guards in both repos; arming one side
 // alone forks the deploy verdict.
 module.exports.LINT_GLOBAL_ALIAS_ACTIVATION = LINT_GLOBAL_ALIAS_ACTIVATION;

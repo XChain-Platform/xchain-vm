@@ -49,8 +49,9 @@
  * the MAX armed per-coin activation height across the VM's exported height-gate
  * maps, so `network: 'mainnet'` runs the Package-3 sandbox the live chain runs
  * rather than the pre-activation rule set a literal `1` selected. Layer 2 for
- * that number is the indexer's deploy-half twin
- * (src/vm_deploy_lint_pkg3_activation.js), which must carry identical heights or
+ * that number is the indexer's deploy-half twin (registry row
+ * `vm_deploy_lint_pkg3_activation.VM_DEPLOY_LINT_PKG3_ACTIVATION` in
+ * src/protocol_changes/gates_3.js), which must carry identical heights or
  * the deploy verdict forks from the runtime strip.
  *
  * SCOPE, stated so nobody reads this guard as broader than it is: it covers the
@@ -314,13 +315,17 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
         // cross-repo authority like the coin gas schedules above. The indexer's
         // deploy half must agree with the VM's runtime half or a contract deploys
         // clean on one side and has the sandbox applied under it on the other.
-        const rel  = path.join('xchain-indexer', 'src', 'vm_deploy_lint_pkg3_activation.js');
+        // The deploy half is a registry row (src/protocol_changes/gates_3.js), read
+        // through the indexer's registry entry by its literal key; the former
+        // predicate module was retired in W4.
+        const rel  = path.join('xchain-indexer', 'src', 'consensus', 'gate_registry.js');
+        const key  = 'vm_deploy_lint_pkg3_activation.VM_DEPLOY_LINT_PKG3_ACTIVATION';
         const file = path.join(PLATFORM_ROOT, rel);
         if (!siblingOrSkip(this, file, rel)) return;
 
-        const twin = loadFresh(file).VM_DEPLOY_LINT_PKG3_ACTIVATION;
+        const twin = loadFresh(file).get(key);
         assert.ok(twin && typeof twin === 'object',
-            rel + ' no longer exports VM_DEPLOY_LINT_PKG3_ACTIVATION; re-point this guard');
+            rel + ' no longer carries ' + key + '; re-point this guard');
 
         // SUBSET equality over the coin/network keys, deliberately: the indexer twin
         // additionally carries bare `testnet`/`regtest` genesis keys the VM expresses

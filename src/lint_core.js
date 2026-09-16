@@ -1135,8 +1135,9 @@ function analyzeContract(code) {
  *        banned-wasm and banned-math. Its OWN activation epoch, not VM_LINT_HARDENING's: that gate
  *        is already open on every network, so riding it would retroactively reject
  *        contracts already accepted. Resolved per-coin on block HEIGHT (xchain-vm
- *        LINT_GLOBAL_ALIAS_ACTIVATION / xchain-indexer
- *        vm_lint_global_alias_activation.js). Defaults to true for author-facing
+ *        LINT_GLOBAL_ALIAS_ACTIVATION / the xchain-indexer registry row
+ *        vm_lint_global_alias_activation.VM_LINT_GLOBAL_ALIAS_ACTIVATION in
+ *        src/protocol_changes/gates_3.js). Defaults to true for author-facing
  *        callers (SDK linter, CLI, unit tests).
  * @returns {{ errors: Array<{rule,message,line,severity}>, warnings: Array<{rule,message,line,severity}> }}
  */

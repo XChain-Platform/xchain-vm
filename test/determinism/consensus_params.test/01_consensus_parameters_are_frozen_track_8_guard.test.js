@@ -25,6 +25,34 @@ const vm = require('../../../src/index.js');
 const lintCore = require('../../../src/lint_core.js');
 const metering = require('../../../src/metering.js');
 
+// The indexer's protocol-change sources as [file, text] pairs: the registry entry
+// src/protocol_changes.js plus every part file under src/protocol_changes/, where the W3
+// split put the rows (CONTROLLER_GUARD at changes_1.js:272, REST_PATTERN_METER at
+// changes_2.js:273). Null when the sibling checkout is absent (standalone clone).
+function indexerProtocolChangeSources() {
+    const path = require('path'), fs = require('fs');
+    const entry = path.resolve(__dirname, '../../../../xchain-indexer/src/protocol_changes.js');
+    if (!fs.existsSync(entry)) return null;
+    const dir = entry.replace(/\.js$/, '');
+    const parts = fs.existsSync(dir)
+        ? fs.readdirSync(dir).filter((f) => f.endsWith('.js')).sort().map((f) => path.join(dir, f))
+        : [];
+    return [entry, ...parts].map((file) => [file, fs.readFileSync(file, 'utf8')]);
+}
+
+// Every mainnet flag-day literal declared for `name` as [file, value], in either row shape
+// the indexer has used: addChange('NAME', 'version', <time>, ...) or the part-file row
+// ['NAME', 'version', <time>, ...] applyChanges feeds to it. The version tier is a
+// wildcard: it belongs to the indexer's platform version stream.
+function indexerFlagDayLiterals(sources, name) {
+    const row = new RegExp("(?:addChange\\(|\\[)\\s*'" + name + "'\\s*,\\s*'[^']+'\\s*,\\s*(\\d+)", 'g');
+    const found = [];
+    for (const [file, src] of sources) {
+        for (const m of src.matchAll(row)) found.push([file, Number(m[1])]);
+    }
+    return found;
+}
+
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('BINARY_ALLOC_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
@@ -116,16 +144,16 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // rejection on it (deploy/index.js enforceBannedRest). A repin that edits one and misses
         // the other passes BOTH CIs and forks the fleet at activation. Same construction as
         // the six-gate CONTROLLER_GUARD guard below; skips only when the sibling repo is
-        // not checked out (standalone clone), where the hard pin above still holds.
-        const path = require('path'), fs = require('fs');
-        const indexerFile = path.resolve(__dirname, '../../../../xchain-indexer/src/protocol_changes.js');
-        if (!fs.existsSync(indexerFile)) this.skip();
-        const src = fs.readFileSync(indexerFile, 'utf8');
-        const all = [...src.matchAll(/addChange\(\s*'REST_PATTERN_METER'\s*,\s*'[^']+'\s*,\s*(\d+)/g)];
+        // not checked out (standalone clone), where the hard pin above still holds. The row
+        // is read from the registry part files (src/protocol_changes/changes_2.js:273).
+        const sources = indexerProtocolChangeSources();
+        if (!sources) this.skip();
+        const all = indexerFlagDayLiterals(sources, 'REST_PATTERN_METER');
         assert.strictEqual(all.length, 1,
-            "expected exactly one REST_PATTERN_METER addChange in the indexer's protocol_changes.js, found " + all.length);
-        assert.strictEqual(vm.REST_PATTERN_METER_GATE_BLOCK_TIME, Number(all[0][1]),
-            'REST_PATTERN_METER diverged between xchain-vm and xchain-indexer: a repin must move both in lockstep');
+            "expected exactly one REST_PATTERN_METER row across the indexer's src/protocol_changes.js and src/protocol_changes/*.js, found "
+            + all.length + (all.length ? ' (' + all.map(([f]) => f).join(', ') + ')' : ''));
+        assert.strictEqual(vm.REST_PATTERN_METER_GATE_BLOCK_TIME, all[0][1],
+            'REST_PATTERN_METER diverged between xchain-vm and xchain-indexer (' + all[0][0] + '): a repin must move both in lockstep');
     });
 });
 
@@ -193,8 +221,9 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // one is: mainnet carries 0 contracts, 0 DEPLOY and 0 EXECUTE actions (measured
         // 2026-09-09), so height 0 rejects nothing and moves no gas. This assertion is
         // what makes a DISARMING or a divergent height visible: moving it is a
-        // deliberate, reviewed edit that must move the xchain-indexer twin
-        // (src/vm_exec_lint_activation.js) in the SAME change.
+        // deliberate, reviewed edit that must move the xchain-indexer twin (registry row
+        // `vm_exec_lint_activation.VM_EXEC_LINT_ACTIVATION` in src/protocol_changes/gates_3.js)
+        // in the SAME change.
         assert.strictEqual(vm.EXEC_LINT_ACTIVATION['BTC:mainnet'], 0);
         assert.strictEqual(vm.EXEC_LINT_ACTIVATION['LTC:mainnet'], 0);
         assert.strictEqual(vm.EXEC_LINT_ACTIVATION['DOGE:mainnet'], 0);
@@ -230,8 +259,9 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // Mainnet arms at genesis by the 2026-09-09 ruling: the indexed mainnet history
         // carries 0 contracts and 0 DEPLOY actions (measured 2026-09-09), so there is no
         // accepted deploy verdict the widened rules can reverse. Moving this height is a
-        // deliberate, reviewed edit that must move the xchain-indexer twin
-        // (src/vm_lint_global_alias_activation.js) in the SAME change; that repo's suite
+        // deliberate, reviewed edit that must move the xchain-indexer twin (registry row
+        // `vm_lint_global_alias_activation.VM_LINT_GLOBAL_ALIAS_ACTIVATION` in
+        // src/protocol_changes/gates_3.js) in the SAME change; that repo's suite
         // pins the pair to equality.
         assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['BTC:mainnet'], 0);
         assert.strictEqual(vm.LINT_GLOBAL_ALIAS_ACTIVATION['LTC:mainnet'], 0);
@@ -308,22 +338,19 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // indexer's own suite freezes its value, but nothing tied the two files
         // together: a coordinated repin that edits the indexer literal and misses
         // one VM constant passes BOTH CIs and forks the fleet at activation.
-        // Read the indexer source directly (monorepo
-        // sibling checkout) and assert every VM gate equals the CONTROLLER_GUARD
-        // activation time. Skips only when the sibling repo is not checked out
-        // (standalone clone); the hard value pins above still guard that case.
-        const path = require('path'), fs = require('fs');
-        const indexerFile = path.resolve(__dirname, '../../../../xchain-indexer/src/protocol_changes.js');
-        if (!fs.existsSync(indexerFile)) this.skip();
-        const src = fs.readFileSync(indexerFile, 'utf8');
-        // The CONSENSUS_VERSION tier is matched as a wildcard because its label
-        // belongs to the indexer's platform version stream. This guard couples the
-        // repos through the flag-day timestamp, independent of a tier-only rename.
-        const all = [...src.matchAll(/addChange\(\s*'CONTROLLER_GUARD'\s*,\s*'[^']+'\s*,\s*(\d+)/g)];
+        // Read the indexer source directly (monorepo sibling checkout: the registry
+        // entry plus its part files, the row is src/protocol_changes/changes_1.js:272)
+        // and assert every VM gate equals the CONTROLLER_GUARD activation time. Skips
+        // only when the sibling repo is not checked out (standalone clone); the hard
+        // value pins above still guard that case. This guard couples the repos through
+        // the flag-day timestamp, independent of a tier-only rename.
+        const sources = indexerProtocolChangeSources();
+        if (!sources) this.skip();
+        const all = indexerFlagDayLiterals(sources, 'CONTROLLER_GUARD');
         assert.strictEqual(all.length, 1,
-            "expected exactly one CONTROLLER_GUARD addChange in the indexer's protocol_changes.js, found " + all.length);
-        const m = all[0];
-        const indexerFlagDay = Number(m[1]);
+            "expected exactly one CONTROLLER_GUARD row across the indexer's src/protocol_changes.js and src/protocol_changes/*.js, found "
+            + all.length + (all.length ? ' (' + all.map(([f]) => f).join(', ') + ')' : ''));
+        const indexerFlagDay = all[0][1];
         const gates = [
             'ASYNC_SURFACE_GATE_BLOCK_TIME', 'BINARY_ALLOC_GATE_BLOCK_TIME',
             'CALL_SPREAD_METER_GATE_BLOCK_TIME', 'STATE_KEY_NUL_GATE_BLOCK_TIME',
