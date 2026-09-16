@@ -25,7 +25,6 @@
 
 const crypto = require('crypto');
 const ivm    = require('isolated-vm');
-const fs     = require('fs');
 
 const IsolateManager    = require('./isolate.js');
 const GasTracker        = require('./gas.js');
