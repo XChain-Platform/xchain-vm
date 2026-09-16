@@ -57,10 +57,12 @@ describe('XCALL bounds single-sourcing parity (5db7dc60)', function () {
     });
 
     it('index.js declares the four bounds FROM PROTO too (no literal re-declaration)', function () {
-        const src = fs.readFileSync(path.join(__dirname, '../../../src/index.js'), 'utf8');
+        // The bounds are declared in the entry's constants part and re-exported
+        // from index.js unchanged.
+        const src = fs.readFileSync(path.join(__dirname, '../../../src/index/constants.js'), 'utf8');
         for (const name of BOUNDS) {
             const re = new RegExp('const\\s+' + name + '\\s*=\\s*PROTO\\.' + name + '\\b');
-            assert.ok(re.test(src), 'index.js must declare ' + name + ' as PROTO.' + name);
+            assert.ok(re.test(src), 'src/index/constants.js must declare ' + name + ' as PROTO.' + name);
         }
     });
 });

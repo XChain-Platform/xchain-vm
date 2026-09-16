@@ -38,13 +38,29 @@ const { buildGateway }  = require('./gateway.js');
 // call_id preimages (keeps a BATCH subcommand's composite form intact).
 const { normalizeRootDiscriminator } = require('./gateway_emit.js');
 const { stripGlobals }  = require('./sandbox.js');
-const { meterCode }     = require('./metering.js');
-const { validateSyntax, checkFloatWarnings } = require('./syntax.js');
 const { ContractRevertError, GasExhaustedError, HostFaultError } = require('./errors.js');
 const { resolveAccessors } = require('./readonly_accessors.js');
 // Consensus wall-clock budget per execution (see consensus_wall_clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
 const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus_wall_clock.js');
+// The entry keeps the class (constructor, the consensus wall-clock resolver,
+// execute and the error classifier), the harness prelude and the activation
+// carriers; the other prototype methods, the contract wrapper and the size
+// constants live in named parts under ./index/ and are installed here so the
+// public surface (constructor, prototype, statics) is the one this file
+// always exported.
+const { installMethods } = require('./index/install_methods.js');
+const {
+    MAX_CODE_SIZE, MAX_CALL_DEPTH, MIN_CALL_GAS, MAX_STACK_DEPTH, MAX_STACK_DEPTH_MUSL,
+    XCALL_MIN_GAS, XCALL_MAX_GAS, XCALL_MAX_HOPS,
+    XCALL_MIN_DEADLINE_BLOCKS, XCALL_MAX_DEADLINE_BLOCKS, XCALL_MAX_RETURN_BYTES,
+} = require('./index/constants.js');
+const { CONTRACT_WRAPPER, CONTRACT_WRAPPER_HARDENED } = require('./index/contract_wrapper.js');
+const blockLifecycleMethods = require('./index/block_lifecycle.js');
+const lintAndMeteringMethods = require('./index/lint_and_metering.js');
+const gatewayInjectionMethods = require('./index/gateway_injection.js');
+const errorResultMethods = require('./index/error_results.js');
+const manifestMethods = require('./index/manifest.js');
 
 /**
  * Harness script that runs inside the isolate to assemble the xchain
@@ -1210,193 +1226,6 @@ const HARNESS_SOURCE = `
 })();
 `;
 
-/**
- * Contract wrapper script. Runs the contract code and invokes the
- * specified method (or the default export if it's a function).
- * Injected variables: __contractCode (string), __methodName (string),
- * __isCrossCall (bool), __readManifest (bool, Phase E manifest introspection)
- */
-const CONTRACT_WRAPPER = `
-(function() {
-    // Execute the contract code to get the exports
-    // Use __Function (saved by sandbox before stripping Function from global scope)
-    var module = { exports: {} };
-    var exports = module.exports;
-    var __Fn = globalThis.__Function;
-    delete globalThis.__Function;
-    (new __Fn('module', 'exports', 'xchain', __contractCode))(module, exports, xchain);
-    var contractExports = module.exports;
-
-    // Permissions-manifest introspection (Phase E). When the host reads a
-    // contract's declared policy at deploy time it sets __readManifest, and we
-    // surface the exported permissions + maxTakeBps WITHOUT dispatching a method.
-    // Type tags are surfaced (not just values) so the indexer can fail-closed on a
-    // malformed manifest (e.g. permissions exported as a string, or a non-integer
-    // maxTakeBps) rather than silently treating it as absent. All validation +
-    // rejection lives host-side (actions/deploy/index.js); the VM only reports faithfully.
-    if (__readManifest) {
-        var __ce = (typeof contractExports === 'object' && contractExports !== null) ? contractExports : {};
-
-        // Contract identity (CONTRACT_META_REQUIRED). Read off an object export OR
-        // a function export, because a function-style contract has nowhere else to
-        // hang it; __ce stays object-only on purpose, so a function export's
-        // permissions/maxTakeBps verdicts do not move (they are ungated today).
-        //
-        // The serialisation and the 4096-unit cap live HERE, in the isolate,
-        // because the host only ever sees this report after JSON.parse and the
-        // whole report is truncated at 65536 characters before parsing: a
-        // programmatically built multi-megabyte meta would otherwise produce an
-        // unparseable report and skip every check. Bounding it here keeps the
-        // report parseable whatever the contract does.
-        //
-        // Nothing in this block may throw. A throw would escape the wrapper and
-        // report the whole manifest as unread, which would silently move the
-        // EXISTING permissions/maxTakeBps verdicts for any contract whose meta
-        // read misbehaves, including below the activation flag. So the property
-        // read is caught (meta may be a throwing getter) and a stringify that
-        // yields undefined (a toJSON returning undefined) is normalised.
-        //
-        // Reported faithfully; every verdict lives host-side (actions/deploy/index.js).
-        var __metaSrc = undefined;
-        var __metaJson = null, __metaError = false, __metaOversize = false;
-        try {
-            __metaSrc = ((typeof contractExports === 'object' && contractExports !== null) || typeof contractExports === 'function')
-                      ? contractExports.meta : undefined;
-        } catch (e) { __metaError = true; }
-        var __metaType = (__metaSrc === undefined) ? 'undefined'
-                       : (__metaSrc === null)      ? 'null'
-                       : Array.isArray(__metaSrc)  ? 'array'
-                       : typeof __metaSrc;
-        if (__metaType === 'object') {
-            try { __metaJson = JSON.stringify(__metaSrc); } catch (e) { __metaError = true; }
-            // A toJSON that returns undefined serialises to undefined, not a string.
-            if (__metaJson === undefined) { __metaJson = null; __metaError = true; }
-            if (__metaJson !== null && __metaJson.length > 4096) { __metaOversize = true; __metaJson = null; }
-            // A Date or a boxed String serialises to a non-object; the host wants a
-            // manifest object or nothing at all.
-            if (__metaJson !== null && __metaJson.charAt(0) !== '{') { __metaError = true; __metaJson = null; }
-        }
-
-        return '\\x02' + JSON.stringify({
-            permissions:     Array.isArray(__ce.permissions) ? __ce.permissions : null,
-            permissionsType: (__ce.permissions === undefined) ? 'undefined' : (Array.isArray(__ce.permissions) ? 'array' : typeof __ce.permissions),
-            maxTakeBps:      (typeof __ce.maxTakeBps === 'number') ? __ce.maxTakeBps : null,
-            maxTakeBpsType:  (__ce.maxTakeBps === undefined) ? 'undefined' : typeof __ce.maxTakeBps,
-            // Whether the contract exports a callable constructor. Runtime-accurate
-            // (matches how execute() dispatches, so it also catches a dynamically
-            // assigned module.exports.initialize). The indexer uses this to reject a
-            // DEPLOY that declares a constructor but supplies no CONSTRUCTOR_PARAMS,
-            // gated on the DEPLOY_INIT_STRICT flag-day. Reported faithfully here;
-            // all verdict logic lives host-side in actions/deploy/index.js.
-            hasInitialize:   (typeof __ce.initialize === 'function'),
-            metaType:        __metaType,
-            metaJson:        __metaJson,
-            metaError:       __metaError,
-            metaOversize:    __metaOversize
-        });
-    }
-
-    // Cross-chain call gate: an injected cross-chain execution may only invoke
-    // methods the contract explicitly opted in via an exported crossCallable
-    // array. This is the blast-radius bound on the federation's relay authority
-    // a quorum-signed dispatch can only reach methods the target contract
-    // consciously exposed. The fixed marker string is matched by the indexer
-    // (xexec.js) to report status 'not_callable' back to the caller.
-    if (__isCrossCall) {
-        var __cc = (typeof contractExports === 'object' && contractExports !== null)
-            ? contractExports.crossCallable : null;
-        if (!Array.isArray(__cc) || __cc.indexOf(__methodName) === -1)
-            throw new Error('XCALL_NOT_CALLABLE: method "' + __methodName + '" is not in the crossCallable allowlist');
-    }
-
-    // Invoke the method
-    var __result;
-    if (typeof contractExports === 'function') {
-        __result = contractExports(xchain);
-    } else if (typeof contractExports === 'object' && contractExports !== null) {
-        var method = contractExports[__methodName];
-        if (typeof method !== 'function')
-            throw new Error('unknown method: ' + __methodName);
-        __result = method(xchain);
-    } else {
-        throw new Error('contract must export a function or object');
-    }
-    // JSON-serialize the return value inside the isolate so it can
-    // cross the boundary as a string (ivm only transfers primitives)
-    if (__result === undefined) return undefined;
-    return '\\x02' + JSON.stringify(__result);
-})();
-`;
-
-// VM_LINT_HARDENING wrapper variant (5bff4687): identical body, but the four
-// injected control bindings (__contractCode/__methodName/__isCrossCall/
-// __readManifest) arrive as IIFE PARAMETERS instead of script-level `let`s.
-// Script-level lexical bindings live in the context's global lexical scope,
-// where the contract body (evaluated via the saved Function constructor, which
-// compiles in global scope) can read or shadow them to defeat the crossCallable
-// allowlist, manifest introspection, and method dispatch. Closure parameters
-// are invisible to Function-constructed code. Derived mechanically from
-// CONTRACT_WRAPPER so the two bodies can never drift; the legacy constant's
-// bytes are untouched (pre-gate executions must compile byte-identical source).
-const CONTRACT_WRAPPER_HARDENED = CONTRACT_WRAPPER
-    .replace('(function() {', '(function(__contractCode, __methodName, __isCrossCall, __readManifest) {')
-    .replace(/\}\)\(\);\s*$/, '})');
-
-// Maximum smart-contract code size (64 KiB). Vendored single source of truth:
-// ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
-// constants.js, MAX_CODE_SIZE); kept equal to the SDK and indexer by the
-// cross-service regression suite (exported at the bottom of this module).
-const PROTO = require('./protocol/constants.js');
-const MAX_CODE_SIZE = PROTO.MAX_CODE_SIZE;
-
-// Cross-contract call protocol constants. Vendored from ./protocol/constants.js
-// (VM_MAX_CALL_DEPTH / VM_MIN_CALL_GAS); the indexer re-validates both host-side
-// (xchain-indexer/src/actions/execute/index.js) so an older bundled VM cannot
-// bypass them. Exported below for the cross-service regression suite.
-const MAX_CALL_DEPTH = PROTO.VM_MAX_CALL_DEPTH;
-const MIN_CALL_GAS   = PROTO.VM_MIN_CALL_GAS;
-
-// Deterministic intra-contract recursion bound. DISTINCT from MAX_CALL_DEPTH
-// (which bounds cross-contract emit.execute chains): this caps how deep a single
-// contract may recurse WITHIN one isolate before the metering-injected depth guard
-// throws a deterministic out_of_stack fault. The value is a fixed, conservative
-// constant chosen well below the smallest native V8 stack limit across every
-// supported architecture (linux/arm64 + linux/amd64) and across the host stack
-// remaining at runSync entry, so the guard always fires before V8's own
-// architecture-dependent RangeError. That makes the maximum recursion depth a
-// contract can observe identical on every validator. A contract that catches the
-// fault can no longer commit a platform-variable depth into hashed state. Purely an
-// in-isolate execution bound (the host never re-validates it), so it lives here
-// rather than in the cross-service protocol constants; all validators agree on it
-// via the pinned consensus runtime version.
-const MAX_STACK_DEPTH = 512;
-
-// Musl-safe recursion bound. On a musl/Alpine 128KB pthread stack the
-// native JSON.parse reviver walk and Array.prototype.join recurse in C++ to the
-// value's nesting depth and overflow BELOW 512 (measured near ~292 reviver / ~379
-// join), so a musl-built validator could fork from a glibc/macOS one on a value
-// nested between the musl overflow onset and 512. The Package 3 bundle gate below
-// (isPkg3SandboxActive) swaps the injected __DEPTH_LIMIT from MAX_STACK_DEPTH to
-// this lower bound at/after the coordinated deploy window; 256 sits below the
-// tightest musl onset with margin while leaving ample headroom for any plausible
-// contract nesting. Both the intra-contract recursion guard and the F-NR native-
-// depth guard read the single injected __DEPTH_LIMIT, so lowering it moves both.
-const MAX_STACK_DEPTH_MUSL = 256;
-
-// Cross-CHAIN call (XCALL) protocol constants. Canonical values:
-// xchain-documentation/protocol/constants.js; the indexer re-validates
-// host-side (execute/index.js processEmission + actions/xcall/index.js).
-const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;     // = MIN_CALL_GAS
-const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;     // target-side ceiling cap (the run is fee-less on the target chain)
-// Single in-VM source of truth: gateway_emit.js declares the hop cap it
-// ENFORCES (emit.crossExecute's hop gate) and this module re-exports it, so a
-// future bump cannot leave the enforcer and the exported/parity-tested value
-// disagreeing. (gateway_emit.js has no require-cycle back into this file.)
-const XCALL_MAX_HOPS            = require('./gateway_emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
-const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
-const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
-const XCALL_MAX_RETURN_BYTES    = PROTO.XCALL_MAX_RETURN_BYTES;
-
 // Coordinated activation (block time, unix seconds) for binary-allocation gas
 // metering (the F3-binary ArrayBuffer/TypedArray byte-length charge in the
 // harness below). That charge is a consensus-affecting gas-schedule change: a
@@ -1972,132 +1801,6 @@ class XChainVM {
     }
 
     /**
-     * Called at the start of each block to initialize the compilation cache.
-     */
-    beginBlock() {
-        if (this._executor) return this._executor.beginBlock();
-        this._blockCache = new Map();
-    }
-
-    /**
-     * Called at the end of each block to clear the compilation cache.
-     */
-    endBlock() {
-        if (this._executor) return this._executor.endBlock();
-        this._blockCache = null;
-    }
-
-    /**
-     * Return the gas-metered form of `code`, from the metered-source cache when
-     * possible. meterCode() is a pure AST transform (acorn parse + AST walk +
-     * astring regen over up to maxCodeSize bytes), the single most expensive step
-     * of a warm execute, and its output depends ONLY on `code` and the two
-     * consensus gate flags, all folded into the cache key. A hit therefore returns
-     * byte-identical metered source to a fresh meterCode() call, so the cache is
-     * invisible to consensus (same key -> same transform) and only removes
-     * redundant per-execute parsing.
-     *
-     * The key hashes the source with sha256 so a 64KB body is compared in 32 bytes
-     * and appends the three gate bits (evalOrder, callSpread, restPattern). The cache persists
-     * across blocks (unlike _blockCache, the V8 cachedData store cleared by
-     * endBlock): a contract re-executing block after block re-meters at most once
-     * per (source, gate-flags) pair. Bounded by maxMeteredCacheSize with FIFO
-     * eviction; correctness holds when it is empty.
-     *
-     * A metering failure (invalid source) is propagated by throwing and is NOT
-     * cached: the miss path stays simple and the cache holds only valid output.
-     * @param {string} code
-     * @param {boolean} specEvalOrder
-     * @param {boolean} meterCallSpread
-     * @param {boolean} meterRestPattern
-     * @param {string} [codeHash] - precomputed sha256(code) hex. Optional: execute()
-     *        computes the digest once and shares it with the lint-verdict cache
-     *        so a 64KB body is hashed once per execution, not twice.
-     *        Omitting it recomputes the identical digest, so the key is unchanged.
-     * @returns {string} metered source
-     */
-    getMeteredCode(code, specEvalOrder, meterCallSpread, meterRestPattern, codeHash) {
-        const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
-            ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0') +
-            (meterRestPattern ? '1' : '0');
-        const hit = this._meteredCache.get(key);
-        if (hit !== undefined) return hit;
-        const metered = meterCode(code, {
-            specEvalOrder: specEvalOrder,
-            meterCallSpread: meterCallSpread,
-            meterRestPattern: meterRestPattern
-        });
-        // FIFO-evict the oldest entry at capacity (Map preserves insertion order).
-        // This cache never feeds consensus, so the eviction policy is a pure
-        // memory/hit-rate tradeoff, not a determinism concern.
-        if (this._meteredCache.size >= this.limits.maxMeteredCacheSize) {
-            const oldest = this._meteredCache.keys().next().value;
-            if (oldest !== undefined) this._meteredCache.delete(oldest);
-        }
-        this._meteredCache.set(key, metered);
-        return metered;
-    }
-
-    /**
-     * Return the execute-time consensus source-lint verdict for `code` under the
-     * resolved ban flags, from the verdict cache when possible.
-     *
-     * validateSyntax() is a pure function of (code, enforceBannedAsync,
-     * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm,
-     * enforceLintGlobalAlias), all folded into the key, so a hit returns the verdict a
-     * fresh call would produce. The two Pkg 3 rules share ONE activation and are
-     * therefore threaded as one bit; the global-alias refinement rides its own.
-     *
-     * This exists because validateSyntax spawns an ivm.Isolate for its V8 syntax check
-     * and then acorn-parses the source; paying that on every execute of a hot contract
-     * would put an isolate spawn on the execution path. The CALLER charges the lint gas
-     * unconditionally, before consulting this cache, so cache state can never move
-     * gasUsed. Bounded by maxMeteredCacheSize with FIFO eviction (a pure memory/hit-rate
-     * tradeoff, not a determinism concern); correctness holds when it is empty.
-     *
-     * @param {string} code
-     * @param {boolean} enforceBannedAsync
-     * @param {boolean} enforceLintHardening
-     * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
-     * @param {boolean} enforceLintGlobalAlias - LINT_GLOBAL_ALIAS refinement (own gate)
-     * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
-     * @param {string} [codeHash] - precomputed sha256(code) hex (see getMeteredCode)
-     * @returns {{valid: boolean, error?: string}}
-     */
-    getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, enforceBannedRest, codeHash) {
-        const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
-            ':' + (enforceBannedAsync ? '1' : '0') +
-            (enforceLintHardening ? '1' : '0') +
-            (enforcePkg3Bans ? '1' : '0') +
-            (enforceLintGlobalAlias ? '1' : '0') +
-            (enforceBannedRest ? '1' : '0');
-        const hit = this._lintVerdictCache.get(key);
-        if (hit !== undefined) return hit;
-        const verdict = validateSyntax(code, {
-            enforceBannedAsync:      enforceBannedAsync,
-            enforceLintHardening:    enforceLintHardening,
-            enforceBannedGenerator:  enforcePkg3Bans,
-            enforceBannedWasm:       enforcePkg3Bans,
-            enforceLintGlobalAlias:  enforceLintGlobalAlias,
-            enforceBannedRest:       enforceBannedRest
-        });
-        if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
-            const oldest = this._lintVerdictCache.keys().next().value;
-            if (oldest !== undefined) this._lintVerdictCache.delete(oldest);
-        }
-        this._lintVerdictCache.set(key, verdict);
-        return verdict;
-    }
-
-    /**
-     * Tear down the subprocess executor (kills the worker child). No-op in
-     * in-process mode. Call from long-lived hosts on shutdown and from tests.
-     */
-    async shutdown() {
-        if (this._executor) return this._executor.shutdown();
-    }
-
-    /**
      * The wall-clock budget THIS execution runs against, in milliseconds.
      *
      * Consensus quantity at/after the flag-day: every validator resolves
@@ -2670,130 +2373,6 @@ class XChainVM {
     }
 
     /**
-     * Inject gateway methods into the isolate context as ivm.Reference objects.
-     */
-    injectGateway(context, gateway) {
-        const g = context.global;
-        // Bridge helper: wraps a host-side function so it can be called from the isolate.
-        // Arguments arrive as a single JSON string; ALL non-null/undefined return values
-        // are prefixed with \x01 and JSON-encoded so they can cross the boundary safely.
-        // This prevents user-supplied strings containing \x01 from being misinterpreted
-        // as protocol markers by the harness wrap() function.
-        const bridge = (fn) => new ivm.Reference(function(jsonArgs) {
-            const args = jsonArgs ? JSON.parse(jsonArgs) : [];
-            try {
-                const result = fn.apply(undefined, args);
-                if (result === null || result === undefined) return result;
-                return '\x01' + JSON.stringify(result);
-            } catch (e) {
-                // Re-throw with a type prefix so the error can be classified
-                // after it loses its class crossing the isolate boundary
-                if (e instanceof ContractRevertError) {
-                    throw new Error('\x03REVERT:' + e.message);
-                }
-                if (e instanceof GasExhaustedError) {
-                    throw new Error('\x03GAS:' + e.used + ':' + e.ceiling);
-                }
-                throw e;
-            }
-        });
-
-        // Context accessors (0 gas)
-        g.setSync('__getBlockHeight',     bridge(gateway.getBlockHeight));
-        g.setSync('__getBlockTimestamp',   bridge(gateway.getBlockTimestamp));
-        g.setSync('__getBlockHash',        bridge(gateway.getBlockHash));
-        g.setSync('__getSourceAddress',    bridge(gateway.getSourceAddress));
-        g.setSync('__getContractAddress',  bridge(gateway.getContractAddress));
-        g.setSync('__getInputParams',      bridge(gateway.getInputParams));
-        g.setSync('__getInputParam',       bridge(gateway.getInputParam));
-        g.setSync('__getInputParamCount',  bridge(gateway.getInputParamCount));
-        g.setSync('__getCallDepth',        bridge(gateway.getCallDepth));
-        g.setSync('__getCrossHops',        bridge(gateway.getCrossHops));
-
-        // Ledger queries (metered)
-        g.setSync('__getBalance',   bridge(gateway.getBalance));
-        g.setSync('__getTokenInfo', bridge(gateway.getTokenInfo));
-        g.setSync('__getPollResult', bridge(gateway.getPollResult));
-
-        // State (metered)
-        g.setSync('__state_get',    bridge(gateway.state.get));
-        g.setSync('__state_has',    bridge(gateway.state.has));
-        g.setSync('__state_set',    bridge(gateway.state.set));
-        g.setSync('__state_delete', bridge(gateway.state.delete));
-
-        // Oracle (metered)
-        g.setSync('__oracle_getPrice',        bridge(gateway.oracle.getPrice));
-        g.setSync('__oracle_getPriceAtRound',  bridge(gateway.oracle.getPriceAtRound));
-        g.setSync('__oracle_getSnapshotAge',   bridge(gateway.oracle.getSnapshotAge));
-
-        // Cross-chain (metered)
-        g.setSync('__crossChain_getAttestation', bridge(gateway.crossChain.getAttestation));
-        g.setSync('__crossChain_isSettled',      bridge(gateway.crossChain.isSettled));
-        g.setSync('__crossChain_getCallResult',  bridge(gateway.crossChain.getCallResult));
-
-        g.setSync('__attestation_request',     bridge(gateway.attestation.request));
-        g.setSync('__attestation_getResponse', bridge(gateway.attestation.getResponse));
-
-        // Contract-targeted staking (metered)
-        g.setSync('__contract_getStake',       bridge(gateway.contract.getStake));
-        g.setSync('__contract_getTotalStaked', bridge(gateway.contract.getTotalStaked));
-        g.setSync('__contract_getStakers',     bridge(gateway.contract.getStakers));
-        g.setSync('__contract_slash',          bridge(gateway.contract.slash));
-
-        // Emit (metered)
-        g.setSync('__emit_send',      bridge(gateway.emit.send));
-        g.setSync('__emit_destroy',   bridge(gateway.emit.destroy));
-        g.setSync('__emit_issue',     bridge(gateway.emit.issue));
-        g.setSync('__emit_mint',      bridge(gateway.emit.mint));
-        g.setSync('__emit_order',     bridge(gateway.emit.order));
-        g.setSync('__emit_dispenser', bridge(gateway.emit.dispenser));
-        g.setSync('__emit_dividend',  bridge(gateway.emit.dividend));
-        g.setSync('__emit_airdrop',   bridge(gateway.emit.airdrop));
-        g.setSync('__emit_callback',  bridge(gateway.emit.callback));
-        g.setSync('__emit_file',      bridge(gateway.emit.file));
-        g.setSync('__emit_list',      bridge(gateway.emit.list));
-        g.setSync('__emit_coinpay',   bridge(gateway.emit.coinpay));
-        g.setSync('__emit_sweep',     bridge(gateway.emit.sweep));
-        g.setSync('__emit_link',      bridge(gateway.emit.link));
-        g.setSync('__emit_broadcast', bridge(gateway.emit.broadcast));
-        g.setSync('__emit_message',   bridge(gateway.emit.message));
-        g.setSync('__emit_vote',      bridge(gateway.emit.vote));
-        g.setSync('__emit_execute',   bridge(gateway.emit.execute));
-        g.setSync('__emit_crossExecute', bridge(gateway.emit.crossExecute));
-
-        // Math
-        g.setSync('__math_add',      bridge(gateway.math.add));
-        g.setSync('__math_subtract', bridge(gateway.math.subtract));
-        g.setSync('__math_multiply', bridge(gateway.math.multiply));
-        g.setSync('__math_divide',   bridge(gateway.math.divide));
-        g.setSync('__math_mod',      bridge(gateway.math.mod));
-        g.setSync('__math_compare',  bridge(gateway.math.compare));
-        g.setSync('__math_gt',       bridge(gateway.math.gt));
-        g.setSync('__math_gte',      bridge(gateway.math.gte));
-        g.setSync('__math_lt',       bridge(gateway.math.lt));
-        g.setSync('__math_lte',      bridge(gateway.math.lte));
-        g.setSync('__math_eq',       bridge(gateway.math.eq));
-        g.setSync('__math_min',      bridge(gateway.math.min));
-        g.setSync('__math_max',      bridge(gateway.math.max));
-        g.setSync('__math_abs',      bridge(gateway.math.abs));
-        g.setSync('__math_isZero',   bridge(gateway.math.isZero));
-        g.setSync('__math_sqrt',     bridge(gateway.math.sqrt));
-        g.setSync('__math_pow',      bridge(gateway.math.pow));
-        g.setSync('__math_log',      bridge(gateway.math.log));
-        g.setSync('__math_log2',     bridge(gateway.math.log2));
-        g.setSync('__math_log10',    bridge(gateway.math.log10));
-
-        // Control flow (gas-free)
-        g.setSync('__revert',  bridge(gateway.revert));
-        g.setSync('__require', bridge(gateway.require));
-
-        // Logging (gas-free)
-        g.setSync('__log',         bridge(gateway.log));
-        g.setSync('__isLogFull',   bridge(gateway.isLogFull));
-        g.setSync('__getLogCount', bridge(gateway.getLogCount));
-    }
-
-    /**
      * Classify an execution error and return the appropriate result.
      *
      * The error STRING prefixes emitted here (revert/out_of_gas/timeout/
@@ -2927,113 +2506,19 @@ class XChainVM {
         // Strip stack traces, file paths, and internal details.
         return this.errorResult(gasTracker, emissionCollector, 'error: ' + this.sanitizeError(msg));
     }
-
-    /**
-     * Sanitize an error message to prevent information leakage.
-     * Returns only the first line, strips file paths and stack traces.
-     */
-    sanitizeError(msg) {
-        if (!msg) return 'unknown error';
-        // Take only the first line
-        const firstLine = msg.split('\n')[0];
-        // Strip file paths (e.g., /home/user/.../file.js:123:45)
-        const sanitized = firstLine.replace(/\s*(\/[\w./-]+(?::\d+(?::\d+)?)?)/g, '');
-        // Truncate to 256 chars
-        return sanitized.length > 256 ? sanitized.substring(0, 256) : sanitized;
-    }
-
-    /**
-     * Build a failure result. State changes and emissions are empty (atomicity).
-     * Logs are preserved for debugging.
-     */
-    errorResult(gasTracker, emissionCollector, errorMsg, gasOverride) {
-        return {
-            success:        false,
-            error:          errorMsg,
-            // gasOverride bounds the consensus-visible gasUsed to the gas ceiling:
-            // for non-deterministic resource terminations (timeout / out_of_memory /
-            // out_of_stack) so gasUsed, and therefore the fee, is identical on every
-            // validator, and for out_of_gas so a single over-ceiling charge (the
-            // allocation wrappers) can never bill the caller beyond their committed budget.
-            gasUsed:        (gasOverride != null) ? gasOverride : gasTracker.getUsed(),
-            returnValue:    null,
-            stateChanges:   [],
-            stateDeletes:   [],
-            emittedActions: [],
-            logs:           emissionCollector.getLogs()
-        };
-    }
-
-    /**
-     * Validate contract code syntax before deployment.
-     * @param {string} code
-     * @param {object} [opts]
-     * @param {boolean} [opts.enforceBannedAsync=true] - block async/await/Promise
-     *        (CONSENSUS_RULES 'banned-async'). CONSENSUS-GATED on the indexer:
-     *        deploy/index.js passes the resolved VM_BANNED_ASYNC activation so a
-     *        from-genesis replay reproduces the historical accept-below verdict.
-     *        Defaults to true for author-facing callers (SDK linter, unit tests).
-     * @returns {{ valid: boolean, error?: string }}
-     */
-    validateSyntax(code, opts) {
-        return validateSyntax(code, opts);
-    }
-
-    /**
-     * Check for floating-point usage warnings.
-     * @param {string} code
-     * @returns {string[]}
-     */
-    checkFloatWarnings(code) {
-        return checkFloatWarnings(code);
-    }
-
-    /**
-     * Read a contract's declared permissions manifest (Phase E) at deploy time.
-     * Instantiates the module top-level inside an isolate (gas-metered, no state,
-     * oracle, or balances) and surfaces its exported `permissions` + `maxTakeBps`
-     * WITHOUT dispatching a method, deterministic across validators because it
-     * depends only on the (immutable) contract code and the pinned runtime. Works
-     * for constructor-less contracts, which vm.execute() never runs otherwise.
-     *
-     * Returns the raw, typed manifest report; the indexer (actions/deploy/index.js) owns
-     * all validation + fail-closed rejection. On a module-level throw, success is
-     * false and the host treats the contract as declaring no manifest (today's
-     * behavior for a contract that only fails on its first execute).
-     *
-     * @param {string} code
-     * @returns {Promise<{ success: boolean, manifest: object|null, error: string|null }>}
-     */
-    // The manifest read must resolve activation gates at the DEPLOY'S OWN block,
-    // because its outcome is hashed into deploy status.
-    //
-    // This used to call execute() with no block context at all, so `opts.network` was
-    // undefined, `opts.blockContext` was undefined (making __pkg3Height NaN and
-    // isPkg3SandboxActive false), and __blockTime defaulted to 0. Every gate therefore
-    // resolved PRE-ACTIVATION no matter which block the deploy was in: the manifest was
-    // read under one sandbox rule set while every later execute() of the same contract
-    // ran under another. Any module-level code whose outcome differs across a gate (a
-    // guard that only arms post-activation, or metering that only then charges toward
-    // the gas ceiling) produced a manifest, and therefore a DEPLOY VERDICT, computed
-    // under rules that were not in force at that height.
-    //
-    // Callers pass the deploy's own context; omitting it preserves the old
-    // pre-activation resolution for non-consensus callers (tooling, tests).
-    async readManifest(code, opts) {
-        opts = opts || {};
-        const result = await this.execute({
-            code, method: '__manifest__', readManifest: true,
-            network:         opts.network,
-            blockContext:    opts.blockContext,
-            contractAddress: opts.contractAddress
-        });
-        if (!result.success)
-            return { success: false, manifest: null, error: result.error };
-        let manifest = null;
-        try { manifest = JSON.parse(result.returnValue); } catch (e) { manifest = null; }
-        return { success: true, manifest, error: null };
-    }
 }
+
+// Put the part methods back on the prototype with class-method flags (not
+// enumerable). The key set and every descriptor match the class body's;
+// only the prototype's property order differs, which nothing reads.
+installMethods(
+    XChainVM.prototype,
+    blockLifecycleMethods,
+    lintAndMeteringMethods,
+    gatewayInjectionMethods,
+    errorResultMethods,
+    manifestMethods
+);
 
 module.exports = XChainVM;
 // Expose the canonical code-size cap so the cross-service regression suite can
