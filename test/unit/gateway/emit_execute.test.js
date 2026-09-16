@@ -175,3 +175,72 @@ describe('emit.execute (cross-contract call)', function() {
         });
     });
 });
+
+// Boundary and precision cases the earlier validation tests did not pin: each
+// one targets a "<" vs "<=" / "+" vs "-" edge that a loose regex assertion
+// or an action-tag-only check let slide past.
+describe('emit.execute (cross-contract call)', function() {
+    describe('boundary precision (index / method / params)', function() {
+        it('should accept contractIndex exactly at Number.MAX_SAFE_INTEGER', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.execute(Object.assign({}, GOOD, { contractIndex: Number.MAX_SAFE_INTEGER }));
+            assert.strictEqual(collector.getActions()[0].params.contractIndex, Number.MAX_SAFE_INTEGER);
+        });
+
+        it('should reject contractIndex one past Number.MAX_SAFE_INTEGER', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.execute(Object.assign({}, GOOD, { contractIndex: Number.MAX_SAFE_INTEGER + 1 })), /positive integer/);
+        });
+
+        it('should reject a non-string method (not just empty / oversized ones)', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.execute(Object.assign({}, GOOD, { method: 123 })), /method/);
+        });
+
+        it('should accept a method at exactly the 64-byte limit', function() {
+            const { emit, collector } = createEmitAPI();
+            const method = 'm'.repeat(64);
+            emit.execute(Object.assign({}, GOOD, { method: method }));
+            assert.strictEqual(collector.getActions()[0].params.method, method);
+        });
+
+        it('should default an explicitly null params to an empty array', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.execute(Object.assign({}, GOOD, { params: null }));
+            assert.deepStrictEqual(collector.getActions()[0].params.params, []);
+        });
+
+        it('should accept params at exactly the 32-entry limit', function() {
+            const { emit, collector } = createEmitAPI();
+            emit.execute(Object.assign({}, GOOD, { params: Array(32).fill('a') }));
+            assert.strictEqual(collector.getActions()[0].params.params.length, 32);
+        });
+
+        it('should accept a params entry at exactly the 1024-byte limit', function() {
+            const { emit, collector } = createEmitAPI();
+            const entry = 'a'.repeat(1024);
+            emit.execute(Object.assign({}, GOOD, { params: [entry] }));
+            assert.strictEqual(collector.getActions()[0].params.params[0], entry);
+        });
+    });
+});
+
+describe('emit.execute (cross-contract call)', function() {
+    describe('boundary precision (required fields / remaining gas)', function() {
+        it('should throw the required-field message for each missing field, not a downstream fallback', function() {
+            const { emit } = createEmitAPI();
+            assert.throws(() => emit.execute({ method: 'm', gasLimit: 5000 }), /missing required field: contractIndex/);
+            assert.throws(() => emit.execute({ contractIndex: 1, gasLimit: 5000 }), /missing required field: method/);
+            assert.throws(() => emit.execute({ contractIndex: 1, method: 'm' }), /missing required field: gasLimit/);
+        });
+
+        it('should compute remaining gas by subtracting used from the ceiling, not adding', function() {
+            const { emit, gasTracker } = createEmitAPI(null, 100000);
+            emit.execute(Object.assign({}, GOOD, { gasLimit: 60000 }));
+            assert.strictEqual(gasTracker.getUsed(), 60500);
+            // remaining = 100000 - 60500 = 39500; 40000 + 500 > 39500 -> throw.
+            // Under ceiling + used (160500) the same call would wrongly pass.
+            assert.throws(() => emit.execute(Object.assign({}, GOOD, { gasLimit: 40000 })), /exceeds remaining gas 39500/);
+        });
+    });
+});
