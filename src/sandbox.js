@@ -21,13 +21,13 @@
 const ivm = require('isolated-vm');
 
 // The canonical, FROZEN set of non-deterministic / dangerous global identifiers
-// the sandbox deletes from the isolate. Defined ONCE in ./stripped-globals.js,
+// the sandbox deletes from the isolate. Defined ONCE in ./stripped_globals.js,
 // which carries the per-entry rationale and the flag-day notes, and is required
 // (not re-copied) by the contract linter and the AI-authoring knowledge base so
 // the three consumers cannot drift. That module is dependency-free on purpose:
 // this file requires isolated-vm at the top level, and the other two consumers
 // must load where no isolate exists.
-const { STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
+const { STRIPPED_GLOBAL_NAMES } = require('./stripped_globals.js');
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
@@ -51,7 +51,7 @@ const { STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
 // Both are hard-neutered so a contract that calls one fails DETERMINISTICALLY
 // (TypeError). NB: String.prototype.toLowerCase/toUpperCase are deliberately NOT
 // here; their Unicode case-folding is pinned by 'unicode: 17.0' in
-// consensus-runtime.js, the same way the e.message residual is covered by the pin.
+// consensus_runtime.js, the same way the e.message residual is covered by the pin.
 const STRIPPED_PROTO_METHODS = Object.freeze([
     { proto: 'String', method: 'match' },
     { proto: 'String', method: 'matchAll' },
@@ -82,12 +82,9 @@ const SAFE_MATH_MEMBERS = Object.freeze([
     'floor', 'ceil', 'round', 'abs', 'min', 'max', 'sign', 'trunc', 'PI', 'E'
 ]);
 
-// Build the in-isolate strip script for a resolved identifier list. The list is
-// decided HOST-side (stripGlobals), so a gated entry (e.g. Promise pre-flag-day)
-// is simply absent from `names` and never deleted (exactly how a pre-activation
-// node behaves). Everything after the toDelete loop is fixed neutering logic that
-// does not depend on the list.
-const buildStripScript = (names) => `
+// Opens the strip IIFE and captures the six built-in prototypes before any
+// global is deleted; both neuter loops resolve their targets through this map.
+const stripScriptProtoCapture = () => `
 (function() {
     // Capture built-in prototype references ONCE, up front, before any global is
     // deleted (RegExp's global is removed further down). Both neuter loops below
@@ -100,7 +97,10 @@ const buildStripScript = (names) => `
         Object: Object.prototype, Array: Array.prototype, String: String.prototype,
         Number: Number.prototype, Boolean: Boolean.prototype, RegExp: RegExp.prototype
     };
+`;
 
+// Deletes the host-resolved global names; the only piece that depends on the list.
+const stripScriptDeleteGlobals = (names) => `
     // Remove non-deterministic globals (host-resolved from STRIPPED_GLOBAL_NAMES;
     // gated entries the caller excludes are simply not present here).
     const toDelete = ${JSON.stringify(names)};
@@ -108,7 +108,11 @@ const buildStripScript = (names) => `
         try { delete globalThis[name]; } catch(e) {}
         try { globalThis[name] = undefined; } catch(e) {}
     }
+`;
 
+// Blocks eval and every Function-family constructor (plain, generator, async,
+// async generator) while saving the harness-private __Function reference.
+const stripScriptFunctionCtors = () => `
     // Block eval and Function constructor
     try { globalThis.eval = undefined; } catch(e) {}
     try {
@@ -138,7 +142,11 @@ const buildStripScript = (names) => `
             try { Object.defineProperty(AsyncGeneratorFunction, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
         } catch(e) {}
     } catch(e) {}
+`;
 
+// Neuters .constructor on the frozen NEUTERED_PROTO_CONSTRUCTORS prototypes
+// (interpolated) so a prototype-chain walk cannot reach a constructor.
+const stripScriptProtoCtors = () => `
     // Neuter the .constructor on built-in prototypes to prevent prototype-chain
     // traversal, e.g. ({}).__proto__.constructor('return process')(). The target
     // set is the frozen NEUTERED_PROTO_CONSTRUCTORS (host-interpolated), resolved
@@ -155,7 +163,11 @@ const buildStripScript = (names) => `
             } catch(e) {}
         }
     })();
+`;
 
+// Removes the RegExp global, then neuters the frozen STRIPPED_PROTO_METHODS
+// (interpolated): regex coercion and locale/ICU methods stay reachable otherwise.
+const stripScriptRegExpAndProtoMethods = () => `
     // Neuter RegExp to prevent catastrophic backtracking (ReDoS)
     // Contracts should not need regex; string operations suffice.
     try { globalThis.RegExp = undefined; } catch(e) {}
@@ -180,7 +192,11 @@ const buildStripScript = (names) => `
             } catch(e) {}
         }
     })();
+`;
 
+// Pins Error stack text to the empty string (stackTraceLimit 0 plus a frozen
+// prepareStackTrace) so no V8 frame data can reach hashed state.
+const stripScriptErrorStacks = () => `
     // Neuter Error stack traces (consensus determinism + info leak).
     // A contract can catch its own errors and return/store e.stack, which lands
     // in hashed state. V8's stack text is non-deterministic across builds and
@@ -202,7 +218,11 @@ const buildStripScript = (names) => `
             value: function() { return ''; }, writable: false, configurable: false
         });
     } catch(e) {}
+`;
 
+// Saves Object.defineProperty for the harness, then freezes defineProperty,
+// defineProperties and descriptor-taking Object.create against getter traps.
+const stripScriptDefineProperty = () => `
     // Save Object.defineProperty for the harness to use (it needs to lock __gas).
     // Store as a non-enumerable global so harness can access it, then harness deletes it.
     var _defineProperty = Object.defineProperty;
@@ -233,7 +253,10 @@ const buildStripScript = (names) => `
             configurable: false
         });
     } catch(e) {}
+`;
 
+// Removes console and the host process/require/importScripts surface.
+const stripScriptHostGlobals = () => `
     // Remove console (xchain.log is provided separately by the gateway)
     try { globalThis.console = undefined; } catch(e) {}
 
@@ -241,7 +264,11 @@ const buildStripScript = (names) => `
     try { globalThis.process = undefined; } catch(e) {}
     try { globalThis.require = undefined; } catch(e) {}
     try { globalThis.importScripts = undefined; } catch(e) {}
+`;
 
+// Replaces Math with the frozen SAFE_MATH_MEMBERS subset (interpolated) and
+// closes the strip IIFE.
+const stripScriptSafeMath = () => `
     // Replace Math with a deterministic, architecture-independent subset.
     //
     // Math.random is omitted (non-deterministic).
@@ -270,6 +297,23 @@ const buildStripScript = (names) => `
     globalThis.Math = _freeze(SafeMath);
 })();
 `;
+
+// Build the in-isolate strip script for a resolved identifier list. The list is
+// decided HOST-side (stripGlobals), so a gated entry (e.g. Promise pre-flag-day)
+// is simply absent from `names` and never deleted (exactly how a pre-activation
+// node behaves). Everything after the toDelete loop is fixed neutering logic that
+// does not depend on the list.
+const buildStripScript = (names) => [
+    stripScriptProtoCapture(),
+    stripScriptDeleteGlobals(names),
+    stripScriptFunctionCtors(),
+    stripScriptProtoCtors(),
+    stripScriptRegExpAndProtoMethods(),
+    stripScriptErrorStacks(),
+    stripScriptDefineProperty(),
+    stripScriptHostGlobals(),
+    stripScriptSafeMath()
+].join('');
 
 /**
  * Strip non-deterministic APIs from the isolate context.

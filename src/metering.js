@@ -153,35 +153,35 @@ const RESERVED_IDENTIFIERS = ['__gas'].concat(ALLOC_HELPERS).concat(DEPTH_HELPER
 const HELPER_SET = new Set(ALLOC_HELPERS);
 
 // Small AST builders for the allocator rewrite.
-function _ident(name) { return { type: 'Identifier', name: name }; }
-function _lit(value)  { return { type: 'Literal', value: value }; }
-function _arr(elements) { return { type: 'ArrayExpression', elements: elements }; }
-function _call(name, args) {
-    return { type: 'CallExpression', callee: _ident(name), arguments: args, optional: false };
+function astIdent(name) { return { type: 'Identifier', name: name }; }
+function astLiteral(value)  { return { type: 'Literal', value: value }; }
+function astArray(elements) { return { type: 'ArrayExpression', elements: elements }; }
+function astCall(name, args) {
+    return { type: 'CallExpression', callee: astIdent(name), arguments: args, optional: false };
 }
-function _clone(node) { return JSON.parse(JSON.stringify(node)); }
-function _void0() { return { type: 'UnaryExpression', operator: 'void', prefix: true, argument: _lit(0) }; }
+function cloneNode(node) { return JSON.parse(JSON.stringify(node)); }
+function astVoid0() { return { type: 'UnaryExpression', operator: 'void', prefix: true, argument: astLiteral(0) }; }
 // A zero-arg arrow that returns `expr` unevaluated: () => expr. Used by the
 // spec-correct obj[k] += rhs rewrite to DEFER the rhs so the helper can read
 // obj[k] first. An arrow (not a function) keeps `this`/`arguments`/`new.target`
 // lexical, so deferring never changes what the rhs would compute inline.
-function _arrowThunk(expr) {
+function arrowThunk(expr) {
     return { type: 'ArrowFunctionExpression', id: null, params: [],
         body: expr, async: false, generator: false, expression: true };
 }
 // The property key of a member expression, as an expression evaluated once:
 // the raw key for computed `o[k]`, or a string literal for `o.k` / `o['k']`.
-function _memberKey(member) {
+function memberKeyExpr(member) {
     return member.computed ? member.property
-        : (member.property.type === 'Identifier' ? _lit(member.property.name) : _lit(member.property.value));
+        : (member.property.type === 'Identifier' ? astLiteral(member.property.name) : astLiteral(member.property.value));
 }
 
 // The rest-destructuring kind of a BINDING PATTERN, or null when the pattern carries
 // no TOP-LEVEL rest. Only a rest that sits directly in the pattern being destructured
 // has an addressable source expression to wrap; a rest nested one level deeper
 // (`var {a: {...c}} = o`) reads an intermediate value with no expression to meter, and
-// is rejected at deploy instead (lint-core findBannedRest).
-function _restKind(pat) {
+// is rejected at deploy instead (lint_core findBannedRest).
+function restKind(pat) {
     if (!pat) return null;
     if (pat.type === 'ObjectPattern')
         return (pat.properties || []).some(function (p) { return p.type === 'RestElement'; }) ? 'obj' : null;
@@ -200,10 +200,10 @@ function _restKind(pat) {
 //     the already-charged helper and hands the pattern a plain array. Sound only
 //     because a rest element drains the iterator anyway; a rest-less ArrayPattern is
 //     left alone so a lazy or infinite iterator is never over-drained.
-function _meterRestSource(pat, src) {
-    const kind = _restKind(pat);
-    if (kind === 'obj') return _call('__objspreadmeter', [src]);
-    if (kind === 'arr') return _call('__arrspread', [_arr([_arr([_lit('s'), src])])]);
+function meterRestSource(pat, src) {
+    const kind = restKind(pat);
+    if (kind === 'obj') return astCall('__objspreadmeter', [src]);
+    if (kind === 'arr') return astCall('__arrspread', [astArray([astArray([astLiteral('s'), src])])]);
     return src;
 }
 
@@ -232,7 +232,7 @@ function _meterRestSource(pat, src) {
  * top-level rest destructure is wrapped in the matching size-charged helper. Rest
  * positions with no addressable source (parameter lists, rest nested inside another
  * pattern, catch-clause rest, for-of/for-in heads) cannot be reached by wrapping and
- * are rejected at deploy on the same flag day instead (lint-core findBannedRest).
+ * are rejected at deploy on the same flag day instead (lint_core findBannedRest).
  */
 function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern) {
     // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's
@@ -246,7 +246,7 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
     function convert(node) {
         // string concatenation: a + b
         if (node.type === 'BinaryExpression' && node.operator === '+') {
-            return _call('__concat', [node.left, node.right]);
+            return astCall('__concat', [node.left, node.right]);
         }
         // compound assign: lhs += rhs
         if (node.type === 'AssignmentExpression' && node.operator === '+=') {
@@ -255,7 +255,7 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
             if (node.left.type === 'Identifier') {
                 return {
                     type: 'AssignmentExpression', operator: '=', left: node.left,
-                    right: _call('__concat', [_clone(node.left), node.right])
+                    right: astCall('__concat', [cloneNode(node.left), node.right])
                 };
             }
             // member lhs (computed o[k] or complex a.b.c): evaluate the object and
@@ -272,8 +272,8 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
             // index.js (isMeteringEvalOrderActive), mirroring the H-5 state-key gate.
             if (node.left.type === 'MemberExpression') {
                 return specEvalOrder
-                    ? _call('__setconcatL', [node.left.object, _memberKey(node.left), _arrowThunk(node.right)])
-                    : _call('__setconcat', [node.left.object, _memberKey(node.left), node.right]);
+                    ? astCall('__setconcatL', [node.left.object, memberKeyExpr(node.left), arrowThunk(node.right)])
+                    : astCall('__setconcat', [node.left.object, memberKeyExpr(node.left), node.right]);
             }
         }
         // tagged template: tag`q0${e0}q1...`  ->  __tmpltag[m](tag/obj[,key], cooked, raw, [e0,...])
@@ -283,26 +283,26 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
         if (node.type === 'TaggedTemplateExpression') {
             const tl = node.quasi;
             const cooked = tl.quasis.map(function (q) {
-                return q.value.cooked == null ? _void0() : _lit(q.value.cooked);
+                return q.value.cooked == null ? astVoid0() : astLiteral(q.value.cooked);
             });
-            const raw = tl.quasis.map(function (q) { return _lit(q.value.raw); });
-            const exprs = _arr(tl.expressions);
+            const raw = tl.quasis.map(function (q) { return astLiteral(q.value.raw); });
+            const exprs = astArray(tl.expressions);
             // member tag (String.raw`...`, obj.m`...`, obj[k]`...`): this = object.
             if (node.tag.type === 'MemberExpression') {
-                return _call('__tmpltagm',
-                    [node.tag.object, _memberKey(node.tag), _arr(cooked), _arr(raw), exprs]);
+                return astCall('__tmpltagm',
+                    [node.tag.object, memberKeyExpr(node.tag), astArray(cooked), astArray(raw), exprs]);
             }
             // plain tag (tag`...`, (0,f)`...`, getTag()`...`): this = undefined.
-            return _call('__tmpltag', [node.tag, _arr(cooked), _arr(raw), exprs]);
+            return astCall('__tmpltag', [node.tag, astArray(cooked), astArray(raw), exprs]);
         }
         // template literal: `q0${e0}q1...`  ->  __tmpl([q0, e0, q1, ...])
         if (node.type === 'TemplateLiteral' && !taggedQuasis.has(node)) {
             const parts = [];
             for (let i = 0; i < node.quasis.length; i++) {
-                parts.push(_lit(node.quasis[i].value.cooked));
+                parts.push(astLiteral(node.quasis[i].value.cooked));
                 if (i < node.expressions.length) parts.push(node.expressions[i]);
             }
-            return _call('__tmpl', [_arr(parts)]);
+            return astCall('__tmpl', [astArray(parts)]);
         }
         // array spread: [a, ...x]  ->  __arrspread([['e',a], ['s',x]])
         // Arrays that mix holes with spread are rewritten too: a hole becomes an
@@ -313,12 +313,12 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
         if (node.type === 'ArrayExpression' &&
             node.elements.some(function (e) { return e && e.type === 'SpreadElement'; })) {
             const segs = node.elements.map(function (e) {
-                if (e === null) return _arr([_lit('h')]); // hole: preserve slot, no gas
+                if (e === null) return astArray([astLiteral('h')]); // hole: preserve slot, no gas
                 return e.type === 'SpreadElement'
-                    ? _arr([_lit('s'), e.argument])
-                    : _arr([_lit('e'), e]);
+                    ? astArray([astLiteral('s'), e.argument])
+                    : astArray([astLiteral('e'), e]);
             });
-            return _call('__arrspread', [_arr(segs)]);
+            return astCall('__arrspread', [astArray(segs)]);
         }
         // object spread: {...x, k: v}  ->  __objspread([['s',x], ['p',['k',v]]])
         if (node.type === 'ObjectExpression' &&
@@ -338,18 +338,18 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
                 // longer a free O(n) operation, and method/accessor `this` is intact.
                 node.properties.forEach(function (p) {
                     if (p.type === 'SpreadElement') {
-                        p.argument = _call('__objspreadmeter', [p.argument]);
+                        p.argument = astCall('__objspreadmeter', [p.argument]);
                     }
                 });
                 return node;
             }
             const segs = node.properties.map(function (p) {
-                if (p.type === 'SpreadElement') return _arr([_lit('s'), p.argument]);
+                if (p.type === 'SpreadElement') return astArray([astLiteral('s'), p.argument]);
                 const keyExpr = p.computed ? p.key
-                    : (p.key.type === 'Identifier' ? _lit(p.key.name) : _lit(p.key.value));
-                return _arr([_lit('p'), _arr([keyExpr, p.value])]);
+                    : (p.key.type === 'Identifier' ? astLiteral(p.key.name) : astLiteral(p.key.value));
+                return astArray([astLiteral('p'), astArray([keyExpr, p.value])]);
             });
-            return _call('__objspread', [_arr(segs)]);
+            return astCall('__objspread', [astArray(segs)]);
         }
         // call / new / method argument spread: f(...x), new C(...x), arr.push(a, ...x)
         //   ->  f(...__arrspread([['s',x]])), new C(...__arrspread([['s',x]])), ...
@@ -370,10 +370,10 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
             node.arguments.some(function (a) { return a && a.type === 'SpreadElement'; })) {
             const segs = node.arguments.map(function (a) {
                 return a.type === 'SpreadElement'
-                    ? _arr([_lit('s'), a.argument])
-                    : _arr([_lit('e'), a]);
+                    ? astArray([astLiteral('s'), a.argument])
+                    : astArray([astLiteral('e'), a]);
             });
-            node.arguments = [{ type: 'SpreadElement', argument: _call('__arrspread', [_arr(segs)]) }];
+            node.arguments = [{ type: 'SpreadElement', argument: astCall('__arrspread', [astArray(segs)]) }];
             return node;
         }
         // destructuring rest, addressable source:  var [x, ...c] = a  /  var {k, ...c} = o
@@ -388,12 +388,12 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
         // CONSENSUS-GATED for the same reason the call-spread rewrite is: it adds a
         // charge that moves gasUsed, so pre-gate the destructure is emitted verbatim.
         if (meterRestPattern && node.type === 'VariableDeclarator' && node.init) {
-            node.init = _meterRestSource(node.id, node.init);
+            node.init = meterRestSource(node.id, node.init);
             return node;
         }
         if (meterRestPattern && node.type === 'AssignmentExpression' && node.operator === '=' &&
             (node.left.type === 'ArrayPattern' || node.left.type === 'ObjectPattern')) {
-            node.right = _meterRestSource(node.left, node.right);
+            node.right = meterRestSource(node.left, node.right);
             return node;
         }
         return node;

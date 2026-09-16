@@ -64,6 +64,7 @@ class MockIndexer {
     _processDestroy(contractAddress, params) {
         const { tick } = params;
         const quantity = this.ledger.normalizeToTick(tick, params.quantity);
+        // Debit from contract custody (tokens destroyed)
         this.ledger.debitContractBalance(contractAddress, tick, quantity);
     }
 

@@ -42,7 +42,7 @@ const TIERS = {
     'sandbox.js':      { tier: 'Critical', target: 95 },
     'gas.js':          { tier: 'Critical', target: 95 },
     'gateway.js':      { tier: 'High',     target: 90 },
-    'gateway-emit.js': { tier: 'High',     target: 90 },
+    'gateway_emit.js': { tier: 'High',     target: 90 },
     'state.js':        { tier: 'High',     target: 90 },
     'math.js':         { tier: 'High',     target: 90 },
     'collector.js':    { tier: 'Medium',   target: 85 },
@@ -92,6 +92,7 @@ function mergeResults(strykerData, customData) {
     // Unified structure: { files: { "filename": { mutants: [...] } } }
     const merged = {};
 
+    // Process Stryker data
     if (strykerData && strykerData.files) {
         for (const [filePath, fileData] of Object.entries(strykerData.files)) {
             const filename = path.basename(filePath);
@@ -113,6 +114,7 @@ function mergeResults(strykerData, customData) {
         }
     }
 
+    // Process custom runner data
     if (customData && customData.files) {
         for (const [filePath, fileData] of Object.entries(customData.files)) {
             const filename = path.basename(filePath);
@@ -204,7 +206,7 @@ function getRecommendation(filename, mutatorName, location) {
         return 'Add test: verify __gas() is injected for the specific AST node type at line ' + line;
     }
 
-    if (filename === 'gateway-emit.js') {
+    if (filename === 'gateway_emit.js') {
         return 'Add test: verify required field validation rejects missing parameters';
     }
 
@@ -235,6 +237,7 @@ function generateMarkdown(mergedFiles) {
         allStats.push(computeFileStats(filePath, fileData));
     }
 
+    // Sort by tier priority, then score ascending
     allStats.sort((a, b) => {
         const td = TIER_ORDER[a.tierInfo.tier] - TIER_ORDER[b.tierInfo.tier];
         return td !== 0 ? td : a.score - b.score;

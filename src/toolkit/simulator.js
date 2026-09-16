@@ -77,10 +77,10 @@
  *     worker to lose, so a contract that aborts the JS engine (bulk allocation
  *     past the isolate memory limit is the shape) takes the simulator's own
  *     process down and the author sees a crashed test run. The indexer runs
- *     execution: 'subprocess' (xchain-indexer/src/actions.js), where the same
+ *     execution: 'subprocess' (xchain-indexer/src/actions/index.js), where the same
  *     contract kills only the worker and the executor returns the deterministic
  *     `out_of_resource: execution host terminated (...)` with gasUsed at the
- *     ceiling (src/process-executor.js hostTerminatedResult). Pass
+ *     ceiling (src/process_executor.js hostTerminatedResult). Pass
  *     execution: 'subprocess' (or `xchain-foundry simulate --execution
  *     subprocess`) to see that result. The wall-clock half of this seam IS
  *     faithful: DEFAULT_LIMITS.maxCpuTimeMs equals CONSENSUS_MAX_WALL_MS.
@@ -97,9 +97,19 @@
 // @ts-nocheck
 
 const XChainVM = require('../index.js');
-const { toContractJs } = require('./transpile.js');
-const { MAX_CODE_SIZE } = require('../lint-core.js');
+const { MAX_CODE_SIZE } = require('../lint_core.js');
 const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../protocol/constants.js');
+const {
+    GATE_BLOCK_TIMES,
+    GATE_FALLBACK_BLOCK_TIME,
+    GUARD_GAS_CEILING,
+    GUARD_METHOD,
+    GUARD_PARAM_ORDER
+} = require('./simulator/constants.js');
+const { liveBlockTime, defaultBlockHeight } = require('./simulator/block_time_gates.js');
+const worldStateSetters = require('./simulator/world_state_setters.js');
+const gateWarnings = require('./simulator/gate_warnings.js');
+const execution = require('./simulator/execution.js');
 
 // Canonical VM gas schedule (matches the component-doc Gas Schedule table and
 // the indexer's VM fee rows). Every CANONICAL_GAS_KEYS entry the VM charges is
@@ -117,99 +127,14 @@ const DEFAULT_GAS_SCHEDULE = Object.freeze({
     VM_XCALL_CALLBACK: 20000
 });
 
-// Default simulated block time. Every block-TIME-keyed metering activation in
-// the VM -- F3 binary-constructor and F3-globals metering, the O(n)-copy meter
-// upgrades, math-output metering, the emission proto-strip, the non-finite gas
-// clamp -- compares blockContext.timestamp against a *_GATE_BLOCK_TIME constant
-// with NO network term, unlike the network-aware gates (async surface, lint
-// hardening, state-key, Pkg-3 sandbox) that regtest activates from genesis. On
-// mainnet three of those are keyed on block HEIGHT per coin instead, which is
-// what defaultBlockHeight() below derives (see HEIGHT_GATES). So
-// `network: 'regtest'` does NOT turn the meters on; only the block time does. A
-// default below the newest flag-day meters under a rule set no live chain runs:
-// measured on Node 22 / Linux, `new Uint8Array(100000)` costs 225 gas at the old
-// 1700000000 default and 100228 gas at the flag-day.
-//
-// Read off the VM's own exported gate constants rather than retyping one, and
-// take the MAX so a later-dated flag day cannot silently strand the simulator
-// below it. Every activation compares with `>=`, so sitting exactly on the
-// newest gate activates all of them. The literal fallback is the ratified 2.0.0
-// flag-day (2026-08-07 00:00:00 UTC) and is reached only if the VM stops
-// exporting the constants at all.
-const GATE_BLOCK_TIMES = Object.keys(XChainVM)
-    .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
-    .map((k) => XChainVM[k]);
-const DEFAULT_BLOCK_TIME = GATE_BLOCK_TIMES.length ? Math.max(...GATE_BLOCK_TIMES) : 1786060800;
+const SCHEDULED_BLOCK_TIME = GATE_BLOCK_TIMES.length
+    ? Math.max(...GATE_BLOCK_TIMES)
+    : GATE_FALLBACK_BLOCK_TIME;
 
-// The sibling class of activations, keyed on block HEIGHT per coin rather than on
-// block time: the Package-3 sandbox bundle, the execute-time source re-lint and the
-// lint global-alias refinement all resolve `<COIN>:<network>` against a threshold
-// map. testnet/regtest are genesis-active, so only mainnet (and any other network
-// string) has a height to reach; a default of 1 there runs the PRE-activation rule
-// set, which BTC:mainnet left behind at 961000 (~2026-08-04). Each entry names the
-// exported map and the exported predicate, so the toolkit reads the consensus
-// decision instead of restating it.
-const HEIGHT_GATES = Object.freeze([
-    { label: 'Pkg-3 sandbox',          map: 'PKG3_SANDBOX_ACTIVATION',      isActive: 'isPkg3SandboxActive' },
-    { label: 'execute-time re-lint',   map: 'EXEC_LINT_ACTIVATION',         isActive: 'isExecLintActive' },
-    { label: 'lint global-alias',      map: 'LINT_GLOBAL_ALIAS_ACTIVATION', isActive: 'isLintGlobalAliasActive' }
-]);
-
-// Networks whose height gates open at genesis, so no height can be "too low".
-const GENESIS_ACTIVE_NETWORKS = Object.freeze(['regtest', 'testnet']);
-
-/**
- * Armed threshold for one height gate at (coin, network), or undefined.
- * EXEC_LINT / LINT_GLOBAL_ALIAS now carry an explicit `0` on every mainnet coin
- * (ARMED at genesis by the 2026-09-09 ruling); a missing entry or a non-finite
- * height is still filtered out rather than coerced to 0.
- */
-function heightGateThreshold(gate, coin, network) {
-    const map = XChainVM[gate.map];
-    if (!map || coin == null) return undefined;
-    const t = map[String(coin) + ':' + String(network)];
-    return Number.isFinite(t) ? t : undefined;
-}
-
-/**
- * Default simulated block height for (coin, network): the MAX armed threshold across
- * the height gates, so sitting on it activates all of them (every predicate compares
- * with `>=`), exactly as DEFAULT_BLOCK_TIME does for the block-time gates. Read off
- * the VM's exported maps, never retyped, so a newly ratified height needs no edit
- * here. Genesis-active networks and an unrecognized coin/network keep the historical 1.
- */
-function defaultBlockHeight(coin, network) {
-    if (GENESIS_ACTIVE_NETWORKS.indexOf(network) !== -1) return 1;
-    const armed = HEIGHT_GATES
-        .map((g) => heightGateThreshold(g, coin, network))
-        .filter((t) => Number.isFinite(t));
-    return armed.length ? Math.max(...armed) : 1;
-}
-
-// Gas ceiling a controller guard runs under. The indexer reads it from
-// GAS_SCHEDULE.VM_GUARD_GAS_CEILING per coin (xchain-indexer/src/coins/BTC.js,
-// DOGE.js, LTC.js all set 200000) and REFUSES to default it
-// (utility.resolveGuardGasCeiling throws when it is missing), so there is no
-// canonical value to import; this is a second home for that number and a
-// deliberate one. A guard's real headroom is 5x smaller than the simulator's
-// 1000000 default, which is the whole reason it is pinned here rather than
-// left to the author. test/determinism/simulator-defaults-cross-repo.test.js
-// compares this constant against GAS_SCHEDULE.VM_GUARD_GAS_CEILING in the
-// sibling coin configs, so a coin-side re-pricing reddens this repo instead of
-// leaving simulate quoting stale headroom; test/toolkit/simulator.test.js keeps
-// a literal pin for a standalone clone with no sibling to read.
-const GUARD_GAS_CEILING = 200000;
-
-// Method name the indexer invokes on a token's bound controller contract
-// (xchain-indexer/src/actions/execute.js GUARD_METHOD).
-const GUARD_METHOD = 'guard';
-
-// Positional, all-string guard inputs, in consensus order
-// (xchain-indexer/src/actions/execute.js runControllerGuard). Named here so
-// callGuard cannot drift from the order the chain actually passes.
-const GUARD_PARAM_ORDER = Object.freeze([
-    'actionType', 'from', 'to', 'tick', 'amount', 'price', 'proceedsTick'
-]);
+// Back-compatible name for the seed a default simulator takes, kept exported (and
+// re-exported from toolkit/index.js) for callers that read it. It is the LIVE
+// anchor; SCHEDULED_BLOCK_TIME above is the preview anchor.
+const DEFAULT_BLOCK_TIME = liveBlockTime();
 
 const DEFAULT_LIMITS = Object.freeze({
     maxCpuTimeMs: 30000,
@@ -224,6 +149,55 @@ const DEFAULT_LIMITS = Object.freeze({
     maxCallDepth: VM_MAX_CALL_DEPTH,
     minCallGas: VM_MIN_CALL_GAS
 });
+
+function initializeBlockContext(opts) {
+    // Which rule set the default anchors on; an unrecognized value reads as
+    // 'live', the fail-safe direction (a typo must not silently preview).
+    this.rules = (opts.rules === 'scheduled') ? 'scheduled' : 'live';
+    // Resolved per construction, never once at module load, so a process that
+    // outlives a flag day picks the new rules up on its next simulator. Held on
+    // the instance because warnIfPreGate measures against THIS simulator's live
+    // anchor rather than a module-wide one.
+    this._liveBlockTime = liveBlockTime();
+    const time0 = (this.rules === 'scheduled') ? SCHEDULED_BLOCK_TIME : this._liveBlockTime;
+
+    // Height, like the timestamp, is DERIVED from the activations it has to
+    // clear; the hash follows the height so it keeps advanceBlock's own naming.
+    const height0 = defaultBlockHeight(this.coin, this.network);
+    this.block = Object.assign(
+        {
+            height: height0,
+            timestamp: time0,
+            hash: 'sim_block_' + String(height0).padStart(16, '0')
+        },
+        opts.block || {}
+    );
+
+    // Scheduled mode is a preview and says so once, naming the gates it turns on
+    // ahead of the live chain by constant name, epoch value and UTC date. Suppressed
+    // when an explicit block.timestamp won, because then the caller chose the instant
+    // and the mode did not seed anything.
+    if (this.rules === 'scheduled' && Number(this.block.timestamp) === SCHEDULED_BLOCK_TIME) {
+        const early = Object.keys(XChainVM)
+            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+            .filter((k) => XChainVM[k] > this._liveBlockTime)
+            .map((k) => k + ' (' + XChainVM[k] + ', ' + new Date(XChainVM[k] * 1000).toISOString() + ')');
+        if (early.length) {
+            console.warn(
+                '[xchain-vm simulator] rules: scheduled simulates block time ' +
+                SCHEDULED_BLOCK_TIME + ', which activates ' + early.length + ' gate(s) ahead ' +
+                'of the live chain: ' + early.join(', ') + '. Gas and deploy verdicts from ' +
+                'this simulator are a PREVIEW, not what a chain charges today.'
+            );
+        }
+    }
+    // One pre-flag-day warning per instance, not per call (see warnIfPreGate).
+    this._preGateWarned = false;
+    // Likewise for the height-gate warning (see warnIfPreHeightGate).
+    this._preHeightGateWarned = false;
+    // Likewise for the deploy-gate rejection warning (see warnDeployGate).
+    this._deployGateWarned = false;
+}
 
 class ContractSimulator {
     /**
@@ -241,8 +215,15 @@ class ContractSimulator {
      * @param {number} [opts.gasCeiling=1000000]
      * @param {object} [opts.gasSchedule]    - override the canonical schedule
      * @param {object} [opts.limits]         - override the default resource limits
+     * @param {string} [opts.rules='live']    - which rule set the default block time
+     *        anchors on. 'live' is the newest ELAPSED *_GATE_BLOCK_TIME, so a
+     *        default simulation matches what a live chain runs right now.
+     *        'scheduled' is the newest RATIFIED gate including future-dated ones,
+     *        for previewing a flag day before it arrives; it warns once, naming
+     *        each gate it activates ahead of the live chain. An explicit
+     *        opts.block.timestamp wins over either mode.
      * @param {object} [opts.block]          - initial { height, timestamp, hash }.
-     *        timestamp defaults to the VM's newest *_GATE_BLOCK_TIME, so the
+     *        timestamp defaults to the newest ELAPSED *_GATE_BLOCK_TIME, so the
      *        block-time-keyed meters are ON and gas matches a live chain; a
      *        lower value simulates the pre-activation rule set and warns once.
      *        height defaults to the newest ARMED activation height for
@@ -268,23 +249,7 @@ class ContractSimulator {
         this.limits = Object.assign({}, DEFAULT_LIMITS, opts.limits || {});
         this.defaultCaller = opts.defaultCaller || 'sim_caller';
 
-        // Height, like the timestamp, is DERIVED from the activations it has to
-        // clear; the hash follows the height so it keeps advanceBlock's own naming.
-        const height0 = defaultBlockHeight(this.coin, this.network);
-        this.block = Object.assign(
-            {
-                height: height0,
-                timestamp: DEFAULT_BLOCK_TIME,
-                hash: 'sim_block_' + String(height0).padStart(16, '0')
-            },
-            opts.block || {}
-        );
-        // One pre-flag-day warning per instance, not per call (see _warnIfPreGate).
-        this._preGateWarned = false;
-        // Likewise for the height-gate warning (see _warnIfPreHeightGate).
-        this._preHeightGateWarned = false;
-        // Likewise for the deploy-gate rejection warning (see _warnDeployGate).
-        this._deployGateWarned = false;
+        initializeBlockContext.call(this, opts);
 
         // Read-only snapshots the author seeds.
         this.balances = {};        // address -> tick -> amountStr
@@ -292,7 +257,7 @@ class ContractSimulator {
         this.oracle = { snapshotAge: 0, prices: {}, rounds: {} };
         this.crossChainData = { attestations: {}, settled: {}, calls: {} };
         // The remaining read-only snapshots the gateway reads. Shapes are the
-        // ones src/readonly-accessors.js documents; an empty snapshot is
+        // ones src/readonly_accessors.js documents; an empty snapshot is
         // behaviour-identical to a null one, because the gateway's own
         // null-guards return the same null / '0' / [] it resolves to.
         this.attestationData   = { responses: {} };
@@ -315,474 +280,17 @@ class ContractSimulator {
         this.vm.beginBlock();
         this._blockOpen = true;
     }
-
-    // ---- read-only-state seeding -------------------------------------------
-
-    /** Seed an address's balance of a tick (read by contract getBalance). */
-    setBalance(address, tick, amount) {
-        if (!this.balances[address]) this.balances[address] = {};
-        this.balances[address][tick] = String(amount);
-        return this;
-    }
-
-    /** Read a seeded balance (mirrors the contract's getBalance view). */
-    getBalance(address, tick) {
-        return (this.balances[address] && this.balances[address][tick]) || null;
-    }
-
-    /** Seed token metadata (read by contract getTokenInfo). */
-    setTokenInfo(tick, info) {
-        this.tokenInfo[tick] = info;
-        return this;
-    }
-
-    /**
-     * Seed an oracle price for a coin pair.
-     * @param {string} pair
-     * @param {string|number|object} price - a scalar price, or a full
-     *        { price, roundNumber, timestamp } record.
-     */
-    setPrice(pair, price) {
-        const rec = (price && typeof price === 'object')
-            ? {
-                price: String(price.price),
-                roundNumber: price.roundNumber != null ? Number(price.roundNumber) : 0,
-                timestamp: price.timestamp != null ? Number(price.timestamp) : this.block.timestamp
-              }
-            : { price: String(price), roundNumber: 0, timestamp: this.block.timestamp };
-        this.oracle.prices[pair] = rec;
-        if (!this.oracle.rounds[pair]) this.oracle.rounds[pair] = {};
-        this.oracle.rounds[pair][String(rec.roundNumber)] = rec;
-        return this;
-    }
-
-    /** Set the oracle snapshot age (seconds) reported by getSnapshotAge(). */
-    setOracleSnapshotAge(seconds) {
-        this.oracle.snapshotAge = Number(seconds);
-        return this;
-    }
-
-    /**
-     * Seed a settled ATTEST response (read by attestation.getResponse in a
-     * callback method). Keys are request_ids; the simulator does not derive
-     * them, so pass the id your callback will be handed.
-     */
-    setAttestationResponse(requestId, value) {
-        this.attestationData.responses[String(requestId)] = value;
-        return this;
-    }
-
-    /**
-     * Seed a finalized VOTE poll result (read by poll.getPollResult).
-     * @param {number|string} pollIndex - the VOTE v0 action_index
-     * @param {object} result - { status, winning_option, total_weight,
-     *        total_voters, decided_early, options:[{index,weight,voters}] }
-     */
-    setPollResult(pollIndex, result) {
-        this.pollData.polls[String(pollIndex)] = result;
-        return this;
-    }
-
-    /**
-     * Seed one staker's stake on THIS contract, keeping the three derived
-     * views the accessor reads in agreement. `stakersByTick` is what
-     * stake.getStakers returns verbatim, so it is kept sorted by descending
-     * amount here the way the indexer pre-sorts it.
-     * @param {string} pubkey
-     * @param {string} tick
-     * @param {string|number} amount
-     */
-    setStake(pubkey, tick, amount) {
-        const pk = String(pubkey || '').toLowerCase();
-        const tk = String(tick || '');
-        const amt = String(amount);
-        const key = pk + '|' + tk;
-        const prev = this.contractStakeData.stakeByPubkeyTick[key];
-        this.contractStakeData.stakeByPubkeyTick[key] = amt;
-
-        const list = (this.contractStakeData.stakersByTick[tk] || []).filter((s) => s.pubkey !== pk);
-        if (Number(amt) !== 0) list.push({ pubkey: pk, amount: amt });
-        list.sort((a, b) => (Number(b.amount) - Number(a.amount)) || (a.pubkey < b.pubkey ? -1 : 1));
-        this.contractStakeData.stakersByTick[tk] = list;
-
-        // Recomputed from the roster rather than accumulated, so re-seeding the
-        // same pubkey replaces its stake instead of double-counting it (prev is
-        // read only to make that intent explicit at the call site).
-        void prev;
-        this.contractStakeData.totalByTick[tk] =
-            String(list.reduce((sum, s) => sum + Number(s.amount), 0));
-        return this;
-    }
-
-    /** Seed a cross-chain attestation value (read by crosschain.getAttestation). */
-    setCrossChainAttestation(chain, actionIndex, value) {
-        this.crossChainData.attestations[String(chain) + ':' + String(actionIndex)] = value;
-        return this;
-    }
-
-    /** Mark a cross-chain action settled (read by crosschain.isSettled). */
-    setCrossChainSettled(chain, actionIndex, settled = true) {
-        this.crossChainData.settled[String(chain) + ':' + String(actionIndex)] = settled === true;
-        return this;
-    }
-
-    /**
-     * Seed the terminal outcome of a cross-chain call this chain originated
-     * (read by crosschain.getCallResult). Keys are lower-cased call_ids,
-     * matching the accessor's own lookup.
-     */
-    setCallResult(callId, result) {
-        this.crossChainData.calls[String(callId).toLowerCase()] =
-            { status: String(result && result.status), payload: String(result && result.payload) };
-        return this;
-    }
-
-    // ---- block control ------------------------------------------------------
-
-    /**
-     * Warn once per simulator when the simulated block time sits below the VM's
-     * newest metering flag-day. Every block-time-keyed meter is OFF down there,
-     * so the gasUsed this run reports is a pre-activation number no live chain
-     * charges. Deliberate below-gate runs are legitimate (the VM's own gated
-     * fixtures do exactly that), so this warns rather than throwing.
-     */
-    _warnIfPreGate() {
-        if (this._preGateWarned) return;
-        if (Number(this.block.timestamp) >= DEFAULT_BLOCK_TIME) return;
-        this._preGateWarned = true;
-        console.warn(
-            '[xchain-vm simulator] block.timestamp ' + this.block.timestamp + ' predates the VM ' +
-            'metering flag-day ' + DEFAULT_BLOCK_TIME + ': the block-time-keyed gas meters are OFF, ' +
-            'so gasUsed UNDER-REPORTS what a live chain charges. Use the default block, ' +
-            'setBlock({ timestamp: ' + DEFAULT_BLOCK_TIME + ' }) or advanceBlock({ byTime }) to ' +
-            'simulate the live rule set.'
-        );
-    }
-
-    /**
-     * Warn once per simulator when a height-keyed gate is OFF for the contract being
-     * executed. The derived default clears every armed gate for the CONFIGURED coin,
-     * so this fires only where the default cannot help: an author-pinned height below
-     * a threshold, or a contractAddress that is not `C:<COIN>:<idx>` (an unresolvable
-     * coin resolves every one of these gates to inactive whatever the height).
-     *
-     * The gate decision itself is delegated to the VM's exported predicates, so the
-     * toolkit can never drift from index.js; the map is read only to tell an ARMED
-     * gate from the explicit `null` unarmed sentinel, which must never warn.
-     * Deliberate below-gate runs stay legal, so this warns rather than throwing.
-     */
-    _warnIfPreHeightGate(contractAddress) {
-        if (this._preHeightGateWarned) return;
-        if (GENESIS_ACTIVE_NETWORKS.indexOf(this.network) !== -1) return;
-
-        const coin = XChainVM.pkg3CoinFromAddress(contractAddress);
-        const height = Number(this.block.height);
-        const armed = HEIGHT_GATES.filter(
-            (g) => heightGateThreshold(g, coin, this.network) !== undefined);
-
-        if (!armed.length) {
-            this._preHeightGateWarned = true;
-            console.warn(
-                '[xchain-vm simulator] no block-HEIGHT activation is armed for coin ' +
-                JSON.stringify(coin) + ' on network ' + JSON.stringify(this.network) + ' ' +
-                '(resolved from contract address ' + JSON.stringify(contractAddress) + '): the ' +
-                'Pkg-3 sandbox, the execute-time re-lint and the lint global-alias refinement ' +
-                'all resolve to INACTIVE at every height, so this run does NOT reproduce a ' +
-                'mainnet rule set. Deploy at a C:<COIN>:<idx> address whose coin the VM gates.'
-            );
-            return;
-        }
-
-        const off = armed.filter((g) => !XChainVM[g.isActive](this.network, coin, height));
-        if (!off.length) return;
-        this._preHeightGateWarned = true;
-        console.warn(
-            '[xchain-vm simulator] block.height ' + height + ' is below the ' + this.network +
-            ' activation for ' + coin + ': ' +
-            off.map((g) => g.label + ' (' + heightGateThreshold(g, coin, this.network) + ')').join(', ') +
-            ' ' + (off.length === 1 ? 'is' : 'are') + ' OFF, so this run executes a ' +
-            'PRE-activation rule set the live chain has left behind. Use the default block or ' +
-            'setBlock({ height: ' + defaultBlockHeight(coin, this.network) + ' }).'
-        );
-    }
-
-    /**
-     * Run the chain's DEPLOY gate over already-transpiled source and return its
-     * verdict as `{ valid, error }`. ADVISORY: deploy() reports it and warns once,
-     * it never refuses, because simulating a source the chain would reject is a
-     * legitimate move (this repo's own fixtures deploy a WebAssembly probe to
-     * measure the runtime strip) and a public toolkit API that started throwing
-     * would break those callers silently.
-     *
-     * The gate is the indexer's, resolved at THIS simulator's epoch rather than
-     * hardcoded on: xchain-indexer/src/actions/deploy.js checks the UTF-8 size cap
-     * and then calls vm.validateSyntax with five epoch-resolved ban flags. It reads
-     * those flags from its own protocolChanges table and per-coin activation
-     * modules; the VM's exported predicates are the twins index.js already uses for
-     * the execute-time re-lint (see the flag map above isExecLintActive's caller),
-     * so they resolve the same verdict without a second copy of the thresholds.
-     * The two height-keyed flags take the CONFIGURED coin, matching deploy.js,
-     * which reads its node's COIN rather than deriving one from the address.
-     */
-    _deployGateVerdict(src) {
-        if (Buffer.byteLength(src, 'utf8') > this.limits.maxCodeSize)
-            return { valid: false, error: 'exceeds max size' };
-        const time   = Number(this.block.timestamp);
-        const height = Number(this.block.height);
-        const pkg3   = XChainVM.isPkg3SandboxActive(this.network, this.coin, height);
-        try {
-            return this.vm.validateSyntax(src, {
-                enforceBannedAsync:     XChainVM.isAsyncSurfaceActive(this.network, time),
-                enforceLintHardening:   XChainVM.isLintHardeningActive(this.network, time),
-                enforceBannedGenerator: pkg3,
-                enforceBannedWasm:      pkg3,
-                enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height)
-            });
-        } catch (e) {
-            // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a
-            // property of THIS machine, not of the contract (syntax.js raises
-            // HostFaultError for exactly that split). Reporting `valid: true` there
-            // would hand the author the reassuring answer a real pass gives, so the
-            // verdict is neither: null says the gate did not run.
-            return { valid: null, error: 'deploy gate could not run on this host: ' + e.message };
-        }
-    }
-
-    /** Merge fields into the current block context ({ height, timestamp, hash }). */
-    setBlock(partial) {
-        Object.assign(this.block, partial || {});
-        return this;
-    }
-
-    /**
-     * Close the current block and open the next one (clears the per-block
-     * compile cache, exactly like the indexer between blocks).
-     * @param {object} [o]
-     * @param {number} [o.byTime=600] - seconds to advance the timestamp
-     * @param {string} [o.hash]       - explicit next block hash
-     */
-    advanceBlock(o = {}) {
-        if (this._blockOpen) this.vm.endBlock();
-        this.block.height += 1;
-        this.block.timestamp += (o.byTime != null ? Number(o.byTime) : 600);
-        this.block.hash = o.hash || ('sim_block_' + String(this.block.height).padStart(16, '0'));
-        this.vm.beginBlock();
-        this._blockOpen = true;
-        return this;
-    }
-
-    // ---- deploy / call ------------------------------------------------------
-
-    /**
-     * Register a contract (and optionally run its `initialize` constructor).
-     * @param {string} code - contract source (JS, or TS if opts.filename is *.ts)
-     * @param {object} [opts]
-     * @param {number} [opts.contractIndex] - explicit index (default auto)
-     * @param {string} [opts.contractAddress] - explicit address (default C:{coin}:{i})
-     * @param {object} [opts.state] - initial state k/v
-     * @param {string} [opts.filename] - drives TS detection (.ts -> type-strip)
-     * @param {string[]} [opts.constructorParams] - if present, runs `initialize`
-     * @param {string} [opts.caller]
-     * @returns {Promise<{contractIndex, contractAddress, initResult, deployGate}>}
-     *          deployGate is the chain's deploy verdict, `{ valid: true }` or
-     *          `{ valid: false, error }`. Advisory: a reject warns once and the
-     *          contract is still registered (see _deployGateVerdict).
-     */
-    async deploy(code, opts = {}) {
-        const src = toContractJs(code, opts.filename || '');
-        const deployGate = this._deployGateVerdict(src);
-        if (deployGate.valid !== true) this._warnDeployGate(deployGate);
-        const index = (opts.contractIndex != null) ? Number(opts.contractIndex) : this._nextIndex;
-        if (index >= this._nextIndex) this._nextIndex = index + 1;
-        const address = opts.contractAddress || ('C:' + this.coin + ':' + index);
-
-        this.contracts.set(index, {
-            code: src,
-            address,
-            state: Object.assign({}, opts.state || {})
-        });
-
-        let initResult = null;
-        if (opts.constructorParams !== undefined) {
-            initResult = await this.call(index, 'initialize', opts.constructorParams, {
-                caller: opts.caller
-            });
-        }
-        return { contractIndex: index, contractAddress: address, initResult, deployGate };
-    }
-
-    /**
-     * Warn once per simulator when the deploy gate rejects a source. Fires only on
-     * a REJECT, so a clean contract keeps the simulator silent, and once per
-     * instance for the same reason the two block-gate warnings are (see
-     * _warnIfPreGate): a per-call warning trains authors to ignore it.
-     */
-    _warnDeployGate(verdict) {
-        if (this._deployGateWarned) return;
-        this._deployGateWarned = true;
-        if (verdict.valid === null) {
-            console.warn('[xchain-vm simulator] ' + verdict.error +
-                '; deployGate.valid is null, which is NOT a pass. `xchain-foundry lint` runs ' +
-                'the acorn half of the same gate without an isolate.');
-            return;
-        }
-        console.warn(
-            '[xchain-vm simulator] the DEPLOY gate rejects this contract: ' + verdict.error +
-            '. On chain xchain-indexer records `invalid: CODE_ENCODING (...)` and the contract ' +
-            'never exists, so any call() result below is simulation-only. The verdict rides ' +
-            'back on deploy() as `deployGate`; `xchain-foundry lint` reports it without an isolate.'
-        );
-    }
-
-    /**
-     * Execute a method on a deployed contract against its persisted state.
-     * @param {number} contractIndex
-     * @param {string} [method='default']
-     * @param {string[]} [params=[]]
-     * @param {object} [opts]
-     * @param {string} [opts.caller]
-     * @param {number} [opts.gasLimit] - per-call ceiling (clamped to gasCeiling)
-     * @param {string} [opts.txHash]   - identity pass-throughs. Forwarded
-     * @param {number} [opts.actionIndex]       verbatim; the VM does its own
-     * @param {string|number} [opts.rootActionIndex]  normalization. Supply them
-     * @param {string} [opts.callPath]          to make a derived request_id /
-     * @param {number} [opts.callDepth]         call_id match a real one.
-     * @param {object} [opts.providerDeadlines] - ATTEST provider deadline windows
-     * @returns {Promise<object>} the VM execute() result, unchanged.
-     */
-    async call(contractIndex, method = 'default', params = [], opts = {}) {
-        return this._execute(contractIndex, method, params, opts, null);
-    }
-
-    /**
-     * Run a token's bound controller contract in the mode the indexer runs it,
-     * mirroring runControllerGuard (xchain-indexer/src/actions/execute.js).
-     *
-     * Guard mode is a MODE, not a flag on call(), on purpose: under isGuard the
-     * chain also passes attestationData null, callPath '' and a 5x smaller gas
-     * ceiling. A raw flag lets an author set one of those four and simulate a
-     * combination the chain never produces.
-     *
-     * @param {number} contractIndex
-     * @param {object} action - { actionType, from, to, tick, amount, price,
-     *        proceedsTick }; each is coerced to a string, absent becomes ''.
-     * @param {object} [opts] - as call(), except attestationData is forced null
-     *        and callPath is forced ''. gasLimit still overrides the ceiling.
-     * @returns {Promise<object>} the VM execute() result, unchanged.
-     */
-    async callGuard(contractIndex, action = {}, opts = {}) {
-        const params = GUARD_PARAM_ORDER.map((k) => {
-            const v = action[k];
-            return (v === undefined || v === null) ? '' : String(v);
-        });
-        return this._execute(contractIndex, GUARD_METHOD, params, opts, {
-            isGuard: true,
-            // A guard has no attestation-request surface (the gateway disables
-            // attestation.request under isGuard), so the chain keeps its read
-            // surface narrow by passing null here. Seeded responses are NOT
-            // visible to a guard, and that is the point.
-            attestationData: null,
-            // A guard is a root execution for its own subtree.
-            callPath: '',
-            gasCeiling: (opts.gasLimit != null) ? Number(opts.gasLimit) : GUARD_GAS_CEILING
-        });
-    }
-
-    /**
-     * Shared execute path for call() and callGuard(). `modeOverrides` is applied
-     * LAST so a mode owns the keys it pins; everything else stays exactly as
-     * call() has always built it.
-     */
-    async _execute(contractIndex, method, params, opts, modeOverrides) {
-        const contract = this.contracts.get(Number(contractIndex));
-        if (!contract) {
-            throw new Error('no contract deployed at index ' + contractIndex);
-        }
-        this._warnIfPreGate();
-        this._warnIfPreHeightGate(contract.address);
-
-        const execOpts = {
-            code: contract.code,
-            state: contract.state,
-            method: method || 'default',
-            params: Array.isArray(params) ? params : [],
-            caller: opts.caller || this.defaultCaller,
-            contractAddress: contract.address,
-            contractIndex: Number(contractIndex),
-            network: this.network,
-            blockContext: {
-                height: this.block.height,
-                timestamp: this.block.timestamp,
-                hash: this.block.hash
-            },
-            balances: this.balances,
-            tokenInfo: this.tokenInfo,
-            oracleData: this.oracle,
-            crossChainData: this.crossChainData,
-            attestationData: this.attestationData,
-            pollData: this.pollData,
-            contractStakeData: this.contractStakeData,
-            // Identity fields. The VM defaults every one of these itself
-            // (txHash '', actionIndex null, rootActionIndex null, callPath '',
-            // callDepth 0, providerDeadlines null), so an omitted opt lands on
-            // exactly the value the simulator produced before they existed.
-            txHash: opts.txHash != null ? String(opts.txHash) : '',
-            actionIndex: opts.actionIndex != null ? Number(opts.actionIndex) : null,
-            rootActionIndex: opts.rootActionIndex != null ? opts.rootActionIndex : null,
-            callPath: typeof opts.callPath === 'string' ? opts.callPath : '',
-            callDepth: Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
-            providerDeadlines: opts.providerDeadlines || null
-        };
-        if (opts.gasLimit != null) execOpts.gasCeiling = Number(opts.gasLimit);
-        if (modeOverrides) Object.assign(execOpts, modeOverrides);
-
-        const result = await this.vm.execute(execOpts);
-
-        // Commit committed state exactly as the indexer does. On failure the VM
-        // returns empty change/delete arrays, so this is a no-op then (atomicity).
-        if (result && result.success) {
-            for (const change of (result.stateChanges || [])) {
-                contract.state[change.key] = change.value;
-            }
-            for (const key of (result.stateDeletes || [])) {
-                delete contract.state[key];
-            }
-        }
-        return result;
-    }
-
-    // ---- inspection ---------------------------------------------------------
-
-    /** Snapshot a deployed contract's current committed state (a copy). */
-    getState(contractIndex) {
-        const c = this.contracts.get(Number(contractIndex));
-        return c ? Object.assign({}, c.state) : null;
-    }
-
-    /** Read one committed state value (or null). */
-    getStateValue(contractIndex, key) {
-        const c = this.contracts.get(Number(contractIndex));
-        return (c && Object.prototype.hasOwnProperty.call(c.state, key)) ? c.state[key] : null;
-    }
-
-    /**
-     * Close the open block and shut down the VM. Each execute() disposes its own
-     * isolate, so the only durable resource is a subprocess-mode worker, which
-     * shutdown() reaps. Call when done with the simulator.
-     * @returns {Promise<void>}
-     */
-    async close() {
-        if (this._blockOpen) {
-            try { this.vm.endBlock(); } catch (e) { /* already closed */ }
-            this._blockOpen = false;
-        }
-        if (typeof this.vm.shutdown === 'function') {
-            try { await this.vm.shutdown(); } catch (e) { /* best-effort */ }
-        }
-    }
 }
+
+Object.assign(
+    ContractSimulator.prototype,
+    worldStateSetters,
+    gateWarnings,
+    execution
+);
 
 module.exports = {
     ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME,
+    SCHEDULED_BLOCK_TIME, liveBlockTime,
     GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER
 };

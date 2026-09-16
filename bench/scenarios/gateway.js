@@ -35,6 +35,7 @@ const {
 const ITERATIONS = 50;
 const WARMUP     = 5;
 
+// Inline contracts that isolate single gateway method types
 const CONTRACTS = {
     context_getters: `
 module.exports = function(xchain) {

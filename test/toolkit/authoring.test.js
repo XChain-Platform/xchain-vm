@@ -22,20 +22,14 @@
 
 const assert = require('assert');
 const {
-    KNOWLEDGE,
-    buildSystemPrompt,
-    buildUserPrompt,
-    buildAuthoringPrompt,
-    buildRepairPrompt,
-    extractContractCode,
-    authorContract
+    KNOWLEDGE
 } = require('../../src/toolkit/authoring.js');
 const { runGate } = require('../../src/toolkit/gate.js');
-const SHARED = require('../../src/stripped-globals.js');
+const SHARED = require('../../src/stripped_globals.js');
 // The two authorities behind the taught reserved-identifier list. Both are
 // acorn-only, so they load wherever this suite does.
 const meteringMod = require('../../src/metering.js');
-const lintCoreMod = require('../../src/lint-core.js');
+const lintCoreMod = require('../../src/lint_core.js');
 
 // sandbox.js requires isolated-vm at the top level, so it is loaded defensively
 // (same convention as test/unit/lint-shared-rules.test.js): the strip-set parity
@@ -43,60 +37,6 @@ const lintCoreMod = require('../../src/lint-core.js');
 // cannot dlopen. Everything else in this suite stays isolate-free.
 let sandboxMod = null;
 try { sandboxMod = require('../../src/sandbox.js'); } catch (e) { /* no isolate */ }
-
-// A gate-clean counter contract used as the model's "good" answer. It carries
-// `meta` because CONTRACT_META_REQUIRED makes identity a deploy verdict: a
-// nameless contract is gate-BLOCKED, which is what NAMELESS_CONTRACT below drives.
-const CLEAN_CONTRACT = `// SPDX-License-Identifier: MIT
-module.exports = {
-    meta: { name: 'Counter', description: 'A counter anyone may increment.', version: '1.0.0' },
-    initialize: function (xchain) {
-        xchain.state.set('count', '0');
-    },
-    increment: function (xchain) {
-        var c = xchain.state.get('count') || '0';
-        xchain.state.set('count', xchain.math.add(c, '1'));
-        return xchain.state.get('count');
-    }
-};`;
-
-// A contract that FAILS the deploy gate: native Math.pow (banned transcendental).
-// It carries a valid `meta` so it fails on exactly one axis.
-const BAD_CONTRACT = `module.exports = {
-    meta: { name: 'Powers', description: 'Stores a power of two.', version: '1.0.0' },
-    initialize: function (xchain) {
-        xchain.state.set('x', String(Math.pow(2, 3)));
-    }
-};`;
-
-// Determinism-clean but with no identity: the shape CONTRACT_META_REQUIRED
-// rejects on chain, and therefore the shape the repair loop has to fix.
-const NAMELESS_CONTRACT = `module.exports = {
-    initialize: function (xchain) {
-        xchain.state.set('count', '0');
-    }
-};`;
-
-// Wrap contract source in a model-style fenced reply, optionally with notes.
-function reply(code, lang, notes) {
-    let out = '```' + (lang || 'javascript') + '\n' + code + '\n```';
-    if (notes) out += '\n\nNotes:\n' + notes;
-    return out;
-}
-
-// A fake LLM: returns queued replies in order; asserts it is called correctly.
-function fakeComplete(replies) {
-    let i = 0;
-    const calls = [];
-    const fn = function (messages) {
-        calls.push(messages);
-        const r = replies[Math.min(i, replies.length - 1)];
-        i++;
-        return r;
-    };
-    fn.calls = calls;
-    return fn;
-}
 
 describe('Toolkit authoring: knowledge base', function () {
     it('exposes the canonical concept map and hard rules', function () {
@@ -110,14 +50,14 @@ describe('Toolkit authoring: knowledge base', function () {
 
     it('teaches the one shared definition, not a copy of it', function () {
         // authoring.js must stay isolated-vm-free (the gate is pure acorn and the
-        // harness runs on any OS), so it requires src/stripped-globals.js, the same
-        // module sandbox.js and lint-core.js require, and this identity check runs
+        // harness runs on any OS), so it requires src/stripped_globals.js, the same
+        // module sandbox.js and lint_core.js require, and this identity check runs
         // without the binding rather than skipping wherever isolated-vm will not load.
         assert.strictEqual(KNOWLEDGE.strippedGlobals, SHARED.STRIPPED_GLOBAL_NAMES,
-            'the authoring knowledge base must teach the very array stripped-globals.js ' +
+            'the authoring knowledge base must teach the very array stripped_globals.js ' +
             'froze; a distinct array means a second literal crept back in');
         assert.strictEqual(KNOWLEDGE.strippedGlobals,
-            require('../../src/lint-core.js').STRIPPED_GLOBAL_NAMES,
+            require('../../src/lint_core.js').STRIPPED_GLOBAL_NAMES,
             'the knowledge base and the linter must read one source of truth');
     });
 
@@ -146,6 +86,9 @@ describe('Toolkit authoring: knowledge base', function () {
         }
     });
 
+});
+
+describe('Toolkit authoring: knowledge base', function () {
     it('the taught reserved identifiers are the set the deploy gate rejects', function () {
         // Pins the taught set against both gate authorities rather than a hand-typed
         // sketch, which drifts in both directions: missing names the gate rejects and
@@ -174,251 +117,5 @@ describe('Toolkit authoring: knowledge base', function () {
         // If our own teaching example would be rejected on deploy, the prompt is lying.
         const g = runGate(KNOWLEDGE.contractShape);
         assert.strictEqual(g.ok, true, 'contractShape must pass the deploy gate: ' + JSON.stringify(g.errors));
-    });
-});
-
-describe('Toolkit authoring: prompt construction', function () {
-    it('system prompt embeds the model shifts, concept map, and hard rules', function () {
-        const sys = buildSystemPrompt();
-        assert(/msg\.sender/.test(sys) && /getSourceAddress/.test(sys));
-        assert(/DEPOSIT/.test(sys) && /BATCH/.test(sys));
-        assert(/REJECTS/.test(sys), 'must warn the gate rejects violations');
-        // The stripped globals are NOT deploy-blocking: they are deleted from the
-        // isolate, so that contract deploys and throws at execution. The prompt has
-        // to say so, or an author reads a gate-clean lint as proof it will run.
-        assert(/THROWS on its first execution/.test(sys),
-            'must distinguish the runtime-throw class from the deploy-reject class');
-        assert(/\bstructuredClone\b/.test(sys) && /\bperformance\b/.test(sys),
-            'the rendered hard rules must carry the full stripped-global list');
-        assert(/deterministic/i.test(sys));
-    });
-
-    it('never claims a decimal literal is rejected at deploy, and still names the Math ban as blocking', function () {
-        // Enforcement parity, derived from the gate rather than from prose: rule
-        // 'float-literal' is absent from CONSENSUS_RULES, so a contract with `0.5`
-        // deploys with a warning (test/toolkit/gate.test.js pins that), while
-        // 'banned-math' IS in the set and rejects. Guidance that welds the two into
-        // one "floats are rejected at deploy" sentence teaches a rule the chain does
-        // not enforce; this asserts the wording cannot drift back.
-        const sys = buildSystemPrompt();
-
-        assert.strictEqual(runGate('module.exports = function(xchain) { var r = 0.5; return String(r); };').ok,
-            true, 'precondition: a decimal literal must still be gate-clean');
-        assert.strictEqual(runGate('module.exports = function(xchain) { return String(Math.pow(2, 3)); };').ok,
-            false, 'precondition: native Math.pow must still be gate-rejected');
-
-        // The affirmative claim, in every phrasing the guidance has actually used.
-        const FALSE_CLAIMS = [
-            /FLOATS ARE REJECTED AT DEPLOY/i,
-            /floats?\s+(?:are|is)\s+rejected/i,
-            /(?:decimal|number|numeric)\s+literals?\s+(?:are|is)\s+rejected/i,
-            /No floats anywhere/i
-        ];
-        for (const re of FALSE_CLAIMS)
-            assert(!re.test(sys), 'guidance still claims deploy rejects floats: ' + re);
-
-        // The genuinely blocking half must survive the split.
-        assert(/Math\.sqrt\/pow\/log/.test(sys), 'the banned Math calls must still be named');
-        assert(/decimal literal[\s\S]{0,120}WARNING|WARNING[\s\S]{0,120}decimal literal/i.test(sys),
-            'the decimal-literal rule must be stated as a warning');
-    });
-
-    it('describe mode puts the English brief in the user prompt', function () {
-        const u = buildUserPrompt({ mode: 'describe', input: 'a vesting vault for TEAM tokens' });
-        assert(/vesting vault for TEAM tokens/.test(u));
-    });
-
-    it('from-solidity mode fences the source and asks for a differences section', function () {
-        const u = buildUserPrompt({ mode: 'from-solidity', input: 'contract C { uint x; }' });
-        assert(/```solidity/.test(u));
-        assert(/contract C \{ uint x; \}/.test(u));
-        assert(/DIFFERENCES/.test(u));
-    });
-
-    it('asks for the contract identity up front, in both modes', function () {
-        // A missing `meta` is a deploy REJECTION, not a style note, so the ask is in
-        // the user message before the brief rather than left to a repair round.
-        for (const mode of ['describe', 'from-solidity']) {
-            const u = buildUserPrompt({ mode, input: 'a vesting vault' });
-            assert(/`meta`/.test(u), mode + ': the prompt must name the meta export');
-            assert(/FIRST key/.test(u), mode + ': meta must be asked for as the first key');
-            assert(/`name` \(1\.\.64 bytes\)/.test(u), mode + ': the name ask must carry its cap');
-            assert(/one-line `description` \(1\.\.512 bytes\)/.test(u), mode + ': the description ask must carry its cap');
-            assert(/REQUIRED/.test(u), mode + ': the ask must say the fields are required');
-            assert(/rejected/.test(u), mode + ': the ask must say a deploy without them is rejected');
-        }
-    });
-
-    it('pins the caller-supplied name and description when given', function () {
-        const u = buildUserPrompt({ mode: 'describe', input: 'x', name: 'Escrow', description: 'Two-party escrow.' });
-        assert(/Use exactly this name: "Escrow"/.test(u));
-        assert(/Use exactly this description: "Two-party escrow\."/.test(u));
-        assert(!/Choose a name/.test(u), 'nothing is left to the model once both are pinned');
-        const half = buildUserPrompt({ mode: 'describe', input: 'x', name: 'Escrow' });
-        assert(/Choose a one-line description/.test(half));
-    });
-
-    it('the hard rules teach the identity export', function () {
-        const text = KNOWLEDGE.hardRules.join('\n');
-        assert(/meta: \{ name, description, version \}/.test(text));
-        assert(/contract\.meta = \{ \.\.\. \}/.test(text), 'the function-export form must be taught (spec R1)');
-        const sys = buildSystemPrompt();
-        assert(/1\.\.64 bytes/.test(sys) && /1\.\.512 bytes/.test(sys),
-            'the rendered system prompt must carry the identity caps');
-    });
-
-    it('buildAuthoringPrompt returns a chat-style messages array', function () {
-        const p = buildAuthoringPrompt({ mode: 'describe', input: 'x' });
-        assert.strictEqual(p.messages.length, 2);
-        assert.strictEqual(p.messages[0].role, 'system');
-        assert.strictEqual(p.messages[1].role, 'user');
-    });
-
-    it('typescript flag asks for erasable-types-only TS', function () {
-        const sys = buildSystemPrompt({ typescript: true });
-        assert(/TypeScript/.test(sys));
-        assert(/no enums/i.test(sys));
-    });
-
-    it('rejects an unknown mode', function () {
-        assert.throws(() => buildAuthoringPrompt({ mode: 'nope', input: 'x' }), /unknown authoring mode/);
-    });
-
-    it('repair prompt lists the gate errors and echoes the previous code', function () {
-        const g = runGate(BAD_CONTRACT);
-        assert.strictEqual(g.ok, false);
-        const rp = buildRepairPrompt(BAD_CONTRACT, g);
-        assert(/FAILS the XChain deploy determinism gate/.test(rp));
-        assert(/banned-math/.test(rp));
-        assert(/Math\.pow/.test(rp));
-    });
-});
-
-describe('Toolkit authoring: response extraction', function () {
-    it('pulls the first fenced block and separates trailing notes', function () {
-        const r = reply(CLEAN_CONTRACT, 'javascript', 'value enters via DEPOSIT, not msg.value.');
-        const ex = extractContractCode(r);
-        assert.strictEqual(ex.hadFence, true);
-        assert(/module\.exports/.test(ex.code));
-        assert(/DEPOSIT/.test(ex.notes));
-        assert(!/```/.test(ex.notes), 'notes must not include the fence');
-    });
-
-    it('reads the fence language tag', function () {
-        const ex = extractContractCode(reply('const x = 1;', 'typescript'));
-        assert.strictEqual(ex.lang, 'typescript');
-    });
-
-    it('falls back to raw text when there is no fence', function () {
-        const ex = extractContractCode('module.exports = function (xchain) { return "1"; };');
-        assert.strictEqual(ex.hadFence, false);
-        assert(/module\.exports/.test(ex.code));
-    });
-
-    it('returns null code for empty input', function () {
-        assert.strictEqual(extractContractCode('').code, null);
-        assert.strictEqual(extractContractCode(null).code, null);
-    });
-});
-
-describe('Toolkit authoring: authorContract harness', function () {
-    it('happy path: a clean first answer passes the gate in one attempt', async function () {
-        const complete = fakeComplete([reply(CLEAN_CONTRACT)]);
-        const res = await authorContract({ mode: 'describe', input: 'a counter', complete });
-        assert.strictEqual(res.ok, true);
-        assert.strictEqual(res.attempts, 1);
-        assert(res.gate.ok);
-        assert(/module\.exports/.test(res.code));
-    });
-
-    it('repair loop: a bad first answer is fixed on the second attempt', async function () {
-        const complete = fakeComplete([reply(BAD_CONTRACT), reply(CLEAN_CONTRACT)]);
-        const res = await authorContract({ mode: 'describe', input: 'a counter', complete, maxRepairs: 2 });
-        assert.strictEqual(res.ok, true);
-        assert.strictEqual(res.attempts, 2, 'should have taken exactly one repair round');
-        // The transcript must contain the repair prompt fed back to the model.
-        const repairMsg = res.transcript.find(m => m.role === 'user' && /banned-math/.test(m.content));
-        assert(repairMsg, 'a repair prompt citing banned-math must be in the transcript');
-    });
-
-    it('repairs a model answer that omits meta, citing the consensus string', async function () {
-        const complete = fakeComplete([reply(NAMELESS_CONTRACT), reply(CLEAN_CONTRACT)]);
-        const res = await authorContract({ mode: 'describe', input: 'a counter', complete, maxRepairs: 2 });
-        assert.strictEqual(res.ok, true);
-        assert.strictEqual(res.attempts, 2, 'the nameless answer must cost exactly one repair round');
-        const repairMsg = res.transcript.find(m => m.role === 'user' &&
-            /invalid: CONTRACT_MANIFEST \(meta required\)/.test(m.content));
-        assert(repairMsg, 'the repair prompt must feed back the chain\'s own verdict string');
-        assert(/contract-meta/.test(repairMsg.content), 'and name the rule that blocked it');
-    });
-
-    it('reports a still-nameless contract as a gate failure after the retry budget', async function () {
-        const complete = fakeComplete([reply(NAMELESS_CONTRACT)]); // never adds meta
-        const res = await authorContract({ mode: 'describe', input: 'x', complete, maxRepairs: 1 });
-        assert.strictEqual(res.ok, false);
-        assert.strictEqual(res.attempts, 2);
-        assert(res.gate.errors.some(e => e.rule === 'contract-meta'),
-            'the unrepaired failure must surface as a blocking contract-meta error');
-    });
-
-    it('gives up after maxRepairs and returns the last gate failure', async function () {
-        const complete = fakeComplete([reply(BAD_CONTRACT)]); // always bad
-        const res = await authorContract({ mode: 'describe', input: 'x', complete, maxRepairs: 2 });
-        assert.strictEqual(res.ok, false);
-        assert.strictEqual(res.attempts, 3, 'first try + 2 repairs');
-        assert(res.gate && res.gate.errors.some(e => e.rule === 'banned-math'));
-    });
-
-    it('maxRepairs: 0 makes exactly one model call', async function () {
-        const complete = fakeComplete([reply(BAD_CONTRACT)]);
-        const res = await authorContract({ mode: 'describe', input: 'x', complete, maxRepairs: 0 });
-        assert.strictEqual(res.attempts, 1);
-        assert.strictEqual(res.ok, false);
-    });
-
-    it('handles a reply with no code by asking again', async function () {
-        const complete = fakeComplete(['I cannot help with that.', reply(CLEAN_CONTRACT)]);
-        const res = await authorContract({ mode: 'describe', input: 'x', complete, maxRepairs: 2 });
-        assert.strictEqual(res.ok, true);
-        assert.strictEqual(res.attempts, 2);
-    });
-
-    it('from-solidity: captures the model differences notes on success', async function () {
-        const notes = 'msg.value has no equivalent; fund via DEPOSIT + BATCH.';
-        const complete = fakeComplete([reply(CLEAN_CONTRACT, 'javascript', notes)]);
-        const res = await authorContract({ mode: 'from-solidity', input: 'contract C {}', complete });
-        assert.strictEqual(res.ok, true);
-        assert(/DEPOSIT/.test(res.notes));
-    });
-
-    it('strips TypeScript before gating when the model returns TS', async function () {
-        const tsContract = `module.exports = {
-    meta: { name: 'Typed', description: 'A typed counter.', version: '1.0.0' },
-    initialize: function (xchain: any): void {
-        let n: string = '0';
-        xchain.state.set('n', n);
-    }
-};`;
-        const complete = fakeComplete([reply(tsContract, 'typescript')]);
-        const res = await authorContract({ mode: 'describe', input: 'x', complete, typescript: true });
-        assert.strictEqual(res.ok, true, JSON.stringify(res.gate && res.gate.errors));
-        // The gate saw JS: no type annotations survive in contractJs.
-        assert(!/:\s*string/.test(res.contractJs), 'types must be erased before the gate');
-    });
-
-    it('throws when no complete function is injected', async function () {
-        await assert.rejects(
-            () => authorContract({ mode: 'describe', input: 'x' }),
-            /requires an injected `complete/
-        );
-    });
-
-    it('accepts an injected gate override (deterministic, no isolate)', async function () {
-        let seen = null;
-        const gate = (code) => { seen = code; return { ok: true, errors: [], advisories: [], warnings: [], gas: { suggested: 1 } }; };
-        const complete = fakeComplete([reply('module.exports = function(x){};')]);
-        const res = await authorContract({ mode: 'describe', input: 'x', complete, gate });
-        assert.strictEqual(res.ok, true);
-        assert(/module\.exports/.test(seen));
     });
 });

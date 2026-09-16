@@ -20,9 +20,9 @@ const assert = require('assert');
 // Require the module DIRECTLY (not the toolkit index) so this stays runnable
 // on a host where isolated-vm cannot dlopen. gate.js pulls in only acorn.
 const { runGate, estimateGas } = require('../../src/toolkit/gate.js');
-// lint-core (not index.js) so this suite still runs where isolated-vm cannot
+// lint_core (not index.js) so this suite still runs where isolated-vm cannot
 // dlopen; mirrors the boundary fixtures in test/unit/lint-cli.test.js.
-const { MAX_CODE_SIZE } = require('../../src/lint-core.js');
+const { MAX_CODE_SIZE } = require('../../src/lint_core.js');
 
 // Pad a clean contract to exactly `bytes` UTF-8 bytes with a trailing line
 // comment, so the padded source stays otherwise lint-clean.
@@ -42,7 +42,7 @@ describe('Toolkit gate: determinism + gas', function() {
     });
 
     // Deploy parity: code over MAX_CODE_SIZE is rejected on chain BEFORE the
-    // syntax gate (deploy.js Buffer.byteLength check), so the gate must FAIL
+    // syntax gate (deploy/index.js Buffer.byteLength check), so the gate must FAIL
     // it too even though `code-size` is deliberately not a CONSENSUS_RULE.
     it('blocks a contract one byte over MAX_CODE_SIZE (deploy parity)', function() {
         const g = runGate(padTo(MAX_CODE_SIZE + 1));
@@ -68,7 +68,9 @@ describe('Toolkit gate: determinism + gas', function() {
         assert.strictEqual(g.ok, false);
         assert(g.errors.some(e => e.rule === 'banned-literal'));
     });
+});
 
+describe('Toolkit gate: determinism + gas', function() {
     it('blocks async surface (nondeterministic microtask timing)', function() {
         const g = runGate('module.exports = async function(xchain) { return 1; };');
         assert.strictEqual(g.ok, false);

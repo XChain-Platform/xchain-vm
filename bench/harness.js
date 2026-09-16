@@ -234,6 +234,17 @@ function printMemory(before, after) {
     console.log('    External:   ' + before.externalMb + ' -> ' + after.externalMb + ' MB (delta: ' + (after.externalMb - before.externalMb).toFixed(2) + ')');
 }
 
+/**
+ * What a benchmark scenario may use. Everything here is shared so that two
+ * scenarios timing the same operation time it the same way: one gas schedule,
+ * one warmup-then-measure loop, one statistics function. A scenario that
+ * builds its own timing loop produces a number nothing else can be compared
+ * against, which is the whole failure mode this module exists to prevent.
+ *
+ * There is deliberately no report writer here: nothing downstream consumes a
+ * machine-readable benchmark file, so the numbers are read from the printed
+ * tables and a writer would be output nobody reads.
+ */
 module.exports = {
     GAS_SCHEDULE,
     createVM,

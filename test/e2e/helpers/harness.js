@@ -71,11 +71,13 @@ class E2EHarness {
     async deploy(opts) {
         const { code, deployer, contractAddress, params } = opts;
 
+        // Validate syntax
         const syntaxResult = this.vm.validateSyntax(code);
         if (!syntaxResult.valid) {
             return { success: false, error: syntaxResult.error };
         }
 
+        // Code size check
         if (Buffer.byteLength(code, 'utf8') > (this.vm.limits.maxCodeSize || 65536)) {
             return { success: false, error: 'code size exceeds limit' };
         }
@@ -133,6 +135,7 @@ class E2EHarness {
             attestationData: this.ledger.buildAttestationAccessor()
         });
 
+        // On success, apply state changes and process emitted actions
         if (result.success) {
             this.ledger.applyStateChanges(
                 opts.contractAddress,
@@ -141,6 +144,7 @@ class E2EHarness {
                 blockContext.height
             );
 
+            // Process emitted actions through mock indexer
             // If an action fails (e.g., overdraw), mark execution as failed
             try {
                 this.indexer.processActions(opts.contractAddress, result.emittedActions);
@@ -201,7 +205,7 @@ class E2EHarness {
      */
     loadContract(name) {
         return fs.readFileSync(
-            path.join(__dirname, '..', 'contracts', name),
+            path.join(__dirname, '..', 'fixtures', 'contracts', name),
             'utf8'
         );
     }

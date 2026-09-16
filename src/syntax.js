@@ -16,7 +16,7 @@
  * Deploy-time validation: V8 syntax check (the only step needing
  * isolated-vm), then the acorn-coverable rules (metering pass, reserved
  * identifiers, banned Math.*, banned literals, and float warnings) which
- * live in the dependency-light, vendorable ./lint-core.js. Keeping the
+ * live in the dependency-light, vendorable ./lint_core.js. Keeping the
  * rules in one place guarantees the deploy path and the SDK/CLI linter
  * never diverge.
  ********************************************************************/
@@ -24,12 +24,12 @@
 
 const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
-const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
+const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint_core.js');
 
 /**
  * Validate contract code syntax before deployment. Runs a V8 syntax check
  * (the only step needing isolated-vm) then the acorn-coverable consensus rules
- * via lint-core.lintSource(); error messages are byte-identical to the
+ * via lint_core.lintSource(); error messages are byte-identical to the
  * historical output, so the on-chain deploy verdict is unchanged.
  *
  * @param {string} code - Contract source code
@@ -37,7 +37,7 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  * @param {boolean} [opts.enforceBannedAsync=true] - whether the 'banned-async'
  *        rule (async/await/Promise) is deploy-blocking. CONSENSUS-GATED: the
  *        indexer passes the resolved VM_BANNED_ASYNC flag-day activation
- *        (deploy.js) so that BELOW the flag day an async/Promise DEPLOY resolves
+ *        (deploy/index.js) so that BELOW the flag day an async/Promise DEPLOY resolves
  *        exactly as it did pre-activation (accepted), and a from-genesis replay
  *        reproduces the historical verdict. Defaults to true so author-facing
  *        callers (the SDK/CLI linter, unit tests) always see the rule.
@@ -46,7 +46,7 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        bindings, SAFE_MATH complement, dynamic import(), shorthand
  *        { Promise }, shadowed-local Promise relaxation) applies. CONSENSUS-
  *        GATED identically to enforceBannedAsync: the indexer passes the
- *        resolved VM_LINT_HARDENING activation (deploy.js) so a from-genesis
+ *        resolved VM_LINT_HARDENING activation (deploy/index.js) so a from-genesis
  *        replay reproduces historical verdicts. Defaults to true.
  * @param {boolean} [opts.enforceLintGlobalAlias=true] - whether the
  *        LINT_GLOBAL_ALIAS refinement applies: sloppy-mode `this` and the
@@ -56,12 +56,12 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        its OWN per-coin block-HEIGHT epoch rather than VM_LINT_HARDENING's,
  *        because that gate is already open on every network and riding it would
  *        retroactively reject contracts the chain already accepted. The indexer
- *        passes the resolved activation (deploy.js). Defaults to true.
+ *        passes the resolved activation (deploy/index.js). Defaults to true.
  * @param {boolean} [opts.enforceBannedGenerator=true] - whether the
  *        'banned-generator' rule (function*, generator methods, yield) is
  *        deploy-blocking. CONSENSUS-GATED identically to enforceBannedAsync, but
  *        on the Pkg 3 per-coin block-HEIGHT flag-day (not a block-time gate): the
- *        indexer passes the resolved activation (deploy.js) so BELOW the height a
+ *        indexer passes the resolved activation (deploy/index.js) so BELOW the height a
  *        generator DEPLOY resolves exactly as it did pre-activation (accepted)
  *        and a from-genesis replay reproduces the historical verdict. Defaults to
  *        true so author-facing callers (SDK/CLI linter, unit tests) always see it.
@@ -71,7 +71,7 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        for-of/for-in head) is deploy-blocking. CONSENSUS-GATED on the
  *        REST_PATTERN_METER block-time flag-day, the same gate that activates the
  *        metering rewrite for the rest forms that DO have an addressable source; the
- *        indexer passes the resolved activation (deploy.js) so BELOW the flag-day such
+ *        indexer passes the resolved activation (deploy/index.js) so BELOW the flag-day such
  *        a deploy resolves exactly as it did pre-activation (accepted) and a
  *        from-genesis replay reproduces the historical verdict. Defaults to true so
  *        author-facing callers (SDK/CLI linter, unit tests) always see it.
@@ -102,10 +102,10 @@ function validateSyntax(code, opts) {
     // it is a contract verdict. A failure to SPAWN the isolate (host memory
     // pressure, thread-creation failure, a native binding that loaded but
     // cannot create isolates) is a property of THIS machine. Reporting the host
-    // fault as 'syntax error: ...' let deploy.js commit
+    // fault as 'syntax error: ...' let deploy/index.js commit
     // 'invalid: CODE_ENCODING' for a contract every healthy peer accepts: a
     // validator-local, host-condition-induced ledger divergence, the same class
-    // the deploy.js EXECUTOR_UNAVAILABLE throw exists to close for a VM that
+    // the deploy/index.js EXECUTOR_UNAVAILABLE throw exists to close for a VM that
     // failed to load at all. HostFaultError carries that code, which
     // faultGuard.rethrowIfInfraFault treats as an infra halt, so the block
     // rolls back and retries and NO verdict is written.
@@ -158,6 +158,6 @@ function checkFloatWarnings(code) {
     return findFloatWarnings(code).map((w) => w.message);
 }
 
-// findBannedMathCalls / findBannedLiterals moved to lint-core.js; re-exported
+// findBannedMathCalls / findBannedLiterals moved to lint_core.js; re-exported
 // here so existing callers of syntax.js keep working unchanged.
 module.exports = { validateSyntax, checkFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest };

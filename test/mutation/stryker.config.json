@@ -1,7 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/core/schema/stryker-schema.json",
   "mutate": [
-    "src/*.js"
+    "src/*.js",
+    "src/gateway/*.js",
+    "src/gateway_emit/*.js",
+    "src/index/*.js"
   ],
   "testRunner": "mocha",
   "mochaOptions": {

@@ -33,6 +33,7 @@ const {
 const BLOCK_SIZE = 100;
 const BLOCKS     = 5;
 
+// Generate unique contract variants by adding a comment
 function makeUniqueVariant(baseCode, index) {
     return '// variant-' + index + '-' + Date.now() + '\n' + baseCode;
 }
@@ -100,6 +101,7 @@ async function main() {
 
     printTable('Block Time by Cache Hit Rate', rows);
 
+    // Speedup analysis
     if (results.length >= 2) {
         const baseline = results[0].meanBlockMs; // 0% hit rate
         console.log('\n  Speedup vs 0% hit rate:');
@@ -109,6 +111,7 @@ async function main() {
         }
     }
 
+    // Per-contract cost at each hit rate
     console.log('\n  Avg per-contract cost:');
     for (const r of results) {
         const perContract = r.meanBlockMs / BLOCK_SIZE;

@@ -65,7 +65,9 @@ describe('Toolkit scaffold', function() {
             'meta must be the FIRST key of the export object');
         assert.strictEqual(runGate(src).errors.filter(e => e.rule === 'contract-meta').length, 0);
     });
+});
 
+describe('Toolkit scaffold', function() {
     it('emits a TS scaffold whose stripped identity is the same', function() {
         const { files, contractFile } = buildScaffold({ name: 'ident-ts', typescript: true });
         const js = toContractJs(files['contracts/' + contractFile], contractFile);
@@ -111,7 +113,9 @@ describe('Toolkit scaffold', function() {
         assert.doesNotMatch(testJs, /^\s*execution: 'subprocess'/m,
             'the subprocess option must stay commented out in the generated harness');
     });
+});
 
+describe('Toolkit scaffold', function() {
     it('rejects an unsafe project name', function() {
         assert.throws(() => buildScaffold({ name: '../evil' }), /invalid project name/);
     });
