@@ -30,7 +30,7 @@
  * WHAT IS NOT GRADED. The top-level prose (what, why, takenAt, note) and the
  * per-entry sdk fields (vendoredInSdk, sdkPath, sdkPathAtOrigin) describe the
  * sdk copy, which is not in this tree; they are printed as not graded.
- * test/unit/lint_parity.test.js is what compares the two copies directly.
+ * test/unit/lint/lint_parity.test.js is what compares the two copies directly.
  *
  * USAGE
  *   node bin/pin_identity.js --compare bin/pins/identity.json

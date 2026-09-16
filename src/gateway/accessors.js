@@ -95,7 +95,7 @@ function buildOracleAPI(gasTracker, readOnlyData, gasSchedule) {
         // each). getSnapshotAge is INTENTIONALLY gas-free, like the zero-gas
         // context accessors: its value is deterministic across all nodes, each
         // call site is already bounded by control-flow gas, and the gas-free
-        // behavior is pinned by test/unit/gateway.test.js (charging it would be
+        // behavior is pinned by test/unit/gateway/gateway.test.js (charging it would be
         // a consensus gas-schedule change).
         oracle: {
             getPrice: (coinPair) => {

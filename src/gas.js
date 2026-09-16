@@ -78,7 +78,7 @@ class GasTracker {
             // `typeof val !== 'number'` is redundant defense: Number.isInteger
             // never coerces, so !Number.isInteger(val) already rejects every
             // non-number. Kept for clarity/intent. Equivalent mutant, proven
-            // exhaustively, see test/unit/gas.test.js boundary tests.
+            // exhaustively, see test/unit/metering/gas.test.js boundary tests.
             // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
             if (typeof val !== 'number' || !Number.isInteger(val) || val < 0)
                 throw new Error('gas schedule value for ' + key + ' must be a non-negative integer, got: ' + val);

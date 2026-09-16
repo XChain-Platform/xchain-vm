@@ -71,6 +71,29 @@
       "test/integration/process_executor.test/13_a_queued_execution_behind_a_host_fault_still_dispatches_the_slot_is_released.test.js",
       "test/integration/process_executor.test/14_a_hostfault_for_an_unknown_id_is_ignored.test.js",
       "test/integration/process_executor.test/15_process_executor_single_in_flight_dispatch_invariant.test.js"
+    ],
+    "test/unit/gateway.test.js": [
+      "test/unit/gateway/gateway.test.js",
+      "test/unit/gateway/gateway.test/01_contract_slash.test.js",
+      "test/unit/gateway/gateway.test/02_control_flow.test.js",
+      "test/unit/gateway/gateway.test/03_logging.test.js",
+      "test/unit/gateway/gateway.test/04_composed_apis_are_wired_in.test.js"
+    ],
+    "test/unit/gateway_emit.test.js": [
+      "test/unit/gateway/gateway_emit.test.js",
+      "test/unit/gateway/gateway_emit.test/01_non_object_params_default_branch_dispenser_file_list_broadcast.test.js",
+      "test/unit/gateway/gateway_emit.test/02_type_validation_throws_validate_types.test.js"
+    ],
+    "test/unit/metering.test.js": [
+      "test/unit/metering/metering.test.js",
+      "test/unit/metering/metering.test/01_meter_code.test.js",
+      "test/unit/metering/metering.test/02_has_gas_identifier.test.js",
+      "test/unit/metering/metering.test/03_deep_binary_expressions.test.js",
+      "test/unit/metering/metering.test/04_combined_constructs.test.js",
+      "test/unit/metering/metering.test/05_per_iteration_gas_cost_regression_pin.test.js",
+      "test/unit/metering/metering.test/06_allocator_transforms.test.js",
+      "test/unit/metering/metering.test/07_ensure_block_braceless_bodies.test.js",
+      "test/unit/metering/metering.test/08_deep_binary_expression_gas_injection.test.js"
     ]
   }
 }

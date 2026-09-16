@@ -26,7 +26,7 @@
  *     an isolate is built (every named network re-lints, mainnet from genesis
  *     since the 2026-09-09 ruling), so the WebAssembly global is unreachable a
  *     layer above the strip; the strip itself is pinned directly in
- *     test/unit/sandbox.test.js (stripWasm);
+ *     test/unit/sandbox/sandbox.test.js (stripWasm);
  *   - testnet/regtest: rejected from genesis the same way;
  *   - per-coin: LTC/DOGE mainnet stay present at a bare BTC 961000 and close
  *     only at their own calendar heights (the per-coin fix).
@@ -72,7 +72,7 @@ const expectLintRejectsWasm = (r) => {
     // At/after a coin's Pkg 3 height the banned-wasm rule is live, and the execute-time
     // source lint (armed on mainnet from genesis by the 2026-09-09 ruling) re-lints the
     // stored source against it before any isolate exists. The strip underneath is the
-    // defence-in-depth layer and is pinned directly in test/unit/sandbox.test.js; through
+    // defence-in-depth layer and is pinned directly in test/unit/sandbox/sandbox.test.js; through
     // execute() the observable verdict at the gate is the lint's.
     it('at the BTC gate (961000), a WebAssembly-referencing contract is rejected at execute', async function () {
         expectLintRejectsWasm(await run(typeofWasm, 961000, 'mainnet', 'BTC'));
