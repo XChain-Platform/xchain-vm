@@ -67,80 +67,98 @@ function send(msg) {
     }
 }
 
-process.on('message', (msg) => {
+function handleInitMessage(msg) {
+    // Force in-process mode in the child (never recurse into another fork).
+    vm = new XChainVM(Object.assign({}, msg.config, { execution: 'in-process' }));
+    send({ type: 'ready' });
+}
+
+function handleBeginBlockMessage() {
+    enqueue(() => { if (vm) vm.beginBlock(); });
+}
+
+function handleEndBlockMessage() {
+    enqueue(() => { if (vm) { vm.endBlock(); flushCoverage(); } });
+}
+
+// vm.execute() throwing is a HOST fault, not a contract outcome, and
+// the two host-fault shapes need OPPOSITE handling.
+//
+// A HostFaultError says THIS MACHINE cannot run the contract at all:
+// index.js raises it when isolateManager.createIsolate() fails, and
+// syntax.js raises it when the execute-time lint isolate cannot be
+// spawned (reaching execute() through getLintVerdict, outside its own
+// try block). Both are properties of this host's memory/thread budget,
+// not of the contract, so every healthy peer commits a normal result
+// for the same execution. Dying here handed the parent's crash clamp a
+// dispatched entry, which resolved a committed
+// 'out_of_resource: execution host terminated' at gasUsed = ceiling --
+// a unilateral fork, and the exact laundering index.js:classifyError
+// re-throws HostFaultError to prevent. Report it instead; the parent
+// rejects the request so the caller HALTS and retries, which is the
+// rule process_executor already enforces for queued and shutdown work.
+// Tested with instanceof, never e.code or the message: an error that
+// crossed the isolate boundary arrives as a plain host Error built from
+// contract-controlled text, and a name/code match would let a contract
+// spoof a chain-wide halt (same anti-spoof rule as classifyError).
+//
+// Every OTHER throw still dies into the parent's deterministic
+// host-termination machinery (onExit -> hostTerminatedResult), which
+// clamps the request to its caller-funded ceiling identically on every
+// validator, exactly as an in-isolate resource failure would.
+function handleExecuteMessage(msg) {
+    enqueue(async () => {
+        let result;
+        try {
+            result = await vm.execute(msg.opts);
+        } catch (e) {
+            if (e instanceof HostFaultError) {
+                send({
+                    type: 'hostfault',
+                    id: msg.id,
+                    reason: String((e && e.message) || 'executor unavailable').slice(0, 200)
+                });
+                // The isolate never came up, so worker state is intact (execute()'s
+                // finally disposes nothing when createIsolate threw). Staying alive
+                // avoids a respawn for what is usually a transient pressure blip.
+                flushCoverage();
+                return;
+            }
+            process.exit(1);
+            return;
+        }
+        send({ type: 'result', id: msg.id, result });
+        // Persist this execution's coverage before the parent can SIGKILL the
+        // worker (inert unless a coverage harness set NODE_V8_COVERAGE).
+        flushCoverage();
+    });
+}
+
+function dispatchMessage(msg) {
     if (!msg) return;
 
     if (msg.type === 'init') {
-        // Force in-process mode in the child (never recurse into another fork).
-        vm = new XChainVM(Object.assign({}, msg.config, { execution: 'in-process' }));
-        send({ type: 'ready' });
+        handleInitMessage(msg);
         return;
     }
 
     if (msg.type === 'beginBlock') {
-        enqueue(() => { if (vm) vm.beginBlock(); });
+        handleBeginBlockMessage();
         return;
     }
 
     if (msg.type === 'endBlock') {
-        enqueue(() => { if (vm) { vm.endBlock(); flushCoverage(); } });
+        handleEndBlockMessage();
         return;
     }
 
     if (msg.type === 'execute') {
-        enqueue(async () => {
-            let result;
-            try {
-                result = await vm.execute(msg.opts);
-            } catch (e) {
-                // vm.execute() throwing is a HOST fault, not a contract outcome, and
-                // the two host-fault shapes need OPPOSITE handling.
-                //
-                // A HostFaultError says THIS MACHINE cannot run the contract at all:
-                // index.js raises it when isolateManager.createIsolate() fails, and
-                // syntax.js raises it when the execute-time lint isolate cannot be
-                // spawned (reaching execute() through getLintVerdict, outside its own
-                // try block). Both are properties of this host's memory/thread budget,
-                // not of the contract, so every healthy peer commits a normal result
-                // for the same execution. Dying here handed the parent's crash clamp a
-                // dispatched entry, which resolved a committed
-                // 'out_of_resource: execution host terminated' at gasUsed = ceiling --
-                // a unilateral fork, and the exact laundering index.js:classifyError
-                // re-throws HostFaultError to prevent. Report it instead; the parent
-                // rejects the request so the caller HALTS and retries, which is the
-                // rule process_executor already enforces for queued and shutdown work.
-                // Tested with instanceof, never e.code or the message: an error that
-                // crossed the isolate boundary arrives as a plain host Error built from
-                // contract-controlled text, and a name/code match would let a contract
-                // spoof a chain-wide halt (same anti-spoof rule as classifyError).
-                //
-                // Every OTHER throw still dies into the parent's deterministic
-                // host-termination machinery (onExit -> hostTerminatedResult), which
-                // clamps the request to its caller-funded ceiling identically on every
-                // validator, exactly as an in-isolate resource failure would.
-                if (e instanceof HostFaultError) {
-                    send({
-                        type: 'hostfault',
-                        id: msg.id,
-                        reason: String((e && e.message) || 'executor unavailable').slice(0, 200)
-                    });
-                    // The isolate never came up, so worker state is intact (execute()'s
-                    // finally disposes nothing when createIsolate threw). Staying alive
-                    // avoids a respawn for what is usually a transient pressure blip.
-                    flushCoverage();
-                    return;
-                }
-                process.exit(1);
-                return;
-            }
-            send({ type: 'result', id: msg.id, result });
-            // Persist this execution's coverage before the parent can SIGKILL the
-            // worker (inert unless a coverage harness set NODE_V8_COVERAGE).
-            flushCoverage();
-        });
+        handleExecuteMessage(msg);
         return;
     }
-});
+}
+
+process.on('message', dispatchMessage);
 
 // If the parent disconnects (shutdown / crash), flush any pending coverage
 // (best-effort; races the parent's SIGKILL) and exit cleanly.
