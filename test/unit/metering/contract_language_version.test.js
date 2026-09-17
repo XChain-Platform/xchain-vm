@@ -19,8 +19,12 @@
 
 const assert = require('assert');
 const fs     = require('fs');
-const path   = require('path');
 const { CONTRACT_ECMA_VERSION, meterCode } = require('../../../src/metering.js');
+
+const sourcePaths = {
+    'metering.js': require.resolve('../../../src/metering.js'),
+    'syntax.js': require.resolve('../../../src/syntax.js'),
+};
 
 // validateSyntax needs isolated-vm (V8 pre-check); skip those cases cleanly
 // where the binding doesn't load; the preflight suite is the loud guard.
@@ -40,7 +44,7 @@ describe('Contract language version (frozen consensus pin)', function () {
 
     it('no parse site hardcodes an ecmaVersion outside the shared constant', function () {
         for (const file of ['metering.js', 'syntax.js']) {
-            const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'src', file), 'utf8');
+            const src = fs.readFileSync(sourcePaths[file], 'utf8');
             const hardcoded = src.match(/ecmaVersion:\s*\d+/g) || [];
             assert.deepStrictEqual(hardcoded, [],
                 file + ' has a hardcoded ecmaVersion; use CONTRACT_ECMA_VERSION: ' + hardcoded.join(', '));
