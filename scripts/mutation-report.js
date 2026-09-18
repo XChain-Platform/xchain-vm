@@ -36,20 +36,37 @@ const DEFAULT_CUSTOM_JSON  = path.join(ROOT, 'reports', 'mutation', 'custom-muta
 const OUTPUT_MD = path.join(ROOT, 'reports', 'mutation', 'MUTATION_SUMMARY.md');
 
 // Tier classification matching XCHAIN_VM_MUTATION_TESTING_PLAN.md
+//
+// Keyed by repo-relative path (not bare filename): the entry-file splits
+// under src/index/, src/gateway/ and src/gateway_emit/ report at the same
+// tier as the entry they were carved out of, instead of falling through to
+// the Unknown/80 default a bare-filename key would give every part file.
 const TIERS = {
-    'index.js':        { tier: 'Critical', target: 95 },
-    'metering.js':     { tier: 'Critical', target: 95 },
-    'sandbox.js':      { tier: 'Critical', target: 95 },
-    'gas.js':          { tier: 'Critical', target: 95 },
-    'gateway.js':      { tier: 'High',     target: 90 },
-    'gateway_emit.js': { tier: 'High',     target: 90 },
-    'state.js':        { tier: 'High',     target: 90 },
-    'math.js':         { tier: 'High',     target: 90 },
-    'collector.js':    { tier: 'Medium',   target: 85 },
-    'validator.js':    { tier: 'Medium',   target: 85 },
-    'syntax.js':       { tier: 'Medium',   target: 85 },
-    'isolate.js':      { tier: 'Low',      target: 80 },
-    'errors.js':       { tier: 'Low',      target: 80 }
+    'src/index.js':                       { tier: 'Critical', target: 95 },
+    'src/index/block_lifecycle.js':       { tier: 'Critical', target: 95 },
+    'src/index/constants.js':             { tier: 'Critical', target: 95 },
+    'src/index/contract_wrapper.js':      { tier: 'Critical', target: 95 },
+    'src/index/error_results.js':         { tier: 'Critical', target: 95 },
+    'src/index/gateway_injection.js':     { tier: 'Critical', target: 95 },
+    'src/index/install_methods.js':       { tier: 'Critical', target: 95 },
+    'src/index/lint_and_metering.js':     { tier: 'Critical', target: 95 },
+    'src/index/manifest.js':              { tier: 'Critical', target: 95 },
+    'src/metering.js':                    { tier: 'Critical', target: 95 },
+    'src/sandbox.js':                     { tier: 'Critical', target: 95 },
+    'src/gas.js':                         { tier: 'Critical', target: 95 },
+    'src/gateway.js':                     { tier: 'High',     target: 90 },
+    'src/gateway/accessors.js':           { tier: 'High',     target: 90 },
+    'src/gateway/contract_stake.js':      { tier: 'High',     target: 90 },
+    'src/gateway_emit.js':                { tier: 'High',     target: 90 },
+    'src/gateway_emit/param_validation.js': { tier: 'High',   target: 90 },
+    'src/gateway_emit/same_chain.js':     { tier: 'High',     target: 90 },
+    'src/state.js':                       { tier: 'High',     target: 90 },
+    'src/math.js':                        { tier: 'High',     target: 90 },
+    'src/collector.js':                   { tier: 'Medium',   target: 85 },
+    'src/validator.js':                   { tier: 'Medium',   target: 85 },
+    'src/syntax.js':                      { tier: 'Medium',   target: 85 },
+    'src/isolate.js':                     { tier: 'Low',      target: 80 },
+    'src/errors.js':                      { tier: 'Low',      target: 80 }
 };
 
 const TIER_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3, Unknown: 4 };
@@ -156,7 +173,7 @@ function computeFileStats(filePath, fileData) {
 
     const scorable = killed + survived + timeout + noCoverage;
     const score = scorable > 0 ? ((killed + timeout) / scorable * 100) : 0;
-    const tierInfo = TIERS[filename] || { tier: 'Unknown', target: 80 };
+    const tierInfo = TIERS[filePath] || { tier: 'Unknown', target: 80 };
     const status = score >= tierInfo.target ? 'PASS' : 'FAIL';
 
     return { filename, filePath, scorable, killed, survived, timeout, noCoverage, ignored, compileError, score, tierInfo, status };
@@ -299,7 +316,7 @@ function generateMarkdown(mergedFiles) {
     const survivedList = [];
     for (const [filePath, fileData] of Object.entries(mergedFiles)) {
         const filename = path.basename(filePath);
-        const tierInfo = TIERS[filename] || { tier: 'Unknown', target: 80 };
+        const tierInfo = TIERS[filePath] || { tier: 'Unknown', target: 80 };
         for (const m of fileData.mutants) {
             if (m.status === 'Survived' || m.status === 'NoCoverage') {
                 survivedList.push({ filename, filePath, tierInfo, mutant: m });
