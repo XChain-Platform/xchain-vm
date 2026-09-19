@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-17
+
+### Changed
+- Mutation-report tiers are keyed by repository-relative paths.
+
+### Fixed
+- The VM entry point no longer loads the unused `fs` module.
+
 ## [0.19.0] - 2026-09-16
 
 ### Changed
