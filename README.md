@@ -310,7 +310,7 @@ Cross-run and cross-process determinism guarantees in `test/determinism/`: golde
 
 Latency/throughput assertions in `test/performance/` (`npm run test:performance`), distinct from the `bench/` scenario scripts below.
 
-### Toolkit Tests (52)
+### Toolkit Tests (141)
 
 `xchain-foundry` / `create-xchain-contract` developer-toolkit coverage: gate, scaffold, and TypeScript-strip logic run on any OS; simulator-backed cases need the isolated-vm binding (Node 22 / Linux).
 
@@ -413,7 +413,7 @@ xchain-vm/
 |   |-- smoke/            (10 tests)
 |   |-- determinism/      (79 tests, incl. a known-red probe subset)
 |   |-- performance/      (5 tests, distinct from bench/ below)
-|   |-- toolkit/          (52 tests: xchain-foundry gate/scaffold/simulate)
+|   |-- toolkit/          (141 tests: xchain-foundry gate/scaffold/simulate)
 |   |-- e2e/              (10 E2E test files, 64 tests + helpers + contracts)
 |   |-- fuzz/             (9 fuzz test files, 57 tests + harness + generators)
 |   |-- chaos/            (3-phase chaos tests, 76 tests + helpers + contracts)
