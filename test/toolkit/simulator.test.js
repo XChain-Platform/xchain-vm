@@ -136,14 +136,16 @@ module.exports = {
         } finally { await sim.close(); }
     });
 
-    it('reports the chain deploy verdict, on mainnet too, where nothing else lints', async function() {
+    it('reports the mainnet deploy verdict and rejects banned syntax again at call time', async function() {
         // This gate is what surfaces a chain-rejected source at DEPLOY, where the
         // author sees it. The 2026-09-09 ruling armed EXEC_LINT_ACTIVATION on mainnet,
         // so a mainnet simulator now re-lints at call() time too, but only for a source
         // that is actually called; a deploy-rejected source that is never called stays
         // silent without this gate. The case asserted here is the readable one because
         // banned-math also strips Math.sqrt, so the rejection is observable either way.
-        const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
+        const sim = new ContractSimulator({
+            coin: 'BTC', network: 'mainnet', block: { height: 0 }
+        });
         const warned = [];
         const real = console.warn;
         console.warn = (...a) => warned.push(a.join(' '));
@@ -156,6 +158,9 @@ module.exports = {
             // Advisory by design: the contract is still registered, so a fixture that
             // deliberately simulates a chain-rejected source keeps working.
             assert.strictEqual(sim.contracts.size, 1);
+            const res = await sim.call(dep.contractIndex, 'run', []);
+            assert.strictEqual(res.success, false);
+            assert.match(String(res.error), /^error: banned syntax: .*Math\.sqrt/);
             // Warned once, not once per deploy.
             await sim.deploy(
                 'module.exports = { run: function(xchain){ return String(Math.pow(2, 3)); } };');
