@@ -19,19 +19,22 @@
 
 const assert = require('assert');
 const fs     = require('fs');
-const { CONTRACT_ECMA_VERSION, meterCode } = require('../../../src/metering.js');
+const { CONTRACT_ECMA_VERSION, meterCode } = require('../../../src/metering');
 
+// Extensionless specifiers so a move from src/metering.js to
+// src/metering/index.js still resolves to the module the VM loads.
 const sourcePaths = {
-    'metering.js': require.resolve('../../../src/metering.js'),
-    'syntax.js': require.resolve('../../../src/syntax.js'),
+    metering: require.resolve('../../../src/metering'),
+    syntax: require.resolve('../../../src/syntax'),
 };
 
 // validateSyntax needs isolated-vm (V8 pre-check); skip those cases cleanly
 // where the binding doesn't load; the preflight suite is the loud guard.
+// Only the binding probe may skip: a syntax.js that fails to load for any
+// other reason (a moved import, say) must fail here, not skip.
 let HAVE_IVM = true;
-let validateSyntax = null;
-try { validateSyntax = require('../../../src/syntax.js').validateSyntax; }
-catch (e) { HAVE_IVM = false; }
+try { require('isolated-vm'); } catch (e) { HAVE_IVM = false; }
+const validateSyntax = HAVE_IVM ? require('../../../src/syntax').validateSyntax : null;
 
 describe('Contract language version (frozen consensus pin)', function () {
 
@@ -43,12 +46,19 @@ describe('Contract language version (frozen consensus pin)', function () {
     });
 
     it('no parse site hardcodes an ecmaVersion outside the shared constant', function () {
-        for (const file of ['metering.js', 'syntax.js']) {
-            const src = fs.readFileSync(sourcePaths[file], 'utf8');
+        let pinnedSites = 0;
+        for (const file of Object.values(sourcePaths)) {
+            const src = fs.readFileSync(file, 'utf8');
             const hardcoded = src.match(/ecmaVersion:\s*\d+/g) || [];
             assert.deepStrictEqual(hardcoded, [],
                 file + ' has a hardcoded ecmaVersion; use CONTRACT_ECMA_VERSION: ' + hardcoded.join(', '));
+            pinnedSites += (src.match(/ecmaVersion:\s*CONTRACT_ECMA_VERSION/g) || []).length;
         }
+        // A re-export shim left behind by a move would pass the check above
+        // without scanning any parse site, so require at least one pinned site.
+        assert.ok(pinnedSites > 0,
+            'no CONTRACT_ECMA_VERSION parse site in ' + Object.values(sourcePaths).join(', ') +
+            '; point this test at the file that now holds the acorn parse');
     });
 
     it('meterCode accepts ES2020 syntax (optional chaining, nullish coalescing)', function () {
