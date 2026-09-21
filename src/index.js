@@ -2614,7 +2614,8 @@ module.exports.isSlashTokenDelimGuardActive = isSlashTokenDelimGuardActive;
 // exported so a test can pin it against the indexer's MAX_TOKEN_DECIMALS.
 module.exports.isSlashAmountPrecisionActive = isSlashAmountPrecisionActive;
 module.exports.MAX_SLASH_AMOUNT_DECIMALS    = MAX_SLASH_AMOUNT_DECIMALS;
-// Cross-CHAIN call (XCALL) protocol constants, same canonical source.
+// Export the cross-chain call protocol limits so validator hosts can pin the
+// VM's bounds against the values they revalidate while processing emissions.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
 module.exports.XCALL_MAX_HOPS            = XCALL_MAX_HOPS;
