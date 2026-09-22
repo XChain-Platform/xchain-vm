@@ -14,6 +14,7 @@
 
 const acorn = require('acorn');
 const walk = require('acorn-walk');
+const { CONTRACT_ECMA_VERSION } = require('../../metering.js');
 
 // --- Contract identity (`meta`) ------------------------------------------
 //
@@ -195,7 +196,7 @@ function getExportedMeta(source) {
     try {
         // acorn is a hard dependency of lint_core, already required above, so an
         // unparseable source is the only way to land here.
-        ast = acorn.parse(String(source), { ecmaVersion: 2020, sourceType: 'script', locations: true });
+        ast = acorn.parse(String(source), { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
     } catch (e) {
         return { status: 'undecidable' };
     }
