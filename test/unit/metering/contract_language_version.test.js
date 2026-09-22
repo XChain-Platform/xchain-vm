@@ -19,14 +19,24 @@
 
 const assert = require('assert');
 const fs     = require('fs');
+const path   = require('path');
 const { CONTRACT_ECMA_VERSION, meterCode } = require('../../../src/metering');
 
-// Extensionless specifiers so a move from src/metering.js to
-// src/metering/index.js still resolves to the module the VM loads.
-const sourcePaths = {
-    metering: require.resolve('../../../src/metering'),
-    syntax: require.resolve('../../../src/syntax'),
-};
+const SRC_DIR = path.join(__dirname, '../../../src');
+
+// Every .js file under src/, recursively, so a new parse site (wherever it
+// lands) is caught without the list needing to be kept in sync by hand.
+function listSourceFiles(dir) {
+    let out = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) out = out.concat(listSourceFiles(full));
+        else if (entry.isFile() && entry.name.endsWith('.js')) out.push(full);
+    }
+    return out;
+}
+
+const sourcePaths = listSourceFiles(SRC_DIR);
 
 // validateSyntax needs isolated-vm (V8 pre-check); skip those cases cleanly
 // where the binding doesn't load; the preflight suite is the loud guard.
@@ -47,7 +57,7 @@ describe('Contract language version (frozen consensus pin)', function () {
 
     it('no parse site hardcodes an ecmaVersion outside the shared constant', function () {
         let pinnedSites = 0;
-        for (const file of Object.values(sourcePaths)) {
+        for (const file of sourcePaths) {
             const src = fs.readFileSync(file, 'utf8');
             const hardcoded = src.match(/ecmaVersion:\s*\d+/g) || [];
             assert.deepStrictEqual(hardcoded, [],
@@ -57,8 +67,8 @@ describe('Contract language version (frozen consensus pin)', function () {
         // A re-export shim left behind by a move would pass the check above
         // without scanning any parse site, so require at least one pinned site.
         assert.ok(pinnedSites > 0,
-            'no CONTRACT_ECMA_VERSION parse site in ' + Object.values(sourcePaths).join(', ') +
-            '; point this test at the file that now holds the acorn parse');
+            'no CONTRACT_ECMA_VERSION parse site found under src/; point this test at the ' +
+            'file that now holds the acorn parse');
     });
 
     it('meterCode accepts ES2020 syntax (optional chaining, nullish coalescing)', function () {
