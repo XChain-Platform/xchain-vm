@@ -22,7 +22,7 @@ const MODEL_SHIFTS = [
 const NATIVE_PRIMITIVES = [
     { want: 'A fungible token', solidity: 'write an ERC-20', xchain: 'ISSUE action (tokens are first-class); no contract' },
     { want: 'Transfer a token', solidity: 'transfer()', xchain: 'SEND action' },
-    { want: 'Check a balance', solidity: 'balanceOf()', xchain: 'explorer/SDK query, or in-contract getBalance(addr, tick)' },
+    { want: 'Check a balance', solidity: 'balanceOf()', xchain: 'explorer/SDK query, or in-contract getBalance(addr, tick) for the caller or the contract itself only (any other address reads null)' },
     { want: 'An NFT', solidity: 'ERC-721', xchain: 'ISSUE with DECIMALS=0 + LOCK_MAX_SUPPLY=1' },
     { want: 'Token sale', solidity: 'crowdsale contract', xchain: 'DISPENSER action, or the crowdsale template' },
     { want: 'Swap two tokens', solidity: 'a DEX pair', xchain: 'ORDER / SWAP actions, or the amm template' },

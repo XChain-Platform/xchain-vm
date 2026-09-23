@@ -201,8 +201,10 @@ runGate(source);                        // { ok, errors, advisories, warnings, g
 // string ("invalid: CONTRACT_MANIFEST (meta required)"). A meta the static walk
 // cannot read (computed, spread, non-literal) is an advisory, not a block.
 
-const sim = new ContractSimulator({ coin: 'BTC' });
-sim.setBalance('alice', 'GOLD', '1000');   // seed read-only ledger/oracle state
+const sim = new ContractSimulator({ coin: 'BTC', defaultCaller: 'alice' });
+// Seed read-only ledger/oracle state. A node preloads balances for the caller and
+// the contract's own address only, so seed those two; any other address reads null on chain.
+sim.setBalance('alice', 'GOLD', '1000');
 sim.setAttestationResponse('req-1', '{"ok":true}');  // and the async read surfaces
 const { contractIndex } = await sim.deploy(source, { constructorParams: ['5'] });
 const res = await sim.call(contractIndex, 'increment', ['3']); // state persists across calls

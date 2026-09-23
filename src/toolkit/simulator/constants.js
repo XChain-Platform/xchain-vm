@@ -96,11 +96,24 @@ const GUARD_PARAM_ORDER = Object.freeze([
     'actionType', 'from', 'to', 'tick', 'amount', 'price', 'proceedsTick'
 ]);
 
+// Activation instants of CONTRACT_META_REQUIRED, the indexer's deploy rule that a
+// contract export a conforming `meta`. The rule is an indexer registry row with no
+// VM twin, so these are a deliberate second home for its flag times
+// (xchain-indexer/src/protocol_changes/flag_times.js), compared against that file by
+// test/determinism/simulator_manifest_gate_cross_repo.test.js. Mainnet and regtest are
+// genesis-active; any network not named here resolves like mainnet.
+const CONTRACT_META_REQUIRED_TIMES = Object.freeze({
+    mainnet: 0,
+    testnet: 1789257600,
+    regtest: 0
+});
+
 module.exports = {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
     HEIGHT_GATES,
     GENESIS_ACTIVE_NETWORKS,
+    CONTRACT_META_REQUIRED_TIMES,
     GUARD_GAS_CEILING,
     GUARD_METHOD,
     GUARD_PARAM_ORDER

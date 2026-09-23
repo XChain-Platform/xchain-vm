@@ -16,6 +16,11 @@
 const XChainVM = require('../../index.js');
 const { HEIGHT_GATES, GENESIS_ACTIVE_NETWORKS } = require('./constants.js');
 const { heightGateThreshold, defaultBlockHeight } = require('./block_time_gates.js');
+const {
+    isContractMetaRequiredActive,
+    manifestPolicyError,
+    contractMetaError
+} = require('./manifest_gate.js');
 
 module.exports = {
     // ---- block control ------------------------------------------------------
@@ -95,8 +100,32 @@ module.exports = {
     },
 
     /**
-     * Run the chain's DEPLOY gate over already-transpiled source and return its
-     * verdict as `{ valid, error }`. ADVISORY: deploy() reports it and warns once,
+     * Warn once per simulator when a seeded balance sits outside the two addresses
+     * a node's snapshot carries. xchain-indexer builds the getBalance snapshot for
+     * the action's SOURCE and the contract's own address only (run_vm.js, and the
+     * constructor and controller-guard paths alike), so any other seeded address
+     * reads a value here and null on chain. Advisory: a suite that seeds several
+     * callers is legitimate, and the seed is left in place.
+     */
+    warnIfBalanceOutOfScope(caller, contractAddress) {
+        if (this._balanceScopeWarned) return;
+        const outside = Object.keys(this.balances)
+            .filter((a) => a !== caller && a !== contractAddress);
+        if (!outside.length) return;
+        this._balanceScopeWarned = true;
+        console.warn(
+            '[xchain-vm simulator] balances are seeded for ' + JSON.stringify(outside) +
+            ', outside this call\'s snapshot scope (caller ' + JSON.stringify(caller) +
+            ', contract ' + JSON.stringify(contractAddress) + '). A node preloads only ' +
+            'those two addresses, so a contract reading getBalance for any other one ' +
+            'gets null on chain whatever it reads here.'
+        );
+    },
+
+    /**
+     * Run the first two legs of the chain's DEPLOY gate (size cap, validateSyntax)
+     * over already-transpiled source and return their verdict as `{ valid, error }`;
+     * manifestGateVerdict is the third leg. ADVISORY: deploy() reports it and warns once,
      * it never refuses, because simulating a source the chain would reject is a
      * legitimate move (this repo's own fixtures deploy a WebAssembly probe to
      * measure the runtime strip) and a public toolkit API that started throwing
@@ -144,6 +173,36 @@ module.exports = {
     },
 
     /**
+     * Run the third leg of the chain's DEPLOY gate: read the contract's manifest the
+     * way xchain-indexer/src/actions/deploy/manifest.js does (same call, same block
+     * context, the real contract address the sandbox gate derives its coin from),
+     * then judge the policy rows and, once CONTRACT_META_REQUIRED is armed at this
+     * block, the meta ladder. A module top level that throws is a real reject (the
+     * chain records `manifest read failed`), so only a read that throws, a host
+     * fault rather than a verdict, returns the null "gate did not run" verdict.
+     * @param {string} src - transpiled source that already passed the first two legs
+     * @param {string} contractAddress
+     * @returns {Promise<{valid: (boolean|null), error?: string}>}
+     */
+    async manifestGateVerdict(src, contractAddress) {
+        let read;
+        try {
+            read = await this.vm.readManifest(src, {
+                network: this.network,
+                contractAddress,
+                blockContext: { height: this.block.height, timestamp: this.block.timestamp }
+            });
+        } catch (e) {
+            return { valid: null, error: 'deploy gate could not run on this host: ' + e.message };
+        }
+        const policy = manifestPolicyError(read);
+        if (policy) return { valid: false, error: policy };
+        if (!isContractMetaRequiredActive(this.network, this.block.timestamp)) return { valid: true };
+        const meta = contractMetaError(read);
+        return meta ? { valid: false, error: meta } : { valid: true };
+    },
+
+    /**
      * Warn once per simulator when the deploy gate rejects a source. Fires only on
      * a REJECT, so a clean contract keeps the simulator silent, and once per
      * instance for the same reason the two block-gate warnings are (see
@@ -158,9 +217,12 @@ module.exports = {
                 'the acorn half of the same gate without an isolate.');
             return;
         }
+        // A manifest-leg error is already the status the chain writes; a lint-leg one is wrapped.
+        const status = /^invalid: /.test(String(verdict.error))
+            ? verdict.error : 'invalid: CODE_ENCODING (...)';
         console.warn(
             '[xchain-vm simulator] the DEPLOY gate rejects this contract: ' + verdict.error +
-            '. On chain xchain-indexer records `invalid: CODE_ENCODING (...)` and the contract ' +
+            '. On chain xchain-indexer records `' + status + '` and the contract ' +
             'never exists, so any call() result below is simulation-only. The verdict rides ' +
             'back on deploy() as `deployGate`; `xchain-foundry lint` reports it without an isolate.'
         );

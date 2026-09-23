@@ -30,6 +30,7 @@ try {
 
 const COUNTER = `
 module.exports = {
+    meta: { name: 'Counter', description: 'A persisted counter' },
     initialize: function(xchain) {
         var start = xchain.getInputParam(0);
         if (start === null || start === undefined) start = '0';
@@ -83,7 +84,8 @@ module.exports = {
     });
 
     it('exposes seeded balances to getBalance', async function() {
-        const sim = new ContractSimulator({ coin: 'BTC' });
+        // alice is the caller, one of the two addresses a node's snapshot carries.
+        const sim = new ContractSimulator({ coin: 'BTC', defaultCaller: 'alice' });
         sim.setBalance('alice', 'GOLD', '1000');
         try {
             const dep = await sim.deploy(
@@ -192,7 +194,8 @@ module.exports = {
         // accept a source whose only violation rides that unarmed gate, exactly as
         // the chain accepted it at that height. Hardcoding the flags would reject it
         // and teach the author their historical contract was never deployable.
-        const WASM = 'module.exports = { probe: function(xchain){ return typeof WebAssembly; } };';
+        const WASM = 'module.exports = { meta: { name: "Wasm probe", description: "Reads WebAssembly" }, ' +
+            'probe: function(xchain){ return typeof WebAssembly; } };';
         const pre = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { height: 1 } });
         const at  = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
         const real = console.warn;
@@ -221,7 +224,8 @@ module.exports = {
         // predicate on both sides of the activation.
         const XChainVM = require('../../src/index.js');
         const GATE = XChainVM.REST_PATTERN_METER_GATE_BLOCK_TIME;
-        const REST = 'module.exports = { run: function(xchain, ...rest){ return String(rest.length); } };';
+        const REST = 'module.exports = { meta: { name: "Rest probe", description: "Counts rest params" }, ' +
+            'run: function(xchain, ...rest){ return String(rest.length); } };';
         const pre = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { timestamp: GATE - 1 } });
         const at  = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { timestamp: GATE } });
         const real = console.warn;

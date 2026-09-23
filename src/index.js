@@ -1716,7 +1716,7 @@ class XChainVM {
         //   Map<sha256(code):evalOrderBit+callSpreadBit+restPatternBit, meteredCode>.
         // meterCode() is a pure AST transform (acorn parse + walk + astring regen over
         // up to maxCodeSize bytes), the single most expensive step of a warm execute,
-        // and its output depends ONLY on the contract source plus the two consensus
+        // and its output depends ONLY on the contract source plus the consensus
         // gate flags (specEvalOrder, meterCallSpread, meterRestPattern), all baked into
         // the key. So a
         // hit returns byte-identical metered source to a fresh call: no consensus
@@ -1731,7 +1731,7 @@ class XChainVM {
             this.limits.maxMeteredCacheSize = this.limits.maxBlockCacheSize || 1000;
 
         // Execute-time lint-verdict cache:
-        //   Map<sha256(code):asyncBit:hardenBit:pkg3Bit:aliasBit, {valid, error?}>.
+        //   Map<sha256(code):<one bit per flag parameter of getLintVerdict>, {valid, error?}>.
         // INVARIANT: the key carries the code digest plus EVERY consensus flag the
         // verdict depends on, with no count written down here that a new flag can
         // falsify. Adding a flag to getLintVerdict without adding its bit lets a warm

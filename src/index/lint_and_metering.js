@@ -81,11 +81,10 @@ module.exports = {
      * Return the execute-time consensus source-lint verdict for `code` under the
      * resolved ban flags, from the verdict cache when possible.
      *
-     * validateSyntax() is a pure function of (code, enforceBannedAsync,
-     * enforceLintHardening, enforceBannedGenerator === enforceBannedWasm,
-     * enforceLintGlobalAlias), all folded into the key, so a hit returns the verdict a
-     * fresh call would produce. The two Pkg 3 rules share ONE activation and are
-     * therefore threaded as one bit; the global-alias refinement rides its own.
+     * validateSyntax() is a pure function of the code plus every flag parameter of this
+     * method, all folded into the key, so a hit returns the verdict a fresh call would
+     * produce. The two Pkg 3 rules share ONE activation and are therefore threaded as
+     * one bit; the global-alias and banned-rest refinements each ride their own.
      *
      * This exists because validateSyntax spawns an ivm.Isolate for its V8 syntax check
      * and then acorn-parses the source; paying that on every execute of a hot contract

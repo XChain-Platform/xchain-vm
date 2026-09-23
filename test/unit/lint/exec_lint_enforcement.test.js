@@ -303,6 +303,19 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             // Correctness survives eviction: the evicted entry recomputes to the same verdict.
             assert.strictEqual(vm.getLintVerdict(CLEAN, true, true, true, true, true).valid, true);
         });
+
+        it('carries one key bit per flag parameter of getLintVerdict', function () {
+            // Signature is (code, ...flags, codeHash); a flag given a default drops out of
+            // Function.length, and this count must then be updated deliberately.
+            const flagCount = newVm().getLintVerdict.length - 2;
+            const vm = newVm();
+            vm.getLintVerdict(CLEAN, ...new Array(flagCount).fill(false));
+            const bits = [...vm._lintVerdictCache.keys()][0].split(':')[1];
+            assert.match(bits, /^[01]+$/);
+            assert.strictEqual(bits.length, flagCount,
+                'a new flag parameter must append its bit to the key, or a warm node can answer ' +
+                'from a verdict computed under the other setting');
+        });
     });
 });
 
