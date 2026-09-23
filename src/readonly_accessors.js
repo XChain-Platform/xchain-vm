@@ -145,7 +145,10 @@ function buildPollAccessor(snap) {
         // Frozen result of a finalized VOTE poll, or null if the poll does not
         // exist or has not finalized yet. Keys are poll indices (the VOTE v0
         // action_index). Shape: { status, winning_option, total_weight,
-        // total_voters, decided_early, options:[{index,weight,voters}] }.
+        // total_voters, decided_early, options:[{index,weight,voters}], tick? },
+        // where `tick` is present only once VOTE_POLL_TICK_VISIBLE is enabled.
+        // Return the host entry verbatim: never project or whitelist its fields
+        // (dropping a flag-gated field makes an electorate-pinned contract revert).
         getPollResult: (pollIndex) => {
             const p = polls[String(pollIndex)];
             return p != null ? p : null;

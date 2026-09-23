@@ -74,7 +74,9 @@ module.exports = {
      * Seed a finalized VOTE poll result (read by poll.getPollResult).
      * @param {number|string} pollIndex - the VOTE v0 action_index
      * @param {object} result - { status, winning_option, total_weight,
-     *        total_voters, decided_early, options:[{index,weight,voters}] }
+     *        total_voters, decided_early, options:[{index,weight,voters}],
+     *        tick? } (tick: the electorate token, present once the host
+     *        enables VOTE_POLL_TICK_VISIBLE)
      */
     setPollResult(pollIndex, result) {
         this.pollData.polls[String(pollIndex)] = result;
