@@ -109,6 +109,13 @@ jobs:
         with:
           node-version: "22"
 
+      # compare only diffs already-recorded JSON manifests (no VM execution,
+      # so isolated-vm need not build from source here), but differential.js
+      # itself requires fast-check/acorn/astring, so those still need to be
+      # on disk before the compare step below can run at all.
+      - name: Install deps
+        run: npm install --ignore-scripts
+
       - name: Download all manifests
         uses: actions/download-artifact@v4
         with:
@@ -121,14 +128,27 @@ jobs:
           set -e
           REF="manifests/differential.linux-x64-glibc.json"
           test -f "$REF" || { echo "reference manifest missing"; exit 1; }
-          status=0
+          divergence=0
+          crash=0
           for m in manifests/differential.*.json; do
             [ "$m" = "$REF" ] && continue
             echo "::group::compare $(basename "$m") vs reference"
-            node test/fuzz/helpers/differential_run.js compare "$REF" "$m" || status=1
+            out="$(node test/fuzz/helpers/differential_run.js compare "$REF" "$m" 2>&1)" && rc=0 || rc=$?
+            printf '%s\n' "$out"
+            if [ "$rc" -ne 0 ]; then
+              if printf '%s\n' "$out" | grep -q 'DIFFERENTIAL DIVERGENCE:'; then
+                divergence=1
+              else
+                crash=1
+              fi
+            fi
             echo "::endgroup::"
           done
-          if [ "$status" -ne 0 ]; then
+          if [ "$crash" -ne 0 ]; then
+            echo "::error::VM differential fuzz tool crashed before it could render a verdict (see the compare group's output above); this is not a consensus divergence"
+            exit 1
+          fi
+          if [ "$divergence" -ne 0 ]; then
             echo "::error::VM differential fuzz found a cross-build consensus divergence"
             exit 1
           fi
