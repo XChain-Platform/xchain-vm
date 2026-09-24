@@ -14,13 +14,13 @@
  * XChain VM: Subprocess coverage harness.
  *
  * The isolate-execution code that runs ONLY inside the forked worker
- * (src/vm_worker.js message handlers, plus src/sandbox.js stripGlobals and
+ * (src/vm-worker.js message handlers, plus src/sandbox.js stripGlobals and
  * the in-isolate paths of src/index.js execute) is invisible to a parent-only
  * coverage run: the child is a separate process. c8 already sets
  * NODE_V8_COVERAGE and merges any coverage-*.json a child writes into that
  * directory, but the parent SIGKILLs the worker on shutdown/respawn and
  * SIGKILL cannot flush V8 coverage, so the worker's execute path was lost
- * (it raced the kill). src/vm_worker.js now calls v8.takeCoverage() after
+ * (it raced the kill). src/vm-worker.js now calls v8.takeCoverage() after
  * each execute/endBlock (guarded on NODE_V8_COVERAGE, inert in production),
  * which writes the worker's profile deterministically before any kill.
  *

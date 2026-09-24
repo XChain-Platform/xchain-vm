@@ -32,7 +32,7 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
     this.timeout(60000);
 
     it('a queued execution behind a host fault still dispatches (the slot is released)', async function () {
-        const ProcessExecutor = require('../../../src/process_executor.js');
+        const ProcessExecutor = require('../../../src/process-executor.js');
         const { HostFaultError } = require('../../../src/errors.js');
         const exec = new ProcessExecutor({
             gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING,

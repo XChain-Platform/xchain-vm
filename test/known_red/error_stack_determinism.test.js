@@ -30,7 +30,7 @@
 
 const assert = require('assert');
 const { createVM, execute } = require('../fuzz/helpers/harness.js');
-const { PINNED, checkConsensusRuntime } = require('../../src/consensus_runtime.js');
+const { PINNED, checkConsensusRuntime } = require('../../src/consensus-runtime.js');
 
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
@@ -120,7 +120,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
     // (e.g. "Cannot read property 'x' of undefined" -> "Cannot read properties
     // of undefined (reading 'x')" at V8 8.4; JSON SyntaxError gained a
     // "(line N column M)" suffix in recent V8). The mitigation this depends
-    // on has SHIPPED: src/consensus_runtime.js pins the exact V8/ICU build the
+    // on has SHIPPED: src/consensus-runtime.js pins the exact V8/ICU build the
     // fleet runs and test/determinism/consensus_runtime_gate.test.js fails any
     // validator that is not on it, both in `npm run ci`. So the residual is
     // testable after all, as the pair it actually is: the exposure is still
