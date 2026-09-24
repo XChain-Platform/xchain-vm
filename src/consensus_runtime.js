@@ -135,7 +135,13 @@ const REFERENCE_NODE = 'v22.22.3';
 // the contract-era instant, which is already in the past: below the flag-day the rule is
 // dropped from the blocking set and no rest destructure is metered, so a from-genesis
 // replay reproduces the historical accept-below/reject-above verdict and gasUsed.
-const CONSENSUS_VERSION = '4';
+//
+// Epoch '5' (this bump) adds the JSON.stringify value-hook resolver. At its dedicated
+// block-time flag day, toJSON methods, replacer functions, and accessors are resolved
+// once before deterministic depth checking and native serialization. Below the gate,
+// the historical serializer path remains unchanged; hook-free values retain identical
+// bytes and gas on both sides of the gate.
+const CONSENSUS_VERSION = '5';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash

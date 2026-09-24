@@ -105,6 +105,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
+    it('JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME is the frozen unarmed sentinel', function () { assert.strictEqual(vm.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME, 9999999999); });
 
     it('REST_PATTERN_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // Size-metering of destructuring rest (the __arrspread/__objspreadmeter-wrapped
