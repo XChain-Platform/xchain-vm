@@ -37,8 +37,21 @@ describe('coverage ratchet floors', () => {
     }
   });
 
+  it('keeps every floor within 1.5 points of the venue measurement', () => {
+    for (const metric of ['lines', 'statements', 'branches', 'functions']) {
+      const headroom = declared.measured[metric] - declared[metric];
+      assert.ok(headroom >= 0, `${metric} floor exceeds its measured value`);
+      assert.ok(headroom <= 1.5, `${metric} floor trails its measured value by ${headroom}`);
+    }
+  });
+
   it('fails the job on a shortfall rather than only reporting it', () => {
     assert.match(pkg.scripts['coverage:check'], /--check-coverage/);
+  });
+
+  it('includes unrequired source files in coverage measurement', () => {
+    assert.match(pkg.scripts.coverage, /(?:^|\s)--all(?:\s|$)/);
+    assert.match(pkg.scripts['coverage:check'], /(?:^|\s)--all(?:\s|$)/);
   });
 });
 
@@ -75,6 +88,19 @@ describe('coverage ratchet scope', () => {
     );
   });
 
+  it('documents every exclusion as process-only or owned by another venue', () => {
+    assert.ok(Array.isArray(declared.processOnlyExcludes));
+    assert.ok(Array.isArray(declared.nonOwnedExcludes));
+    assert.deepEqual(
+      [...declared.processOnlyExcludes, ...declared.nonOwnedExcludes].sort(),
+      [...declared.unitScopeExcludes].sort(),
+    );
+    assert.match(pkg.scripts['test:toolkit'], /test\/toolkit/);
+    for (const excluded of declared.nonOwnedExcludes) {
+      assert.match(excluded, /^src\/toolkit\//);
+    }
+  });
+
   it('measures the same set in the report a human reads', () => {
     assert.deepEqual(
       excludesOf(pkg.scripts.coverage).sort(),
@@ -84,9 +110,9 @@ describe('coverage ratchet scope', () => {
     assert.deepEqual(includesOf(pkg.scripts.coverage), includesOf(pkg.scripts['coverage:check']));
   });
 
-  it('still measures every excluded file under the subprocess ratchet', () => {
+  it('still measures every process-only exclusion under the subprocess ratchet', () => {
     const subprocessIncludes = includesOf(pkg.scripts['coverage:subprocess']);
-    for (const excluded of declared.unitScopeExcludes) {
+    for (const excluded of declared.processOnlyExcludes) {
       assert.ok(
         subprocessIncludes.includes(excluded),
         `${excluded} is excluded from the unit ratchet and measured by no other one, so it is unmeasured`,
@@ -94,10 +120,16 @@ describe('coverage ratchet scope', () => {
     }
   });
 
+  it('runs the subprocess ratchet in the full CI venue', () => {
+    const ciFull = fs.readFileSync(path.join(repoRoot, 'bin', 'ci-full.sh'), 'utf8');
+    assert.match(ciFull, /npm run coverage:subprocess/);
+  });
+
   it('excludes only files that exist, so a rename cannot leave a dead exclude', () => {
     for (const excluded of declared.unitScopeExcludes) {
+      const existingPrefix = excluded.split('*', 1)[0].replace(/\/$/, '');
       assert.ok(
-        fs.existsSync(path.join(repoRoot, excluded)),
+        fs.existsSync(path.join(repoRoot, existingPrefix)),
         `${excluded} is excluded from the ratchet but no such file exists`,
       );
     }

@@ -58,6 +58,7 @@ FAILED=""
 # run, so a bare `npm run ci:full` still runs every tier as it always did.
 CI_TIER_FULL_ONLY=(
   "coverage ratchet (coverage:check)"
+  "subprocess coverage (coverage:subprocess)"
 )
 DEFERRED=""
 ci_tier_deferred() {
@@ -132,6 +133,7 @@ run_tier "identity pin (vendored lint trio)" identity_pin_check
 # GitHub does not set XCHAIN_REQUIRE_SIBLINGS for this job, so neither does
 # this tier.
 run_tier "coverage ratchet (coverage:check)" npm run coverage:check
+run_tier "subprocess coverage (coverage:subprocess)" npm run coverage:subprocess
 
 echo
 # >>> ci-tier summary (generated) >>>
