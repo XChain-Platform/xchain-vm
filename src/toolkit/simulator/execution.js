@@ -53,17 +53,20 @@ module.exports = {
      * @param {string[]} [opts.constructorParams] - if present, runs `initialize`
      * @param {string} [opts.caller]
      * @returns {Promise<{contractIndex, contractAddress, initResult, deployGate}>}
-     *          deployGate is the chain's deploy verdict, `{ valid: true }` or
-     *          `{ valid: false, error }`. Advisory: a reject warns once and the
-     *          contract is still registered (see deployGateVerdict).
+     *          deployGate is the chain's deploy verdict over all three legs (size
+     *          cap, validateSyntax, manifest + meta), `{ valid: true }` or
+     *          `{ valid: false, error }`, or `valid: null` when a leg could not run
+     *          on this host. Advisory: a reject warns once and the contract is
+     *          still registered (see deployGateVerdict, manifestGateVerdict).
      */
     async deploy(code, opts = {}) {
         const src = toContractJs(code, opts.filename || '');
-        const deployGate = this.deployGateVerdict(src);
-        if (deployGate.valid !== true) this.warnDeployGate(deployGate);
         const index = (opts.contractIndex != null) ? Number(opts.contractIndex) : this._nextIndex;
         if (index >= this._nextIndex) this._nextIndex = index + 1;
         const address = opts.contractAddress || ('C:' + this.coin + ':' + index);
+        let deployGate = this.deployGateVerdict(src);
+        if (deployGate.valid === true) deployGate = await this.manifestGateVerdict(src, address);
+        if (deployGate.valid !== true) this.warnDeployGate(deployGate);
 
         this.contracts.set(index, {
             code: src,
@@ -144,15 +147,17 @@ module.exports = {
         if (!contract) {
             throw new Error('no contract deployed at index ' + contractIndex);
         }
+        const caller = opts.caller || this.defaultCaller;
         this.warnIfPreGate();
         this.warnIfPreHeightGate(contract.address);
+        this.warnIfBalanceOutOfScope(caller, contract.address);
 
         const execOpts = {
             code: contract.code,
             state: contract.state,
             method: method || 'default',
             params: Array.isArray(params) ? params : [],
-            caller: opts.caller || this.defaultCaller,
+            caller,
             contractAddress: contract.address,
             contractIndex: Number(contractIndex),
             network: this.network,

@@ -50,7 +50,10 @@
  * What it does NOT do (out of scope; that is the real indexer + regtest):
  *   - process emitted ACTIONs against the ledger (SEND/ISSUE/... are captured
  *     for assertions, never applied to balances). getBalance reads only what
- *     the author seeds.
+ *     the author seeds. A node also SCOPES that snapshot: it preloads balances
+ *     for the action's SOURCE and the contract's own address only, so a seed
+ *     for any third address reads back here and is null on chain. call() warns
+ *     once when such a seed is present (see warnIfBalanceOutOfScope).
  *   - resolve emit.execute / emit.crossExecute call trees. Those emissions are
  *     captured; the callee is not auto-run.
  *   - ASSIGN the identity discriminators a real node assigns. txHash,
@@ -59,10 +62,16 @@
  *     matches chain only when the caller supplies the real values.
  *   - populate the read-only snapshots. They start empty and read back
  *     null / '0' / [] until seeded, which is the same answer a node gives for
- *     data that genuinely does not exist; a stale seed is the author's.
+ *     data that genuinely does not exist; a stale seed is the author's. The
+ *     oracle snapshot hides no history by default (roundFloor 0), while a node
+ *     ships a bounded window; setOracleRoundFloor(n) simulates that window, so
+ *     getPriceAtRound on an unseeded round below n returns the chain's
+ *     { price: null, outsideWindow: true } row instead of plain null.
  *   - REFUSE a deploy the chain's deploy gate would reject. deploy() runs that
- *     gate (code size + validateSyntax, resolved at the configured network /
- *     coin / block) and hands the verdict back as `deployGate`, warning once on a
+ *     gate's three legs (code size, validateSyntax, then the manifest read with
+ *     its permissions / maxTakeBps rows and the CONTRACT_META_REQUIRED meta
+ *     ladder, all resolved at the configured network / coin / block) and hands
+ *     the verdict back as `deployGate`, warning once on a
  *     reject, but it still registers the contract: simulating a source the chain
  *     would not accept is a legitimate move, and this repo's own fixtures do it to
  *     measure the runtime strips. A `deployGate.valid === false` means the later
@@ -197,6 +206,8 @@ function initializeBlockContext(opts) {
     this._preHeightGateWarned = false;
     // Likewise for the deploy-gate rejection warning (see warnDeployGate).
     this._deployGateWarned = false;
+    // Likewise for the balance-scope warning (see warnIfBalanceOutOfScope).
+    this._balanceScopeWarned = false;
 }
 
 class ContractSimulator {
@@ -254,7 +265,8 @@ class ContractSimulator {
         // Read-only snapshots the author seeds.
         this.balances = {};        // address -> tick -> amountStr
         this.tokenInfo = {};       // tick -> info object
-        this.oracle = { snapshotAge: 0, prices: {}, rounds: {} };
+        // roundFloor: oldest round the snapshot guarantees; 0 means no history is hidden.
+        this.oracle = { snapshotAge: 0, prices: {}, rounds: {}, roundFloor: 0 };
         this.crossChainData = { attestations: {}, settled: {}, calls: {} };
         // The remaining read-only snapshots the gateway reads. Shapes are the
         // ones src/readonly_accessors.js documents; an empty snapshot is

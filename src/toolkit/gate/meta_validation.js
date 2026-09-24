@@ -14,6 +14,7 @@
 
 const acorn = require('acorn');
 const walk = require('acorn-walk');
+const { CONTRACT_ECMA_VERSION } = require('../../metering.js');
 
 // --- Contract identity (`meta`) ------------------------------------------
 //
@@ -34,9 +35,14 @@ const walk = require('acorn-walk');
 // contract the chain would accept on a shape it merely cannot see.
 
 // Frozen consensus tokens, copied verbatim from spec 2.3 so the author reads the
-// same string the chain will write into the action's status.
+// same string the chain will write into the action's status. READ_FAILED,
+// NOT_OBJECT and OVERSIZE need the evaluated read, so only the simulator's deploy
+// gate reaches them; the static walk here never does.
 const META_VERDICTS = {
+    READ_FAILED: 'invalid: CONTRACT_MANIFEST (manifest read failed)',
     REQUIRED:    'invalid: CONTRACT_MANIFEST (meta required)',
+    NOT_OBJECT:  'invalid: CONTRACT_MANIFEST (meta must be a plain object)',
+    OVERSIZE:    'invalid: CONTRACT_MANIFEST (meta exceeds 4096 characters)',
     NAME:        'invalid: CONTRACT_MANIFEST (meta.name must be a string of 1..64 bytes, printable, trimmed)',
     DESCRIPTION: 'invalid: CONTRACT_MANIFEST (meta.description must be a string of 1..512 bytes, printable, trimmed)',
     VERSION:     'invalid: CONTRACT_MANIFEST (meta.version must be a string of 1..32 bytes, printable, trimmed)'
@@ -195,7 +201,7 @@ function getExportedMeta(source) {
     try {
         // acorn is a hard dependency of lint_core, already required above, so an
         // unparseable source is the only way to land here.
-        ast = acorn.parse(String(source), { ecmaVersion: 2020, sourceType: 'script', locations: true });
+        ast = acorn.parse(String(source), { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
     } catch (e) {
         return { status: 'undecidable' };
     }

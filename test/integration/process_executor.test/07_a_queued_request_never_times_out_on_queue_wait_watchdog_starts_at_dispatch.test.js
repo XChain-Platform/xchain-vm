@@ -45,14 +45,23 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
 
             // Shrink the watchdog so queue wait spans several windows, then
             // hold dispatch closed (exactly the backed-up/respawning state).
+            const defaultWatchdogMs = exec._watchdogMs;
             exec._watchdogMs = 250;
             exec._sawReady = false;
 
             const queued = exec.execute({ ...BASE, code: `module.exports = function(){ return 'queued'; };` });
 
+            // Observation window, not a synchronization point: do not convert to
+            // a poll. The claim is that the queue does NOT drain while 3+ shrunk
+            // windows elapse, and a timer armed at acceptance fires before this
+            // one does, so host load cannot turn a regression green.
             await new Promise((r) => setTimeout(r, 800));
             assert.strictEqual(exec._queue.length, 1,
                 'request must still be queued after 3+ watchdog windows, not resolved');
+
+            // Restore the real bound before dispatch so a loaded host cannot trip
+            // the shrunk window while the contract itself runs.
+            exec._watchdogMs = defaultWatchdogMs;
 
             // Worker becomes dispatchable again → the contract must RUN.
             exec._sawReady = true;

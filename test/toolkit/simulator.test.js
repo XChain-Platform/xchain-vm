@@ -30,6 +30,7 @@ try {
 
 const COUNTER = `
 module.exports = {
+    meta: { name: 'Counter', description: 'A persisted counter' },
     initialize: function(xchain) {
         var start = xchain.getInputParam(0);
         if (start === null || start === undefined) start = '0';
@@ -83,7 +84,8 @@ module.exports = {
     });
 
     it('exposes seeded balances to getBalance', async function() {
-        const sim = new ContractSimulator({ coin: 'BTC' });
+        // alice is the caller, one of the two addresses a node's snapshot carries.
+        const sim = new ContractSimulator({ coin: 'BTC', defaultCaller: 'alice' });
         sim.setBalance('alice', 'GOLD', '1000');
         try {
             const dep = await sim.deploy(
@@ -136,14 +138,16 @@ module.exports = {
         } finally { await sim.close(); }
     });
 
-    it('reports the chain deploy verdict, on mainnet too, where nothing else lints', async function() {
+    it('reports the mainnet deploy verdict and rejects banned syntax again at call time', async function() {
         // This gate is what surfaces a chain-rejected source at DEPLOY, where the
         // author sees it. The 2026-09-09 ruling armed EXEC_LINT_ACTIVATION on mainnet,
         // so a mainnet simulator now re-lints at call() time too, but only for a source
         // that is actually called; a deploy-rejected source that is never called stays
         // silent without this gate. The case asserted here is the readable one because
         // banned-math also strips Math.sqrt, so the rejection is observable either way.
-        const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
+        const sim = new ContractSimulator({
+            coin: 'BTC', network: 'mainnet', block: { height: 0 }
+        });
         const warned = [];
         const real = console.warn;
         console.warn = (...a) => warned.push(a.join(' '));
@@ -156,6 +160,9 @@ module.exports = {
             // Advisory by design: the contract is still registered, so a fixture that
             // deliberately simulates a chain-rejected source keeps working.
             assert.strictEqual(sim.contracts.size, 1);
+            const res = await sim.call(dep.contractIndex, 'run', []);
+            assert.strictEqual(res.success, false);
+            assert.match(String(res.error), /^error: banned syntax: .*Math\.sqrt/);
             // Warned once, not once per deploy.
             await sim.deploy(
                 'module.exports = { run: function(xchain){ return String(Math.pow(2, 3)); } };');
@@ -187,7 +194,8 @@ module.exports = {
         // accept a source whose only violation rides that unarmed gate, exactly as
         // the chain accepted it at that height. Hardcoding the flags would reject it
         // and teach the author their historical contract was never deployable.
-        const WASM = 'module.exports = { probe: function(xchain){ return typeof WebAssembly; } };';
+        const WASM = 'module.exports = { meta: { name: "Wasm probe", description: "Reads WebAssembly" }, ' +
+            'probe: function(xchain){ return typeof WebAssembly; } };';
         const pre = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { height: 1 } });
         const at  = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
         const real = console.warn;
@@ -216,7 +224,8 @@ module.exports = {
         // predicate on both sides of the activation.
         const XChainVM = require('../../src/index.js');
         const GATE = XChainVM.REST_PATTERN_METER_GATE_BLOCK_TIME;
-        const REST = 'module.exports = { run: function(xchain, ...rest){ return String(rest.length); } };';
+        const REST = 'module.exports = { meta: { name: "Rest probe", description: "Counts rest params" }, ' +
+            'run: function(xchain, ...rest){ return String(rest.length); } };';
         const pre = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { timestamp: GATE - 1 } });
         const at  = new ContractSimulator({ coin: 'BTC', network: 'mainnet', block: { timestamp: GATE } });
         const real = console.warn;

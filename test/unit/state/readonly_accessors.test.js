@@ -20,6 +20,7 @@ const {
     buildContractStakeAccessor,
     buildCrossChainAccessor,
     buildAttestationAccessor,
+    buildPollAccessor,
     resolveAccessors,
 } = require('../../../src/readonly_accessors.js');
 
@@ -200,6 +201,25 @@ describe('Read-only accessors', function () {
             assert.strictEqual(r.crossChainData, null);
             assert.strictEqual(r.attestationData.getResponse('x'), null);
             assert.strictEqual(r.contractStakeData.getTotalStaked('T'), '5');
+        });
+    });
+
+    describe('buildPollAccessor', function () {
+        it('returns null for a null snapshot and for an unknown poll', function () {
+            assert.strictEqual(buildPollAccessor(null), null);
+            assert.strictEqual(buildPollAccessor({ polls: {} }).getPollResult(7), null);
+        });
+        it('returns the host entry verbatim, keeping the flag-gated tick and unknown fields', function () {
+            const entry = {
+                status: 'finalized', winning_option: 0, total_weight: '4000',
+                total_voters: 12, decided_early: false,
+                options: [{ index: 0, weight: '4000', voters: 12 }],
+                tick: 'GOVTOK', futureField: 'kept'
+            };
+            const expected = JSON.parse(JSON.stringify(entry));
+            const got = buildPollAccessor({ polls: { '7': entry } }).getPollResult(7);
+            assert.deepStrictEqual(got, expected);
+            assert.strictEqual(got.tick, 'GOVTOK');
         });
     });
 });

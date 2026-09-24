@@ -53,9 +53,11 @@ try {
 
 // Allocates a large typed array: unmetered below the binary-alloc flag-day,
 // charged at byte length at/after it. The state write keeps the call from being
-// optimized into nothing.
+// optimized into nothing. The meta keeps the deploy gate clean, so the only
+// warning a test sees is the one it is about.
 const ALLOC = `
 module.exports = {
+    meta: { name: 'Alloc probe', description: 'Allocates a large typed array' },
     alloc: function (xchain) {
         var buf = new Uint8Array(100000);
         xchain.state.set('n', String(buf.length));
@@ -201,7 +203,8 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
     // fixed verdict, so it keeps its teeth on both sides of the flag day instead of
     // going vacuous the day the gate elapses.
     it('gives a default mainnet simulation the live chain\'s banned-rest verdict', async function () {
-        const REST = 'module.exports = { run: function(xchain, ...rest){ return String(rest.length); } };';
+        const REST = 'module.exports = { meta: { name: "Rest probe", description: "Counts rest params" }, ' +
+            'run: function(xchain, ...rest){ return String(rest.length); } };';
         const now = Math.floor(Date.now() / 1000);
         const restEnforcedNow = XChainVM.isRestPatternMeterActive('mainnet', now);
         const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });

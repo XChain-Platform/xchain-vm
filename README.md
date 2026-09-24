@@ -4,7 +4,7 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.20.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.20.1-blue" alt="Version">
   <img src="https://img.shields.io/badge/tests-2%2C557%2B%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
@@ -201,8 +201,10 @@ runGate(source);                        // { ok, errors, advisories, warnings, g
 // string ("invalid: CONTRACT_MANIFEST (meta required)"). A meta the static walk
 // cannot read (computed, spread, non-literal) is an advisory, not a block.
 
-const sim = new ContractSimulator({ coin: 'BTC' });
-sim.setBalance('alice', 'GOLD', '1000');   // seed read-only ledger/oracle state
+const sim = new ContractSimulator({ coin: 'BTC', defaultCaller: 'alice' });
+// Seed read-only ledger/oracle state. A node preloads balances for the caller and
+// the contract's own address only, so seed those two; any other address reads null on chain.
+sim.setBalance('alice', 'GOLD', '1000');
 sim.setAttestationResponse('req-1', '{"ok":true}');  // and the async read surfaces
 const { contractIndex } = await sim.deploy(source, { constructorParams: ['5'] });
 const res = await sim.call(contractIndex, 'increment', ['3']); // state persists across calls
@@ -310,7 +312,7 @@ Cross-run and cross-process determinism guarantees in `test/determinism/`: golde
 
 Latency/throughput assertions in `test/performance/` (`npm run test:performance`), distinct from the `bench/` scenario scripts below.
 
-### Toolkit Tests (52)
+### Toolkit Tests (141)
 
 `xchain-foundry` / `create-xchain-contract` developer-toolkit coverage: gate, scaffold, and TypeScript-strip logic run on any OS; simulator-backed cases need the isolated-vm binding (Node 22 / Linux).
 
@@ -413,7 +415,7 @@ xchain-vm/
 |   |-- smoke/            (10 tests)
 |   |-- determinism/      (79 tests, incl. a known-red probe subset)
 |   |-- performance/      (5 tests, distinct from bench/ below)
-|   |-- toolkit/          (52 tests: xchain-foundry gate/scaffold/simulate)
+|   |-- toolkit/          (141 tests: xchain-foundry gate/scaffold/simulate)
 |   |-- e2e/              (10 E2E test files, 64 tests + helpers + contracts)
 |   |-- fuzz/             (9 fuzz test files, 57 tests + harness + generators)
 |   |-- chaos/            (3-phase chaos tests, 76 tests + helpers + contracts)

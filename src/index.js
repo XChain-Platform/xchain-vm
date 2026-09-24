@@ -1716,7 +1716,7 @@ class XChainVM {
         //   Map<sha256(code):evalOrderBit+callSpreadBit+restPatternBit, meteredCode>.
         // meterCode() is a pure AST transform (acorn parse + walk + astring regen over
         // up to maxCodeSize bytes), the single most expensive step of a warm execute,
-        // and its output depends ONLY on the contract source plus the two consensus
+        // and its output depends ONLY on the contract source plus the consensus
         // gate flags (specEvalOrder, meterCallSpread, meterRestPattern), all baked into
         // the key. So a
         // hit returns byte-identical metered source to a fresh call: no consensus
@@ -1731,7 +1731,7 @@ class XChainVM {
             this.limits.maxMeteredCacheSize = this.limits.maxBlockCacheSize || 1000;
 
         // Execute-time lint-verdict cache:
-        //   Map<sha256(code):asyncBit:hardenBit:pkg3Bit:aliasBit, {valid, error?}>.
+        //   Map<sha256(code):<one bit per flag parameter of getLintVerdict>, {valid, error?}>.
         // INVARIANT: the key carries the code digest plus EVERY consensus flag the
         // verdict depends on, with no count written down here that a new flag can
         // falsify. Adding a flag to getLintVerdict without adding its bit lets a warm
@@ -2614,7 +2614,8 @@ module.exports.isSlashTokenDelimGuardActive = isSlashTokenDelimGuardActive;
 // exported so a test can pin it against the indexer's MAX_TOKEN_DECIMALS.
 module.exports.isSlashAmountPrecisionActive = isSlashAmountPrecisionActive;
 module.exports.MAX_SLASH_AMOUNT_DECIMALS    = MAX_SLASH_AMOUNT_DECIMALS;
-// Cross-CHAIN call (XCALL) protocol constants, same canonical source.
+// Export the cross-chain call protocol limits so validator hosts can pin the
+// VM's bounds against the values they revalidate while processing emissions.
 module.exports.XCALL_MIN_GAS             = XCALL_MIN_GAS;
 module.exports.XCALL_MAX_GAS             = XCALL_MAX_GAS;
 module.exports.XCALL_MAX_HOPS            = XCALL_MAX_HOPS;

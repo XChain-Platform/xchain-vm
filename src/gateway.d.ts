@@ -113,6 +113,12 @@ export interface PollResult {
     total_voters: number;
     decided_early: boolean;
     options: Array<{ index: number; weight: string; voters: number }>;
+    /**
+     * The poll's electorate token tick (null for a poll bound to no token).
+     * Present only once the host enables VOTE_POLL_TICK_VISIBLE; absent below it.
+     * Electorate-pinning contracts (treasury.executeProposal) read it.
+     */
+    tick?: string | null;
 }
 
 /** Terminal outcome of a cross-chain call this chain originated. */

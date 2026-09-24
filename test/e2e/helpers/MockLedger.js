@@ -268,7 +268,8 @@ class MockLedger {
 
     // Seed a finalized poll readable via xchain.getPollResult. `result` mirrors
     // the indexer's getPollResultsForVM map entries: { status, winning_option,
-    // total_weight, total_voters, decided_early, options:[{index,weight,voters}] }.
+    // total_weight, total_voters, decided_early, options:[{index,weight,voters}],
+    // tick? } (tick present once the host enables VOTE_POLL_TICK_VISIBLE).
     seedPollResult(pollIndex, result) {
         this.pollResults[String(pollIndex)] = result;
     }

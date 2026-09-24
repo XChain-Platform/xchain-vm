@@ -61,6 +61,18 @@ module.exports = {
     },
 
     /**
+     * Set the oldest oracle round this simulated host guarantees. 0 (the default)
+     * hides no history. A positive floor is the bounded window a node ships: an
+     * unseeded round below it reads back from oracle.getPriceAtRound as
+     * { price: null, outsideWindow: true } rather than as plain null.
+     */
+    setOracleRoundFloor(roundFloor) {
+        const n = Number(roundFloor);
+        this.oracle.roundFloor = (Number.isFinite(n) && n > 0) ? n : 0;
+        return this;
+    },
+
+    /**
      * Seed a settled ATTEST response (read by attestation.getResponse in a
      * callback method). Keys are request_ids; the simulator does not derive
      * them, so pass the id your callback will be handed.
@@ -74,7 +86,9 @@ module.exports = {
      * Seed a finalized VOTE poll result (read by poll.getPollResult).
      * @param {number|string} pollIndex - the VOTE v0 action_index
      * @param {object} result - { status, winning_option, total_weight,
-     *        total_voters, decided_early, options:[{index,weight,voters}] }
+     *        total_voters, decided_early, options:[{index,weight,voters}],
+     *        tick? } (tick: the electorate token, present once the host
+     *        enables VOTE_POLL_TICK_VISIBLE)
      */
     setPollResult(pollIndex, result) {
         this.pollData.polls[String(pollIndex)] = result;
