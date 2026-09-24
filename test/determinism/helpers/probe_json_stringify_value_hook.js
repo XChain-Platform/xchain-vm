@@ -31,7 +31,7 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const { createVM, execute, XChainVM } = require('../fuzz/helpers/harness.js');
+const { createVM, execute, XChainVM } = require('../../fuzz/helpers/harness.js');
 
 const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
 // Use the dedicated hook-gate export when it exists; fall back to the F-NR
