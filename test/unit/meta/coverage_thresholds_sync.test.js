@@ -56,7 +56,7 @@ describe('coverage ratchet floors', () => {
 });
 
 // The ratchet also has a SCOPE, and scope drift breaks it as quietly as a floor
-// does. src/process_executor.js forks a child and speaks IPC to it: the unit suite
+// does. src/process-executor.js forks a child and speaks IPC to it: the unit suite
 // can construct it and read a knob back, nothing more, so it is measured by
 // coverage:subprocess against the integration suite instead. It stayed out of the
 // unit report by accident until a unit test required it, at which point it entered

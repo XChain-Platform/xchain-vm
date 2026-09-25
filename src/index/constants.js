@@ -15,7 +15,7 @@
  *
  * The code-size, call, recursion and cross-chain (XCALL) bounds the VM
  * enforces and re-exports for the cross-service parity suites. Vendored
- * from ./protocol/constants.js and gateway_emit.js, never re-declared as
+ * from ./protocol/constants.js and gateway-emit.js, never re-declared as
  * literals; a part of the entry so the bounds read as one table.
  ********************************************************************/
 // @ts-nocheck
@@ -66,11 +66,11 @@ const MAX_STACK_DEPTH_MUSL = 256;
 // host-side (execute/index.js processEmission + actions/xcall/index.js).
 const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;     // = MIN_CALL_GAS
 const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;     // target-side ceiling cap (the run is fee-less on the target chain)
-// Single in-VM source of truth: gateway_emit.js declares the hop cap it
+// Single in-VM source of truth: gateway-emit.js declares the hop cap it
 // ENFORCES (emit.crossExecute's hop gate) and this module re-exports it, so a
 // future bump cannot leave the enforcer and the exported/parity-tested value
-// disagreeing. (gateway_emit.js has no require-cycle back into this file.)
-const XCALL_MAX_HOPS            = require('../gateway_emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
+// disagreeing. (gateway-emit.js has no require-cycle back into this file.)
+const XCALL_MAX_HOPS            = require('../gateway-emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
 const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
 const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
 const XCALL_MAX_RETURN_BYTES    = PROTO.XCALL_MAX_RETURN_BYTES;

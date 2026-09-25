@@ -36,7 +36,7 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
     this.timeout(60000);
 
     it('concurrent execute() calls are dispatched one at a time and all complete', async function () {
-        const ProcessExecutor = require('../../../src/process_executor.js');
+        const ProcessExecutor = require('../../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
@@ -65,7 +65,7 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
     });
 
     it('a queued entry has no watchdog timer until it dispatches (queue wait never counts)', async function () {
-        const ProcessExecutor = require('../../../src/process_executor.js');
+        const ProcessExecutor = require('../../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {

@@ -20,7 +20,7 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const cr = require('../../src/consensus_runtime.js');
+const cr = require('../../src/consensus-runtime.js');
 const vm = require('../../src/index.js');
 const lintCore = require('../../src/lint_core.js');
 const metering = require('../../src/metering.js');

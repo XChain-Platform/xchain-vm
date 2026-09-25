@@ -52,7 +52,7 @@
  * test pass.
  *
  * Zero dependencies on purpose: index.js (the enforcing path) and
- * process_executor.js (the parent-side watchdog that must never fire before
+ * process-executor.js (the parent-side watchdog that must never fire before
  * the in-isolate bound) both read it without a require cycle.
  ********************************************************************/
 // @ts-nocheck

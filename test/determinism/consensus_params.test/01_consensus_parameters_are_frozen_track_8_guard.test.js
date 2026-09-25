@@ -20,7 +20,7 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const cr = require('../../../src/consensus_runtime.js');
+const cr = require('../../../src/consensus-runtime.js');
 const vm = require('../../../src/index.js');
 const lintCore = require('../../../src/lint_core.js');
 const metering = require('../../../src/metering.js');
@@ -82,7 +82,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // default-configured node's outcome; TIGHTENING it is a separate consensus
         // event (future flag-day + re-goldened baselines + atomic deploy).
         assert.strictEqual(vm.CONSENSUS_MAX_WALL_MS, 30000);
-        assert.strictEqual(require('../../../src/consensus_wall_clock.js').CONSENSUS_MAX_WALL_MS,
+        assert.strictEqual(require('../../../src/consensus-wall-clock.js').CONSENSUS_MAX_WALL_MS,
             vm.CONSENSUS_MAX_WALL_MS, 'enforcing module and export must be the same value');
         // The activation rides the ratified 2.0.0 flag-day, like its siblings.
         assert.strictEqual(vm.isConsensusWallClockActive('regtest', 0), true);
@@ -373,11 +373,11 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('XCALL_MAX_HOPS is single-sourced from the emit-time enforcer and pinned', function () {
-        // gateway_emit.js declares the hop cap it enforces (crossExecute's hop
+        // gateway-emit.js declares the hop cap it enforces (crossExecute's hop
         // gate) and index.js re-exports that same binding for the cross-service
         // parity suite. Pin both the value and the single-sourcing so a future
         // bump cannot leave the enforcer and the parity-tested export diverging.
-        const gatewayEmit = require('../../../src/gateway_emit.js');
+        const gatewayEmit = require('../../../src/gateway-emit.js');
         assert.strictEqual(vm.XCALL_MAX_HOPS, 2);
         assert.strictEqual(gatewayEmit.XCALL_MAX_HOPS, vm.XCALL_MAX_HOPS,
             'gateway_emit enforcer and index.js export must be the same value');

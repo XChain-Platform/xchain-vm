@@ -13,7 +13,7 @@
  **********************************************************************
  * XChain VM: Worker (child side)
  *
- * Forked by src/process_executor.js. Holds ONE in-process XChainVM and runs
+ * Forked by src/process-executor.js. Holds ONE in-process XChainVM and runs
  * contract executions on its behalf. If a contract aborts V8, THIS process
  * dies and the parent maps it to a deterministic resource-failure result.
  * the indexer host stays alive.
@@ -34,7 +34,7 @@ let vm = null;
 // and the in-isolate paths of index.execute) is invisible to a parent-process
 // coverage run unless the child flushes its V8 coverage to the NODE_V8_COVERAGE
 // directory before the parent tears it down. The parent SIGKILLs the worker on
-// shutdown/respawn (see process_executor.js), and SIGKILL cannot flush, so relying
+// shutdown/respawn (see process-executor.js), and SIGKILL cannot flush, so relying
 // on clean exit alone loses the execute path (it raced the kill). Flushing after
 // each execute writes the accumulated profile to disk deterministically. Guarded
 // on NODE_V8_COVERAGE, so it is completely inert in production (which never sets

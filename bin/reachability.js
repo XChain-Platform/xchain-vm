@@ -127,7 +127,7 @@ function toolingSweepDirs(siblingsRoot) {
  */
 const DYNAMIC_EDGES = [
     {
-        from: 'src/process_executor.js',
+        from: 'src/process-executor.js',
         // The subprocess executor never requires the worker: it forks it, from a
         // __dirname join built once at module load. No literal anywhere names the
         // worker as a require, so without this edge the single file that carries
@@ -135,12 +135,12 @@ const DYNAMIC_EDGES = [
         // The path is read out of the module's own WORKER_PATH line rather than
         // restated, because a restated copy is a second registry that drifts.
         toList: () => {
-            const declared = fs.readFileSync(path.join(REPO_ROOT, 'src/process_executor.js'), 'utf8');
+            const declared = fs.readFileSync(path.join(REPO_ROOT, 'src/process-executor.js'), 'utf8');
             const line = /const WORKER_PATH = path\.join\(__dirname, *(['"])([^'"]+)\1\)/.exec(declared);
             if (!line) {
-                throw new Error('src/process_executor.js no longer declares WORKER_PATH as a __dirname join: the fork edge cannot be read');
+                throw new Error('src/process-executor.js no longer declares WORKER_PATH as a __dirname join: the fork edge cannot be read');
             }
-            const target = resolveRequire('src/process_executor.js', './' + line[2]);
+            const target = resolveRequire('src/process-executor.js', './' + line[2]);
             if (!target) throw new Error(`WORKER_PATH names ${line[2]}, which does not resolve: the fork edge is stale`);
             return [target];
         },
