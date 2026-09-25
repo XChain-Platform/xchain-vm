@@ -11,8 +11,8 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * KNOWN-RED (re-derivation): does a JSON.stringify value hook let a spine
- * past the F-NR structural-depth guard (src/index.js __guardNativeDepth)?
+ * Security regression: JSON.stringify value hooks cannot bypass the F-NR
+ * structural-depth guard after their dedicated flag day.
  *
  * __guardNativeDepth walks only the VALUE ARGUMENT itself -- array elements
  * and own-enumerable-property values, read once, before the native
@@ -24,14 +24,14 @@
  * guard at all.
  *
  * "direct spine" is the known-good control: the identical spine, with no
- * hook, must trip the deterministic out_of_stack fault. Each "value hook"
- * case asserts that same outcome; a pass means the hook cannot smuggle the
- * spine past the guard, a failure means it can.
+ * hook, must trip the deterministic out_of_stack fault. A toJSON method or
+ * replacer that produces that spine must take the same fault. An accessor is
+ * read once and its first answer is the value handed to the serializer.
  ********************************************************************/
 // @ts-nocheck
 
 const assert = require('assert');
-const { createVM, execute, XChainVM } = require('../../fuzz/helpers/harness.js');
+const { createVM, execute, XChainVM } = require('../fuzz/helpers/harness.js');
 
 const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
 // Use the dedicated hook-gate export when it exists; fall back to the F-NR
@@ -62,8 +62,31 @@ async function run(code, timestamp) {
     return r;
 }
 
-(XChainVM ? describe : describe.skip)('JSON.stringify value-hook depth bypass (re-derivation)', function () {
+(XChainVM ? describe : describe.skip)('JSON.stringify value-hook depth gate', function () {
     this.timeout(30000);
+
+    it('keeps a hook-free value byte- and gas-identical across the gate', async function () {
+        const code = `module.exports = function(xchain) {
+            return JSON.stringify({ a: [1, { b: 'value' }], c: true });
+        };`;
+        const before = await run(code, HOOK_GATE - 1);
+        const after = await run(code, HOOK_GATE);
+        assert.strictEqual(before.success, true);
+        assert.strictEqual(after.success, true);
+        assert.strictEqual(after.returnValue, before.returnValue, 'serialized bytes must not move at the gate');
+        assert.strictEqual(after.gasUsed, before.gasUsed, 'hook-free gas must not move at the gate');
+    });
+
+    it('keeps the legacy hook-bearing outcome below the gate', async function () {
+        const code = `module.exports = function(xchain) {
+            ${SPINE_BUILDER}
+            var wrapped = { toJSON: function() { return spine; } };
+            return JSON.stringify(wrapped);
+        };`;
+        const r = await run(code, HOOK_GATE - 1);
+        assert.strictEqual(r.success, true,
+            `the pre-gate value hook must keep the legacy successful outcome; got ${r.error}`);
+    });
 
     describe('direct spine', function () {
         it('passed directly, the spine ends out_of_stack', async function () {
@@ -115,10 +138,9 @@ async function run(code, timestamp) {
                 return JSON.stringify(obj);
             };`;
             const r = await run(code, HOOK_GATE);
-            assert.strictEqual(r.success, false,
-                `getter-hooked spine must fault the same as the direct spine; got returnValue=${r.returnValue}`);
-            assert.strictEqual(r.error, OUT_OF_STACK,
-                `expected the frozen out_of_stack fault, got ${r.error}`);
+            assert.strictEqual(r.success, true,
+                `getter must serialize its first answer without a second read; got ${r.error}`);
+            assert.strictEqual(JSON.parse(r.returnValue), '{"x":{"y":1}}');
         });
     });
 });
