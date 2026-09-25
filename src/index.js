@@ -2890,9 +2890,8 @@ module.exports.isLintGlobalAliasActive = isLintGlobalAliasActive;
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).
 module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
-// Coordinated flag-day (block time) that activates JSON.stringify value-hook
-// resolution (toJSON / replacer / accessor depth bypasses of the F-NR guard).
-// Exposed so the consensus-params freeze guard can pin it; consensus-critical.
+// JSON.stringify value-hook resolution flag day, exported for the
+// consensus-params freeze guard because a divergent value forks the fleet.
 // The release cut pins the instant.
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
 // Coordinated flag-day (block time) that activates the async/Promise contract

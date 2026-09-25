@@ -62,7 +62,63 @@ async function run(code, timestamp) {
     return r;
 }
 
-(XChainVM ? describe : describe.skip)('JSON.stringify value-hook depth gate', function () {
+function registerDirectSpineTests() {
+    it('passed directly, the spine ends out_of_stack', async function () {
+        const code = `module.exports = function(xchain) {
+            ${SPINE_BUILDER}
+            return JSON.stringify(spine);
+        };`;
+        const r = await run(code, GATE);
+        assert.strictEqual(r.success, false,
+            `direct spine must fault, not return; got returnValue=${r.returnValue}`);
+        assert.strictEqual(r.error, OUT_OF_STACK,
+            `expected the frozen out_of_stack fault, got ${r.error}`);
+    });
+}
+
+function registerValueHookTests() {
+    it('toJSON: a shallow wrapper whose toJSON() returns the spine', async function () {
+        const code = `module.exports = function(xchain) {
+            ${SPINE_BUILDER}
+            var wrapped = { toJSON: function() { return spine; } };
+            return JSON.stringify(wrapped);
+        };`;
+        const r = await run(code, HOOK_GATE);
+        assert.strictEqual(r.success, false,
+            `toJSON-hooked spine must fault the same as the direct spine; got returnValue=${r.returnValue}`);
+        assert.strictEqual(r.error, OUT_OF_STACK,
+            `expected the frozen out_of_stack fault, got ${r.error}`);
+    });
+
+    it('replacer: a shallow value whose replacer substitutes the spine', async function () {
+        const code = `module.exports = function(xchain) {
+            ${SPINE_BUILDER}
+            var shallow = { x: 1 };
+            function replacer(key, val) { return key === 'x' ? spine : val; }
+            return JSON.stringify(shallow, replacer);
+        };`;
+        const r = await run(code, HOOK_GATE);
+        assert.strictEqual(r.success, false,
+            `replacer-hooked spine must fault the same as the direct spine; got returnValue=${r.returnValue}`);
+        assert.strictEqual(r.error, OUT_OF_STACK,
+            `expected the frozen out_of_stack fault, got ${r.error}`);
+    });
+
+    it('own getter: shallow on the first read, the spine on the second', async function () {
+        const code = `module.exports = function(xchain) {
+            ${SPINE_BUILDER}
+            var reads = 0;
+            var obj = { get x() { reads++; return reads === 1 ? { y: 1 } : spine; } };
+            return JSON.stringify(obj);
+        };`;
+        const r = await run(code, HOOK_GATE);
+        assert.strictEqual(r.success, true,
+            `getter must serialize its first answer without a second read; got ${r.error}`);
+        assert.strictEqual(JSON.parse(r.returnValue), '{"x":{"y":1}}');
+    });
+}
+
+function registerGateTests() {
     this.timeout(30000);
 
     it('keeps a hook-free value byte- and gas-identical across the gate', async function () {
@@ -88,59 +144,8 @@ async function run(code, timestamp) {
             `the pre-gate value hook must keep the legacy successful outcome; got ${r.error}`);
     });
 
-    describe('direct spine', function () {
-        it('passed directly, the spine ends out_of_stack', async function () {
-            const code = `module.exports = function(xchain) {
-                ${SPINE_BUILDER}
-                return JSON.stringify(spine);
-            };`;
-            const r = await run(code, GATE);
-            assert.strictEqual(r.success, false,
-                `direct spine must fault, not return; got returnValue=${r.returnValue}`);
-            assert.strictEqual(r.error, OUT_OF_STACK,
-                `expected the frozen out_of_stack fault, got ${r.error}`);
-        });
-    });
+    describe('direct spine', registerDirectSpineTests);
+    describe('value hook', registerValueHookTests);
+}
 
-    describe('value hook', function () {
-        it('toJSON: a shallow wrapper whose toJSON() returns the spine', async function () {
-            const code = `module.exports = function(xchain) {
-                ${SPINE_BUILDER}
-                var wrapped = { toJSON: function() { return spine; } };
-                return JSON.stringify(wrapped);
-            };`;
-            const r = await run(code, HOOK_GATE);
-            assert.strictEqual(r.success, false,
-                `toJSON-hooked spine must fault the same as the direct spine; got returnValue=${r.returnValue}`);
-            assert.strictEqual(r.error, OUT_OF_STACK,
-                `expected the frozen out_of_stack fault, got ${r.error}`);
-        });
-
-        it('replacer: a shallow value whose replacer substitutes the spine', async function () {
-            const code = `module.exports = function(xchain) {
-                ${SPINE_BUILDER}
-                var shallow = { x: 1 };
-                function replacer(key, val) { return key === 'x' ? spine : val; }
-                return JSON.stringify(shallow, replacer);
-            };`;
-            const r = await run(code, HOOK_GATE);
-            assert.strictEqual(r.success, false,
-                `replacer-hooked spine must fault the same as the direct spine; got returnValue=${r.returnValue}`);
-            assert.strictEqual(r.error, OUT_OF_STACK,
-                `expected the frozen out_of_stack fault, got ${r.error}`);
-        });
-
-        it('own getter: shallow on the first read, the spine on the second', async function () {
-            const code = `module.exports = function(xchain) {
-                ${SPINE_BUILDER}
-                var reads = 0;
-                var obj = { get x() { reads++; return reads === 1 ? { y: 1 } : spine; } };
-                return JSON.stringify(obj);
-            };`;
-            const r = await run(code, HOOK_GATE);
-            assert.strictEqual(r.success, true,
-                `getter must serialize its first answer without a second read; got ${r.error}`);
-            assert.strictEqual(JSON.parse(r.returnValue), '{"x":{"y":1}}');
-        });
-    });
-});
+(XChainVM ? describe : describe.skip)('JSON.stringify value-hook depth gate', registerGateTests);
