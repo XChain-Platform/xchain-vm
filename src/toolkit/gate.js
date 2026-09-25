@@ -31,7 +31,7 @@ const { lintSource, findFloatWarnings, CONSENSUS_RULES } = require('../lint_core
 const { checkContractMeta, getExportedMeta, isValidMetaText } = require('./gate/meta_validation.js');
 
 // Heuristic gas-budget estimate. Ported from xchain-sdk ContractUtils
-// .suggestGasLimit (src/contracts.js): a coarse author-time budget, NOT a
+// .suggestGasLimit (src/contract/utils.js): a coarse author-time budget, NOT a
 // consensus figure. The real cost comes from `simulate` (result.gasUsed);
 // this is the "before you even run it" hint.
 function estimateGas(sourceCode) {
