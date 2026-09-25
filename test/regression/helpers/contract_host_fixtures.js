@@ -90,7 +90,7 @@ function makeAttestationData() {
 // is reserved. Each digest pins gasUsed (VM_EMISSION + the 5000 gasLimit
 // reservation, charged atomically against `ceiling - used`) and the queued
 // EXECUTE emission, so an order-of-operations or remaining-gas-check
-// regression in gateway_emit.js fails CI instead of forking gasUsed.
+// regression in gateway-emit.js fails CI instead of forking gasUsed.
 // getCallDepth() is folded into the return value so the depth threading
 // itself is part of the pinned output.
 function makeEmitExecuteFixture(callDepth) {

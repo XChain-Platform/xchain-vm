@@ -2,15 +2,15 @@
   "comment": "Coverage floors for the CI coverage job (regression floors, 1-1.5 points below measured, not tier targets; raise as coverage climbs). Mirrored into the coverage:check npm script in package.json and guarded by test/unit/meta/coverage_thresholds_sync.test.js. Re-measured 2026-09-23 with the declared siblings checked out on Node 22: 98.05 lines/statements, 88.09 branches, and 95.95 functions over 1112 passing unit tests.",
   "scopeComment": "The unit ratchet measures every src/**/*.js file through c8 --all except process-only code measured by coverage:subprocess and developer-toolkit code owned by test:toolkit. Keep the documented exclusion classes, unitScopeExcludes, and both unit coverage scripts identical; guarded by test/unit/meta/coverage_thresholds_sync.test.js.",
   "processOnlyExcludes": [
-    "src/process_executor.js",
-    "src/vm_worker.js"
+    "src/process-executor.js",
+    "src/vm-worker.js"
   ],
   "nonOwnedExcludes": [
     "src/toolkit/**"
   ],
   "unitScopeExcludes": [
-    "src/process_executor.js",
-    "src/vm_worker.js",
+    "src/process-executor.js",
+    "src/vm-worker.js",
     "src/toolkit/**"
   ],
   "measured": {

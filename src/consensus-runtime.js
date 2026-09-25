@@ -194,7 +194,7 @@ function describeMismatch(result) {
         'than the rest of the fleet, which would FORK the chain:\n' +
         lines.join('\n') +
         `\nInstall the canonical runtime (${REFERENCE_NODE}, node:22-bookworm) ` +
-        'or, if the fleet is deliberately upgrading, re-pin src/consensus_runtime.js ' +
+        'or, if the fleet is deliberately upgrading, re-pin src/consensus-runtime.js ' +
         '+ regenerate the determinism manifests + coordinate an atomic fleet activation.'
     );
 }

@@ -13,7 +13,7 @@
 // CROSS-REPO BYTE-MATCH GUARD (consensus-critical).
 //
 // The ATTEST request_id and XCALL call_id are derived in the VM (gateway.js /
-// gateway_emit.js) and RE-derived in the indexer (xchain-indexer
+// gateway-emit.js) and RE-derived in the indexer (xchain-indexer
 // actions/attest/index.js / actions/xcall/index.js). If the two preimages ever
 // drift by a single byte, every legitimate
 // emission is rejected by the re-derivation and the fleet forks. The VM-side suites
@@ -41,7 +41,7 @@ const fs     = require('fs');
 const path   = require('path');
 const { buildGateway } = require('../../../src/gateway.js');
 const { buildEmitAPI, GOLDEN_VECTORS, normalizeRootDiscriminator,
-        buildRequestIdPreimage, buildCallIdPreimage } = require('../../../src/gateway_emit.js');
+        buildRequestIdPreimage, buildCallIdPreimage } = require('../../../src/gateway-emit.js');
 const GasTracker = require('../../../src/gas.js');
 const EmissionCollector = require('../../../src/collector.js');
 
@@ -310,7 +310,7 @@ describe('cross-repo request_id / call_id byte-match (consensus-critical) @regre
                     vmCallId({ network: COIN_CONFIG.NETWORK, txHash: TXH, rootActionIndex: c.root,
                                callPath: '', contractIndex: c.contractIndex, targetChain: 'DOGE' }),
                     crypto.createHash('sha256').update(vmCallPreimage(c.root, '', c.contractIndex)).digest('hex'),
-                    'gateway_emit.js no longer derives the call_id from buildCallIdPreimage for ' + c.name);
+                    'gateway-emit.js no longer derives the call_id from buildCallIdPreimage for ' + c.name);
             });
         }
     });

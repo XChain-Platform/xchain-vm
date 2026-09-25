@@ -27,7 +27,7 @@ const { pow, sqrt, log, log2, log10 } = mathjs;
 // In mathjs 15 the global config is READONLY, so precision is fixed at the library
 // default (64) for a given mathjs version and cannot drift at runtime. The determinism
 // guard pins the mathjs/decimal.js versions and asserts mathjs.config().precision in the
-// consensus surface (consensus_runtime.js MATH_PINNED), so a dependency bump that would
+// consensus surface (consensus-runtime.js MATH_PINNED), so a dependency bump that would
 // change this default cannot ship without a coordinated CONSENSUS_VERSION change.
 
 // Maximum input length for math operations to prevent DoS via

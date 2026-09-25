@@ -35,13 +35,13 @@ const ActionValidator   = require('./validator.js');
 const { buildGateway }  = require('./gateway.js');
 // Canonical coercion for the per-root discriminator threaded into the request_id /
 // call_id preimages (keeps a BATCH subcommand's composite form intact).
-const { normalizeRootDiscriminator } = require('./gateway_emit.js');
+const { normalizeRootDiscriminator } = require('./gateway-emit.js');
 const { stripGlobals }  = require('./sandbox.js');
 const { ContractRevertError, GasExhaustedError, HostFaultError } = require('./errors.js');
-const { resolveAccessors } = require('./readonly_accessors.js');
-// Consensus wall-clock budget per execution (see consensus_wall_clock.js). The
+const { resolveAccessors } = require('./readonly-accessors.js');
+// Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
-const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus_wall_clock.js');
+const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
 // The entry keeps the class (constructor, the consensus wall-clock resolver,
 // execute and the error classifier), the harness prelude and the activation
 // carriers; the other prototype methods, the contract wrapper and the size
@@ -1770,7 +1770,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 }
 
 // Activation for the CONSENSUS wall-clock budget per execution
-// (CONSENSUS_MAX_WALL_MS, ./consensus_wall_clock.js). Below this gate the
+// (CONSENSUS_MAX_WALL_MS, ./consensus-wall-clock.js). Below this gate the
 // wall-clock net is the per-NODE limits.maxCpuTimeMs, which is not a consensus
 // value: two validators configured differently return DIFFERENT statuses and
 // DIFFERENT gasUsed for the same execution (timeout + gasUsed clamped to the
@@ -1786,7 +1786,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 // what makes riding an already-ratified flag-day safe: no execution on a
 // default-configured node changes outcome, so there is no history to preserve
 // below the gate. TIGHTENING the value later is a different change and needs
-// its own future flag-day (see consensus_wall_clock.js).
+// its own future flag-day (see consensus-wall-clock.js).
 //
 // NOTE for a future reader: three comments inside HARNESS_SOURCE (the F3-globals,
 // Set/Map and TypedArray metering notes) still describe maxCpuTimeMs as "the
@@ -2123,7 +2123,7 @@ class XChainVM {
         this._executor = null;
         if (this.execution === 'subprocess') {
             // Lazy require to avoid loading child_process for in-process callers.
-            const ProcessExecutor = require('./process_executor.js');
+            const ProcessExecutor = require('./process-executor.js');
             this._executor = new ProcessExecutor(config);
         }
     }
@@ -2294,7 +2294,7 @@ class XChainVM {
                 __codeHash
             );
             if (!__lintVerdict.valid) {
-                // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus_runtime.js);
+                // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus-runtime.js);
                 // the indexer collapses it to the generic failure token. The lint message is
                 // deterministic and path-free, so it is safe to surface verbatim.
                 return this.errorResult(gasTracker, emissionCollector,
@@ -2409,7 +2409,7 @@ class XChainVM {
                     // the asynchronous frameworks (attestation, cross-chain calls) are
                     // disabled: their results arrive blocks later, after the guarded
                     // action has already committed or reverted. Enforced at emit time
-                    // in gateway.js (attestation.request) + gateway_emit.js (crossExecute).
+                    // in gateway.js (attestation.request) + gateway-emit.js (crossExecute).
                     isGuard:         Boolean(opts.isGuard),
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
@@ -2644,7 +2644,7 @@ class XChainVM {
                 hostSignals.runStartNs = process.hrtime.bigint();
                 // CONSENSUS: the timeout is the per-execution wall-clock budget
                 // resolved above, NOT the node's limits.maxCpuTimeMs (which binds
-                // ungated executions only). See consensus_wall_clock.js.
+                // ungated executions only). See consensus-wall-clock.js.
                 const rawReturn = script.runSync(context, { timeout: hostSignals.wallBudgetMs });
                 // The contract wrapper JSON-serializes non-null return values
                 // with a \x02 prefix inside the isolate
@@ -2709,7 +2709,7 @@ class XChainVM {
      *
      * The error STRING prefixes emitted here (revert/out_of_gas/timeout/
      * out_of_memory/out_of_stack/error; out_of_resource from process_executor)
-     * are the frozen STATUS_ERROR_PREFIXES in consensus_runtime.js. The indexer
+     * are the frozen STATUS_ERROR_PREFIXES in consensus-runtime.js. The indexer
      * collapses them into CONSENSUS_STATUS_TOKENS (utility.vmFailureStatus).
      * Changing a prefix is a consensus change; guarded by the consensus-params
      * tests in both repos.
@@ -2962,7 +2962,7 @@ module.exports.XCALL_MAX_DEADLINE_BLOCKS = XCALL_MAX_DEADLINE_BLOCKS;
 module.exports.XCALL_MAX_RETURN_BYTES    = XCALL_MAX_RETURN_BYTES;
 // Expose the pinned consensus runtime + checker so the indexer (and any
 // validator process bundling the VM) can gate the engine version it runs on.
-const consensusRuntime = require('./consensus_runtime.js');
+const consensusRuntime = require('./consensus-runtime.js');
 module.exports.CONSENSUS_RUNTIME = consensusRuntime.PINNED;
 module.exports.CONSENSUS_VERSION = consensusRuntime.CONSENSUS_VERSION;
 module.exports.CONSENSUS_STATUS_TOKENS = consensusRuntime.CONSENSUS_STATUS_TOKENS;
