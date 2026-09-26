@@ -26,7 +26,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **External attestation**: `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
 - **Deterministic math**: `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point; native `Math.sqrt/pow/log/log2/log10` rejected at deploy time
 - **Contract state management**: key-value state with dirty tracking, key count limits, and value size limits
-- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly checks (see `CONSENSUS_RULES` in `src/lint-core.js`), float usage warnings
+- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly checks (see `CONSENSUS_RULES` in `src/lint_core.js`), float usage warnings
 - **Per-block compilation cache**: V8 cached compilation data eliminates redundant parsing for hot contracts
 - **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap
 - **Consensus wall-clock bound**: one execution's wall-clock budget is a protocol constant (`CONSENSUS_MAX_WALL_MS`), not a per-node setting; see below
@@ -59,7 +59,8 @@ npm install
 
 ### Prerequisites
 
-`isolated-vm` requires native C++ compilation. Install build dependencies:
+`isolated-vm` ships prebuilt bindings for supported Node 22 platforms. If a
+prebuilt binding is unavailable, install the native C++ build dependencies:
 
 ```bash
 # Ubuntu/Debian
@@ -178,7 +179,7 @@ npx create-xchain-contract my-token --ts
 # Static determinism gate + gas estimate (runs on ANY OS/CPU; no isolated-vm)
 xchain-foundry lint contracts/my-token.js
 
-# Deploy + run a method in the in-memory simulator (Node 22 / Linux)
+# Deploy + run a method in the in-memory simulator (Node 22)
 xchain-foundry simulate contracts/my-token.js --constructor 5 --method increment --params 3
 
 # AI-assisted authoring (Tier 3): print a ready-to-use prompt, no network call or key
@@ -223,8 +224,7 @@ chain writes, so a nameless contract is caught before a fee is paid rather than
 at the deploy verdict. `create-xchain-contract` scaffolds `meta` as the first key
 of the contract, and the `describe` / `from-solidity` authoring prompts ask for a
 name and a one-line description up front and repair a reply that omits them. The simulator executes contracts, so it needs
-the isolated-vm binding (Node 22 / Linux); on a macOS dev box use `lint`
-locally and run the simulator / generated tests on Node-22 Linux (CI). See the
+an isolated-vm binding for the current platform and Node 22. See the
 `src/toolkit/` modules for details.
 
 ## Scripts
@@ -232,7 +232,7 @@ locally and run the simulator / generated tests on Node-22 Linux (CI). See the
 | Command | Description |
 |---|---|
 | `npm test` | Unit tests (1,196 tests, 30s timeout) |
-| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator on Node-22 Linux) (141 tests) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator requires a Node 22 isolated-vm binding) (141 tests) |
 | `npm run test:integration` | Integration tests (194 tests) |
 | `npm run test:security` | Security tests (298 tests) |
 | `npm run test:boundary` | Boundary condition tests (117 tests) |
@@ -314,7 +314,7 @@ Latency/throughput assertions in `test/performance/` (`npm run test:performance`
 
 ### Toolkit Tests (141)
 
-`xchain-foundry` / `create-xchain-contract` developer-toolkit coverage: gate, scaffold, and TypeScript-strip logic run on any OS; simulator-backed cases need the isolated-vm binding (Node 22 / Linux).
+`xchain-foundry` / `create-xchain-contract` developer-toolkit coverage: gate, scaffold, and TypeScript-strip logic run on any OS; simulator-backed cases need an isolated-vm binding for the current platform and Node 22.
 
 ### Regression Tests (128 via `test:regression:full`; +31 determinism-tagged tests live alongside them in `test/regression/` but run under `test:determinism`)
 

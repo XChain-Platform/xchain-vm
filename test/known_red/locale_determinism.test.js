@@ -11,12 +11,12 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * KNOWN-RED acceptance test: locale/unicode-sensitive prototype methods
- * are reachable inside the sandbox (suspected consensus-fork surface).
+ * Acceptance test: locale/unicode-sensitive prototype methods must remain
+ * unavailable inside the sandbox because they are a consensus-fork surface.
  *
- * sandbox.js strips the locale GLOBALS (Intl/Temporal/performance/
- * structuredClone) but NOT the ICU-sensitive METHODS on the built-in
- * prototypes, which work without `Intl`:
+ * sandbox.js strips the locale globals (Intl/Temporal/performance/
+ * structuredClone) and the ICU-sensitive methods on the built-in
+ * prototypes, which otherwise work without `Intl`:
  *
  *     String.prototype.normalize       (ICU normalization tables)
  *     String.prototype.localeCompare   (ICU collation)
@@ -28,10 +28,9 @@
  * -> divergent Merkle root across a heterogeneous fleet -> FORK (same class
  * as Finding F1, different path).
  *
- * POST-FIX invariant: these methods must be neutered (removed / throw), so
+ * These methods must be neutered (removed / throw), so
  * a contract that calls one fails deterministically rather than producing
- * locale-dependent output. RED until sandbox.js neuters them. Excluded from
- * the green suites by the `.known-red.js` suffix. Run explicitly:
+ * locale-dependent output. Run this acceptance tier explicitly:
  *
  *     npm run test:known-red
  *
@@ -60,7 +59,7 @@ async function run(code) {
     return r;
 }
 
-describe('KNOWN-RED: locale/unicode prototype methods must be neutered', function () {
+describe('locale/unicode prototype methods must be neutered', function () {
     this.timeout(30000);
 
     const VECTORS = [
@@ -87,7 +86,7 @@ describe('KNOWN-RED: locale/unicode prototype methods must be neutered', functio
     }
 });
 
-describe('KNOWN-RED: String regex methods must be neutered (ReDoS / %RegExp% coercion)', function () {
+describe('String regex methods must be neutered (ReDoS / %RegExp% coercion)', function () {
     this.timeout(30000);
 
     // These coerce their string argument to a RegExp via the %RegExp% intrinsic,

@@ -87,9 +87,7 @@ describe('Preflight: sandbox engine must load', function() {
 // suite loads.
 const SUITE_ROOT = path.join(__dirname, '..');
 const SUITE_FILE_RE = /\.(test|fuzz)\.js$/;
-const KNOWN_EMPTY_SUITES = new Set([
-    'test/unit/metering/metering.test.js',
-]);
+const KNOWN_EMPTY_SUITES = new Set();
 const REGISTRATION_NAMES = new Set(['it', 'test']);
 const CONTAINER_NAMES = new Set(['describe', 'context', 'suite']);
 const SKIP_SUFFIXES = new Set(['only', 'skip', 'todo']);

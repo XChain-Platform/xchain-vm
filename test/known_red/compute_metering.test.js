@@ -11,15 +11,14 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Acceptance test (was KNOWN-RED): native compute/iteration builtins
+ * Acceptance test: native compute/iteration builtins
  * must be size-metered so the gas ceiling, not the wall-clock backstop,
  * is the binding constraint.
  *
- * RED before the G1 fix (the compute builtins were charged ~1 gas at the
+ * Before size metering, the compute builtins were charged ~1 gas at the
  * call site regardless of input size (~66,000 native element-touches per
- * gas, see probe), GREEN after `src/index.js` extends F3-style size
- * metering to them. Excluded from the green suites by the `.known-red.js`
- * suffix (the determinism globs match `*.test.js`). Run explicitly:
+ * gas, see probe). `src/index.js` now extends F3-style size metering to
+ * them. Run this acceptance tier explicitly with:
  *
  *     npm run test:known-red
  *
@@ -70,7 +69,7 @@ function assertGasBounded(id, r) {
     );
 }
 
-describe('compute builtins must be size-metered (was KNOWN-RED)', function () {
+describe('compute builtins must be size-metered', function () {
     this.timeout(180000);
 
     const BUILTINS = [
@@ -105,7 +104,7 @@ describe('compute builtins must be size-metered (was KNOWN-RED)', function () {
     }
 });
 
-describe('Object statics must be size-metered (was KNOWN-RED)', function () {
+describe('Object statics must be size-metered', function () {
     this.timeout(120000);
 
     // Smaller object working set: a very large key count + enumeration can exceed
@@ -135,7 +134,7 @@ describe('Object statics must be size-metered (was KNOWN-RED)', function () {
     }
 });
 
-describe('Object statics must be size-metered (was KNOWN-RED)', function () {
+describe('Object statics must be size-metered', function () {
     this.timeout(120000);
 
     // Syntax-level allocators (G4): the metering pass rewrites these into the
@@ -184,7 +183,7 @@ describe('Object statics must be size-metered (was KNOWN-RED)', function () {
     });
 });
 
-describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {
+describe('string-growth metering: + / += / template', function () {
     this.timeout(60000);
 
     // The metering pass rewrites + / += into __concat and template literals into
@@ -226,7 +225,7 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
     });
 });
 
-describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {
+describe('string-growth metering: + / += / template', function () {
     this.timeout(60000);
 
     // ---- item #6: member-lhs += and tagged-template residuals are now gas-bound ----
@@ -254,7 +253,7 @@ describe('string-growth metering: + / += / template (was KNOWN-RED)', function (
     }
 });
 
-describe('string-growth metering: + / += / template (was KNOWN-RED)', function () {
+describe('string-growth metering: + / += / template', function () {
     this.timeout(60000);
 
     // Correctness guards: the rewrites must preserve JS semantics exactly.
