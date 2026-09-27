@@ -14,15 +14,9 @@
 // @ts-nocheck
 
 const assert = require('assert');
+const { ContractSimulator } = require('../../src/toolkit/simulator.js');
 
-let ContractSimulator = null;
-try {
-    ({ ContractSimulator } = require('../../src/toolkit/simulator.js'));
-} catch (e) {
-    console.log('Skipping simulator optional-chain gate tests (isolated-vm unavailable):', e.message);
-}
-
-(ContractSimulator ? describe : describe.skip)('toolkit: simulator optional-chain deploy gate', function () {
+describe('toolkit: simulator optional-chain deploy gate', function () {
     this.timeout(30000);
 
     it('passes the network activation verdict to validateSyntax', async function () {
