@@ -57,6 +57,7 @@ const {
 const { CONTRACT_WRAPPER, CONTRACT_WRAPPER_HARDENED } = require('./index/contract_wrapper.js');
 const blockLifecycleMethods = require('./index/block_lifecycle.js');
 const lintAndMeteringMethods = require('./index/lint_and_metering.js');
+const { isLintOptionalChainActive } = require('./index/lint_optional_chain_heights.js');
 const gatewayInjectionMethods = require('./index/gateway_injection.js');
 const errorResultMethods = require('./index/error_results.js');
 const manifestMethods = require('./index/manifest.js');
@@ -2251,7 +2252,7 @@ class XChainVM {
         // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
         // under the rule set of the deploy block and its verdict was final.
         //
-        // The five flags are resolved by the SAME predicates the rest of the VM already
+        // The six flags are resolved by the SAME predicates the rest of the VM already
         // uses, which are the execution-side twins of the flags the indexer threads into
         // deploy/index.js validateSyntax, so the execute-time verdict agrees with what a deploy
         // in this block would have produced:
@@ -2260,6 +2261,7 @@ class XChainVM {
         //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
         //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
         //   banned-rest (unmeterable rest)  -> isRestPatternMeterActive (block time)
+        //   LINT_OPTIONAL_CHAIN refinement  -> isLintOptionalChainActive (per-coin height)
         // The whole check rides its own per-coin height gate (isExecLintActive), armed at
         // genesis on every named network: below it, which now means only a chain the
         // resolver cannot place, nothing is charged and nothing is checked, so the
@@ -2291,6 +2293,7 @@ class XChainVM {
                 isPkg3SandboxActive(opts.network, __execLintCoin, __execLintHeight),
                 isLintGlobalAliasActive(opts.network, __execLintCoin, __execLintHeight),
                 isRestPatternMeterActive(opts.network, __lintBlockTime),
+                isLintOptionalChainActive(opts.network, __execLintCoin, __execLintHeight),
                 __codeHash
             );
             if (!__lintVerdict.valid) {

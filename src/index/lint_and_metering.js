@@ -99,16 +99,27 @@ module.exports = {
      * @param {boolean} enforcePkg3Bans - banned-generator + banned-wasm (one gate)
      * @param {boolean} enforceLintGlobalAlias - LINT_GLOBAL_ALIAS refinement (own gate)
      * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
+     * @param {boolean} enforceLintOptionalChain - LINT_OPTIONAL_CHAIN refinement
      * @param {string} [codeHash] - precomputed sha256(code) hex (see getMeteredCode)
      * @returns {{valid: boolean, error?: string}}
      */
-    getLintVerdict(code, enforceBannedAsync, enforceLintHardening, enforcePkg3Bans, enforceLintGlobalAlias, enforceBannedRest, codeHash) {
+    getLintVerdict(
+        code,
+        enforceBannedAsync,
+        enforceLintHardening,
+        enforcePkg3Bans,
+        enforceLintGlobalAlias,
+        enforceBannedRest,
+        enforceLintOptionalChain,
+        codeHash
+    ) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
             (enforcePkg3Bans ? '1' : '0') +
             (enforceLintGlobalAlias ? '1' : '0') +
-            (enforceBannedRest ? '1' : '0');
+            (enforceBannedRest ? '1' : '0') +
+            (enforceLintOptionalChain === true ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -117,7 +128,8 @@ module.exports = {
             enforceBannedGenerator:  enforcePkg3Bans,
             enforceBannedWasm:       enforcePkg3Bans,
             enforceLintGlobalAlias:  enforceLintGlobalAlias,
-            enforceBannedRest:       enforceBannedRest
+            enforceBannedRest:       enforceBannedRest,
+            enforceLintOptionalChain: enforceLintOptionalChain === true
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;
