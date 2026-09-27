@@ -1,0 +1,70 @@
+{
+  "note": "Expected lint verdicts after optional-chain global-object matching is active.",
+  "cases": [
+    {
+      "source": "const p = (globalThis?.globalThis).Promise;",
+      "activeRules": ["banned-async"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const w = (globalThis?.globalThis).WebAssembly;",
+      "activeRules": ["banned-wasm"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const m = (globalThis?.globalThis).Math.pow(2, 3);",
+      "activeRules": ["banned-math"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const p = (this?.globalThis).Promise;",
+      "activeRules": ["banned-async"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const w = (this?.globalThis)?.WebAssembly;",
+      "activeRules": ["banned-wasm"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const m = (this?.globalThis)?.Math.log(2);",
+      "activeRules": ["banned-math"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const p = (globalThis?.[\"globalThis\"]).Promise;",
+      "activeRules": ["banned-async"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const m = (globalThis?.Math).pow(2, 3);",
+      "activeRules": ["banned-math"],
+      "aliasOffRules": ["banned-math"]
+    },
+    {
+      "source": "const m = (globalThis?.[\"Math\"]).pow(2, 3);",
+      "activeRules": ["banned-math"],
+      "aliasOffRules": ["banned-math"]
+    },
+    {
+      "source": "const m = (this?.Math).log(2);",
+      "activeRules": ["banned-math"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const p = ((globalThis?.globalThis)?.globalThis).Promise;",
+      "activeRules": ["banned-async"],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const x = (a?.globalThis).Promise;",
+      "activeRules": [],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const o = { Math: 1 }; const y = (o?.Math);",
+      "activeRules": [],
+      "aliasOffRules": []
+    }
+  ]
+}
