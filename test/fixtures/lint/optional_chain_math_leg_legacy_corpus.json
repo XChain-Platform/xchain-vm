@@ -1,0 +1,29 @@
+{
+  "note": "Pre-activation verdicts for optional-chain Math-object legs, a nested chain, and negative controls.",
+  "cases": [
+    {
+      "source": "const m = (globalThis?.Math).pow(2, 3);",
+      "legacyRules": []
+    },
+    {
+      "source": "const m = (globalThis?.[\"Math\"]).pow(2, 3);",
+      "legacyRules": []
+    },
+    {
+      "source": "const m = (this?.Math).log(2);",
+      "legacyRules": []
+    },
+    {
+      "source": "const p = ((globalThis?.globalThis)?.globalThis).Promise;",
+      "legacyRules": []
+    },
+    {
+      "source": "const x = (a?.globalThis).Promise;",
+      "legacyRules": []
+    },
+    {
+      "source": "const o = { Math: 1 }; const y = (o?.Math);",
+      "legacyRules": []
+    }
+  ]
+}
