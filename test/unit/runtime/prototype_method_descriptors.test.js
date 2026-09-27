@@ -35,7 +35,7 @@ const BASE_PROTOTYPE_ROWS = [
     ["endBlock", false, true, true, "function", 0],
     ["errorResult", false, true, true, "function", 4],
     ["execute", false, true, true, "function", 1],
-    ["getLintVerdict", false, true, true, "function", 7],
+    ["getLintVerdict", false, true, true, "function", 8],
     ["getMeteredCode", false, true, true, "function", 5],
     ["injectGateway", false, true, true, "function", 2],
     ["readManifest", false, true, true, "function", 2],
