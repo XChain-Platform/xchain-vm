@@ -46,6 +46,11 @@ describe('toolkit: simulator optional-chain deploy gate', function () {
                 );
                 assert.strictEqual(seen.length, 1);
                 assert.strictEqual(
+                    Object.prototype.hasOwnProperty.call(seen[0], 'enforceLintOptionalChain'),
+                    true,
+                    testCase.network + ' explicit option'
+                );
+                assert.strictEqual(
                     seen[0].enforceLintOptionalChain,
                     testCase.expected,
                     testCase.network + ' activation verdict'
