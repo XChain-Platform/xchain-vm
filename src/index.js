@@ -57,7 +57,10 @@ const {
 const { CONTRACT_WRAPPER, CONTRACT_WRAPPER_HARDENED } = require('./index/contract_wrapper.js');
 const blockLifecycleMethods = require('./index/block_lifecycle.js');
 const lintAndMeteringMethods = require('./index/lint_and_metering.js');
-const { isLintOptionalChainActive } = require('./index/lint_optional_chain_heights.js');
+const {
+    LINT_OPTIONAL_CHAIN_ACTIVATION,
+    isLintOptionalChainActive,
+} = require('./index/lint_optional_chain_heights.js');
 const gatewayInjectionMethods = require('./index/gateway_injection.js');
 const errorResultMethods = require('./index/error_results.js');
 const manifestMethods = require('./index/manifest.js');
@@ -2889,6 +2892,10 @@ module.exports.EXEC_LINT_GAS_BYTES_PER_UNIT = EXEC_LINT_GAS_BYTES_PER_UNIT;
 // alone forks the deploy verdict.
 module.exports.LINT_GLOBAL_ALIAS_ACTIVATION = LINT_GLOBAL_ALIAS_ACTIVATION;
 module.exports.isLintGlobalAliasActive = isLintGlobalAliasActive;
+// Optional-chain lint activation, twinned with indexer registry row
+// `vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION`.
+module.exports.LINT_OPTIONAL_CHAIN_ACTIVATION = LINT_OPTIONAL_CHAIN_ACTIVATION;
+module.exports.isLintOptionalChainActive = isLintOptionalChainActive;
 // Coordinated flag-day (block time) that activates the F3-binary allocation gas
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).

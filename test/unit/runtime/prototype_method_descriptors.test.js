@@ -62,6 +62,8 @@ const BASE_STATIC_ROWS = [
     ["EXEC_LINT_GAS_BYTES_PER_UNIT", true, true, true, "number", null],
     ["LINT_GLOBAL_ALIAS_ACTIVATION", true, true, true, "object", null],
     ["isLintGlobalAliasActive", true, true, true, "function", 3],
+    ["LINT_OPTIONAL_CHAIN_ACTIVATION", true, true, true, "object", null],
+    ["isLintOptionalChainActive", true, true, true, "function", 3],
     ["BINARY_ALLOC_GATE_BLOCK_TIME", true, true, true, "number", null],
     ["JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME", true, true, true, "number", null],
     ["ASYNC_SURFACE_GATE_BLOCK_TIME", true, true, true, "number", null],
