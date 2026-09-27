@@ -14,6 +14,7 @@
 // @ts-nocheck
 
 const XChainVM = require('../../index.js');
+const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
 const { HEIGHT_GATES, GENESIS_ACTIVE_NETWORKS } = require('./constants.js');
 const { heightGateThreshold, defaultBlockHeight } = require('./block_time_gates.js');
 const {
@@ -160,6 +161,7 @@ module.exports = {
                 enforceBannedGenerator: pkg3,
                 enforceBannedWasm:      pkg3,
                 enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
+                enforceLintOptionalChain: isLintOptionalChainActive(this.network, this.coin, height),
                 enforceBannedRest:      XChainVM.isRestPatternMeterActive(this.network, time)
             });
         } catch (e) {
