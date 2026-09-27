@@ -88,6 +88,32 @@ run_tier() {
   fi
 }
 # <<< ci-tier timer <<<
+fast_defer() {
+  DEFERRED="$DEFERRED [$1]"
+  echo; echo "ci:full ===== $1 DEFERRED (CI_TIER=fast, runs in the full sweep) ====="
+}
+
+FAST_SELECTOR_PLAN=""
+FAST_SELECTOR_WHY=""
+prepare_fast_selector() {
+  if [ ! -f bin/ci_fast_select.js ]; then
+    FAST_SELECTOR_WHY="helper missing"
+    return 1
+  fi
+  local status
+  FAST_SELECTOR_PLAN="$(node bin/ci_fast_select.js --plan 2>&1)"
+  status=$?
+  if [ -n "$FAST_SELECTOR_PLAN" ]; then printf '%s\n' "$FAST_SELECTOR_PLAN"; fi
+  if [ "$status" -ne 0 ]; then
+    FAST_SELECTOR_WHY="exit $status: $(printf '%s\n' "$FAST_SELECTOR_PLAN" | tail -n 1)"
+    return 1
+  fi
+  if ! printf '%s\n' "$FAST_SELECTOR_PLAN" | grep -Eq '^consensus [01]$'; then
+    FAST_SELECTOR_WHY="invalid plan output"
+    return 1
+  fi
+}
+
 need_sib() {
   local s
   for s in "$@"; do
@@ -111,7 +137,22 @@ need_sib xchain-documentation xchain-indexer xchain-sdk xchain-contracts
 # fails loud instead. need_sib above already guarantees the siblings are
 # present, so this env var is what turns that presence into strict enforcement
 # the same way GitHub's run does.
-run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+if [ "${CI_TIER:-full}" = "fast" ]; then
+  if prepare_fast_selector; then
+    if printf '%s\n' "$FAST_SELECTOR_PLAN" | grep -q '^consensus 1$'; then
+      run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+    else
+      run_tier "ci (changed tests)" env XCHAIN_REQUIRE_SIBLINGS=1 node bin/ci_fast_select.js --run
+      fast_defer "ci"
+    fi
+  else
+    echo "ci:full: fast selector unavailable ($FAST_SELECTOR_WHY); running the full unit tier"
+    run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+  fi
+  run_tier "fast-tier selector self-test" ./node_modules/.bin/mocha --no-config --timeout 20000 --exit bin/test/ci_fast_select.test.js
+else
+  run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+fi
 
 # --- identity pin (this gate only; no ci.yml job runs it) --------------------
 # bin/pins/identity.json holds the sha256 of the lint trio the sdk vendors.
