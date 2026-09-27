@@ -27,10 +27,15 @@ function normalizeFile(file) {
     return file.split(path.sep).join('/').replace(/^\.\//, '');
 }
 
-function isConsensusPath(file) {
+function isConsensusCodePath(file) {
     if (file.startsWith('src/') && !file.startsWith('src/toolkit/')) return true;
     if (file.startsWith('bin/pins/')) return true;
     if (file === 'bin/pin_identity.js' || file === 'bin/lint.js') return true;
+    return false;
+}
+
+function widensToConsensus(file) {
+    if (isConsensusCodePath(file)) return true;
     if (WIDEN.some((prefix) => file.startsWith(prefix))) return true;
     return CONTROL_FILES.has(file);
 }
@@ -78,14 +83,14 @@ function selectFastTests(changedFiles, { listTests, findRequirers }) {
     const selected = new Set(ALWAYS.filter((file) => availableSet.has(file)));
 
     for (const file of changed) {
-        if (isConsensusPath(file)) reasons.push(`consensus: ${file}`);
+        if (widensToConsensus(file)) reasons.push(`consensus: ${file}`);
         if (isTestFile(file) && !isGroupTest(file)) reasons.push(`deferred: ${file}`);
         if (isGroupTest(file) && availableSet.has(file)) selected.add(file);
     }
 
     for (const sourceFile of changed.filter((file) => file.startsWith('src/') && file.endsWith('.js'))) {
         const importers = findRequirers(sourceFile, { relativeOnly: true }).map(normalizeFile);
-        for (const importer of importers.filter(isConsensusPath)) {
+        for (const importer of importers.filter(isConsensusCodePath)) {
             reasons.push(`consensus importer: ${importer}`);
         }
         for (const testFile of available) {

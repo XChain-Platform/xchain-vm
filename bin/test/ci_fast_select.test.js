@@ -79,6 +79,20 @@ describe('bin/ci_fast_select.js', () => {
         assert(plan.reasons.some((reason) => reason.includes('src/sandbox.js')));
     });
 
+    it('widens changed fixtures without treating them as consensus importers', () => {
+        const changedFixture = selectFastTests(['test/fixtures/program.js'], {
+            listTests: () => ['test/preflight.test.js'],
+            findRequirers: () => [],
+        });
+        const plan = selectFastTests(['src/toolkit/gate.js'], {
+            listTests: () => ['test/preflight.test.js'],
+            findRequirers: (_file, options) => options.relativeOnly ? ['test/fixtures/program.js'] : [],
+        });
+        assert.strictEqual(changedFixture.consensus, true);
+        assert.strictEqual(plan.consensus, false);
+        assert(!plan.reasons.some((reason) => reason.includes('test/fixtures/program.js')));
+    });
+
     it('finds extensionless relative requires', () => {
         const sourceFile = ['src/metering', 'js'].join('.');
         const requirers = findRequirers(sourceFile, { relativeOnly: true });
