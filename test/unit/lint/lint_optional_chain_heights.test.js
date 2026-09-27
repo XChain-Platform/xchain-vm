@@ -20,7 +20,7 @@ const {
     LINT_OPTIONAL_CHAIN_ACTIVATION,
     resolveOptionalChainActive,
     isLintOptionalChainActive,
-} = require('../../../src/index/lint_optional_chain_activation.js');
+} = require('../../../src/index/lint_optional_chain_heights.js');
 
 describe('optional-chain lint activation', function () {
     const coins = ['BTC', 'LTC', 'DOGE'];
