@@ -14,6 +14,7 @@
 // @ts-nocheck
 
 const XChainVM = require('../../index.js');
+const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
 const { HEIGHT_GATES, GENESIS_ACTIVE_NETWORKS } = require('./constants.js');
 const { heightGateThreshold, defaultBlockHeight } = require('./block_time_gates.js');
 const {
@@ -154,14 +155,18 @@ module.exports = {
         const height = Number(this.block.height);
         const pkg3   = XChainVM.isPkg3SandboxActive(this.network, this.coin, height);
         try {
-            return this.vm.validateSyntax(src, {
+            const options = {
                 enforceBannedAsync:     XChainVM.isAsyncSurfaceActive(this.network, time),
                 enforceLintHardening:   XChainVM.isLintHardeningActive(this.network, time),
                 enforceBannedGenerator: pkg3,
                 enforceBannedWasm:      pkg3,
                 enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
                 enforceBannedRest:      XChainVM.isRestPatternMeterActive(this.network, time)
+            };
+            Object.defineProperty(options, 'enforceLintOptionalChain', {
+                value: isLintOptionalChainActive(this.network, this.coin, height)
             });
+            return this.vm.validateSyntax(src, options);
         } catch (e) {
             // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a
             // property of THIS machine, not of the contract (syntax.js raises
