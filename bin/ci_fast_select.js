@@ -160,7 +160,7 @@ function findRequirers(sourceFile, options = {}) {
     const normalized = normalizeFile(sourceFile);
     const moduleTail = normalized.replace(/\.js$/, '');
     if (options.moduleTail) return grepFiles(moduleTail);
-    const candidates = grepFiles(path.posix.basename(normalized));
+    const candidates = grepFiles(path.posix.basename(moduleTail));
     return candidates.filter((file) => requireTargets(file).includes(normalized));
 }
 

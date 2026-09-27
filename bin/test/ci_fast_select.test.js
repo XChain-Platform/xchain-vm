@@ -79,6 +79,12 @@ describe('bin/ci_fast_select.js', () => {
         assert(plan.reasons.some((reason) => reason.includes('src/sandbox.js')));
     });
 
+    it('finds extensionless relative requires', () => {
+        const sourceFile = ['src/metering', 'js'].join('.');
+        const requirers = findRequirers(sourceFile, { relativeOnly: true });
+        assert(requirers.includes('test/unit/metering/contract_language_version.test.js'));
+    });
+
     it('defers a tracked performance test outside the ci group', () => {
         const changedFile = 'test/performance/throughput.test.js';
         assert(fs.existsSync(path.join(REPO_ROOT, changedFile)));
