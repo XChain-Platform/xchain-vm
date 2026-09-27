@@ -37,8 +37,7 @@ const legacyRulesBySource = new Map(
         .map(({ source, legacyRules }) => [source, legacyRules])
 );
 
-// W3L-9 removes this skip when optional-chain lint matching lands.
-describe.skip('optional-chain lint behavior', function () {
+describe('optional-chain lint behavior', function () {
     for (const { source, activeRules, aliasOffRules } of activeCorpus.cases) {
         it('applies active and legacy verdicts for: ' + source, function () {
             assert.deepStrictEqual(
