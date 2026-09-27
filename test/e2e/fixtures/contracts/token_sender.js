@@ -12,6 +12,7 @@
 
 // Simple contract: stores config on init, sends tokens on demand
 module.exports = {
+    meta: { name: 'Token Sender', description: 'Stores config on init and sends deposited tokens on demand.', version: '1.0.0', ownerWithdraw: true },
     initialize: function(xchain) {
         xchain.state.set('owner', xchain.getSourceAddress());
         xchain.state.set('token', xchain.getInputParam(0) || 'TEST');
