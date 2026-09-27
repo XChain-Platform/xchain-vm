@@ -24,8 +24,8 @@ describe('optional-chain pre-activation lint verdicts', function () {
 
     for (const { source, legacyRules } of corpus.cases) {
         it('reproduces legacy rules for ' + source, function () {
-            const defaultRules = lintSource(source).errors.map((error) => error.rule);
-            const disabledRules = lintSource(source, { globalAlias: false })
+            const defaultRules = lintSource(source, { optionalChain: false }).errors.map((error) => error.rule);
+            const disabledRules = lintSource(source, { optionalChain: false, globalAlias: false })
                 .errors.map((error) => error.rule);
 
             assert.deepStrictEqual(defaultRules, legacyRules);
