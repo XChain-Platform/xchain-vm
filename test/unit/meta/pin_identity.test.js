@@ -42,6 +42,9 @@ describe('bin/pin_identity grade', () => {
         assert.ok(diffs[0].includes('digest mismatch'));
     });
 
+});
+
+describe('bin/pin_identity grade entry set', () => {
     it('reports a dropped entry as missing from the pin', () => {
         const pin = realPin();
         delete pin.files['src/stripped_globals.js'];
