@@ -1,0 +1,39 @@
+{
+  "note": "Pre-activation lint verdicts for optional-chain global-object spellings measured on 2026-09-27.",
+  "cases": [
+    {
+      "source": "const p = globalThis?.Promise;",
+      "legacyRules": [
+        "banned-async"
+      ]
+    },
+    {
+      "source": "const p = (globalThis?.globalThis).Promise;",
+      "legacyRules": []
+    },
+    {
+      "source": "const w = (globalThis?.globalThis).WebAssembly;",
+      "legacyRules": []
+    },
+    {
+      "source": "const m = (globalThis?.globalThis).Math.pow(2, 3);",
+      "legacyRules": []
+    },
+    {
+      "source": "const p = (this?.globalThis).Promise;",
+      "legacyRules": []
+    },
+    {
+      "source": "const w = (this?.globalThis)?.WebAssembly;",
+      "legacyRules": []
+    },
+    {
+      "source": "const m = (this?.globalThis)?.Math.log(2);",
+      "legacyRules": []
+    },
+    {
+      "source": "const p = (globalThis?.[\"globalThis\"]).Promise;",
+      "legacyRules": []
+    }
+  ]
+}
