@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-29
+
+### Fixed
+- Placed JSON stringify value-hook behavior behind its consensus activation gate.
+
 ### Security
 - value-hook depth bypass: reachable
 - JSON.stringify value hooks are resolved once before the depth guard behind an unarmed flag day; CONSENSUS_VERSION is now 5.
