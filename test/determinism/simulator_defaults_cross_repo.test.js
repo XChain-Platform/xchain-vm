@@ -58,7 +58,8 @@
  * numbers the SIMULATOR quotes. maxCodeSize is excluded from the indexer scrape
  * because both sides single-source it (deploy.MAX_CODE_SIZE / lint_core.js), so
  * there is no literal to compare, and the EXEC_LINT / LINT_GLOBAL_ALIAS twins are
- * pinned by consensus-params.test.js in each repo rather than here.
+ * pinned by each repo's consensus-params freeze guard (here
+ * test/determinism/consensus_params.test/) rather than here.
  ********************************************************************/
 
 const assert = require('assert');

@@ -18,7 +18,7 @@
 
 # The canonical XCALL constant map.
 xchain-documentation
-# XCALL constant parity and the consensus-params twin.
+# XCALL constant parity, the consensus-params twin and the slash-amount decimal ceiling twin.
 xchain-indexer
 # XCALL constant parity and lint-core parity.
 xchain-sdk

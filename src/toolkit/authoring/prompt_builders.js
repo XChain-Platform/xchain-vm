@@ -170,7 +170,7 @@ function buildRepairPrompt(previousCode, gateResult) {
         (e.rule ? e.rule + ': ' : '') + e.message);
     return [
         'The previous contract FAILS the XChain deploy determinism gate and would be rejected ' +
-            'on deploy. Fix every error below and return the corrected complete contract in one ' +
+            'on deploy, or would stop executing once a scheduled consensus rule activates. Fix every error below and return the corrected complete contract in one ' +
             'fenced code block. Do not introduce new violations of the HARD RULES.',
         '',
         'Gate errors:',

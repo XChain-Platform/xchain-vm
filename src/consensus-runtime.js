@@ -105,9 +105,10 @@ const REFERENCE_NODE = 'v22.22.3';
 // in lint_core.js). Bumping it is a CONSENSUS EVENT and must accompany a new
 // golden in both repos and (post-launch) a protocol_changes.js block-height
 // activation. The indexer asserts the bundled VM's CONSENSUS_VERSION equals its
-// expected value (test/unit/consensus_params.test.js), and the VM determinism
-// guard (test/determinism/consensus-params.test.js) freezes a digest of the
-// strip set and CONSENSUS_RULES against THIS version, so a change to either
+// expected value (test/unit/consensus/consensus_params.test/vm_coupling.test.js),
+// and the VM determinism guard (test/determinism/consensus_params.test.js)
+// freezes a digest of the strip set and CONSENSUS_RULES against THIS version,
+// so a change to either
 // surface cannot ship without bumping this epoch in lockstep.
 //
 // Epoch '2' froze the async/Promise contract surface: the sandbox strips the

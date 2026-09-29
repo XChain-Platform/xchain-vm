@@ -35,7 +35,7 @@ const { STRIPPED_GLOBAL_NAMES } = require('./stripped_globals.js');
 // owning intrinsic (resolved to its `.prototype` inside the isolate) and the method
 // to neuter. This list is the single source of truth that buildStripScript
 // interpolates, and it is frozen + digested by the determinism guard
-// (test/determinism/consensus-params.test.js) exactly like STRIPPED_GLOBAL_NAMES;
+// (test/determinism/consensus_params.test.js) exactly like STRIPPED_GLOBAL_NAMES;
 // any add/remove is a consensus change that must update both repos' goldens.
 //
 // Two categories, same fork risk:

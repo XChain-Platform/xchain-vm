@@ -65,7 +65,7 @@ const SIBLINGS = [
       guards: 'the canonical XCALL constant map' },
     { repo: 'xchain-indexer', envs: [],
       marker: 'src',
-      guards: 'XCALL constant parity and the consensus-params twin' },
+      guards: 'XCALL constant parity, the consensus-params twin and the slash-amount decimal ceiling twin' },
     { repo: 'xchain-sdk', envs: [],
       marker: 'src',
       guards: 'XCALL constant parity and lint_core parity' },

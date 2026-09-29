@@ -148,7 +148,7 @@ returned different statuses **and** different `gasUsed` for the same execution
 contract checkpoint). A config file could fork the fleet.
 
 At/after the coordinated flag-day an execution therefore runs against
-`CONSENSUS_MAX_WALL_MS` (30000 ms, `src/consensus_wall_clock.js`) on every node,
+`CONSENSUS_MAX_WALL_MS` (30000 ms, `src/consensus-wall-clock.js`) on every node,
 whatever `limits.maxCpuTimeMs` says. Exceeding it is unchanged and
 deterministic: status `timeout: wall-clock safety net triggered`, `gasUsed`
 clamped to the execution's gas ceiling, no state changes, no emissions.
@@ -218,6 +218,12 @@ await sim.close();
 
 The `lint` gate (banned-API / float / async / syntax checks, the code-size cap,
 the `contract-meta` identity rule, + gas estimate) is pure JS and runs anywhere.
+It is stricter than a single deploy on purpose: it applies every consensus rule at
+full strength, including one whose activation is scheduled (banned-rest) or not
+yet armed, because the chain re-lints stored code at every execution and a
+contract that deploys under a not-yet-active rule stops executing once it
+activates. The exact deploy verdict for one network and block is the simulator's
+`deployGate`.
 `runGate` enforces contract identity: a contract exporting no valid
 `meta: { name, description, version }` fails the gate with the same string the
 chain writes, so a nameless contract is caught before a fee is paid rather than

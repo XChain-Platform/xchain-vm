@@ -1754,9 +1754,10 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
 }
 
 // Token-decimal ceiling a contract.slash amount may carry post-activation. MUST equal
-// the indexer's MAX_TOKEN_DECIMALS (xchain-indexer/src/config.js:122); a divergent
-// value would let the VM emit an amount the slash arithmetic cannot represent.
-const MAX_SLASH_AMOUNT_DECIMALS = 18;
+// the indexer's MAX_TOKEN_DECIMALS (xchain-indexer/src/config/token_limits.js); a divergent
+// value would let the VM emit an amount the slash arithmetic cannot represent. Declared in
+// gateway/slash_limits.js, which also builds the gateway's amount regex from it.
+const { MAX_SLASH_AMOUNT_DECIMALS } = require('./gateway/slash_limits.js');
 
 // Activation for widening the contract.slash `amount` precision ceiling from 8 to
 // MAX_SLASH_AMOUNT_DECIMALS. The 8-dp regex contradicted the other side of the same
@@ -2929,8 +2930,9 @@ module.exports.METERING_EVAL_ORDER_GATE_BLOCK_TIME = METERING_EVAL_ORDER_GATE_BL
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_TIME;
 // Destructuring-rest metering + the deploy rejection of unmeterable rest positions.
-// Its own FUTURE flag-day (see the constant); consensus-visible, pinned in
-// test/determinism/consensus-params.test.js against the indexer's REST_PATTERN_METER.
+// Its own FUTURE flag-day (see the constant); consensus-visible, pinned by the
+// test/determinism/consensus_params.test/ freeze guard against the indexer's
+// REST_PATTERN_METER.
 module.exports.REST_PATTERN_METER_GATE_BLOCK_TIME = REST_PATTERN_METER_GATE_BLOCK_TIME;
 module.exports.isRestPatternMeterActive = isRestPatternMeterActive;
 // Coordinated flag-day (block time) that activates canonical string state keys

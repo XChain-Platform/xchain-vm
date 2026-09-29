@@ -21,13 +21,13 @@
 
 // contract.slash amount forms, pre- and post-activation.
 // The legacy form caps fractional digits at 8; the widened form allows the token
-// ceiling MAX_TOKEN_DECIMALS (18, xchain-indexer/src/config.js), the precision
+// ceiling MAX_TOKEN_DECIMALS (18, xchain-indexer/src/config/token_limits.js), the precision
 // STAKE v3 already admits and slashContractStake already computes at. Which form
 // applies is decided by readOnlyData.slashAmountPrecisionOn (host-set, see
 // isSlashAmountPrecisionActive in index.js) because ACCEPTING a call the legacy
 // form rejects changes replay for historical blocks exactly as rejecting one does.
-const SLASH_AMOUNT_LEGACY_RE = /^[0-9]+(\.[0-9]{1,8})?$/;
-const SLASH_AMOUNT_WIDE_RE   = /^[0-9]+(\.[0-9]{1,18})?$/;
+// Both forms are built in ./slash_limits.js from the ceilings index.js also exports.
+const { SLASH_AMOUNT_LEGACY_RE, SLASH_AMOUNT_WIDE_RE } = require('./slash_limits.js');
 
 // Shape checks for one contract.slash call, in the order they throw: the
 // pubkey, the token, the gated token-delimiter guard, then the amount form.
@@ -62,8 +62,9 @@ function validateSlashArgs(pubkey, token, amount, readOnlyData) {
 function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasSchedule) {
     return {
         // Contract-targeted staking: readable + slashable from inside the contract being staked TO.
-        // The contractStakeData accessor is pre-loaded by execute/index.js for ONLY the currently-executing
-        // contract's stakes; a contract cannot read/slash stakes targeting another contract.
+        // The indexer pre-loads contractStakeData for ONLY the executing contract's stakes, on both paths
+        // (actions/execute/run_vm.js loadVmSnapshot, actions/execute/controller_guard.js loadGuardSnapshot),
+        // so a contract cannot read/slash stakes targeting another contract.
         contract: {
             // Returns the SUM of active stake amounts for (pubkey, token) on THIS contract.
             // Returns '0' if no active stake (also during pre-activation grace).

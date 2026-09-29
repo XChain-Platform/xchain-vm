@@ -21,7 +21,7 @@ const XChainVM = require('../../index.js');
 // clamp -- compares blockContext.timestamp against a *_GATE_BLOCK_TIME constant
 // with NO network term, unlike the network-aware gates (async surface, lint
 // hardening, state-key, Pkg-3 sandbox) that regtest activates from genesis. On
-// mainnet three of those are keyed on block HEIGHT per coin instead, which is
+// mainnet the height-keyed gates are keyed on block HEIGHT per coin instead, which is
 // what defaultBlockHeight() below derives (see HEIGHT_GATES). So
 // `network: 'regtest'` does NOT turn the meters on; only the block time does. A
 // default below the newest flag-day meters under a rule set no live chain runs:
@@ -55,21 +55,22 @@ const GATE_BLOCK_TIMES = Object.keys(XChainVM)
 const GATE_FALLBACK_BLOCK_TIME = 1786060800;
 
 // The sibling class of activations, keyed on block HEIGHT per coin rather than on
-// block time: the Package-3 sandbox bundle, the execute-time source re-lint and the
-// lint global-alias refinement all resolve `<COIN>:<network>` against a threshold
-// map. testnet/regtest are genesis-active, so only mainnet (and any other network
-// string) has a height to reach; a default of 1 there runs the PRE-activation rule
-// set, which BTC:mainnet left behind at 961000 (~2026-08-04). Each entry names the
-// exported map and the exported predicate, so the toolkit reads the consensus
-// decision instead of restating it.
+// block time: the Package-3 sandbox bundle, the execute-time source re-lint, the
+// lint global-alias refinement and the lint optional-chain refinement all resolve
+// `<COIN>:<network>` against a threshold map. Whether a gate is on from genesis is
+// decided per gate by its own predicate, never per network (the optional-chain
+// gate is genesis-on for regtest only and needs a threshold on testnet). A default
+// of 1 below an armed threshold runs the PRE-activation rule set, which BTC:mainnet
+// left behind at 961000 (~2026-08-04). Each entry names the exported map and the
+// exported predicate, so the toolkit reads the consensus decision instead of
+// restating it; test/toolkit/simulator_height_gates.test.js holds the table
+// complete against the VM's exported `*_ACTIVATION` maps.
 const HEIGHT_GATES = Object.freeze([
-    { label: 'Pkg-3 sandbox',          map: 'PKG3_SANDBOX_ACTIVATION',      isActive: 'isPkg3SandboxActive' },
-    { label: 'execute-time re-lint',   map: 'EXEC_LINT_ACTIVATION',         isActive: 'isExecLintActive' },
-    { label: 'lint global-alias',      map: 'LINT_GLOBAL_ALIAS_ACTIVATION', isActive: 'isLintGlobalAliasActive' }
+    { label: 'Pkg-3 sandbox',          map: 'PKG3_SANDBOX_ACTIVATION',        isActive: 'isPkg3SandboxActive' },
+    { label: 'execute-time re-lint',   map: 'EXEC_LINT_ACTIVATION',           isActive: 'isExecLintActive' },
+    { label: 'lint global-alias',      map: 'LINT_GLOBAL_ALIAS_ACTIVATION',   isActive: 'isLintGlobalAliasActive' },
+    { label: 'lint optional-chain',    map: 'LINT_OPTIONAL_CHAIN_ACTIVATION', isActive: 'isLintOptionalChainActive' }
 ]);
-
-// Networks whose height gates open at genesis, so no height can be "too low".
-const GENESIS_ACTIVE_NETWORKS = Object.freeze(['regtest', 'testnet']);
 
 // Gas ceiling a controller guard runs under. The indexer reads it from
 // GAS_SCHEDULE.VM_GUARD_GAS_CEILING per coin (xchain-indexer/src/coins/BTC.js,
@@ -86,11 +87,11 @@ const GENESIS_ACTIVE_NETWORKS = Object.freeze(['regtest', 'testnet']);
 const GUARD_GAS_CEILING = 200000;
 
 // Method name the indexer invokes on a token's bound controller contract
-// (xchain-indexer/src/actions/execute/index.js GUARD_METHOD).
+// (xchain-indexer/src/actions/execute/controller_guard.js GUARD_METHOD).
 const GUARD_METHOD = 'guard';
 
 // Positional, all-string guard inputs, in consensus order
-// (xchain-indexer/src/actions/execute/index.js runControllerGuard). Named here so
+// (xchain-indexer/src/actions/execute/controller_guard.js runControllerGuard). Named here so
 // callGuard cannot drift from the order the chain actually passes.
 const GUARD_PARAM_ORDER = Object.freeze([
     'actionType', 'from', 'to', 'tick', 'amount', 'price', 'proceedsTick'
@@ -112,7 +113,6 @@ module.exports = {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
     HEIGHT_GATES,
-    GENESIS_ACTIVE_NETWORKS,
     CONTRACT_META_REQUIRED_TIMES,
     GUARD_GAS_CEILING,
     GUARD_METHOD,
