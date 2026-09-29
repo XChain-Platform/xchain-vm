@@ -27,23 +27,15 @@ function normalizeFile(file) {
     return file.split(path.sep).join('/').replace(/^\.\//, '');
 }
 
-function matchesNarrowPrefix(file, prefixes) {
-    return prefixes.some((prefix) => {
-        const trimmed = prefix.trim().replace(/\/$/, '');
-        return trimmed && (file === trimmed || file.startsWith(`${trimmed}/`));
-    });
-}
-
-function isConsensusCodePath(file, narrowPrefixes = []) {
-    if (matchesNarrowPrefix(file, narrowPrefixes)) return false;
+function isConsensusCodePath(file) {
     if (file.startsWith('src/') && !file.startsWith('src/toolkit/')) return true;
     if (file.startsWith('bin/pins/')) return true;
     if (file === 'bin/pin_identity.js' || file === 'bin/lint.js') return true;
     return false;
 }
 
-function widensToConsensus(file, narrowPrefixes = []) {
-    if (isConsensusCodePath(file, narrowPrefixes)) return true;
+function widensToConsensus(file) {
+    if (isConsensusCodePath(file)) return true;
     if (WIDEN.some((prefix) => file.startsWith(prefix))) return true;
     return CONTROL_FILES.has(file);
 }
@@ -83,7 +75,7 @@ function uniqueSorted(values) {
     return [...new Set(values)].sort();
 }
 
-function selectFastTests(changedFiles, { listTests, findRequirers }, { narrowPrefixes = [] } = {}) {
+function selectFastTests(changedFiles, { listTests, findRequirers }) {
     const changed = uniqueSorted(changedFiles.map(normalizeFile));
     const available = uniqueSorted(listTests().map(normalizeFile)).filter(isGroupTest);
     const availableSet = new Set(available);
@@ -91,14 +83,14 @@ function selectFastTests(changedFiles, { listTests, findRequirers }, { narrowPre
     const selected = new Set(ALWAYS.filter((file) => availableSet.has(file)));
 
     for (const file of changed) {
-        if (widensToConsensus(file, narrowPrefixes)) reasons.push(`consensus: ${file}`);
+        if (widensToConsensus(file)) reasons.push(`consensus: ${file}`);
         if (isTestFile(file) && !isGroupTest(file)) reasons.push(`deferred: ${file}`);
         if (isGroupTest(file) && availableSet.has(file)) selected.add(file);
     }
 
     for (const sourceFile of changed.filter((file) => file.startsWith('src/') && file.endsWith('.js'))) {
         const importers = findRequirers(sourceFile, { relativeOnly: true }).map(normalizeFile);
-        for (const importer of importers.filter((file) => isConsensusCodePath(file, narrowPrefixes))) {
+        for (const importer of importers.filter(isConsensusCodePath)) {
             reasons.push(`consensus importer: ${importer}`);
         }
         for (const testFile of available) {
@@ -139,26 +131,18 @@ function resolveBase({ env, git }) {
     }
 }
 
-function runGitAt(root, args) {
-    return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-}
-
 function runGit(args) {
-    return runGitAt(REPO_ROOT, args);
-}
-
-function listTestsAt(root) {
-    const output = runGitAt(root, ['ls-files', 'test']);
-    return output.split('\n').filter(Boolean).filter((file) => fs.existsSync(path.join(root, file)));
+    return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 function listTests() {
-    return listTestsAt(REPO_ROOT);
+    const output = runGit(['ls-files', 'test']);
+    return output.split('\n').filter(Boolean).filter((file) => fs.existsSync(path.join(REPO_ROOT, file)));
 }
 
-function grepFilesAt(root, needle) {
+function grepFiles(needle) {
     try {
-        const output = runGitAt(root, ['grep', '-l', '-F', '--', needle, '--', '*.js']);
+        const output = runGit(['grep', '-l', '-F', '--', needle, '--', '*.js']);
         return output.split('\n').filter(Boolean);
     } catch (error) {
         if (error.status === 1) return [];
@@ -166,188 +150,28 @@ function grepFilesAt(root, needle) {
     }
 }
 
-function requireTargetsFromSource(root, file, text) {
+function requireTargets(file) {
+    const text = fs.readFileSync(path.join(REPO_ROOT, file), 'utf8');
     const targets = [];
     const requirePattern = /require\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g;
     for (const match of text.matchAll(requirePattern)) {
-        const absolute = path.resolve(root, path.dirname(file), match[1]);
+        const absolute = path.resolve(REPO_ROOT, path.dirname(file), match[1]);
         targets.push(absolute, `${absolute}.js`, path.join(absolute, 'index.js'));
     }
-    return targets.map((target) => normalizeFile(path.relative(root, target)));
-}
-
-function requireTargetsAt(root, file) {
-    const text = fs.readFileSync(path.join(root, file), 'utf8');
-    return requireTargetsFromSource(root, file, text);
-}
-
-function findRequirersAt(root, sourceFile, options = {}) {
-    const normalized = normalizeFile(sourceFile);
-    const moduleTail = normalized.replace(/\.js$/, '');
-    if (options.moduleTail) return grepFilesAt(root, moduleTail);
-    const candidates = grepFilesAt(root, path.posix.basename(moduleTail));
-    return candidates.filter((file) => requireTargetsAt(root, file).includes(normalized));
+    return targets.map((target) => normalizeFile(path.relative(REPO_ROOT, target)));
 }
 
 function findRequirers(sourceFile, options = {}) {
-    return findRequirersAt(REPO_ROOT, sourceFile, options);
-}
-
-function gitLinesAt(root, args, allowNoMatches = false) {
-    try {
-        return runGitAt(root, args).split(/\r?\n/).filter(Boolean);
-    } catch (error) {
-        if (allowNoMatches && error.status === 1) return [];
-        throw error;
-    }
-}
-
-function selectionDependencies({ root = process.cwd(), indexed = false } = {}) {
-    const tests = listTestsAt(root);
-    if (!indexed) {
-        return {
-            listTests: () => tests,
-            findRequirers: (file, options) => findRequirersAt(root, file, options),
-        };
-    }
-    const files = gitLinesAt(root, ['ls-files']).filter((file) => {
-        return file.endsWith('.js') && fs.existsSync(path.join(root, file));
-    });
-    const sources = new Map();
-    const importers = new Map();
-    for (const file of files) {
-        const source = fs.readFileSync(path.join(root, file), 'utf8');
-        sources.set(file, source);
-        for (const target of requireTargetsFromSource(root, file, source)) {
-            if (!importers.has(target)) importers.set(target, []);
-            importers.get(target).push(file);
-        }
-    }
-    return {
-        listTests: () => tests,
-        findRequirers: (file, options = {}) => {
-            const normalized = normalizeFile(file);
-            if (!options.moduleTail) return importers.get(normalized) || [];
-            const moduleTail = normalized.replace(/\.js$/, '');
-            return [...sources].filter(([, source]) => source.includes(moduleTail)).map(([name]) => name);
-        },
-    };
+    const normalized = normalizeFile(sourceFile);
+    const moduleTail = normalized.replace(/\.js$/, '');
+    if (options.moduleTail) return grepFiles(moduleTail);
+    const candidates = grepFiles(path.posix.basename(moduleTail));
+    return candidates.filter((file) => requireTargets(file).includes(normalized));
 }
 
 function noBaseReason(env) {
     if (env.PROM_CI_BASE_SHA) return `invalid ${env.PROM_CI_BASE_SHA}; merge-base failed`;
     return 'merge-base with origin/develop failed';
-}
-
-function changedFilesForCommit(root, commit) {
-    const revision = gitLinesAt(root, ['rev-list', '--parents', '-n', '1', commit])[0];
-    const [, parent] = revision.split(' ');
-    if (parent) return gitLinesAt(root, ['diff', '--name-only', `${parent}..${commit}`]);
-    return gitLinesAt(root, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', commit]);
-}
-
-function emptyReplayCounts() {
-    return { wholeUnit: 0, changedTests: 0, testOnly: 0, noTests: 0 };
-}
-
-function countReplayPlan(counts, changed, plan) {
-    if (plan.consensus) {
-        counts.wholeUnit++;
-    } else if (plan.tests.length && changed.every((file) => file.startsWith('test/'))) {
-        counts.testOnly++;
-    } else if (plan.tests.length) {
-        counts.changedTests++;
-    } else {
-        counts.noTests++;
-    }
-}
-
-function replayPlans(limit, narrowPrefixes) {
-    const root = process.cwd();
-    const commits = gitLinesAt(root, [
-        'log', '--first-parent', '-n', String(limit), '--format=%H', 'origin/develop',
-    ]);
-    const current = emptyReplayCounts();
-    const narrowed = emptyReplayCounts();
-    const dependencies = selectionDependencies({ root, indexed: true });
-    for (const commit of commits) {
-        const changed = changedFilesForCommit(root, commit);
-        countReplayPlan(current, changed, selectFastTests(changed, dependencies));
-        countReplayPlan(narrowed, changed, selectFastTests(changed, dependencies, { narrowPrefixes }));
-    }
-    return { commits, current, narrowed, narrowPrefixes, dependencies };
-}
-
-function fraction(value, total) {
-    return `${value}/${total}`;
-}
-
-function printReplayRow(name, total, counts) {
-    process.stdout.write(`${[
-        name,
-        total,
-        fraction(counts.wholeUnit, total),
-        fraction(counts.changedTests, total),
-        fraction(counts.testOnly, total),
-        fraction(counts.noTests, total),
-    ].join(' ')}\n`);
-}
-
-function parseList(value) {
-    return value.split(',').map((item) => item.trim()).filter(Boolean);
-}
-
-function parseMustSelect(value) {
-    return parseList(value).map((pair) => {
-        const separator = pair.indexOf(':');
-        if (separator <= 0 || separator === pair.length - 1) {
-            throw new Error(`invalid --must-select pair: ${pair}`);
-        }
-        return { source: pair.slice(0, separator), test: pair.slice(separator + 1) };
-    });
-}
-
-function replayOptions(args) {
-    const limit = Number(args[0]);
-    if (!Number.isSafeInteger(limit) || limit < 1) {
-        throw new Error('--replay requires a positive integer');
-    }
-    const options = { limit, narrowPrefixes: [], mustSelect: [] };
-    for (let index = 1; index < args.length; index += 2) {
-        const flag = args[index];
-        const value = args[index + 1];
-        if (!value || (flag !== '--narrow' && flag !== '--must-select')) {
-            throw new Error(`invalid replay option: ${flag || ''}`.trim());
-        }
-        if (flag === '--narrow') options.narrowPrefixes.push(...parseList(value));
-        else options.mustSelect.push(...parseMustSelect(value));
-    }
-    return options;
-}
-
-function runReplay(args) {
-    try {
-        const options = replayOptions(args);
-        const result = replayPlans(options.limit, options.narrowPrefixes);
-        process.stdout.write('plan commits consensus-1 changed-tests test-only no-tests\n');
-        printReplayRow('current', result.commits.length, result.current);
-        if (options.narrowPrefixes.length) {
-            printReplayRow('narrowed', result.commits.length, result.narrowed);
-        }
-        let failed = false;
-        for (const pair of options.mustSelect) {
-            const plan = selectFastTests([pair.source], result.dependencies, {
-                narrowPrefixes: result.narrowPrefixes,
-            });
-            const selected = plan.tests.some((test) => test.file === pair.test);
-            process.stdout.write(`must-select ${selected ? 'PASS' : 'FAIL'} ${pair.source}:${pair.test}\n`);
-            if (!selected) failed = true;
-        }
-        return failed ? 1 : 0;
-    } catch (error) {
-        process.stderr.write(`replay-error ${error.message}\n`);
-        return 2;
-    }
 }
 
 function computePlan(env) {
@@ -386,10 +210,8 @@ function runPlan(plan) {
 
 function main() {
     const mode = process.argv[2];
-    if (mode === '--replay') return runReplay(process.argv.slice(3));
     if (mode !== '--plan' && mode !== '--run') {
-        process.stderr.write('usage: node bin/ci_fast_select.js --plan|--run|--replay N ' +
-            '[--narrow prefix,...] [--must-select file:testfile,...]\n');
+        process.stderr.write('usage: node bin/ci_fast_select.js --plan|--run\n');
         return 2;
     }
     try {
@@ -409,6 +231,6 @@ function main() {
     }
 }
 
-module.exports = { resolveBase, selectFastTests, listTests, findRequirers, replayPlans };
+module.exports = { resolveBase, selectFastTests, listTests, findRequirers };
 
 if (require.main === module) process.exitCode = main();
