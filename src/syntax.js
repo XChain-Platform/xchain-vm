@@ -26,6 +26,14 @@ const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
 const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint_core.js');
 
+function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWasm, bannedRest) {
+    if (error.rule === 'banned-async' && !bannedAsync) return false;
+    if (error.rule === 'banned-generator' && !bannedGenerator) return false;
+    if (error.rule === 'banned-wasm' && !bannedWasm) return false;
+    if (error.rule === 'banned-rest' && !bannedRest) return false;
+    return CONSENSUS_RULES.has(error.rule);
+}
+
 /**
  * Validate contract code syntax before deployment. Runs a V8 syntax check
  * (the only step needing isolated-vm) then the acorn-coverable consensus rules
@@ -57,6 +65,10 @@ const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, 
  *        because that gate is already open on every network and riding it would
  *        retroactively reject contracts the chain already accepted. The indexer
  *        passes the resolved activation (deploy/index.js). Defaults to true.
+ * @param {boolean} [opts.enforceLintOptionalChain=true] - whether the xchain-vm
+ *        LINT_OPTIONAL_CHAIN_ACTIVATION refinement applies. The indexer passes
+ *        vm_lint_optional_chain_activation.VM_LINT_OPTIONAL_CHAIN_ACTIVATION.
+ *        Defaults to true.
  * @param {boolean} [opts.enforceBannedGenerator=true] - whether the
  *        'banned-generator' rule (function*, generator methods, yield) is
  *        deploy-blocking. CONSENSUS-GATED identically to enforceBannedAsync, but
@@ -91,6 +103,7 @@ function validateSyntax(code, opts) {
     const enforceBannedAsync     = !opts || opts.enforceBannedAsync !== false;
     const enforceLintHardening   = !opts || opts.enforceLintHardening !== false;
     const enforceLintGlobalAlias = !opts || opts.enforceLintGlobalAlias !== false;
+    const enforceLintOptionalChain = !opts || opts.enforceLintOptionalChain !== false;
     const enforceBannedGenerator = !opts || opts.enforceBannedGenerator !== false;
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
@@ -133,14 +146,10 @@ function validateSyntax(code, opts) {
     // banned-rest on the REST_PATTERN_METER block-time gate.
     const blocking = lintSource(code, {
         hardened: enforceLintHardening,
-        globalAlias: enforceLintGlobalAlias
-    }).errors.filter((e) => {
-        if (e.rule === 'banned-async' && !enforceBannedAsync) return false;
-        if (e.rule === 'banned-generator' && !enforceBannedGenerator) return false;
-        if (e.rule === 'banned-wasm' && !enforceBannedWasm) return false;
-        if (e.rule === 'banned-rest' && !enforceBannedRest) return false;
-        return CONSENSUS_RULES.has(e.rule);
-    });
+        globalAlias: enforceLintGlobalAlias,
+        optionalChain: enforceLintOptionalChain
+    }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
+        enforceBannedGenerator, enforceBannedWasm, enforceBannedRest));
     if (blocking.length > 0)
         return { valid: false, error: blocking[0].message };
 

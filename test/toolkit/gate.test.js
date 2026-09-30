@@ -96,6 +96,14 @@ describe('Toolkit gate: determinism + gas', function() {
         assert(g.warnings.length > 0, 'should surface a float warning');
     });
 
+    it('blocks a rule whose activation is still scheduled (strict on purpose)', function() {
+        // Mainnet DEPLOY accepts a rest parameter until REST_PATTERN_METER, but the
+        // execute-time re-lint rejects every call after it, so the gate must block now.
+        const g = runGate('module.exports = function(xchain, ...xs) { return xs.length; };');
+        assert.strictEqual(g.ok, false);
+        assert(g.errors.some(e => e.rule === 'banned-rest'));
+    });
+
     it('surfaces non-string input as a blocking error', function() {
         const g = runGate(12345);
         assert.strictEqual(g.ok, false);

@@ -14,8 +14,9 @@
 // @ts-nocheck
 
 const XChainVM = require('../../index.js');
-const { HEIGHT_GATES, GENESIS_ACTIVE_NETWORKS } = require('./constants.js');
-const { heightGateThreshold, defaultBlockHeight } = require('./block_time_gates.js');
+const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
+const { HEIGHT_GATES } = require('./constants.js');
+const { heightGateThreshold, heightGateNeed, defaultBlockHeight } = require('./block_time_gates.js');
 const {
     isContractMetaRequiredActive,
     manifestPolicyError,
@@ -60,26 +61,27 @@ module.exports = {
      * coin resolves every one of these gates to inactive whatever the height).
      *
      * The gate decision itself is delegated to the VM's exported predicates, so the
-     * toolkit can never drift from index.js; the map is read only to tell an ARMED
-     * gate from the explicit `null` unarmed sentinel, which must never warn.
+     * toolkit can never drift from index.js. A gate counts as armed when its own
+     * predicate is on from genesis at (network, coin) or its map holds a finite
+     * threshold; the explicit `null` unarmed sentinel must never warn. A genesis-on
+     * gate is on at every height, so it can never be listed as OFF.
      * Deliberate below-gate runs stay legal, so this warns rather than throwing.
      */
     warnIfPreHeightGate(contractAddress) {
         if (this._preHeightGateWarned) return;
-        if (GENESIS_ACTIVE_NETWORKS.indexOf(this.network) !== -1) return;
 
         const coin = XChainVM.pkg3CoinFromAddress(contractAddress);
         const height = Number(this.block.height);
         const armed = HEIGHT_GATES.filter(
-            (g) => heightGateThreshold(g, coin, this.network) !== undefined);
+            (g) => heightGateNeed(g, coin, this.network) !== undefined);
 
         if (!armed.length) {
             this._preHeightGateWarned = true;
             console.warn(
                 '[xchain-vm simulator] no block-HEIGHT activation is armed for coin ' +
                 JSON.stringify(coin) + ' on network ' + JSON.stringify(this.network) + ' ' +
-                '(resolved from contract address ' + JSON.stringify(contractAddress) + '): the ' +
-                'Pkg-3 sandbox, the execute-time re-lint and the lint global-alias refinement ' +
+                '(resolved from contract address ' + JSON.stringify(contractAddress) + '): ' +
+                HEIGHT_GATES.map((g) => g.label).join(', ') + ' ' +
                 'all resolve to INACTIVE at every height, so this run does NOT reproduce a ' +
                 'mainnet rule set. Deploy at a C:<COIN>:<idx> address whose coin the VM gates.'
             );
@@ -154,14 +156,18 @@ module.exports = {
         const height = Number(this.block.height);
         const pkg3   = XChainVM.isPkg3SandboxActive(this.network, this.coin, height);
         try {
-            return this.vm.validateSyntax(src, {
+            const options = {
                 enforceBannedAsync:     XChainVM.isAsyncSurfaceActive(this.network, time),
                 enforceLintHardening:   XChainVM.isLintHardeningActive(this.network, time),
                 enforceBannedGenerator: pkg3,
                 enforceBannedWasm:      pkg3,
                 enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
                 enforceBannedRest:      XChainVM.isRestPatternMeterActive(this.network, time)
+            };
+            Object.defineProperty(options, 'enforceLintOptionalChain', {
+                value: isLintOptionalChainActive(this.network, this.coin, height)
             });
+            return this.vm.validateSyntax(src, options);
         } catch (e) {
             // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a
             // property of THIS machine, not of the contract (syntax.js raises

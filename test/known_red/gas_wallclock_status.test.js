@@ -11,7 +11,7 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Acceptance test (was KNOWN-RED): gas-vs-wall-clock is a host-timing
+ * Acceptance test: gas-vs-wall-clock is a host-timing
  * race, so the consensus-visible result of a gas-burning contract MUST be
  * identical whether the gas ceiling or the wall-clock net fires first.
  *
@@ -23,16 +23,16 @@
  * (xchain-indexer util.vmFailureStatus → db.getBlockHashes), so two honest
  * validators committing different tokens would FORK.
  *
- * RED before the fix: the determinism harness hashed the RAW error, and the
- * indexer kept `out_of_gas` distinct from `out_of_resource`, so the two
- * budgets below produced different consensus results. GREEN after: the
- * resource-exhaustion family (out_of_gas / timeout / out_of_memory /
+ * The determinism harness once hashed the raw error, and the indexer kept
+ * `out_of_gas` distinct from `out_of_resource`, so the two budgets below
+ * produced different consensus results. The resource-exhaustion family
+ * (out_of_gas / timeout / out_of_memory /
  * out_of_stack / out_of_resource) collapses to one host-independent token
  * (harness `consensusError`, mirroring the indexer collapse), so WHICH
  * ceiling fires no longer changes consensus. gasUsed is clamped to the
  * ceiling on both paths, so the fee was already fork-safe.
  *
- * Excluded from the green suites by the `.known-red.js` suffix. Run:
+ * Run this acceptance tier with:
  *     npm run test:known-red
  *
  * Evidence behind it: test/determinism/helpers/probe_gas_vs_wallclock_race.js.
@@ -55,7 +55,7 @@ async function run(maxCpuTimeMs) {
     return r;
 }
 
-describe('gas-vs-wall-clock status must not fork (was KNOWN-RED)', function () {
+describe('gas-vs-wall-clock status must not fork', function () {
     this.timeout(60000);
 
     let fast, slow;

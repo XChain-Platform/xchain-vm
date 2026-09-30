@@ -57,7 +57,7 @@ const TIERS = {
     'src/gateway.js':                     { tier: 'High',     target: 90 },
     'src/gateway/accessors.js':           { tier: 'High',     target: 90 },
     'src/gateway/contract_stake.js':      { tier: 'High',     target: 90 },
-    'src/gateway_emit.js':                { tier: 'High',     target: 90 },
+    'src/gateway-emit.js':                { tier: 'High',     target: 90 },
     'src/gateway_emit/param_validation.js': { tier: 'High',   target: 90 },
     'src/gateway_emit/same_chain.js':     { tier: 'High',     target: 90 },
     'src/state.js':                       { tier: 'High',     target: 90 },
@@ -223,7 +223,7 @@ function getRecommendation(filename, mutatorName, location) {
         return 'Add test: verify __gas() is injected for the specific AST node type at line ' + line;
     }
 
-    if (filename === 'gateway_emit.js') {
+    if (filename === 'gateway-emit.js') {
         return 'Add test: verify required field validation rejects missing parameters';
     }
 

@@ -35,7 +35,7 @@ const { STRIPPED_GLOBAL_NAMES } = require('./stripped_globals.js');
 // owning intrinsic (resolved to its `.prototype` inside the isolate) and the method
 // to neuter. This list is the single source of truth that buildStripScript
 // interpolates, and it is frozen + digested by the determinism guard
-// (test/determinism/consensus-params.test.js) exactly like STRIPPED_GLOBAL_NAMES;
+// (test/determinism/consensus_params.test.js) exactly like STRIPPED_GLOBAL_NAMES;
 // any add/remove is a consensus change that must update both repos' goldens.
 //
 // Two categories, same fork risk:
@@ -51,7 +51,7 @@ const { STRIPPED_GLOBAL_NAMES } = require('./stripped_globals.js');
 // Both are hard-neutered so a contract that calls one fails DETERMINISTICALLY
 // (TypeError). NB: String.prototype.toLowerCase/toUpperCase are deliberately NOT
 // here; their Unicode case-folding is pinned by 'unicode: 17.0' in
-// consensus_runtime.js, the same way the e.message residual is covered by the pin.
+// consensus-runtime.js, the same way the e.message residual is covered by the pin.
 const STRIPPED_PROTO_METHODS = Object.freeze([
     { proto: 'String', method: 'match' },
     { proto: 'String', method: 'matchAll' },

@@ -20,7 +20,8 @@
  *   xchain-foundry lint <file...> [--json]
  *       Static determinism gate + gas estimate. No isolated-vm needed, so it
  *       runs on any OS/CPU with millisecond feedback. .ts files are stripped
- *       to JS first. Exit 1 if any file has a deploy-blocking error.
+ *       to JS first. Exit 1 if any file has a blocking error (every consensus
+ *       rule at full strength, scheduled bans included).
  *
  *   xchain-foundry gas <file...>
  *       Print only the heuristic gas-budget estimate for each file.

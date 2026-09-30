@@ -33,7 +33,7 @@
 // them silently drift.
 //
 // The accessor objects below are pure, deterministic stand-ins for the indexer's
-// real providers (xchain-indexer/src/db/contracts.js getContractStakeData() and the
+// real providers (xchain-indexer/src/db/contracts/vm_stake_snapshot.js getContractStakeDataForVM() and the
 // attestation-response store). They return the same shapes the production
 // accessors return, so a change in gas charging, response serialisation, or
 // __gas injection around these call sites shifts the digest and fails CI
@@ -90,7 +90,7 @@ function makeAttestationData() {
 // is reserved. Each digest pins gasUsed (VM_EMISSION + the 5000 gasLimit
 // reservation, charged atomically against `ceiling - used`) and the queued
 // EXECUTE emission, so an order-of-operations or remaining-gas-check
-// regression in gateway_emit.js fails CI instead of forking gasUsed.
+// regression in gateway-emit.js fails CI instead of forking gasUsed.
 // getCallDepth() is folded into the return value so the depth threading
 // itself is part of the pinned output.
 function makeEmitExecuteFixture(callDepth) {

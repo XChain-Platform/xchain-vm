@@ -20,7 +20,7 @@
 const { GasExhaustedError } = require('./errors.js');
 
 // Every gas key the VM itself charges against during execution (see gateway.js
-// and gateway_emit.js). A schedule handed to the VM MUST define all of these:
+// and gateway-emit.js). A schedule handed to the VM MUST define all of these:
 // a missing key resolves to `undefined` the first time that operation is metered,
 // which charge() then rejects deep inside execution. Validating membership up
 // front turns that latent, execution-time failure into a deterministic
@@ -44,7 +44,7 @@ const CANONICAL_GAS_KEYS = Object.freeze([
     'VM_ATTEST_REQUEST',
     'VM_EMISSION',
     // XCALL buckets are charged unconditionally by emit.crossExecute
-    // (gateway_emit.js); listing them here makes a missing/mistyped schedule
+    // (gateway-emit.js); listing them here makes a missing/mistyped schedule
     // value fail loud at construction instead of silently charging a fallback
     // default that diverges gasUsed (and therefore fee) across the fleet.
     'VM_XCALL_REQUEST',
@@ -55,7 +55,7 @@ const CANONICAL_GAS_KEYS = Object.freeze([
 // callee with the caller-funded reservation (opts.gasCeiling = gasLimit) as its
 // ceiling; anything non-positive/non-integer/over the configured ceiling falls
 // back to the configured ceiling. Lives here so the in-process execute path
-// (index.js) and the subprocess host-termination clamp (process_executor.js)
+// (index.js) and the subprocess host-termination clamp (process-executor.js)
 // resolve the SAME ceiling. If they drifted, a host-terminated nested call
 // would bill a different gasUsed than the in-isolate clamp → fee divergence → fork.
 function effectiveCeiling(requested, configCeiling) {

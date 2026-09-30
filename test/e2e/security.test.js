@@ -34,6 +34,18 @@ function createHarness() {
     return h;
 }
 
+async function deployPreHardening(h, opts) {
+    const validateSyntax = h.vm.validateSyntax;
+    h.vm.validateSyntax = function(code) {
+        return validateSyntax.call(this, code, { enforceLintHardening: false });
+    };
+    try {
+        return await h.deploy(opts);
+    } finally {
+        h.vm.validateSyntax = validateSyntax;
+    }
+}
+
 async function executeHostStateProbe(h) {
     // Execute a contract that writes to global-like patterns
     await h.deploy({
@@ -77,7 +89,10 @@ async function executeHostStateProbe(h) {
     describe('E2E-030: Sandbox escape battery', function() {
         it('should block all escape vectors through the full pipeline', async function() {
             const code = h.loadContract('sandbox_escape.js');
-            await h.deploy({ code, deployer: 'deployer', contractAddress: 'C:BTC:30' });
+            const deployed = await deployPreHardening(h, {
+                code, deployer: 'deployer', contractAddress: 'C:BTC:30'
+            });
+            assertSuccess(deployed);
 
             const result = await h.execute({
                 contractAddress: 'C:BTC:30', method: 'default',
@@ -138,13 +153,14 @@ async function executeHostStateProbe(h) {
         });
 
         it('should block Math.random()', async function() {
-            await h.deploy({
+            const deployed = await deployPreHardening(h, {
                 code: `module.exports = {
                     initialize: function(xchain) {},
                     tryRandom: function(xchain) { return typeof Math.random; }
                 };`,
                 deployer: 'deployer', contractAddress: 'C:BTC:31b'
             });
+            assertSuccess(deployed);
             const r = await h.execute({
                 contractAddress: 'C:BTC:31b', method: 'tryRandom',
                 params: [], caller: 'user1'

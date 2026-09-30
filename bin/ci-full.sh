@@ -58,6 +58,7 @@ FAILED=""
 # run, so a bare `npm run ci:full` still runs every tier as it always did.
 CI_TIER_FULL_ONLY=(
   "coverage ratchet (coverage:check)"
+  "subprocess coverage (coverage:subprocess)"
 )
 DEFERRED=""
 ci_tier_deferred() {
@@ -73,17 +74,46 @@ ci_tier_deferred() {
   return 1
 }
 # <<< ci-tier <<<
+# >>> ci-tier timer (generated block; re-run the tier wirer to update) >>>
 run_tier() {
   ci_tier_deferred "$1" && return 0  # ci-tier guard (generated)
   local name="$1"; shift
+  local __ci_tier_t0=$SECONDS
   echo; echo "ci:full ===== $name ====="
   if "$@"; then
-    echo "ci:full ----- $name PASS"
+    echo "ci:full ----- $name PASS ($(( SECONDS - __ci_tier_t0 ))s)"
   else
     FAILED="$FAILED [$name]"
-    echo "ci:full ----- $name FAIL"
+    echo "ci:full ----- $name FAIL ($(( SECONDS - __ci_tier_t0 ))s)"
   fi
 }
+# <<< ci-tier timer <<<
+fast_defer() {
+  DEFERRED="$DEFERRED [$1]"
+  echo; echo "ci:full ===== $1 DEFERRED (CI_TIER=fast, runs in the full sweep) ====="
+}
+
+FAST_SELECTOR_PLAN=""
+FAST_SELECTOR_WHY=""
+prepare_fast_selector() {
+  if [ ! -f bin/ci_fast_select.js ]; then
+    FAST_SELECTOR_WHY="helper missing"
+    return 1
+  fi
+  local status
+  FAST_SELECTOR_PLAN="$(node bin/ci_fast_select.js --plan 2>&1)"
+  status=$?
+  if [ -n "$FAST_SELECTOR_PLAN" ]; then printf '%s\n' "$FAST_SELECTOR_PLAN"; fi
+  if [ "$status" -ne 0 ]; then
+    FAST_SELECTOR_WHY="exit $status: $(printf '%s\n' "$FAST_SELECTOR_PLAN" | tail -n 1)"
+    return 1
+  fi
+  if ! printf '%s\n' "$FAST_SELECTOR_PLAN" | grep -Eq '^consensus [01]$'; then
+    FAST_SELECTOR_WHY="invalid plan output"
+    return 1
+  fi
+}
+
 need_sib() {
   local s
   for s in "$@"; do
@@ -107,7 +137,22 @@ need_sib xchain-documentation xchain-indexer xchain-sdk xchain-contracts
 # fails loud instead. need_sib above already guarantees the siblings are
 # present, so this env var is what turns that presence into strict enforcement
 # the same way GitHub's run does.
-run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+if [ "${CI_TIER:-full}" = "fast" ]; then
+  if prepare_fast_selector; then
+    if printf '%s\n' "$FAST_SELECTOR_PLAN" | grep -q '^consensus 1$'; then
+      run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+    else
+      run_tier "ci (changed tests)" env XCHAIN_REQUIRE_SIBLINGS=1 node bin/ci_fast_select.js --run
+      fast_defer "ci"
+    fi
+  else
+    echo "ci:full: fast selector unavailable ($FAST_SELECTOR_WHY); running the full unit tier"
+    run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+  fi
+  run_tier "fast-tier selector self-test" ./node_modules/.bin/mocha --no-config --timeout 20000 --exit bin/test/ci_fast_select.test.js
+else
+  run_tier "ci" env XCHAIN_REQUIRE_SIBLINGS=1 npm run ci
+fi
 
 # --- identity pin (this gate only; no ci.yml job runs it) --------------------
 # bin/pins/identity.json holds the sha256 of the lint trio the sdk vendors.
@@ -132,6 +177,7 @@ run_tier "identity pin (vendored lint trio)" identity_pin_check
 # GitHub does not set XCHAIN_REQUIRE_SIBLINGS for this job, so neither does
 # this tier.
 run_tier "coverage ratchet (coverage:check)" npm run coverage:check
+run_tier "subprocess coverage (coverage:subprocess)" npm run coverage:subprocess
 
 echo
 # >>> ci-tier summary (generated) >>>

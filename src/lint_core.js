@@ -129,10 +129,11 @@ const ADVISORY_STRIPPED_GLOBALS = ADVISORY_STRIPPED_GLOBAL_NAMES;
 // targets. With `aliased` false only the bare `globalThis` identifier qualifies,
 // which is byte-for-byte the pre-epoch behaviour, so a from-genesis replay below
 // the activation reproduces the historical verdict.
-function isMathObjectRef(node, aliased) {
+function isMathObjectRef(node, aliased, optionalChain) {
     if (!node) return false;
+    if (optionalChain && node.type === 'ChainExpression') node = node.expression;
     if (node.type === 'Identifier' && node.name === 'Math') return true;
-    if (node.type === 'MemberExpression' && isGlobalObjectRef(node.object, aliased))
+    if (node.type === 'MemberExpression' && isGlobalObjectRef(node.object, aliased, optionalChain))
         return staticMemberKey(node) === 'Math';
     return false;
 }
@@ -187,13 +188,15 @@ function staticMemberKey(node) {
 // tightening MUST ride its own activation epoch: it moves DEPLOY verdicts, so it
 // may only apply at or after a height the whole fleet agrees on. Below the
 // activation `aliased` is false and every spelling resolves as it historically did.
-function isGlobalObjectRef(node, aliased) {
+function isGlobalObjectRef(node, aliased, optionalChain) {
     if (!node) return false;
+    if (optionalChain && node.type === 'ChainExpression') node = node.expression;
     if (node.type === 'Identifier' && node.name === 'globalThis') return true;
     if (!aliased) return false;
     if (node.type === 'ThisExpression') return true;
     if (node.type === 'MemberExpression')
-        return staticMemberKey(node) === 'globalThis' && isGlobalObjectRef(node.object, aliased);
+        return staticMemberKey(node) === 'globalThis'
+            && isGlobalObjectRef(node.object, aliased, optionalChain);
     return false;
 }
 
@@ -217,11 +220,13 @@ function isGlobalObjectRef(node, aliased) {
  *        chain as the global object qualifying `Math`, exactly as banned-async
  *        and banned-wasm already do. Defaults to true for author-facing callers
  *        (SDK linter, CLI, unit tests), as the sibling scanners do.
+ * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
  * @returns {Array<{name: string, line: (number|string), transcendental: boolean}>}
  */
-function findBannedMathCalls(code, hardened, aliased) {
+function findBannedMathCalls(code, hardened, aliased, optionalChain) {
     if (hardened === undefined) hardened = true;
     if (aliased === undefined) aliased = true;
+    if (optionalChain === undefined) optionalChain = true;
     const hits = [];
     let ast;
     try {
@@ -236,7 +241,7 @@ function findBannedMathCalls(code, hardened, aliased) {
     }
     walk.simple(ast, {
         MemberExpression(node) {
-            if (!isMathObjectRef(node.object, aliased)) return;
+            if (!isMathObjectRef(node.object, aliased, optionalChain)) return;
             let member = null;
             if (!node.computed && node.property && node.property.type === 'Identifier') {
                 member = node.property.name;                 // Math.pow
@@ -473,11 +478,13 @@ function scopeDeclares(node, name) {
  * @param {string} code - Contract source code
  * @param {boolean} [hardened=true] - VM_LINT_HARDENING consensus flag
  * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
+ * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
  * @returns {Array<{kind: string, line: (number|string)}>}
  */
-function findBannedAsync(code, hardened, aliased) {
+function findBannedAsync(code, hardened, aliased, optionalChain) {
     if (hardened === undefined) hardened = true;
     if (aliased === undefined) aliased = true;
+    if (optionalChain === undefined) optionalChain = true;
     const hits = [];
     let ast;
     try {
@@ -526,7 +533,7 @@ function findBannedAsync(code, hardened, aliased) {
         MemberExpression(node) {
             // globalThis.Promise / globalThis['Promise'] / globalThis[`Promise`], and
             // (aliased) this.Promise / globalThis.globalThis...Promise.
-            if (!isGlobalObjectRef(node.object, aliased)) return;
+            if (!isGlobalObjectRef(node.object, aliased, optionalChain)) return;
             if (staticMemberKey(node) === 'Promise')
                 hits.push({ kind: 'promise', line: node.loc ? node.loc.start.line : '?' });
         }
@@ -602,10 +609,12 @@ function findBannedGenerator(code) {
  *
  * @param {string} code - Contract source code
  * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
+ * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
  * @returns {Array<{line: (number|string)}>}
  */
-function findBannedWasm(code, aliased) {
+function findBannedWasm(code, aliased, optionalChain) {
     if (aliased === undefined) aliased = true;
+    if (optionalChain === undefined) optionalChain = true;
     const hits = [];
     let ast;
     try {
@@ -637,7 +646,7 @@ function findBannedWasm(code, aliased) {
         MemberExpression(node) {
             // globalThis.WebAssembly / globalThis['WebAssembly'] / globalThis[`WebAssembly`],
             // and (aliased) this.WebAssembly / globalThis.globalThis...WebAssembly.
-            if (!isGlobalObjectRef(node.object, aliased)) return;
+            if (!isGlobalObjectRef(node.object, aliased, optionalChain)) return;
             if (staticMemberKey(node) === 'WebAssembly')
                 hits.push({ line: node.loc ? node.loc.start.line : '?' });
         }
@@ -781,10 +790,12 @@ function findBannedRest(code) {
  * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
  * @param {string[]} [names] - name set to scan for (defaults to
  *        ADVISORY_STRIPPED_GLOBALS; injectable so tests can drive one name)
+ * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
  * @returns {Array<{name: string, line: (number|string)}>}
  */
-function findBannedStrippedGlobals(code, aliased, names) {
+function findBannedStrippedGlobals(code, aliased, names, optionalChain) {
     if (aliased === undefined) aliased = true;
+    if (optionalChain === undefined) optionalChain = true;
     const wanted = new Set(names || ADVISORY_STRIPPED_GLOBALS);
     const hits = [];
     let ast;
@@ -812,7 +823,7 @@ function findBannedStrippedGlobals(code, aliased, names) {
             hits.push({ name: node.name, line: node.loc ? node.loc.start.line : '?' });
         },
         MemberExpression(node) {
-            if (!isGlobalObjectRef(node.object, aliased)) return;
+            if (!isGlobalObjectRef(node.object, aliased, optionalChain)) return;
             const key = staticMemberKey(node);
             if (key && wanted.has(key))
                 hits.push({ name: key, line: node.loc ? node.loc.start.line : '?' });
@@ -1139,11 +1150,18 @@ function analyzeContract(code) {
  *        vm_lint_global_alias_activation.VM_LINT_GLOBAL_ALIAS_ACTIVATION in
  *        src/protocol_changes/gates_3.js). Defaults to true for author-facing
  *        callers (SDK linter, CLI, unit tests).
+ * @param {boolean} [opts.optionalChain=true] - apply the LINT_OPTIONAL_CHAIN
+ *        refinement: a parenthesized optional chain is unwrapped while resolving
+ *        global-object and Math references. Resolved per-coin on block HEIGHT
+ *        (xchain-vm LINT_OPTIONAL_CHAIN_ACTIVATION / the xchain-indexer registry
+ *        row vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION).
+ *        Defaults to true for author-facing callers (SDK linter, CLI, unit tests).
  * @returns {{ errors: Array<{rule,message,line,severity}>, warnings: Array<{rule,message,line,severity}> }}
  */
 function lintSource(code, opts) {
     const hardened = !opts || opts.hardened !== false;
     const globalAlias = !opts || opts.globalAlias !== false;
+    const optionalChain = !opts || opts.optionalChain !== false;
     if (typeof code !== 'string') {
         return {
             errors: [{ rule: 'invalid-type', message: 'Contract source must be a string', line: null, severity: 'error' }],
@@ -1209,7 +1227,7 @@ function lintSource(code, opts) {
 
     // 4. Banned Math.* check (transcendentals always; hardened: the full
     //    complement of the sandbox SAFE_MATH_MEMBERS whitelist).
-    const banned = findBannedMathCalls(code, hardened, globalAlias);
+    const banned = findBannedMathCalls(code, hardened, globalAlias, optionalChain);
     for (const hit of banned) {
         errors.push({
             rule: 'banned-math',
@@ -1263,7 +1281,7 @@ function lintSource(code, opts) {
     //    version-dependent microtask-drain timing, which is outside the
     //    consensus_runtime pin: two validators can diverge (success vs timeout,
     //    or differing post-await state). Rejected at deploy like BigInt/RegExp.
-    const asyncs = findBannedAsync(code, hardened, globalAlias);
+    const asyncs = findBannedAsync(code, hardened, globalAlias, optionalChain);
     for (const hit of asyncs) {
         const advice = hit.kind === 'promise'
             ? 'Promise schedules microtasks whose drain timing is isolated-vm version-dependent and unpinned'
@@ -1325,7 +1343,7 @@ function lintSource(code, opts) {
         });
     }
 
-    for (const hit of findBannedWasm(code, globalAlias)) {
+    for (const hit of findBannedWasm(code, globalAlias, optionalChain)) {
         errors.push({
             rule: 'banned-wasm',
             message: 'banned global: WebAssembly at line ' + hit.line +
@@ -1371,7 +1389,7 @@ function lintSource(code, opts) {
     //     CONSENSUS_RULE: the sandbox strip is the load-bearing enforcement and
     //     is already unconditional, so promoting this to a deploy-blocking rule
     //     would move on-chain verdicts and needs its own activation epoch.
-    for (const hit of findBannedStrippedGlobals(code, globalAlias)) {
+    for (const hit of findBannedStrippedGlobals(code, globalAlias, undefined, optionalChain)) {
         warnings.push({
             rule: 'banned-stripped-global',
             message: 'stripped global: ' + hit.name + ' at line ' + hit.line +

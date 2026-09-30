@@ -13,7 +13,7 @@
  **********************************************************************
  * Red-team: the FABRICATE node-fault stance can silently fork ONE node.
  *
- * The out-of-process executor (src/process_executor.js) answers ANY host
+ * The out-of-process executor (src/process-executor.js) answers ANY host
  * termination (crash, hang/watchdog, or a worker that can never start,
  * _broken) with a deterministic `hostTerminatedResult` (out_of_resource,
  * gasUsed = ceiling) and lets the block ADVANCE. This is correct and

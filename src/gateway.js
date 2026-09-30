@@ -27,7 +27,7 @@
 
 const crypto = require('crypto');
 const { ContractRevertError } = require('./errors.js');
-const { buildEmitAPI, buildRequestIdPreimage } = require('./gateway_emit.js');
+const { buildEmitAPI, buildRequestIdPreimage } = require('./gateway-emit.js');
 const { buildMathAPI } = require('./math.js');
 const { buildContextAPI, buildStateAPI, buildOracleAPI, buildCrossChainAPI } = require('./gateway/accessors.js');
 const { buildContractStakeAPI } = require('./gateway/contract_stake.js');
@@ -55,7 +55,7 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
 
         // Action emission (metered, 500 gas each; emit.execute additionally
         // reserves the callee's gasLimit; emit.crossExecute pre-pays the
-        // request + remote ceiling + callback, see gateway_emit.js)
+        // request + remote ceiling + callback, see gateway-emit.js)
         emit: buildEmitAPI(gasTracker, emissionCollector, gasSchedule, {
             callDepth:    readOnlyData.callDepth,
             maxCallDepth: readOnlyData.maxCallDepth,
@@ -225,7 +225,7 @@ function queueAttestRequest(emissionCollector, readOnlyData, providerId, request
     // (action_index advanced with injection timing and forked the PBFT).
     // MUST byte-match the indexer's re-derivation in
     // xchain-indexer/src/actions/attest/index.js (parseRequest, EMITTER_PATH).
-    // Assembled by buildRequestIdPreimage (gateway_emit.js), which owns the
+    // Assembled by buildRequestIdPreimage (gateway-emit.js), which owns the
     // per-field normalization for both preimage classes; raw readOnlyData
     // values go in.
     let emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;

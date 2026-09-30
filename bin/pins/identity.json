@@ -6,7 +6,7 @@
   "algorithm": "sha256",
   "files": {
     "src/lint_core.js": {
-      "canonical": "a7f020f89c0752a9493a523f0c8dba1e97510e835bbd2de0b59a94c56edffc4c",
+      "canonical": "8f8a57481b7d3e6c63c142d8574357ab9021582e91fee74e53899c987d9405ea",
       "vendoredInSdk": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"

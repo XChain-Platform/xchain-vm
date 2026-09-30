@@ -10,7 +10,7 @@
 // license (without AGPL source-disclosure terms) is available -
 // contact legal@dankest.llc.
 
-const { buildEmitAPI } = require('../../../../../src/gateway_emit.js');
+const { buildEmitAPI } = require('../../../../../src/gateway-emit.js');
 const GasTracker = require('../../../../../src/gas.js');
 const EmissionCollector = require('../../../../../src/collector.js');
 

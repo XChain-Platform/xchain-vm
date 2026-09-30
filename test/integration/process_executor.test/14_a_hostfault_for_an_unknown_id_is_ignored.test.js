@@ -31,7 +31,7 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
     this.timeout(60000);
 
     it('a hostfault for an unknown id is ignored', function () {
-        const ProcessExecutor = require('../../../src/process_executor.js');
+        const ProcessExecutor = require('../../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         try {
             exec.onMessage({ type: 'hostfault', id: 999999, reason: 'stale' });

@@ -58,7 +58,8 @@
  * numbers the SIMULATOR quotes. maxCodeSize is excluded from the indexer scrape
  * because both sides single-source it (deploy.MAX_CODE_SIZE / lint_core.js), so
  * there is no literal to compare, and the EXEC_LINT / LINT_GLOBAL_ALIAS twins are
- * pinned by consensus-params.test.js in each repo rather than here.
+ * pinned by each repo's consensus-params freeze guard (here
+ * test/determinism/consensus_params.test/) rather than here.
  ********************************************************************/
 
 const assert = require('assert');
@@ -71,7 +72,7 @@ const XChainVM = require('../../src/index.js');
 const { CANONICAL_GAS_KEYS } = require('../../src/gas.js');
 const { MAX_CODE_SIZE } = require('../../src/lint_core.js');
 const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../../src/protocol/constants.js');
-const { CONSENSUS_MAX_WALL_MS } = require('../../src/consensus_wall_clock.js');
+const { CONSENSUS_MAX_WALL_MS } = require('../../src/consensus-wall-clock.js');
 
 // The frozen values. Editing one here without moving the indexer coin configs
 // (and the VM constants the limits are single-sourced from) is the exact mistake

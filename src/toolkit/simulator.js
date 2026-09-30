@@ -89,7 +89,7 @@
  *     execution: 'subprocess' (xchain-indexer/src/actions/index.js), where the same
  *     contract kills only the worker and the executor returns the deterministic
  *     `out_of_resource: execution host terminated (...)` with gasUsed at the
- *     ceiling (src/process_executor.js hostTerminatedResult). Pass
+ *     ceiling (src/process-executor.js hostTerminatedResult). Pass
  *     execution: 'subprocess' (or `xchain-foundry simulate --execution
  *     subprocess`) to see that result. The wall-clock half of this seam IS
  *     faithful: DEFAULT_LIMITS.maxCpuTimeMs equals CONSENSUS_MAX_WALL_MS.
@@ -269,7 +269,7 @@ class ContractSimulator {
         this.oracle = { snapshotAge: 0, prices: {}, rounds: {}, roundFloor: 0 };
         this.crossChainData = { attestations: {}, settled: {}, calls: {} };
         // The remaining read-only snapshots the gateway reads. Shapes are the
-        // ones src/readonly_accessors.js documents; an empty snapshot is
+        // ones src/readonly-accessors.js documents; an empty snapshot is
         // behaviour-identical to a null one, because the gateway's own
         // null-guards return the same null / '0' / [] it resolves to.
         this.attestationData   = { responses: {} };

@@ -12,11 +12,11 @@
 
 const assert = require('assert');
 const crypto = require('crypto');
-const { buildEmitAPI } = require('../../../src/gateway_emit.js');
+const { buildEmitAPI } = require('../../../src/gateway-emit.js');
 const GasTracker = require('../../../src/gas.js');
 const EmissionCollector = require('../../../src/collector.js');
 const ActionValidator = require('../../../src/validator.js');
-const { buildCrossChainAccessor } = require('../../../src/readonly_accessors.js');
+const { buildCrossChainAccessor } = require('../../../src/readonly-accessors.js');
 
 const SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,

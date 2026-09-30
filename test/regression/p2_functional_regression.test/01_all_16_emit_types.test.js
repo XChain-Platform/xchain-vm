@@ -22,7 +22,7 @@
 
 const assert = require('assert');
 const { GAS_SCHEDULE } = require('../helpers/harness.js');
-const { buildEmitAPI } = require('../../../src/gateway_emit.js');
+const { buildEmitAPI } = require('../../../src/gateway-emit.js');
 const GasTracker = require('../../../src/gas.js');
 const EmissionCollector = require('../../../src/collector.js');
 

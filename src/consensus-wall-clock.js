@@ -43,23 +43,27 @@
  * protocol constant changes the outcome of NO execution on a default-configured
  * node: this change closes the heterogeneity fork surface without also moving
  * the bound. The magnitude is a separate question with a real cost (a measured
- * worst-case EXECUTE burns the 1,000,000-gas ceiling in ~750 ms, so 30 s is
- * roughly 40x the metered worst case, which is exactly why batch cost weights
- * grounded on a gas-ceiling burn are grounded on today's metering coverage and
- * not on this bound). Tightening it is a consensus TIGHTENING: it must ride its
- * own future flag-day, re-golden the determinism baselines, and deploy
- * fleet-wide atomically. Do not edit this value to make a slow box or a slow
- * test pass.
+ * worst-case metered EXECUTE burns the 1,000,000-gas ceiling in ~750 ms on the
+ * pinned runtime, so 30 s is roughly 40x the metered worst case, which is
+ * exactly why batch cost weights grounded on a gas-ceiling burn are grounded on
+ * today's metering coverage and not on this bound). Re-measure it with
+ * test/determinism/helpers/probe_wall_clock_calibration.js after any re-pin or
+ * metering change; its unmetered-suspect vectors show which builtins still
+ * reach this bound before the gas ceiling. Tightening it is a consensus
+ * TIGHTENING: it must ride its own future flag-day, re-golden the determinism
+ * baselines, and deploy fleet-wide atomically. Do not edit this value to make a
+ * slow box or a slow test pass.
  *
  * Zero dependencies on purpose: index.js (the enforcing path) and
- * process_executor.js (the parent-side watchdog that must never fire before
+ * process-executor.js (the parent-side watchdog that must never fire before
  * the in-isolate bound) both read it without a require cycle.
  ********************************************************************/
 // @ts-nocheck
 
 // Consensus wall-clock budget for ONE contract execution, milliseconds.
-// Pinned by test/determinism/consensus-params.test.js; a node running a
-// different value forks the fleet on the first execution that reaches it.
+// Pinned by the freeze guard in test/determinism/consensus_params.test/ and by
+// test/unit/consensus/consensus_wall_time.test.js; a node running a different
+// value forks the fleet on the first execution that reaches it.
 const CONSENSUS_MAX_WALL_MS = 30000;
 
 /**

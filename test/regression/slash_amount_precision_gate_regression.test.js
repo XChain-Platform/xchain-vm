@@ -15,9 +15,10 @@
  *
  * contract.slash validated its `amount` against /^[0-9]+(\.[0-9]{1,8})?$/, an
  * 8-decimal ceiling the rest of the seam does not share: STAKE v3 bounds a stake's
- * precision by the token's own DECIMALS (xchain-indexer src/actions/stake.js) up to
- * MAX_TOKEN_DECIMALS 18 (xchain-indexer src/config.js:122), and slashContractStake
- * (xchain-indexer src/db/contracts.js) deliberately does its deduction arithmetic at that same
+ * precision by the token's own DECIMALS (xchain-indexer src/actions/stake/contract_stake.js
+ * validateStakeAmount) up to MAX_TOKEN_DECIMALS 18 (xchain-indexer src/config/token_limits.js
+ * applyTokenSupplyLimits), and slashContractStake
+ * (xchain-indexer src/db/contracts/slash.js) deliberately does its deduction arithmetic at that same
  * per-token precision. So an exact partial ("graduated") slash of a 9-to-18-decimal
  * staked token could never be emitted: it threw at the gateway before the indexer
  * ever saw it, for exactly the tokens the documented any-token staking API accepts.
@@ -81,7 +82,8 @@ const run = (vm, code, blockContext, network) =>
     });
 
     it('the post-activation ceiling equals the indexer MAX_TOKEN_DECIMALS', function () {
-        // xchain-indexer/src/config.js:122 sets MAX_TOKEN_DECIMALS = 18. A VM ceiling
+        // xchain-indexer/src/config/token_limits.js sets MAX_TOKEN_DECIMALS = 18 (the
+        // sibling read is test/determinism/slash_amount_decimals_cross_repo.test.js). A VM ceiling
         // above it would emit an amount the slash arithmetic cannot represent; below
         // it re-opens the gap this gate exists to close.
         assert.strictEqual(MAX_DP, 18);
@@ -156,6 +158,20 @@ const run = (vm, code, blockContext, network) =>
         assert.strictEqual(lo.success, false, 'below the gate 19 dp must throw');
         assert.strictEqual(hi.success, false, 'above the gate 19 dp must still throw');
         assert.ok(/amount must be a positive decimal string/.test(hi.error || ''), hi.error);
+    });
+
+    // Tie the wide regex's own digit literal (gateway/contract_stake.js) to the exported
+    // ceiling, so the two VM-side copies of 18 cannot diverge with every literal case green.
+    it('the wide amount form admits exactly MAX_SLASH_AMOUNT_DECIMALS fractional digits', async function () {
+        assert.ok(Number.isInteger(MAX_DP) && MAX_DP > 8, 'MAX_SLASH_AMOUNT_DECIMALS must stay exported');
+        const atCeiling = '1.' + '1'.repeat(MAX_DP);
+        const pastCeiling = '1.' + '1'.repeat(MAX_DP + 1);
+        const ok = await run(vm, slashCode(atCeiling), AT);
+        assert.strictEqual(ok.success, true, MAX_DP + ' dp must emit at the flag day: ' + ok.error);
+        assert.strictEqual(ok.emittedActions[0].params.amount, atCeiling);
+        const over = await run(vm, slashCode(pastCeiling), AT);
+        assert.strictEqual(over.success, false, (MAX_DP + 1) + ' dp must be rejected at the flag day');
+        assert.ok(/amount must be a positive decimal string/.test(over.error || ''), over.error);
     });
 
     it('an 8-dp amount is unaffected on both sides of the gate', async function () {

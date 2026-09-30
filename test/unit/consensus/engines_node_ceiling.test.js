@@ -14,7 +14,7 @@
 
 // engines.node must keep an upper bound below Node 23.
 //
-// src/consensus_runtime.js pins process.versions.modules to 127 (Node 22)
+// src/consensus-runtime.js pins process.versions.modules to 127 (Node 22)
 // alongside v8/icu/unicode/cldr, so a process on Node 24 (ABI 137) fails
 // checkConsensusRuntime() and cannot agree with the fleet. isolated-vm 6.2.0
 // installs on either major from per-ABI prebuilt bindings, so the ceiling is

@@ -35,8 +35,8 @@
  *   2. buildAuthoringPrompt() turns an English brief or a Solidity source into a
  *      well-formed system+user message pair embedding that knowledge.
  *   3. authorContract() runs a caller-injected `complete()` (any LLM client) and
- *      pipes the result through the SAME static determinism gate the on-chain
- *      deploy validator uses (toolkit gate.runGate), with an automatic repair
+ *      pipes the result through the static determinism gate (toolkit gate.runGate,
+ *      the on-chain deploy rules at full strength, scheduled bans included), with an automatic repair
  *      loop: gate errors are fed back as a fix-it prompt until the contract is
  *      gate-clean or the retry budget is spent.
  *

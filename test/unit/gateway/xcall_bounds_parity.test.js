@@ -42,16 +42,16 @@ describe('XCALL bounds single-sourcing parity (5db7dc60)', function () {
     });
 
     (vm ? it : it.skip)('gateway_emit exports the hop bound from the same source', function () {
-        const emit = require('../../../src/gateway_emit.js');
+        const emit = require('../../../src/gateway-emit.js');
         assert.strictEqual(emit.XCALL_MAX_HOPS, PROTO.XCALL_MAX_HOPS);
     });
 
-    it('the enforcer (gateway_emit.js) declares every bound FROM PROTO, never as a literal', function () {
-        const src = fs.readFileSync(path.join(__dirname, '../../../src/gateway_emit.js'), 'utf8');
+    it('the enforcer (gateway-emit.js) declares every bound FROM PROTO, never as a literal', function () {
+        const src = fs.readFileSync(path.join(__dirname, '../../../src/gateway-emit.js'), 'utf8');
         for (const name of BOUNDS.concat(['XCALL_MAX_HOPS'])) {
             const re = new RegExp('const\\s+' + name + '\\s*=\\s*PROTO\\.' + name + '\\b');
             assert.ok(re.test(src),
-                'gateway_emit.js must declare ' + name + ' as PROTO.' + name +
+                'gateway-emit.js must declare ' + name + ' as PROTO.' + name +
                 ' (a re-declared literal can drift from the exported/parity-tested value)');
         }
     });

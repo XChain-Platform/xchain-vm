@@ -31,7 +31,7 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
     this.timeout(60000);
 
     it('a single in-flight worker death still FABRICATES (resolves), not rejects', async function () {
-        const ProcessExecutor = require('../../../src/process_executor.js');
+        const ProcessExecutor = require('../../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {

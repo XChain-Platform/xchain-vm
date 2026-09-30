@@ -20,7 +20,7 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const cr = require('../../src/consensus_runtime.js');
+const cr = require('../../src/consensus-runtime.js');
 const vm = require('../../src/index.js');
 const lintCore = require('../../src/lint_core.js');
 const metering = require('../../src/metering.js');
@@ -28,8 +28,8 @@ const metering = require('../../src/metering.js');
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '4');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '4', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '5');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '5', 're-export must match');
     });
 });
 

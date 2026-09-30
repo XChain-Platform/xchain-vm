@@ -35,13 +35,13 @@ const ActionValidator   = require('./validator.js');
 const { buildGateway }  = require('./gateway.js');
 // Canonical coercion for the per-root discriminator threaded into the request_id /
 // call_id preimages (keeps a BATCH subcommand's composite form intact).
-const { normalizeRootDiscriminator } = require('./gateway_emit.js');
+const { normalizeRootDiscriminator } = require('./gateway-emit.js');
 const { stripGlobals }  = require('./sandbox.js');
 const { ContractRevertError, GasExhaustedError, HostFaultError } = require('./errors.js');
-const { resolveAccessors } = require('./readonly_accessors.js');
-// Consensus wall-clock budget per execution (see consensus_wall_clock.js). The
+const { resolveAccessors } = require('./readonly-accessors.js');
+// Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
-const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus_wall_clock.js');
+const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
 // The entry keeps the class (constructor, the consensus wall-clock resolver,
 // execute and the error classifier), the harness prelude and the activation
 // carriers; the other prototype methods, the contract wrapper and the size
@@ -57,6 +57,10 @@ const {
 const { CONTRACT_WRAPPER, CONTRACT_WRAPPER_HARDENED } = require('./index/contract_wrapper.js');
 const blockLifecycleMethods = require('./index/block_lifecycle.js');
 const lintAndMeteringMethods = require('./index/lint_and_metering.js');
+const {
+    LINT_OPTIONAL_CHAIN_ACTIVATION,
+    isLintOptionalChainActive,
+} = require('./index/lint_optional_chain_heights.js');
 const gatewayInjectionMethods = require('./index/gateway_injection.js');
 const errorResultMethods = require('./index/error_results.js');
 const manifestMethods = require('./index/manifest.js');
@@ -479,6 +483,18 @@ const HARNESS_SOURCE = `
     var __hasOwn = Object.prototype.hasOwnProperty;
     var __isArray = Array.isArray;   // captured native (contract cannot repoint the guard)
     var __nrGuardOn = (__meterUpgradeOn && __NR_DEPTH_LIMIT > 0);
+    // Second, LATER flag day for the JSON.stringify value-hook half below
+    // (__resolveForStringify). It rides its own activation because the binary-alloc
+    // flag day above has already passed: blocks executed under it must replay
+    // byte-for-byte, so the hook resolution cannot be folded into it. A gate value of
+    // 0 means UNARMED (never active) rather than active-since-the-epoch, so an
+    // un-pinned or zeroed constant fails safe instead of switching every historical
+    // block onto the new rule.
+    var __jsonHookGuardOn = (__nrGuardOn &&
+        typeof __blockTime === 'number' &&
+        typeof __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME === 'number' &&
+        __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME > 0 &&
+        __blockTime >= __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME);
     var __guardNativeDepth = function(root) {
         if (!__nrGuardOn) return;
         if (__stackPoison) throw __stackError();
@@ -569,6 +585,289 @@ const HARNESS_SOURCE = `
             } else if (ch === 93 || ch === 125) {  // ']' or '}'
                 if (depth > 0) depth--;
             }
+        }
+    };
+
+    // ----- F-NR, value-hook half: JSON.stringify's toJSON / replacer / accessor -----
+    // __guardNativeDepth above measures the ARGUMENT and then hands the ORIGINAL
+    // value to the native serializer, so anything that makes the serializer walk
+    // DEEPER than the guard counted re-opens the host-dependent native overflow the
+    // guard exists to close:
+    //   1. toJSON    - the guard descends only children whose typeof is 'object',
+    //                  and a method is typeof 'function', so
+    //                  {toJSON:function(){return spine;}} measures as depth 1 and
+    //                  serializes as deep as the spine the hook hands back.
+    //   2. replacer  - arguments[1] went straight into the native call, so structure
+    //                  a replacer FUNCTION returns was never depth-checked at all.
+    //   3. accessors - the guard reads v[k] once and the serializer reads it again,
+    //                  so an own getter can answer shallow first and deep second.
+    // The JSON.parse wrapper already closes the analogous ToString bypass by
+    // coercing ONCE and guarding the coerced text. This is that same principle for
+    // the value side: run every hook exactly ONCE here, measure the depth of what
+    // the hooks actually produced, and hand the native serializer a value that
+    // cannot change under it.
+    //
+    // Shape: one iterative frame-based DFS (never recursive, so the pass itself
+    // cannot overflow; frames are pooled by depth, so the walk allocates nothing
+    // per node). A node is INERT when the native serializer, walking it, would run
+    // no contract code at all: no toJSON anywhere on its prototype chain, no own
+    // accessor among the properties that get serialized, no hole an inherited getter
+    // could answer, no primitive wrapper to unwrap, and no replacer to apply. An
+    // inert subtree is passed through BY REFERENCE and never copied, so a hook-free
+    // value takes byte-for-byte the pre-gate path for byte-for-byte the pre-gate gas
+    // and allocates nothing: only hook/accessor-bearing values are materialized.
+    // Everything not proven inert is REBUILT as a null-prototype plain copy, which is
+    // what makes handing it to the native call safe: the copy carries only primitives
+    // and other copy nodes, its null prototype means a contract-installed
+    // Object.prototype.toJSON / Array.prototype.toJSON cannot re-enter during the
+    // native call, and an own "__proto__" key survives as data instead of re-pointing
+    // the copy.
+    //
+    // Deviations from ECMA-262 SerializeJSONProperty, each deterministic on every
+    // host and each pinned by the security suite:
+    //   - A cyclic structure keeps the behaviour the value guard ALREADY has above
+    //     the binary-alloc flag day: the depth counter runs the cycle up to
+    //     __NR_DEPTH_LIMIT and takes the deterministic out_of_stack. It deliberately
+    //     does not become V8's "Converting circular structure to JSON" TypeError,
+    //     whose message embeds constructor names and a property path and is a worse
+    //     consensus input than the fault it would replace.
+    //   - A primitive-wrapper object whose prototype has been re-pointed to
+    //     Object.prototype serializes as a plain object rather than as its wrapped
+    //     primitive: the internal-slot probe runs only for objects whose prototype is
+    //     neither Object.prototype nor null, so the hot path stays free of throws.
+    //     A false POSITIVE there would pass an unmeasured object through by
+    //     reference, so the probe is the exact internal-slot brand check and never a
+    //     prototype guess; a false negative only costs spec fidelity on a value a
+    //     contract had to go out of its way to disguise.
+    //   - A replacer ARRAY is re-derived here into a plain string list and THAT list
+    //     is what the native call receives, so a replacer array whose elements are
+    //     accessors cannot answer this pass one key set and the serializer another.
+    var __rsfObjectProto = Object.prototype;
+    var __rsfOkeys       = Object.keys;   // raw native; the Object-statics meter wraps Object.keys further down
+    var __rsfString      = String;
+    var __rsfStrValueOf  = String.prototype.valueOf;
+    var __rsfNumValueOf  = Number.prototype.valueOf;
+    var __rsfBoolValueOf = Boolean.prototype.valueOf;
+    var __rsfBigProto    = (typeof BigInt === 'function' && BigInt.prototype) ? BigInt.prototype : null;
+    var __rsfBigValueOf  = __rsfBigProto ? __rsfBigProto.valueOf : null;
+
+    // Gas charged the first time a node is MATERIALIZED, on top of the per-node and
+    // per-width charges the inert walk already pays. The copy is an allocation, and
+    // the reasoning F3-binary uses for ArrayBuffer byte lengths applies unchanged:
+    // the deterministic gas ceiling must bind BEFORE the isolate memory limit, or a
+    // hook-bearing structure that unfolds exponentially
+    // (a={toJSON:function(){return [a,a];}}) reaches a CATCHABLE allocation failure
+    // whose point depends on heap occupancy and GC timing, i.e. exactly the
+    // host-dependent fork this guard exists to close. 32 gas/node keeps the copy
+    // under the isolate memory ceiling at every gas ceiling in use (an 8 MB limit
+    // against a 1e6..3e6 ceiling is 2.7..8 bytes per gas, and a copy node is ~56).
+    var __RSF_COPY_GAS = 32;
+
+    var __RSF_SKIP = 0, __RSF_LEAF = 1, __RSF_ARR = 2, __RSF_OBJ = 3;
+    var __rsfLeaf      = undefined;  // out-param: the leaf value __rsfClassify accepted
+    var __rsfUnwrapped = false;      // out-param: that leaf came out of a primitive wrapper
+    var __rsfClassify = function(v) {
+        __rsfUnwrapped = false;
+        if (v === null) { __rsfLeaf = null; return __RSF_LEAF; }
+        var t = typeof v;
+        if (t === 'undefined' || t === 'function' || t === 'symbol') return __RSF_SKIP;
+        if (t !== 'object') { __rsfLeaf = v; return __RSF_LEAF; }   // string/number/boolean/bigint
+        if (__isArray(v)) return __RSF_ARR;
+        var p = __getProto(v);
+        if (p !== __rsfObjectProto && p !== null) {
+            // Only an object carrying the matching internal slot answers these
+            // without throwing, so a plain object can never be mistaken for a
+            // wrapper. Unwrap to the primitive (SerializeJSONProperty step 4) so the
+            // copy holds a primitive rather than a contract object; a wrapped BigInt
+            // unwraps to a BigInt and still raises the native TypeError downstream.
+            try { __rsfLeaf = __rsfStrValueOf.call(v);  __rsfUnwrapped = true; return __RSF_LEAF; } catch (e) {}
+            try { __rsfLeaf = __rsfNumValueOf.call(v);  __rsfUnwrapped = true; return __RSF_LEAF; } catch (e) {}
+            try { __rsfLeaf = __rsfBoolValueOf.call(v); __rsfUnwrapped = true; return __RSF_LEAF; } catch (e) {}
+            if (__rsfBigValueOf) {
+                try { __rsfLeaf = __rsfBigValueOf.call(v); __rsfUnwrapped = true; return __RSF_LEAF; } catch (e) {}
+            }
+        }
+        return __RSF_OBJ;
+    };
+    // Would the native serializer look up (and possibly call) a toJSON on this value?
+    // The 'in' operator never invokes an accessor, so this probe runs no contract
+    // code. (NB: this harness is a template literal, so a backtick anywhere in here
+    // -- comments included -- would terminate it.)
+    var __rsfHasToJSON = function(v) {
+        if (v === null) return false;
+        var t = typeof v;
+        if (t === 'object' || t === 'function') return ('toJSON' in v);
+        if (t === 'bigint') return (__rsfBigProto !== null && ('toJSON' in __rsfBigProto));
+        return false;
+    };
+    // The SerializeJSONProperty preamble, applied exactly once per slot and in spec
+    // order: value.toJSON(key), then replacer.call(holder, key, value). Sets
+    // __rsfRanHook when contract code ran, which is what forces the holder to be
+    // materialized (the slot no longer equals what a re-read would return).
+    var __rsfRanHook = false;
+    var __rsfResolve = function(holder, key, v, repFn) {
+        var ran = false;
+        if (__rsfHasToJSON(v)) {
+            // Presence alone forces materialization: the .toJSON read below can
+            // itself be an inherited accessor, and a callable one replaces the value.
+            ran = true;
+            var tj = v.toJSON;
+            if (typeof tj === 'function') { __gasFunc(1); v = tj.call(v, __rsfString(key)); }
+        }
+        if (repFn !== null) { ran = true; __gasFunc(1); v = repFn.call(holder, __rsfString(key), v); }
+        __rsfRanHook = ran;
+        return v;
+    };
+    // JSON.stringify step 4.b.ii: a replacer ARRAY becomes a de-duplicated key
+    // filter of String/Number (and wrapped String/Number) elements.
+    var __rsfPropertyList = function(replacer) {
+        if (replacer === null || typeof replacer !== 'object' || !__isArray(replacer)) return null;
+        var len = replacer.length >>> 0;
+        if (len > 1) __gasFunc(len);
+        var seen = { __proto__: null };
+        var list = [], i, v, t, item;
+        for (i = 0; i < len; i++) {
+            v = replacer[i]; t = typeof v; item = undefined;
+            if (t === 'string') item = v;
+            else if (t === 'number') item = __rsfString(v);
+            else if (t === 'object' && v !== null) {
+                try { item = __rsfStrValueOf.call(v); } catch (e) {
+                    try { item = __rsfString(__rsfNumValueOf.call(v)); } catch (e2) {}
+                }
+            }
+            if (item !== undefined && seen[item] !== true) { seen[item] = true; list.push(item); }
+        }
+        return list;
+    };
+    var __rsfFrames = [];   // pooled by depth: the walk allocates no frame per node
+    // Set by __resolveForStringify to the SANITIZED replacer key list (or null). The
+    // native call is handed this list rather than the caller's array so that (a) it,
+    // not this pass, decides the emitted key order -- a plain object cannot reproduce
+    // every order a replacer array can ask for, since integer-like keys always
+    // enumerate ascending and first -- and (b) an element that is an accessor cannot
+    // answer this pass one key set and the serializer another. Re-applying the list
+    // to an already-filtered copy is idempotent: the copy holds exactly these keys.
+    var __rsfForwardList = null;
+    var __resolveForStringify = function(rootValue, replacer) {
+        if (__stackPoison) throw __stackError();
+        // Fail closed: without setPrototypeOf a copy cannot be made immune to a
+        // contract-installed Array.prototype.toJSON, so take the deterministic fault
+        // rather than fall back to the raw native call.
+        if (typeof __setProto !== 'function') { __stackPoison = true; throw __stackError(); }
+
+        var repFn      = (typeof replacer === 'function') ? replacer : null;
+        var propList   = (repFn === null) ? __rsfPropertyList(replacer) : null;
+        // A replacer FUNCTION runs contract code at every slot, so it materializes
+        // everything. A replacer ARRAY runs none: it is a pure key filter, so it only
+        // narrows the key list this walk measures (which keeps the depth measurement
+        // exact rather than conservative) and is forwarded to the native call
+        // untouched whenever the value came through inert.
+        var forceDirty = (repFn !== null);
+        var depthLimit = __NR_DEPTH_LIMIT;
+        var fi = -1;
+        __rsfForwardList = propList;
+
+        var materialize = function(fr) {
+            if (fr.out !== null) return;
+            __gasFunc(__RSF_COPY_GAS);
+            fr.inert = false;
+            if (fr.isArr) { fr.out = []; __setProto(fr.out, null); }
+            else { fr.out = { __proto__: null }; }
+            // Backfill the inert prefix. Every slot already committed was an
+            // unchanged read of an own data property (an accessor, a hole, a hook or
+            // a wrapper would have materialized the frame at that slot), so
+            // re-reading them runs no contract code and yields identical values.
+            var b, bk, bv, bt;
+            for (b = 0; b < fr.done; b++) {
+                bk = fr.isArr ? b : fr.keys[b];
+                bv = fr.src[bk];
+                bt = typeof bv;
+                if (bt === 'undefined' || bt === 'function' || bt === 'symbol') {
+                    if (fr.isArr) fr.out[b] = null;      // arrays encode a skipped slot as null
+                    continue;                            // objects elide it
+                }
+                fr.out[bk] = bv;
+            }
+        };
+        var pushFrame = function(src, isArr, dirty, pKey) {
+            fi++;
+            var fr = __rsfFrames[fi];
+            if (!fr) fr = __rsfFrames[fi] = { src: null, isArr: false, keys: null, n: 0, i: 0,
+                                              done: 0, out: null, inert: true, pKey: null };
+            fr.src = src; fr.isArr = isArr; fr.i = 0; fr.done = 0;
+            fr.out = null; fr.inert = true; fr.pKey = pKey;
+            __gasFunc(1);                                        // per-node base (DAG / exponential-reuse bound)
+            if (fi + 1 > depthLimit) { __stackPoison = true; throw __stackError(); }
+            if (isArr) { fr.keys = null; fr.n = src.length >>> 0; }
+            else { fr.keys = (propList !== null) ? propList : __rsfOkeys(src); fr.n = fr.keys.length; }
+            if (fr.n > 1) __gasFunc(fr.n);                       // per-node scan width
+            if (dirty) materialize(fr);
+            return fr;
+        };
+
+        // Root: SerializeJSONProperty("", { "": value }), so a root-level
+        // toJSON/replacer sees the spec's empty-string key and wrapper holder.
+        var v = __rsfResolve({ '': rootValue }, '', rootValue, repFn);
+        var rootHooked = __rsfRanHook;
+        var kind = __rsfClassify(v);
+        if (kind === __RSF_SKIP) return undefined;
+        if (kind === __RSF_LEAF) return __rsfLeaf;
+
+        var f, pf, i, key, raw, desc, res, ck;
+        // A container a hook just produced must be COPIED when it carries a toJSON of
+        // its own: SerializeJSONProperty applies toJSON once per slot, so the native
+        // call must not find a second one and apply it again. The null-prototype copy
+        // is what makes that true (an inherited toJSON is not copied, and an own
+        // callable one serializes to nothing, exactly as the spec walk would).
+        pushFrame(v, kind === __RSF_ARR, forceDirty || (rootHooked && __rsfHasToJSON(v)), null);
+        while (true) {
+            f = __rsfFrames[fi];
+            if (f.i >= f.n) {
+                res = f.inert ? f.src : f.out;
+                fi--;
+                if (fi < 0) return res;
+                pf = __rsfFrames[fi];
+                if (!f.inert) materialize(pf);   // the slot changed -> the holder must be a copy too
+                if (pf.out !== null) pf.out[f.pKey] = res;
+                pf.done = pf.i;
+                continue;
+            }
+
+            i = f.i;
+            // Read the slot EXACTLY ONCE. A data property is taken from its
+            // descriptor (no Get, so no contract code); an accessor, a hole or a
+            // PropertyList key the holder lacks is read with a single Get, and the
+            // frame materializes because a second read could answer differently.
+            if (f.isArr) {
+                key = i;
+                desc = __hasOwn.call(f.src, i) ? __getOwnDesc(f.src, i) : undefined;
+                if (desc !== undefined && desc.get === undefined && desc.set === undefined) raw = desc.value;
+                else { materialize(f); raw = f.src[i]; }
+            } else {
+                key = f.keys[i];
+                desc = __hasOwn.call(f.src, key) ? __getOwnDesc(f.src, key) : undefined;
+                if (desc !== undefined && desc.get === undefined && desc.set === undefined) raw = desc.value;
+                else { materialize(f); raw = f.src[key]; }
+            }
+
+            res = __rsfResolve(f.src, key, raw, repFn);
+            var slotHooked = __rsfRanHook;
+            if (slotHooked) materialize(f);
+            ck = __rsfClassify(res);
+            if (__rsfUnwrapped) materialize(f);
+
+            if (ck === __RSF_ARR || ck === __RSF_OBJ) {
+                f.i = i + 1;
+                // See the root push: a hook result carrying its own toJSON must be
+                // copied so the native call cannot apply that toJSON a second time.
+                pushFrame(res, ck === __RSF_ARR, forceDirty || (slotHooked && __rsfHasToJSON(res)), key);
+                continue;
+            }
+            if (f.out !== null) {
+                if (ck === __RSF_SKIP) { if (f.isArr) f.out[i] = null; }   // objects elide
+                else f.out[key] = __rsfLeaf;
+            }
+            f.i = i + 1; f.done = i + 1;
         }
     };
     // ----- end F-NR -----
@@ -905,6 +1204,19 @@ const HARNESS_SOURCE = `
     if (typeof JSON !== 'undefined') {
         var __jstr = JSON.stringify;
         if (typeof __jstr === 'function') __lockMethod(JSON, 'stringify', function(value) {
+            if (__jsonHookGuardOn) {
+                // Resolve toJSON/replacer/accessors ONCE, depth-check what they
+                // actually produced, and serialize THAT. A replacer FUNCTION is
+                // deliberately not forwarded: it has already been applied, and running
+                // it twice would be both wrong and another way past the depth
+                // measurement. A replacer ARRAY runs no contract code, so it is
+                // forwarded when the value came through inert and the native call
+                // still owes the key filtering (__rsfPassReplacer).
+                var copy = __resolveForStringify(value, arguments[1]);
+                var rr = __jstr.call(this, copy, __rsfForwardList, arguments[2]);
+                if (typeof rr === 'string') __allocGas(rr.length);
+                return rr;
+            }
             __guardNativeDepth(value);   // native recursion sink (F-NR)
             var r = __jstr.apply(this, arguments);
             if (typeof r === 'string') __allocGas(r.length);
@@ -1241,6 +1553,27 @@ const HARNESS_SOURCE = `
 // that differs across the fleet is itself a fork.
 const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 
+// Coordinated activation (block time, unix seconds) for resolving JSON.stringify
+// VALUE HOOKS before the native serializer sees the value (__resolveForStringify in
+// the harness above). The F-NR native-depth guard that rides
+// BINARY_ALLOC_GATE_BLOCK_TIME measures the ARGUMENT and then hands the ORIGINAL
+// value to the native serializer, so a toJSON method, a replacer function or an own
+// getter can present a shallow value to the guard and a deep one to the serializer,
+// putting the host-dependent native overflow (~128KB stack on musl vs ~2MB on glibc)
+// back within reach of a contract that catches the RangeError and branches on it.
+//
+// This needs its OWN, LATER flag day: the binary-alloc activation above is already
+// past, and every block executed under it must replay byte-for-byte, so the hook
+// resolution cannot be folded into a timestamp that has already armed. At/after this
+// timestamp a hook- or accessor-bearing value is resolved once and serialized from a
+// materialized copy (moving both its bytes, where a hook was lying, and its gasUsed,
+// by the per-node copy charge); below it the value guard behaves exactly as it does
+// today. Hook-FREE values are passed through by reference and are byte- and
+// gas-identical on both sides of the flag day.
+//
+// The release cut pins the instant.
+const JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = 9999999999;
+
 // Coordinated activation (block time, unix seconds) for the async/Promise
 // contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
 // `Promise` (sandbox.js) and the deploy validator rejects async/await/Promise
@@ -1421,9 +1754,10 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
 }
 
 // Token-decimal ceiling a contract.slash amount may carry post-activation. MUST equal
-// the indexer's MAX_TOKEN_DECIMALS (xchain-indexer/src/config.js:122); a divergent
-// value would let the VM emit an amount the slash arithmetic cannot represent.
-const MAX_SLASH_AMOUNT_DECIMALS = 18;
+// the indexer's MAX_TOKEN_DECIMALS (xchain-indexer/src/config/token_limits.js); a divergent
+// value would let the VM emit an amount the slash arithmetic cannot represent. Declared in
+// gateway/slash_limits.js, which also builds the gateway's amount regex from it.
+const { MAX_SLASH_AMOUNT_DECIMALS } = require('./gateway/slash_limits.js');
 
 // Activation for widening the contract.slash `amount` precision ceiling from 8 to
 // MAX_SLASH_AMOUNT_DECIMALS. The 8-dp regex contradicted the other side of the same
@@ -1441,7 +1775,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 }
 
 // Activation for the CONSENSUS wall-clock budget per execution
-// (CONSENSUS_MAX_WALL_MS, ./consensus_wall_clock.js). Below this gate the
+// (CONSENSUS_MAX_WALL_MS, ./consensus-wall-clock.js). Below this gate the
 // wall-clock net is the per-NODE limits.maxCpuTimeMs, which is not a consensus
 // value: two validators configured differently return DIFFERENT statuses and
 // DIFFERENT gasUsed for the same execution (timeout + gasUsed clamped to the
@@ -1457,7 +1791,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 // what makes riding an already-ratified flag-day safe: no execution on a
 // default-configured node changes outcome, so there is no history to preserve
 // below the gate. TIGHTENING the value later is a different change and needs
-// its own future flag-day (see consensus_wall_clock.js).
+// its own future flag-day (see consensus-wall-clock.js).
 //
 // NOTE for a future reader: three comments inside HARNESS_SOURCE (the F3-globals,
 // Set/Map and TypedArray metering notes) still describe maxCpuTimeMs as "the
@@ -1794,7 +2128,7 @@ class XChainVM {
         this._executor = null;
         if (this.execution === 'subprocess') {
             // Lazy require to avoid loading child_process for in-process callers.
-            const ProcessExecutor = require('./process_executor.js');
+            const ProcessExecutor = require('./process-executor.js');
             this._executor = new ProcessExecutor(config);
         }
     }
@@ -1922,7 +2256,7 @@ class XChainVM {
         // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
         // under the rule set of the deploy block and its verdict was final.
         //
-        // The five flags are resolved by the SAME predicates the rest of the VM already
+        // The six flags are resolved by the SAME predicates the rest of the VM already
         // uses, which are the execution-side twins of the flags the indexer threads into
         // deploy/index.js validateSyntax, so the execute-time verdict agrees with what a deploy
         // in this block would have produced:
@@ -1931,6 +2265,7 @@ class XChainVM {
         //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
         //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
         //   banned-rest (unmeterable rest)  -> isRestPatternMeterActive (block time)
+        //   LINT_OPTIONAL_CHAIN refinement  -> isLintOptionalChainActive (per-coin height)
         // The whole check rides its own per-coin height gate (isExecLintActive), armed at
         // genesis on every named network: below it, which now means only a chain the
         // resolver cannot place, nothing is charged and nothing is checked, so the
@@ -1962,10 +2297,11 @@ class XChainVM {
                 isPkg3SandboxActive(opts.network, __execLintCoin, __execLintHeight),
                 isLintGlobalAliasActive(opts.network, __execLintCoin, __execLintHeight),
                 isRestPatternMeterActive(opts.network, __lintBlockTime),
+                isLintOptionalChainActive(opts.network, __execLintCoin, __execLintHeight),
                 __codeHash
             );
             if (!__lintVerdict.valid) {
-                // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus_runtime.js);
+                // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus-runtime.js);
                 // the indexer collapses it to the generic failure token. The lint message is
                 // deterministic and path-free, so it is safe to surface verbatim.
                 return this.errorResult(gasTracker, emissionCollector,
@@ -2080,7 +2416,7 @@ class XChainVM {
                     // the asynchronous frameworks (attestation, cross-chain calls) are
                     // disabled: their results arrive blocks later, after the guarded
                     // action has already committed or reverted. Enforced at emit time
-                    // in gateway.js (attestation.request) + gateway_emit.js (crossExecute).
+                    // in gateway.js (attestation.request) + gateway-emit.js (crossExecute).
                     isGuard:         Boolean(opts.isGuard),
                     params:          opts.params || [],
                     blockContext:    opts.blockContext,
@@ -2196,6 +2532,10 @@ class XChainVM {
             const __blockTime = opts.blockContext && Number(opts.blockContext.timestamp);
             context.global.setSync('__blockTime', Number.isFinite(__blockTime) ? __blockTime : 0);
             context.global.setSync('__BINARY_ALLOC_GATE_BLOCK_TIME', BINARY_ALLOC_GATE_BLOCK_TIME);
+            // Second, later flag day: the JSON.stringify value-hook resolution
+            // (__resolveForStringify). Injected the same way and stripped by the same
+            // harness cleanup pass, so contract code never sees it.
+            context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME);
 
             // Run harness script to assemble xchain object inside isolate.
             // Reuse cached V8 bytecode when available: the harness source is a
@@ -2311,7 +2651,7 @@ class XChainVM {
                 hostSignals.runStartNs = process.hrtime.bigint();
                 // CONSENSUS: the timeout is the per-execution wall-clock budget
                 // resolved above, NOT the node's limits.maxCpuTimeMs (which binds
-                // ungated executions only). See consensus_wall_clock.js.
+                // ungated executions only). See consensus-wall-clock.js.
                 const rawReturn = script.runSync(context, { timeout: hostSignals.wallBudgetMs });
                 // The contract wrapper JSON-serializes non-null return values
                 // with a \x02 prefix inside the isolate
@@ -2376,7 +2716,7 @@ class XChainVM {
      *
      * The error STRING prefixes emitted here (revert/out_of_gas/timeout/
      * out_of_memory/out_of_stack/error; out_of_resource from process_executor)
-     * are the frozen STATUS_ERROR_PREFIXES in consensus_runtime.js. The indexer
+     * are the frozen STATUS_ERROR_PREFIXES in consensus-runtime.js. The indexer
      * collapses them into CONSENSUS_STATUS_TOKENS (utility.vmFailureStatus).
      * Changing a prefix is a consensus change; guarded by the consensus-params
      * tests in both repos.
@@ -2553,10 +2893,18 @@ module.exports.EXEC_LINT_GAS_BYTES_PER_UNIT = EXEC_LINT_GAS_BYTES_PER_UNIT;
 // alone forks the deploy verdict.
 module.exports.LINT_GLOBAL_ALIAS_ACTIVATION = LINT_GLOBAL_ALIAS_ACTIVATION;
 module.exports.isLintGlobalAliasActive = isLintGlobalAliasActive;
+// Optional-chain lint activation, twinned with indexer registry row
+// `vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION`.
+module.exports.LINT_OPTIONAL_CHAIN_ACTIVATION = LINT_OPTIONAL_CHAIN_ACTIVATION;
+module.exports.isLintOptionalChainActive = isLintOptionalChainActive;
 // Coordinated flag-day (block time) that activates the F3-binary allocation gas
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).
 module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
+// JSON.stringify value-hook resolution flag day, exported for the
+// consensus-params freeze guard because a divergent value forks the fleet.
+// The release cut pins the instant.
+module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
 // Coordinated flag-day (block time) that activates the async/Promise contract
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
@@ -2582,8 +2930,9 @@ module.exports.METERING_EVAL_ORDER_GATE_BLOCK_TIME = METERING_EVAL_ORDER_GATE_BL
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
 module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_TIME;
 // Destructuring-rest metering + the deploy rejection of unmeterable rest positions.
-// Its own FUTURE flag-day (see the constant); consensus-visible, pinned in
-// test/determinism/consensus-params.test.js against the indexer's REST_PATTERN_METER.
+// Its own FUTURE flag-day (see the constant); consensus-visible, pinned by the
+// test/determinism/consensus_params.test/ freeze guard against the indexer's
+// REST_PATTERN_METER.
 module.exports.REST_PATTERN_METER_GATE_BLOCK_TIME = REST_PATTERN_METER_GATE_BLOCK_TIME;
 module.exports.isRestPatternMeterActive = isRestPatternMeterActive;
 // Coordinated flag-day (block time) that activates canonical string state keys
@@ -2624,7 +2973,7 @@ module.exports.XCALL_MAX_DEADLINE_BLOCKS = XCALL_MAX_DEADLINE_BLOCKS;
 module.exports.XCALL_MAX_RETURN_BYTES    = XCALL_MAX_RETURN_BYTES;
 // Expose the pinned consensus runtime + checker so the indexer (and any
 // validator process bundling the VM) can gate the engine version it runs on.
-const consensusRuntime = require('./consensus_runtime.js');
+const consensusRuntime = require('./consensus-runtime.js');
 module.exports.CONSENSUS_RUNTIME = consensusRuntime.PINNED;
 module.exports.CONSENSUS_VERSION = consensusRuntime.CONSENSUS_VERSION;
 module.exports.CONSENSUS_STATUS_TOKENS = consensusRuntime.CONSENSUS_STATUS_TOKENS;

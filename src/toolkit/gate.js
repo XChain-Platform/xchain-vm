@@ -21,9 +21,17 @@
  *
  * What this does NOT cover (needs the isolate, so it lives in the simulator
  * on Node-22/Linux): the V8 syntax compile. `runGate` therefore reports
- * "static-clean", which is deploy parity for everything acorn can see; a
- * V8-only syntax error (extremely rare, e.g. a duplicate strict-mode
- * binding) still needs `xchain-foundry simulate`.
+ * "static-clean" for everything acorn can see; a V8-only syntax error
+ * (extremely rare, e.g. a duplicate strict-mode binding) still needs
+ * `xchain-foundry simulate`.
+ *
+ * It is STRICTER than one deploy, on purpose: it runs every consensus lint rule
+ * at full strength, including rules whose activation is scheduled (banned-rest at
+ * REST_PATTERN_METER) or not yet armed (the optional-chain refinement). The chain
+ * re-lints stored code at every execution against the rules active at that block,
+ * so a contract that deploys today under a not-yet-active rule stops executing once
+ * the rule activates. The exact deploy verdict for one network and block is the
+ * simulator's deploy gate (simulator/gate_warnings.js deployGateVerdict).
  ********************************************************************/
 // @ts-nocheck
 
@@ -31,7 +39,7 @@ const { lintSource, findFloatWarnings, CONSENSUS_RULES } = require('../lint_core
 const { checkContractMeta, getExportedMeta, isValidMetaText } = require('./gate/meta_validation.js');
 
 // Heuristic gas-budget estimate. Ported from xchain-sdk ContractUtils
-// .suggestGasLimit (src/contracts.js): a coarse author-time budget, NOT a
+// .suggestGasLimit (src/contract/utils.js): a coarse author-time budget, NOT a
 // consensus figure. The real cost comes from `simulate` (result.gasUsed);
 // this is the "before you even run it" hint.
 function estimateGas(sourceCode) {
@@ -71,10 +79,13 @@ function estimateGas(sourceCode) {
  * @param {string} code - contract source (already TS-stripped if authored in TS)
  * @returns {{ ok:boolean, errors:Array, advisories:Array, warnings:Array,
  *             gas:{suggested:number,rationale:string} }}
- *   ok         - true when there are zero DEPLOY-BLOCKING errors
- *   errors     - blocking violations: the determinism rules (CONSENSUS_RULES), the
- *                code-size cap, and the contract-identity rule ('contract-meta'),
- *                which are what the on-chain DEPLOY rejects
+ *   ok         - true when there are zero blocking errors: the contract deploys and
+ *                keeps executing under every consensus rule defined today
+ *   errors     - blocking violations: every determinism rule (CONSENSUS_RULES) at full
+ *                strength, the code-size cap, and the contract-identity rule
+ *                ('contract-meta'). A superset of what one DEPLOY rejects: a rule not
+ *                yet active at deploy is still here, because the execute-time re-lint
+ *                rejects every call once it activates
  *   advisories - non-blocking analyzer findings (crossCallable integrity, gas
  *                footguns) that never change the deploy verdict
  *   warnings   - float-literal warnings and other non-blocking notes
@@ -87,8 +98,9 @@ function runGate(code) {
     // being outside DEPLOY_BLOCKING, like any other non-blocking finding.
     const allErrors = (lint.errors || []).concat(checkContractMeta(code));
 
-    // Deploy parity: the on-chain validator blocks on CONSENSUS_RULES (see
-    // syntax.js validateSyntax) PLUS the code-size cap, which the indexer
+    // Block on every CONSENSUS_RULES entry regardless of its activation (the on-chain
+    // validator drops a not-yet-active one at deploy, see syntax.js validateSyntax,
+    // but the execute-time re-lint enforces it later) PLUS the code-size cap, which the indexer
     // enforces by byte length BEFORE validateSyntax (deploy/index.js), so it is not
     // itself a consensus rule but is still deploy-blocking, PLUS the contract
     // identity rule, which deploy/index.js rejects after the manifest read once

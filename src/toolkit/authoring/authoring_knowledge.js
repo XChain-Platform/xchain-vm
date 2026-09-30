@@ -1,5 +1,5 @@
 // Canonical knowledge base. Sourced from developer-guide/Solidity_To_XChain.md
-// (itself verified against src/gateway.js / gateway_emit.js). Kept as structured
+// (itself verified against src/gateway.js / gateway-emit.js). Kept as structured
 // data so it drives the prompt AND is assertable in tests; a drift here is a
 // drift the authoring prompt would teach the model, so it is worth pinning.
 

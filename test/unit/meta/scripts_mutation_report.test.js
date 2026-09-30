@@ -70,8 +70,8 @@ describe('scripts/mutation-report (static contract)', function () {
         assert.strictEqual(TIERS['src/index.js'].target, 95);
         assert.strictEqual(TIERS['src/gateway.js'].tier, 'High');
         assert.strictEqual(TIERS['src/gateway.js'].target, 90);
-        assert.strictEqual(TIERS['src/gateway_emit.js'].tier, 'High');
-        assert.strictEqual(TIERS['src/gateway_emit.js'].target, 90);
+        assert.strictEqual(TIERS['src/gateway-emit.js'].tier, 'High');
+        assert.strictEqual(TIERS['src/gateway-emit.js'].target, 90);
     });
 
     it('keys mutation tiers on the repo-relative path, so an entry-file split part inherits its entry tier', function () {

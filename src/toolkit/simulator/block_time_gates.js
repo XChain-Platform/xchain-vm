@@ -17,8 +17,7 @@ const XChainVM = require('../../index.js');
 const {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
-    HEIGHT_GATES,
-    GENESIS_ACTIVE_NETWORKS
+    HEIGHT_GATES
 } = require('./constants.js');
 
 /**
@@ -51,18 +50,28 @@ function heightGateThreshold(gate, coin, network) {
 }
 
 /**
- * Default simulated block height for (coin, network): the MAX armed threshold across
- * the height gates, so sitting on it activates all of them (every predicate compares
- * with `>=`), exactly as DEFAULT_BLOCK_TIME does for the block-time gates. Read off
- * the VM's exported maps, never retyped, so a newly ratified height needs no edit
- * here. Genesis-active networks and an unrecognized coin/network keep the historical 1.
+ * Lowest height at which one height gate is on for (coin, network), or undefined when
+ * it is unarmed there. Genesis activation is asked of the gate's own predicate, so a
+ * gate that is genesis-on for regtest only (the optional-chain refinement) still needs
+ * its armed threshold on testnet.
  */
-function defaultBlockHeight(coin, network) {
-    if (GENESIS_ACTIVE_NETWORKS.indexOf(network) !== -1) return 1;
-    const armed = HEIGHT_GATES
-        .map((g) => heightGateThreshold(g, coin, network))
-        .filter((t) => Number.isFinite(t));
-    return armed.length ? Math.max(...armed) : 1;
+function heightGateNeed(gate, coin, network) {
+    if (XChainVM[gate.isActive](network, coin, 1) === true) return 1;
+    return heightGateThreshold(gate, coin, network);
 }
 
-module.exports = { liveBlockTime, heightGateThreshold, defaultBlockHeight };
+/**
+ * Default simulated block height for (coin, network): the MAX height any gate needs,
+ * so sitting on it activates all of them (every predicate compares with `>=`), exactly
+ * as DEFAULT_BLOCK_TIME does for the block-time gates. Read off the VM's exported maps
+ * and predicates, never retyped, so a newly ratified height needs no edit here. With no
+ * armed gate (an unrecognized coin or network) it keeps the historical 1.
+ */
+function defaultBlockHeight(coin, network) {
+    const needs = HEIGHT_GATES
+        .map((g) => heightGateNeed(g, coin, network))
+        .filter((t) => Number.isFinite(t));
+    return needs.length ? Math.max(...needs) : 1;
+}
+
+module.exports = { liveBlockTime, heightGateThreshold, heightGateNeed, defaultBlockHeight };

@@ -56,6 +56,8 @@ const GENERATOR = 'function* g(){ yield 1; }\nmodule.exports = function(xchain){
 
 // banned-async (the block-time async gate leg).
 const ASYNC = 'module.exports = function(xchain){ let p = Promise; return 7; };';
+// Valid with the optional-chain refinement off, banned-wasm with it on.
+const OPTCHAIN = 'module.exports = function(){ const w = (globalThis?.globalThis).WebAssembly; return 1; };';
 
 function runOpts(extra) {
     return Object.assign({
@@ -243,26 +245,33 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
         it('returns the verdict a fresh validateSyntax call produces', function () {
             const vm = newVm();
             const { validateSyntax } = require('../../../src/syntax.js');
-            for (const code of [CLEAN, GENERATOR, ASYNC]) {
-                const cached = vm.getLintVerdict(code, true, true, true, true, true);
-                const fresh  = validateSyntax(code, {
-                    enforceBannedAsync: true, enforceLintHardening: true,
-                    enforceBannedGenerator: true, enforceBannedWasm: true,
-                    enforceLintGlobalAlias: true, enforceBannedRest: true
-                });
-                assert.deepStrictEqual(cached, fresh, 'cached verdict drifted from a fresh one for: ' + code);
+            // Pass the optional-chain bit on BOTH sides: validateSyntax defaults it on while
+            // getLintVerdict keys an omitted one off, so parity must name it explicitly.
+            for (const code of [CLEAN, GENERATOR, ASYNC, OPTCHAIN]) {
+                for (const oc of [false, true]) {
+                    const cached = vm.getLintVerdict(code, true, true, true, true, true, oc);
+                    const fresh  = validateSyntax(code, {
+                        enforceBannedAsync: true, enforceLintHardening: true,
+                        enforceBannedGenerator: true, enforceBannedWasm: true,
+                        enforceLintGlobalAlias: true, enforceBannedRest: true,
+                        enforceLintOptionalChain: oc
+                    });
+                    assert.deepStrictEqual(cached, fresh,
+                        'cached verdict drifted from a fresh one (optional-chain ' + oc + ') for: ' + code);
+                }
             }
         });
 
         it('partitions on the five consensus flag bits, not just the source', function () {
             const vm = newVm();
-            vm.getLintVerdict(GENERATOR, false, false, false, false, false);
-            vm.getLintVerdict(GENERATOR, true,  false, false, false, false);
-            vm.getLintVerdict(GENERATOR, false, true,  false, false, false);
-            vm.getLintVerdict(GENERATOR, false, false, true,  false, false);
-            vm.getLintVerdict(GENERATOR, false, false, false, true,  false);
-            vm.getLintVerdict(GENERATOR, false, false, false, false, true);
-            assert.strictEqual(vm._lintVerdictCache.size, 6);
+            vm.getLintVerdict(GENERATOR, false, false, false, false, false, false);
+            vm.getLintVerdict(GENERATOR, true,  false, false, false, false, false);
+            vm.getLintVerdict(GENERATOR, false, true,  false, false, false, false);
+            vm.getLintVerdict(GENERATOR, false, false, true,  false, false, false);
+            vm.getLintVerdict(GENERATOR, false, false, false, true,  false, false);
+            vm.getLintVerdict(GENERATOR, false, false, false, false, true,  false);
+            vm.getLintVerdict(GENERATOR, false, false, false, false, false, true);
+            assert.strictEqual(vm._lintVerdictCache.size, 7);
             // And the flags actually change the verdict: the Pkg 3 bit is what bans the
             // generator, so the same source is valid with the bit off and invalid with it on.
             assert.strictEqual(vm.getLintVerdict(GENERATOR, false, false, false, false, false).valid, true);
@@ -277,6 +286,10 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             const RESTPARAM = 'module.exports = function(){ function s(...n){ return n.length; } return s(1); };';
             assert.strictEqual(vm.getLintVerdict(RESTPARAM, true, true, true, true, false).valid, true);
             assert.strictEqual(vm.getLintVerdict(RESTPARAM, true, true, true, true, true).valid, false);
+            // ...and so is the optional-chain bit (LINT_OPTIONAL_CHAIN): a parenthesised
+            // optional-chain WebAssembly reference is accepted with it off, rejected with it on.
+            assert.strictEqual(vm.getLintVerdict(OPTCHAIN, true, true, true, true, true, false).valid, true);
+            assert.strictEqual(vm.getLintVerdict(OPTCHAIN, true, true, true, true, true, true).valid, false);
         });
     });
 });
@@ -288,10 +301,18 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             const crypto = require('crypto');
             const vm = newVm();
             const hash = crypto.createHash('sha256').update(CLEAN).digest('hex');
-            vm.getLintVerdict(CLEAN, true, true, true, true, true, hash);
-            vm.getLintVerdict(CLEAN, true, true, true, true, true);
+            // codeHash is the EIGHTH argument, after all six flags, as execute() passes it.
+            vm.getLintVerdict(CLEAN, true, true, true, true, true, true, hash);
+            vm.getLintVerdict(CLEAN, true, true, true, true, true, true);
             assert.strictEqual(vm._lintVerdictCache.size, 1,
                 'a shared digest and a self-computed one must produce the same cache key');
+            assert.ok([...vm._lintVerdictCache.keys()][0].startsWith(hash + ':'));
+            // Prove the supplied digest is used verbatim rather than recomputed: a sentinel
+            // that is not sha256(CLEAN) must become the key prefix.
+            const sentinel = 'f'.repeat(64);
+            const vm2 = newVm();
+            vm2.getLintVerdict(CLEAN, true, true, true, true, true, true, sentinel);
+            assert.deepStrictEqual([...vm2._lintVerdictCache.keys()], [sentinel + ':111111']);
         });
 
         it('evicts FIFO at the bound instead of growing without limit', function () {

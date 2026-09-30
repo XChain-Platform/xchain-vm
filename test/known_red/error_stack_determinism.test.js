@@ -11,16 +11,15 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Acceptance test (was KNOWN-RED): contract-visible Error.stack must be
+ * Acceptance test: contract-visible Error.stack must be
  * neutered (consensus determinism + info leak).
  *
  * A contract can catch its own errors and return/store e.stack, which lands
  * in hashed state. V8's stack text leaks isolate-internal frame data
  * (line/column offsets into the harness wrapper, frame formatting, depth)
  * that changes across V8 patch releases and whenever HARNESS_SOURCE is
- * edited -> two validators commit different bytes -> fork. RED before the
- * sandbox fix (e.stack was a full trace incl. "<isolated-vm>:11:6"), GREEN
- * after `src/sandbox.js` sets stackTraceLimit=0 + a frozen prepareStackTrace.
+ * edited -> two validators commit different bytes -> fork. `src/sandbox.js`
+ * prevents this by setting stackTraceLimit=0 and a frozen prepareStackTrace.
  *
  * Run via `npm run test:known-red` (and now `npm run ci`).
  *
@@ -30,7 +29,7 @@
 
 const assert = require('assert');
 const { createVM, execute } = require('../fuzz/helpers/harness.js');
-const { PINNED, checkConsensusRuntime } = require('../../src/consensus_runtime.js');
+const { PINNED, checkConsensusRuntime } = require('../../src/consensus-runtime.js');
 
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
@@ -42,7 +41,7 @@ async function ret(code) {
     return r;
 }
 
-describe('Error.stack must be neutered (was KNOWN-RED)', function () {
+describe('Error.stack must be neutered', function () {
     this.timeout(30000);
 
     // Normal (non-overflow) throws: prepareStackTrace + stackTraceLimit=0 apply,
@@ -82,7 +81,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
     });
 });
 
-describe('Error.stack must be neutered (was KNOWN-RED)', function () {
+describe('Error.stack must be neutered', function () {
     this.timeout(30000);
 
     // Stack-OVERFLOW path. Deep recursion used to surface as a contract-catchable
@@ -110,7 +109,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
     });
 });
 
-describe('Error.stack must be neutered (was KNOWN-RED)', function () {
+describe('Error.stack must be neutered', function () {
     this.timeout(30000);
 
     // DOCUMENTED RESIDUAL: not in-VM fixable, mitigated by a consensus parameter.
@@ -120,7 +119,7 @@ describe('Error.stack must be neutered (was KNOWN-RED)', function () {
     // (e.g. "Cannot read property 'x' of undefined" -> "Cannot read properties
     // of undefined (reading 'x')" at V8 8.4; JSON SyntaxError gained a
     // "(line N column M)" suffix in recent V8). The mitigation this depends
-    // on has SHIPPED: src/consensus_runtime.js pins the exact V8/ICU build the
+    // on has SHIPPED: src/consensus-runtime.js pins the exact V8/ICU build the
     // fleet runs and test/determinism/consensus_runtime_gate.test.js fails any
     // validator that is not on it, both in `npm run ci`. So the residual is
     // testable after all, as the pair it actually is: the exposure is still
