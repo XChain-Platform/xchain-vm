@@ -13,6 +13,20 @@
  ********************************************************************/
 // @ts-nocheck
 
+const { bignumber } = require('mathjs');
+
+// The indexer snapshot's cap on the getStakers roster per tick; the total still counts every staker.
+const MAX_STAKERS_PER_TICK = 1000;
+
+// Parse a seeded stake exactly, naming the argument when it is not a decimal amount.
+function stakeAmount(amount) {
+    try {
+        return bignumber(String(amount));
+    } catch (e) {
+        throw new Error('setStake: amount must be a decimal number, got ' + JSON.stringify(String(amount)));
+    }
+}
+
 module.exports = {
     // ---- read-only-state seeding -------------------------------------------
 
@@ -97,9 +111,12 @@ module.exports = {
 
     /**
      * Seed one staker's stake on THIS contract, keeping the three derived
-     * views the accessor reads in agreement. `stakersByTick` is what
-     * stake.getStakers returns verbatim, so it is kept sorted by descending
-     * amount here the way the indexer pre-sorts it.
+     * views the accessor reads in agreement. Mirrors the indexer snapshot
+     * with exact BigNumber arithmetic: `stakersByTick` (what getStakers
+     * returns verbatim) is sorted by descending amount with an ascending
+     * pubkey tiebreak and capped at 1000, and `totalByTick` sums every
+     * staker. Re-seeding a pubkey replaces its stake; a zero stake removes
+     * it. Amounts are taken as given, so seed them at the token's precision.
      * @param {string} pubkey
      * @param {string} tick
      * @param {string|number} amount
@@ -107,22 +124,23 @@ module.exports = {
     setStake(pubkey, tick, amount) {
         const pk = String(pubkey || '').toLowerCase();
         const tk = String(tick || '');
-        const amt = String(amount);
-        const key = pk + '|' + tk;
-        const prev = this.contractStakeData.stakeByPubkeyTick[key];
-        this.contractStakeData.stakeByPubkeyTick[key] = amt;
+        stakeAmount(amount);
+        this.contractStakeData.stakeByPubkeyTick[pk + '|' + tk] = String(amount);
 
-        const list = (this.contractStakeData.stakersByTick[tk] || []).filter((s) => s.pubkey !== pk);
-        if (Number(amt) !== 0) list.push({ pubkey: pk, amount: amt });
-        list.sort((a, b) => (Number(b.amount) - Number(a.amount)) || (a.pubkey < b.pubkey ? -1 : 1));
-        this.contractStakeData.stakersByTick[tk] = list;
-
-        // Recomputed from the roster rather than accumulated, so re-seeding the
-        // same pubkey replaces its stake instead of double-counting it (prev is
-        // read only to make that intent explicit at the call site).
-        void prev;
+        // Rebuild from every seeded stake on the tick, so the cap never loses a staker.
+        const roster = [];
+        for (const [key, amt] of Object.entries(this.contractStakeData.stakeByPubkeyTick)) {
+            const bar = key.indexOf('|');
+            if (key.slice(bar + 1) !== tk) continue;
+            const big = stakeAmount(amt);
+            if (!big.isZero()) roster.push({ pubkey: key.slice(0, bar), amount: amt, big });
+        }
+        roster.sort((a, b) => (b.big.gt(a.big) ? 1 : a.big.gt(b.big) ? -1
+            : a.pubkey < b.pubkey ? -1 : a.pubkey > b.pubkey ? 1 : 0));
+        this.contractStakeData.stakersByTick[tk] = roster.slice(0, MAX_STAKERS_PER_TICK)
+            .map((s) => ({ pubkey: s.pubkey, amount: s.amount }));
         this.contractStakeData.totalByTick[tk] =
-            String(list.reduce((sum, s) => sum + Number(s.amount), 0));
+            roster.reduce((sum, s) => sum.plus(s.big), bignumber(0)).toString();
         return this;
     },
 

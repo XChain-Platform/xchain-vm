@@ -91,6 +91,12 @@ const AST_TOOLCHAIN_PINNED = Object.freeze({
     astring:   '1.9.0'
 });
 
+// Pin the sandbox addon: classifyError reads isolated-vm's own timeout/disposed text
+// to pick the status and clamp gasUsed, so a bump is a CONSENSUS_VERSION event.
+const RUNTIME_ADDON_PINNED = Object.freeze({
+    isolatedVm: '6.2.0'
+});
+
 // The reference Node release the pin was taken from. Informational only:
 // a different Node PATCH that carries the SAME v8/icu/unicode/cldr/modules
 // is consensus-equivalent and intentionally NOT rejected. Recorded so the
@@ -201,7 +207,7 @@ function describeMismatch(result) {
 }
 
 module.exports = {
-    PINNED, MATH_PINNED, AST_TOOLCHAIN_PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
+    PINNED, MATH_PINNED, AST_TOOLCHAIN_PINNED, RUNTIME_ADDON_PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
     CONSENSUS_STATUS_TOKENS, STATUS_ERROR_PREFIXES,
     checkConsensusRuntime, describeMismatch
 };

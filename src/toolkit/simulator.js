@@ -111,6 +111,7 @@ const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../protocol/constants.js
 const {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
+    isArmedGateTime,
     GUARD_GAS_CEILING,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
@@ -188,7 +189,7 @@ function initializeBlockContext(opts) {
     // and the mode did not seed anything.
     if (this.rules === 'scheduled' && Number(this.block.timestamp) === SCHEDULED_BLOCK_TIME) {
         const early = Object.keys(XChainVM)
-            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && isArmedGateTime(XChainVM[k]))
             .filter((k) => XChainVM[k] > this._liveBlockTime)
             .map((k) => k + ' (' + XChainVM[k] + ', ' + new Date(XChainVM[k] * 1000).toISOString() + ')');
         if (early.length) {
@@ -229,7 +230,7 @@ class ContractSimulator {
      * @param {string} [opts.rules='live']    - which rule set the default block time
      *        anchors on. 'live' is the newest ELAPSED *_GATE_BLOCK_TIME, so a
      *        default simulation matches what a live chain runs right now.
-     *        'scheduled' is the newest RATIFIED gate including future-dated ones,
+     *        'scheduled' is the newest ARMED gate including future-dated ones,
      *        for previewing a flag day before it arrives; it warns once, naming
      *        each gate it activates ahead of the live chain. An explicit
      *        opts.block.timestamp wins over either mode.

@@ -318,6 +318,18 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
+    it('RUNTIME_ADDON_PINNED equals the golden and matches the installed isolated-vm', function () {
+        assert.deepStrictEqual(cr.RUNTIME_ADDON_PINNED, { isolatedVm: '6.2.0' });
+        assert.ok(Object.isFrozen(cr.RUNTIME_ADDON_PINNED));
+        // classifyError keys timeout status and the gasUsed clamp on isolated-vm's own
+        // message text, so a bump must travel with a coordinated CONSENSUS_VERSION change.
+        assert.strictEqual(require('isolated-vm/package.json').version, cr.RUNTIME_ADDON_PINNED.isolatedVm,
+            'installed isolated-vm drifted from the consensus pin');
+    });
+});
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
     it('CONSENSUS_STATUS_TOKENS is the frozen closed set (resource family collapsed)', function () {
         assert.deepStrictEqual(cr.CONSENSUS_STATUS_TOKENS, ['reverted', 'out_of_resource', 'failed']);
         assert.ok(Object.isFrozen(cr.CONSENSUS_STATUS_TOKENS));
