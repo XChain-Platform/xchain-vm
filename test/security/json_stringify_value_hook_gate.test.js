@@ -33,13 +33,13 @@
 const assert = require('assert');
 const { createVM, execute, XChainVM } = require('../fuzz/helpers/harness.js');
 
-const GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
+const BINARY_ALLOC_GATE = (XChainVM && XChainVM.BINARY_ALLOC_GATE_BLOCK_TIME) || 1786060800;
 // Use the dedicated hook-gate export when it exists; fall back to the F-NR
 // guard's own activation gate (BINARY_ALLOC_GATE_BLOCK_TIME) otherwise, since
 // that is what currently arms __guardNativeDepth (__nrGuardOn).
 const HOOK_GATE = (XChainVM && typeof XChainVM.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME === 'number')
     ? XChainVM.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME
-    : GATE;
+    : BINARY_ALLOC_GATE;
 const DEPTH_LIMIT = (XChainVM && XChainVM.MAX_STACK_DEPTH_MUSL) || 256;
 
 const OUT_OF_STACK = 'out_of_stack: maximum call depth exceeded';
@@ -74,7 +74,7 @@ function registerDirectSpineTests() {
             ${SPINE_BUILDER}
             return JSON.stringify(spine);
         };`;
-        const r = await run(code, GATE);
+        const r = await run(code, BINARY_ALLOC_GATE);
         assert.strictEqual(r.success, false,
             `direct spine must fault, not return; got returnValue=${r.returnValue}`);
         assert.strictEqual(r.error, OUT_OF_STACK,
@@ -125,7 +125,12 @@ function registerValueHookTests() {
 }
 
 async function assertRegtestGenesisGate() {
-    const r = await run(VALUE_HOOK_SPINE, GATE, 'regtest');
+    assert.strictEqual(XChainVM.jsonStringifyHookGateTime('regtest'), 0,
+        'regtest must resolve to an active-since-genesis hook gate');
+    const t = BINARY_ALLOC_GATE + 1;
+    assert.ok(t < XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION.mainnet,
+        'regtest probe must remain below the mainnet hook gate');
+    const r = await run(VALUE_HOOK_SPINE, t, 'regtest');
     assert.strictEqual(r.success, false,
         `regtest gate zero must be active above the binary-allocation gate; got ${r.returnValue}`);
     assert.strictEqual(r.error, OUT_OF_STACK);
@@ -135,7 +140,7 @@ async function assertNetworkGateIsolation() {
     const activation = XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION;
     const original = activation.testnet;
     const t = activation.mainnet - 1;
-    assert.ok(t >= GATE, 'isolation timestamp must arm the native-depth prerequisite');
+    assert.ok(t >= BINARY_ALLOC_GATE, 'isolation timestamp must arm the native-depth prerequisite');
     assert.ok(t < activation.mainnet, 'isolation timestamp must precede mainnet activation');
     try {
         activation.testnet = t;
