@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generatedOn": "arm64-node22-v8_12.4.254.21-node.56",
-  "note": "Verified by golden.determinism.test.js on every platform. Resource-tier hazards (memory ceiling) are observed, not asserted byte-equal.",
+  "note": "Verified by golden.determinism.test.js on every platform. Resource-tier scenarios, the memory ceiling included, are asserted byte-equal too.",
   "scenarios": [
     {
       "id": "amm_swap/addLiquidity",
