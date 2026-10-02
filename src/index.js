@@ -1572,14 +1572,13 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 // Keep the scalar mainnet literal for existing consumers that pin or parse it.
 const JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = 9999999999;
 
-// Mainnet and testnet remain unarmed while regtest exercises the rule from genesis.
-// Unknown or missing networks resolve like mainnet so existing callers retain the
-// replay-safe production behaviour.
-const JSON_STRINGIFY_HOOK_ACTIVATION = {
+// Keep mainnet and testnet unarmed while regtest exercises the rule from genesis.
+// Resolve unknown or missing networks like mainnet to retain replay-safe behaviour.
+const JSON_STRINGIFY_HOOK_ACTIVATION = Object.seal({
     mainnet: JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
     testnet: 9999999999,
     regtest: 0,
-};
+});
 function jsonStringifyHookGateTime(network) {
     const gate = JSON_STRINGIFY_HOOK_ACTIVATION[network];
     return Number.isFinite(gate) ? gate : JSON_STRINGIFY_HOOK_ACTIVATION.mainnet;
@@ -2916,8 +2915,10 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // consensus-params freeze guard because a divergent value forks the fleet.
 // The network-aware map and resolver below are authoritative for execution.
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
-module.exports.JSON_STRINGIFY_HOOK_ACTIVATION = JSON_STRINGIFY_HOOK_ACTIVATION;
-module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
+Object.setPrototypeOf(module.exports, Object.assign(
+    Object.create(Object.getPrototypeOf(module.exports)),
+    { JSON_STRINGIFY_HOOK_ACTIVATION, jsonStringifyHookGateTime }
+));
 // Coordinated flag-day (block time) that activates the async/Promise contract
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
