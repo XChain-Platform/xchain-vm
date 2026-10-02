@@ -487,13 +487,11 @@ const HARNESS_SOURCE = `
     // (__resolveForStringify). It rides its own activation because the binary-alloc
     // flag day above has already passed: blocks executed under it must replay
     // byte-for-byte, so the hook resolution cannot be folded into it. A gate value of
-    // 0 means UNARMED (never active) rather than active-since-the-epoch, so an
-    // un-pinned or zeroed constant fails safe instead of switching every historical
-    // block onto the new rule.
+    // 0 means active since genesis; the per-network resolver injected by the host keeps
+    // a pre-launch network's activation from changing mainnet replay behaviour.
     var __jsonHookGuardOn = (__nrGuardOn &&
         typeof __blockTime === 'number' &&
         typeof __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME === 'number' &&
-        __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME > 0 &&
         __blockTime >= __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME);
     var __guardNativeDepth = function(root) {
         if (!__nrGuardOn) return;
@@ -1571,8 +1569,21 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 // today. Hook-FREE values are passed through by reference and are byte- and
 // gas-identical on both sides of the flag day.
 //
-// The release cut pins the instant.
+// Keep the scalar mainnet literal for existing consumers that pin or parse it.
 const JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = 9999999999;
+
+// Mainnet and testnet remain unarmed while regtest exercises the rule from genesis.
+// Unknown or missing networks resolve like mainnet so existing callers retain the
+// replay-safe production behaviour.
+const JSON_STRINGIFY_HOOK_ACTIVATION = {
+    mainnet: JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
+    testnet: 9999999999,
+    regtest: 0,
+};
+function jsonStringifyHookGateTime(network) {
+    const gate = JSON_STRINGIFY_HOOK_ACTIVATION[network];
+    return Number.isFinite(gate) ? gate : JSON_STRINGIFY_HOOK_ACTIVATION.mainnet;
+}
 
 // Coordinated activation (block time, unix seconds) for the async/Promise
 // contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
@@ -2535,7 +2546,7 @@ class XChainVM {
             // Second, later flag day: the JSON.stringify value-hook resolution
             // (__resolveForStringify). Injected the same way and stripped by the same
             // harness cleanup pass, so contract code never sees it.
-            context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME);
+            context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
 
             // Run harness script to assemble xchain object inside isolate.
             // Reuse cached V8 bytecode when available: the harness source is a
@@ -2903,8 +2914,10 @@ module.exports.isLintOptionalChainActive = isLintOptionalChainActive;
 module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // JSON.stringify value-hook resolution flag day, exported for the
 // consensus-params freeze guard because a divergent value forks the fleet.
-// The release cut pins the instant.
+// The network-aware map and resolver below are authoritative for execution.
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
+module.exports.JSON_STRINGIFY_HOOK_ACTIVATION = JSON_STRINGIFY_HOOK_ACTIVATION;
+module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
 // Coordinated flag-day (block time) that activates the async/Promise contract
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.

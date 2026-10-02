@@ -105,7 +105,20 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
-    it('JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME is the frozen unarmed sentinel', function () { assert.strictEqual(vm.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME, 9999999999); });
+    it('JSON.stringify hook activation is frozen per network with a mainnet compatibility alias', function () {
+        assert.deepStrictEqual(vm.JSON_STRINGIFY_HOOK_ACTIVATION, {
+            mainnet: 9999999999,
+            testnet: 9999999999,
+            regtest: 0,
+        });
+        assert.strictEqual(vm.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
+            vm.JSON_STRINGIFY_HOOK_ACTIVATION.mainnet);
+        assert.strictEqual(vm.jsonStringifyHookGateTime('mainnet'), 9999999999);
+        assert.strictEqual(vm.jsonStringifyHookGateTime('testnet'), 9999999999);
+        assert.strictEqual(vm.jsonStringifyHookGateTime('regtest'), 0);
+        assert.strictEqual(vm.jsonStringifyHookGateTime(undefined), 9999999999);
+        assert.strictEqual(vm.jsonStringifyHookGateTime('unknown'), 9999999999);
+    });
 
     it('REST_PATTERN_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // Size-metering of destructuring rest (the __arrspread/__objspreadmeter-wrapped

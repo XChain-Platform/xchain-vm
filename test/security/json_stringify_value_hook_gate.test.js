@@ -54,10 +54,10 @@ const SPINE_BUILDER = `
 
 const blockContext = (t) => ({ height: 100, timestamp: t, hash: 'gate' });
 
-async function run(code, timestamp) {
+async function run(code, timestamp, network) {
     const vm = createVM();
     vm.beginBlock();
-    const r = await execute(vm, code, { method: 'default', blockContext: blockContext(timestamp) });
+    const r = await execute(vm, code, { method: 'default', network, blockContext: blockContext(timestamp) });
     vm.endBlock();
     return r;
 }
@@ -142,6 +142,41 @@ function registerGateTests() {
         const r = await run(code, HOOK_GATE - 1);
         assert.strictEqual(r.success, true,
             `the pre-gate value hook must keep the legacy successful outcome; got ${r.error}`);
+    });
+
+    it('activates regtest gate zero once the native-depth prerequisite is active', async function () {
+        const code = `module.exports = function(xchain) {
+            ${SPINE_BUILDER}
+            var wrapped = { toJSON: function() { return spine; } };
+            return JSON.stringify(wrapped);
+        };`;
+        const r = await run(code, GATE, 'regtest');
+        assert.strictEqual(r.success, false,
+            `regtest gate zero must be active above the binary-allocation gate; got ${r.returnValue}`);
+        assert.strictEqual(r.error, OUT_OF_STACK);
+    });
+
+    it('keeps mainnet inactive when a testnet threshold activates at the same time', async function () {
+        const code = `module.exports = function(xchain) {
+            ${SPINE_BUILDER}
+            var wrapped = { toJSON: function() { return spine; } };
+            return JSON.stringify(wrapped);
+        };`;
+        const activation = XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION;
+        const original = activation.testnet;
+        const t = GATE + 1;
+        try {
+            activation.testnet = t;
+            const testnet = await run(code, t, 'testnet');
+            const mainnet = await run(code, t, 'mainnet');
+            assert.strictEqual(testnet.success, false,
+                `testnet must activate at its own threshold; got ${testnet.returnValue}`);
+            assert.strictEqual(testnet.error, OUT_OF_STACK);
+            assert.strictEqual(mainnet.success, true,
+                `mainnet must remain below its own threshold; got ${mainnet.error}`);
+        } finally {
+            activation.testnet = original;
+        }
     });
 
     describe('direct spine', registerDirectSpineTests);
