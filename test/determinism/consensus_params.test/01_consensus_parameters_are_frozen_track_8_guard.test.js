@@ -70,7 +70,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
-
     it('CONSENSUS_MAX_WALL_MS is the frozen per-execution wall-clock budget', function () {
         // Gas does not bound wall time: shapes exist whose wall-time-per-gas is far
         // above the schedule's assumption, and for those the wall-clock net is what
@@ -94,7 +93,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
-
     it('CALL_SPREAD_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // Size-metering of call/new/method argument spread (the __arrspread-wrapped
         // argument list) activates fleet-wide at this block time on mainnet. It moves
@@ -104,10 +102,12 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // flag-day (protocol_changes.js: 1786060800).
         assert.strictEqual(vm.CALL_SPREAD_METER_GATE_BLOCK_TIME, 1786060800);
     });
-});
 
-describe('consensus parameters are frozen (track 8 guard)', function () {
-    it('JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME is the frozen unarmed sentinel', function () { assert.strictEqual(vm.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME, 9999999999); });
+    it('JSON.stringify hook activation is frozen per network with a mainnet compatibility alias', function () {
+        assert.deepStrictEqual([vm.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME, vm.JSON_STRINGIFY_HOOK_ACTIVATION,
+            ...['mainnet', 'testnet', 'regtest', undefined, 'unknown'].map(vm.jsonStringifyHookGateTime)],
+        [9999999999, { mainnet: 9999999999, testnet: 9999999999, regtest: 0 }, 9999999999, 9999999999, 0, 9999999999, 9999999999]);
+    });
 
     it('REST_PATTERN_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // Size-metering of destructuring rest (the __arrspread/__objspreadmeter-wrapped

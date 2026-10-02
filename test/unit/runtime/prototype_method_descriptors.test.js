@@ -66,6 +66,8 @@ const BASE_STATIC_ROWS = [
     ["isLintOptionalChainActive", true, true, true, "function", 3],
     ["BINARY_ALLOC_GATE_BLOCK_TIME", true, true, true, "number", null],
     ["JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME", true, true, true, "number", null],
+    ["JSON_STRINGIFY_HOOK_ACTIVATION", true, true, true, "object", null],
+    ["jsonStringifyHookGateTime", true, true, true, "function", 1],
     ["ASYNC_SURFACE_GATE_BLOCK_TIME", true, true, true, "number", null],
     ["isAsyncSurfaceActive", true, true, true, "function", 2],
     ["STATE_KEY_NUL_GATE_BLOCK_TIME", true, true, true, "number", null],

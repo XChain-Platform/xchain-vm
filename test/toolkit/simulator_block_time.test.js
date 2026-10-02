@@ -121,6 +121,11 @@ function armedGateTimes() {
         assert.ok(SCHEDULED_BLOCK_TIME >= DEFAULT_BLOCK_TIME);
         assert.ok(SCHEDULED_BLOCK_TIME < UNARMED_SENTINEL,
             'the scheduled anchor sits on an unarmed placeholder, not a ratified gate');
+        assert.strictEqual(XChainVM.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
+            XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION.mainnet,
+            'the scalar compatibility gate must remain the mainnet activation');
+        assert.ok(!armedGateTimes().includes(XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION.regtest),
+            'the network activation map must not enter the simulator scalar time anchors');
     });
 
     // liveBlockTime takes the instant, so this does not depend on the host clock.
