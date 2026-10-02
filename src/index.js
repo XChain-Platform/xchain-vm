@@ -2915,10 +2915,8 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // consensus-params freeze guard because a divergent value forks the fleet.
 // The network-aware map and resolver below are authoritative for execution.
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
-Object.setPrototypeOf(module.exports, Object.assign(
-    Object.create(Object.getPrototypeOf(module.exports)),
-    { JSON_STRINGIFY_HOOK_ACTIVATION, jsonStringifyHookGateTime }
-));
+module.exports.JSON_STRINGIFY_HOOK_ACTIVATION = JSON_STRINGIFY_HOOK_ACTIVATION;
+module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
 // Coordinated flag-day (block time) that activates the async/Promise contract
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
