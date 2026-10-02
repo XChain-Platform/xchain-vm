@@ -134,7 +134,9 @@ async function assertRegtestGenesisGate() {
 async function assertNetworkGateIsolation() {
     const activation = XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION;
     const original = activation.testnet;
-    const t = GATE + 1;
+    const t = activation.mainnet - 1;
+    assert.ok(t >= GATE, 'isolation timestamp must arm the native-depth prerequisite');
+    assert.ok(t < activation.mainnet, 'isolation timestamp must precede mainnet activation');
     try {
         activation.testnet = t;
         const testnet = await run(VALUE_HOOK_SPINE, t, 'testnet');
