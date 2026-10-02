@@ -25,14 +25,16 @@ const vm = require('../../../src/index.js');
 const lintCore = require('../../../src/lint_core.js');
 const metering = require('../../../src/metering.js');
 
-// The indexer's protocol-change sources as [file, text] pairs: the registry entry
-// src/protocol_changes.js plus every part file under src/protocol_changes/, where the W3
-// split put the rows (CONTROLLER_GUARD at changes_1.js:272, REST_PATTERN_METER at
-// changes_2.js:273). Null when the sibling checkout is absent (standalone clone).
-function indexerProtocolChangeSources() {
+// The indexer's protocol-change sources as [file, text] pairs: src/protocol_changes.js plus
+// every part file under src/protocol_changes/. Skips the test when the sibling is absent
+// (standalone clone); fails it instead when XCHAIN_REQUIRE_SIBLINGS=1 declares siblings supplied.
+function indexerProtocolChangeSources(ctx, what) {
     const path = require('path'), fs = require('fs');
     const entry = path.resolve(__dirname, '../../../../xchain-indexer/src/protocol_changes.js');
-    if (!fs.existsSync(entry)) return null;
+    if (!fs.existsSync(entry)) {
+        assert.notStrictEqual(process.env.XCHAIN_REQUIRE_SIBLINGS, '1', `${what} cannot run: ${entry} is missing; XCHAIN_REQUIRE_SIBLINGS=1 forbids the green-by-skip`);
+        ctx.skip();
+    }
     const dir = entry.replace(/\.js$/, '');
     const parts = fs.existsSync(dir)
         ? fs.readdirSync(dir).filter((f) => f.endsWith('.js')).sort().map((f) => path.join(dir, f))
@@ -144,11 +146,10 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // flag day: the VM gates the metering rewrite on it, the indexer gates the deploy
         // rejection on it (deploy/index.js enforceBannedRest). A repin that edits one and misses
         // the other passes BOTH CIs and forks the fleet at activation. Same construction as
-        // the six-gate CONTROLLER_GUARD guard below; skips only when the sibling repo is
-        // not checked out (standalone clone), where the hard pin above still holds. The row
-        // is read from the registry part files (src/protocol_changes/changes_2.js:273).
-        const sources = indexerProtocolChangeSources();
-        if (!sources) this.skip();
+        // the six-gate CONTROLLER_GUARD guard below; skips when the sibling repo is absent
+        // (standalone clone, where the hard pin above still holds) and fails instead under
+        // XCHAIN_REQUIRE_SIBLINGS=1. The row is read from src/protocol_changes/changes_2.js.
+        const sources = indexerProtocolChangeSources(this, 'the REST_PATTERN_METER cross-repo repin guard');
         const all = indexerFlagDayLiterals(sources, 'REST_PATTERN_METER');
         assert.strictEqual(all.length, 1,
             "expected exactly one REST_PATTERN_METER row across the indexer's src/protocol_changes.js and src/protocol_changes/*.js, found "
@@ -342,11 +343,10 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // Read the indexer source directly (monorepo sibling checkout: the registry
         // entry plus its part files, the row is src/protocol_changes/changes_1.js:272)
         // and assert every VM gate equals the CONTROLLER_GUARD activation time. Skips
-        // only when the sibling repo is not checked out (standalone clone); the hard
-        // value pins above still guard that case. This guard couples the repos through
-        // the flag-day timestamp, independent of a tier-only rename.
-        const sources = indexerProtocolChangeSources();
-        if (!sources) this.skip();
+        // when the sibling repo is absent (standalone clone, where the hard value pins
+        // above still guard) and fails instead under XCHAIN_REQUIRE_SIBLINGS=1. This guard
+        // couples the repos through the flag-day timestamp, independent of a tier-only rename.
+        const sources = indexerProtocolChangeSources(this, 'the six-gate CONTROLLER_GUARD cross-repo repin guard');
         const all = indexerFlagDayLiterals(sources, 'CONTROLLER_GUARD');
         assert.strictEqual(all.length, 1,
             "expected exactly one CONTROLLER_GUARD row across the indexer's src/protocol_changes.js and src/protocol_changes/*.js, found "

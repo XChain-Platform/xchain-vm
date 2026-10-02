@@ -46,7 +46,7 @@ async function main() {
         version: 1,
         generatedOn: platform,
         note: 'Verified by golden.determinism.test.js on every platform. ' +
-              'Resource-tier hazards (memory ceiling) are observed, not asserted byte-equal.',
+              'Resource-tier scenarios, the memory ceiling included, are asserted byte-equal too.',
         scenarios: entries.map(e => ({
             id: e.id,
             tier: e.tier,
