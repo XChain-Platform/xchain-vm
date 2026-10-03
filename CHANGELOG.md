@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.3] - 2026-10-03
+
+### Changed
+- Armed the JSON stringify hook on testnet at block time 1791039938.
+- Armed the optional-chain lint on BTC testnet at 154971, LTC testnet at 4905844 and DOGE testnet at 67961578.
+- Kept VM activation exports network-aware and pinned to the consensus gate maps.
+
 ## [0.21.0] - 2026-09-29
 
 ### Fixed
