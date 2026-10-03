@@ -34,7 +34,7 @@ const XChainVM = require('../../index.js');
 //   LIVE (the default) is the newest gate that has ALREADY ELAPSED, so a default
 //   simulation meters and deploy-validates under the rule set a live chain is
 //   running at this moment.
-//   SCHEDULED is the max over every gate, elapsed or not, so a future-dated
+//   SCHEDULED is the max over every ARMED gate, elapsed or not, so a future-dated
 //   flag-day can be previewed on purpose.
 //
 // A single MAX cannot be both. A future-dated gate turns it into a preview of
@@ -49,8 +49,12 @@ const XChainVM = require('../../index.js');
 // it. The literal fallback is the ratified 2.0.0 flag-day (2026-08-07 00:00:00
 // UTC) and is reached only if the VM stops exporting the constants at all, or
 // if no gate has elapsed yet.
+// A gate at or above UNARMED_GATE_BLOCK_TIME is a placeholder awaiting its release
+// cut (JSON_STRINGIFY_HOOK today), never a ratified flag day, so neither anchor sees it.
+const UNARMED_GATE_BLOCK_TIME = 9999999999;
+const isArmedGateTime = (t) => Number.isFinite(t) && t < UNARMED_GATE_BLOCK_TIME;
 const GATE_BLOCK_TIMES = Object.keys(XChainVM)
-    .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+    .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && isArmedGateTime(XChainVM[k]))
     .map((k) => XChainVM[k]);
 const GATE_FALLBACK_BLOCK_TIME = 1786060800;
 
@@ -112,6 +116,8 @@ const CONTRACT_META_REQUIRED_TIMES = Object.freeze({
 module.exports = {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
+    UNARMED_GATE_BLOCK_TIME,
+    isArmedGateTime,
     HEIGHT_GATES,
     CONTRACT_META_REQUIRED_TIMES,
     GUARD_GAS_CEILING,

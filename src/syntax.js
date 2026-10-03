@@ -67,7 +67,7 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  *        passes the resolved activation (deploy/index.js). Defaults to true.
  * @param {boolean} [opts.enforceLintOptionalChain=true] - whether the xchain-vm
  *        LINT_OPTIONAL_CHAIN_ACTIVATION refinement applies. The indexer passes
- *        vm_lint_optional_chain_activation.VM_LINT_OPTIONAL_CHAIN_ACTIVATION.
+ *        vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION.
  *        Defaults to true.
  * @param {boolean} [opts.enforceBannedGenerator=true] - whether the
  *        'banned-generator' rule (function*, generator methods, yield) is

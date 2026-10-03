@@ -19,11 +19,11 @@
  * validator would disagree with the fleet → chain split. Run this in CI
  * on x86_64 and on every node version the fleet may run.
  *
- * RESOURCE-tier scenarios are checked for deterministic FAILURE shape
- * (same success flag + same error class) but the memory-ceiling hazard
- * is asserted only to be a clean, contained failure (not byte-equal,
- * because GC timing legitimately varies. The point is to surface, loudly,
- * if a resource outcome silently changes.
+ * RESOURCE-tier scenarios, the memory ceiling included, are asserted
+ * byte-equal too: a resource termination clamps gasUsed to the ceiling,
+ * empties state and emissions, and hashes under one folded error class,
+ * so whichever ceiling fires first the consensus-visible result is fixed.
+ * The point is to surface, loudly, if a resource outcome silently changes.
  ********************************************************************/
 // @ts-nocheck
 
@@ -124,22 +124,15 @@ if (XChainVM) {
                 it(`${sc.id} fails the same way (${sc.hazard ? 'hazard: ' + sc.hazard : 'bounded'})`, function () {
                     const got = live.get(sc.id);
                     assert.ok(got, `scenario "${sc.id}" did not execute`);
-                    if (sc.hazard === 'memory-ceiling-nondeterminism') {
-                        // Memory ceilings legitimately fire at GC-timing-dependent
-                        // points. We require ONLY: the contract still fails cleanly
-                        // and contained (no success, no partial emissions/state).
-                        assert.strictEqual(got.success, false,
-                            `memory-bomb unexpectedly SUCCEEDED on this platform; ` +
-                            `the memory ceiling did not contain it`);
-                    } else {
-                        // Gas/count-bounded ceilings ARE deterministic; hold them
-                        // to the same standard as invariants.
-                        assert.strictEqual(got.hash, sc.hash,
-                            `RESOURCE DETERMINISM BREAK on "${sc.id}": a gas/count ` +
-                            `ceiling produced a different result than the manifest ` +
-                            `(manifest gasUsed=${sc.gasUsed} live=${got.gasUsed}). ` +
-                            `Gas metering must be platform-independent.`);
-                    }
+                    // Hold every resource ceiling to the invariant standard: gas, memory and
+                    // wall-clock terminations all clamp gasUsed to the ceiling, drop state and
+                    // emissions, and hash under one folded error class, so any byte drift forks.
+                    assert.strictEqual(got.hash, sc.hash,
+                        `RESOURCE DETERMINISM BREAK on "${sc.id}": a resource ` +
+                        `ceiling produced a different result than the manifest ` +
+                        `(manifest gasUsed=${sc.gasUsed} error=${JSON.stringify(sc.error)}, ` +
+                        `live gasUsed=${got.gasUsed} error=${JSON.stringify(got.error)}). ` +
+                        `Resource terminations must be platform-independent.`);
                 });
             }
         });

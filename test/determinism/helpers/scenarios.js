@@ -184,9 +184,9 @@ const SCENARIOS = [
     {
         id: 'memory_bomb/memory_limit',
         tier: 'resource',
-        // HAZARD: memory ceiling fires at a GC-timing-dependent point. gasUsed
-        // at the moment of OOM may differ across V8 versions / arch. Tracked
-        // here precisely to MEASURE whether the outcome is determinism-safe.
+        // HAZARD: the point an OOM or timeout fires may vary by V8 version or
+        // arch, but the consensus-visible result must not (gasUsed clamps to the
+        // ceiling, the error class folds), so the golden guard asserts its hash.
         hazard: 'memory-ceiling-nondeterminism',
         code: load('memory_bomb'),
         method: 'default',

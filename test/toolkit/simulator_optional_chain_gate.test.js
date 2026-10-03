@@ -22,7 +22,7 @@ describe('toolkit: simulator optional-chain deploy gate', function () {
     it('passes the network activation verdict to validateSyntax', async function () {
         const cases = [
             { network: 'regtest', expected: true },
-            { network: 'testnet', expected: false },
+            { network: 'testnet', expected: true },
             { network: 'mainnet', expected: false }
         ];
 

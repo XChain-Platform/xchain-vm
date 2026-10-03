@@ -68,6 +68,17 @@ module.exports = {
 
 const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every gate
 
+// Gate constants at or above this are unarmed placeholders, not ratified flag days.
+const UNARMED_SENTINEL = 9999999999;
+
+// Every armed *_GATE_BLOCK_TIME the VM exports, as epoch seconds.
+function armedGateTimes() {
+    return Object.keys(XChainVM)
+        .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
+        .map((k) => XChainVM[k])
+        .filter((t) => t < UNARMED_SENTINEL);
+}
+
 (ContractSimulator ? describe : describe.skip)('toolkit: simulator default block time', function () {
     this.timeout(30000);
 
@@ -106,18 +117,20 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
     });
 
     it('keeps the scheduled anchor at the newest ratified gate', function () {
-        const gates = Object.keys(XChainVM)
-            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
-            .map((k) => XChainVM[k]);
-        assert.strictEqual(SCHEDULED_BLOCK_TIME, Math.max(...gates));
+        assert.strictEqual(SCHEDULED_BLOCK_TIME, Math.max(...armedGateTimes()));
         assert.ok(SCHEDULED_BLOCK_TIME >= DEFAULT_BLOCK_TIME);
+        assert.ok(SCHEDULED_BLOCK_TIME < UNARMED_SENTINEL,
+            'the scheduled anchor sits on an unarmed placeholder, not a ratified gate');
+        assert.strictEqual(XChainVM.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
+            XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION.mainnet,
+            'the scalar compatibility gate must remain the mainnet activation');
+        assert.ok(!armedGateTimes().includes(XChainVM.JSON_STRINGIFY_HOOK_ACTIVATION.regtest),
+            'the network activation map must not enter the simulator scalar time anchors');
     });
 
     // liveBlockTime takes the instant, so this does not depend on the host clock.
     it('advances the live anchor across a flag day and never past one', function () {
-        const gates = Object.keys(XChainVM)
-            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && Number.isFinite(XChainVM[k]))
-            .map((k) => XChainVM[k]);
+        const gates = armedGateTimes();
         const newest = Math.max(...gates);
         const oldest = Math.min(...gates);
         assert.strictEqual(liveBlockTime(newest), newest, 'sitting exactly on a gate activates it');
@@ -151,6 +164,8 @@ const PRE_GATE_TIME = 1700000000;   // the old default: 2023-11-14, below every 
         if (SCHEDULED_BLOCK_TIME > DEFAULT_BLOCK_TIME) {
             assert.strictEqual(seen.length, 1, 'expected exactly one preview warning, got ' + seen.length);
             assert.ok(/PREVIEW/.test(seen[0]), 'unexpected warning: ' + seen[0]);
+            assert.ok(!/JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME/.test(seen[0]),
+                'the preview names an unarmed gate: ' + seen[0]);
         }
     });
 
