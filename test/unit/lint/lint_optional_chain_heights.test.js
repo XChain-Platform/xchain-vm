@@ -33,11 +33,12 @@ describe('optional-chain lint activation', function () {
         'DOGE:testnet',
     ];
 
-    it('exports a frozen map with exactly six unarmed entries', function () {
+    it('exports a frozen map with six entries: mainnet unarmed, testnet at the v0.21.3 heights', function () {
         assert.ok(Object.isFrozen(LINT_OPTIONAL_CHAIN_ACTIVATION));
         assert.deepStrictEqual(Object.keys(LINT_OPTIONAL_CHAIN_ACTIVATION), expectedKeys);
+        const armed = { 'BTC:testnet': 154939, 'LTC:testnet': 4905307, 'DOGE:testnet': 67960786 };
         for (const key of expectedKeys) {
-            assert.strictEqual(LINT_OPTIONAL_CHAIN_ACTIVATION[key], null);
+            assert.strictEqual(LINT_OPTIONAL_CHAIN_ACTIVATION[key], armed[key] ?? null);
         }
     });
 
@@ -45,14 +46,21 @@ describe('optional-chain lint activation', function () {
         assert.strictEqual(isLintOptionalChainActive('regtest', 'BTC', 0), true);
     });
 
-    for (const network of ['testnet', 'mainnet']) {
-        it('keeps every ' + network + ' chain unarmed', function () {
-            for (const coin of coins) {
-                assert.strictEqual(isLintOptionalChainActive(network, coin, 0), false);
-                assert.strictEqual(isLintOptionalChainActive(network, coin, 10000000), false);
-            }
-        });
-    }
+    it('keeps every mainnet chain unarmed', function () {
+        for (const coin of coins) {
+            assert.strictEqual(isLintOptionalChainActive('mainnet', coin, 0), false);
+            assert.strictEqual(isLintOptionalChainActive('mainnet', coin, 10000000), false);
+        }
+    });
+
+    it('arms every testnet chain at its v0.21.3 height', function () {
+        const armed = { 'BTC:testnet': 154939, 'LTC:testnet': 4905307, 'DOGE:testnet': 67960786 };
+        for (const coin of coins) {
+            const height = armed[coin + ':testnet'];
+            assert.strictEqual(isLintOptionalChainActive('testnet', coin, height - 1), false);
+            assert.strictEqual(isLintOptionalChainActive('testnet', coin, height), true);
+        }
+    });
 
     it('rejects an unknown network, null coin and non-finite height', function () {
         assert.strictEqual(isLintOptionalChainActive('devnet', 'BTC', 100), false);

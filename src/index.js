@@ -1576,7 +1576,7 @@ const JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = 9999999999;
 // Resolve unknown or missing networks like mainnet to retain replay-safe behaviour.
 const JSON_STRINGIFY_HOOK_ACTIVATION = Object.seal({
     mainnet: JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
-    testnet: 9999999999,
+    testnet: 1791019443,
     regtest: 0,
 });
 function jsonStringifyHookGateTime(network) {
