@@ -95,7 +95,7 @@ function heightWarnings(lines) {
 
     it('leaves regtest and an explicit height alone, and starts testnet at its v0.21.3 optional-chain height', function () {
         assert.strictEqual(new ContractSimulator().block.height, 1);
-        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, 154971);
+        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, 155001);
         assert.strictEqual(new ContractSimulator().block.hash, 'sim_block_0000000000000001');
         const pinned = new ContractSimulator({ network: 'mainnet', block: { height: 7 } });
         assert.strictEqual(pinned.block.height, 7);

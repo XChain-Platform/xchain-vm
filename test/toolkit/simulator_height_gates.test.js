@@ -76,7 +76,7 @@ describe('toolkit: simulator HEIGHT_GATES covers every VM height gate', function
     });
 
     it('keeps the default heights the shipped optional-chain map implies', function () {
-        const armed = { 'BTC:testnet': 154971, 'LTC:testnet': 4905844, 'DOGE:testnet': 67961578 };
+        const armed = { 'BTC:testnet': 155001, 'LTC:testnet': 4906040, 'DOGE:testnet': 67962387 };
         for (const coin of ['BTC', 'LTC', 'DOGE']) {
             assert.strictEqual(defaultBlockHeight(coin, 'regtest'), 1);
             assert.strictEqual(defaultBlockHeight(coin, 'testnet'), armed[coin + ':testnet']);
@@ -96,7 +96,7 @@ describe('toolkit: simulator HEIGHT_GATES covers every VM height gate', function
     });
 
     it('warns on testnet below an armed optional-chain threshold and stays quiet otherwise', function () {
-        assert.deepStrictEqual(heightWarningsFor('testnet', 154971, 'C:BTC:5'), []);
+        assert.deepStrictEqual(heightWarningsFor('testnet', 155001, 'C:BTC:5'), []);
         assert.deepStrictEqual(heightWarningsFor('regtest', 1, 'C:BTC:5'), []);
         withArmedOptionalChain({ 'BTC:testnet': 500 }, function () {
             const below = heightWarningsFor('testnet', 1, 'C:BTC:5');

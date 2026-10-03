@@ -36,7 +36,7 @@ describe('optional-chain lint activation', function () {
     it('exports a frozen map with six entries: mainnet unarmed, testnet at the v0.21.3 heights', function () {
         assert.ok(Object.isFrozen(LINT_OPTIONAL_CHAIN_ACTIVATION));
         assert.deepStrictEqual(Object.keys(LINT_OPTIONAL_CHAIN_ACTIVATION), expectedKeys);
-        const armed = { 'BTC:testnet': 154971, 'LTC:testnet': 4905844, 'DOGE:testnet': 67961578 };
+        const armed = { 'BTC:testnet': 155001, 'LTC:testnet': 4906040, 'DOGE:testnet': 67962387 };
         for (const key of expectedKeys) {
             assert.strictEqual(LINT_OPTIONAL_CHAIN_ACTIVATION[key], armed[key] ?? null);
         }
@@ -54,7 +54,7 @@ describe('optional-chain lint activation', function () {
     });
 
     it('arms every testnet chain at its v0.21.3 height', function () {
-        const armed = { 'BTC:testnet': 154971, 'LTC:testnet': 4905844, 'DOGE:testnet': 67961578 };
+        const armed = { 'BTC:testnet': 155001, 'LTC:testnet': 4906040, 'DOGE:testnet': 67962387 };
         for (const coin of coins) {
             const height = armed[coin + ':testnet'];
             assert.strictEqual(isLintOptionalChainActive('testnet', coin, height - 1), false);
