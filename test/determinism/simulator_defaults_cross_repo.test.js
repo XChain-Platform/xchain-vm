@@ -300,9 +300,9 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
 
     it('keeps regtest at height 1, starts testnet at its v0.21.3 optional-chain height, and lets an explicit height win', function () {
         // regtest activates every height gate from genesis, so the historical default stands;
-        // testnet arms the optional-chain lint at BTC 154939 in v0.21.3.
+        // testnet arms the optional-chain lint at BTC 154971 in v0.21.3.
         assert.strictEqual(new ContractSimulator().block.height, 1);
-        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, 154939);
+        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, 154971);
         // A deliberate below-gate run stays possible: the author's height wins.
         assert.strictEqual(
             new ContractSimulator({ network: 'mainnet', block: { height: 5 } }).block.height, 5);

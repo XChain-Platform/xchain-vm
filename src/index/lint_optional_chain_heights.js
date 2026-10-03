@@ -19,9 +19,9 @@ const LINT_OPTIONAL_CHAIN_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
     'DOGE:mainnet': null,
-    'BTC:testnet':  154939,
-    'LTC:testnet':  4905307,
-    'DOGE:testnet': 67960786,
+    'BTC:testnet':  154971,
+    'LTC:testnet':  4905844,
+    'DOGE:testnet': 67961578,
 });
 
 function resolveOptionalChainActive(map, network, coin, blockHeight) {

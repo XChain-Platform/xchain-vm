@@ -106,7 +106,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     it('JSON.stringify hook activation is frozen per network with a mainnet compatibility alias', function () {
         assert.deepStrictEqual([vm.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME, vm.JSON_STRINGIFY_HOOK_ACTIVATION,
             ...['mainnet', 'testnet', 'regtest', undefined, 'unknown'].map(vm.jsonStringifyHookGateTime)],
-        [9999999999, { mainnet: 9999999999, testnet: 1791019443, regtest: 0 }, 9999999999, 1791019443, 0, 9999999999, 9999999999]);
+        [9999999999, { mainnet: 9999999999, testnet: 1791039938, regtest: 0 }, 9999999999, 1791039938, 0, 9999999999, 9999999999]);
     });
 
     it('REST_PATTERN_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
