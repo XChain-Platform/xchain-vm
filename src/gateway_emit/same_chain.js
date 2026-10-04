@@ -16,7 +16,7 @@
  * The emit methods that queue an action on THIS chain: the deferred
  * cross-contract call (execute) and the protocol actions from send to
  * vote. Each builder returns the members it owns, in emit API order, for
- * buildEmitAPI (../gateway_emit.js) to spread into the one emit object.
+ * buildEmitAPI (../gateway_emit/index.js) to spread into the one emit object.
  ********************************************************************/
 // @ts-nocheck
 
