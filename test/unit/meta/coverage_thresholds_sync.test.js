@@ -64,17 +64,23 @@ describe('coverage ratchet floors', () => {
 // Excluding it is only honest while it is still measured somewhere, so that is
 // asserted here too, and the excludes on coverage:check and coverage have to agree
 // or the report a human reads describes a different set than the job enforces.
-describe('coverage ratchet scope', () => {
+const loadScopeFixture = () => {
   const repoRoot = path.join(__dirname, '..', '..', '..');
-  const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
-  const declared = JSON.parse(
-    fs.readFileSync(path.join(repoRoot, 'bin', 'coverage-thresholds.json'), 'utf8'),
-  );
+  return {
+    repoRoot,
+    pkg: JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')),
+    declared: JSON.parse(
+      fs.readFileSync(path.join(repoRoot, 'bin', 'coverage-thresholds.json'), 'utf8'),
+    ),
+  };
+};
+const excludesOf = (script) =>
+  [...script.matchAll(/--exclude\s+'([^']+)'/g)].map((m) => m[1]);
+const includesOf = (script) =>
+  [...script.matchAll(/--include\s+'([^']+)'/g)].map((m) => m[1]);
 
-  const excludesOf = (script) =>
-    [...script.matchAll(/--exclude\s+'([^']+)'/g)].map((m) => m[1]);
-  const includesOf = (script) =>
-    [...script.matchAll(/--include\s+'([^']+)'/g)].map((m) => m[1]);
+describe('coverage ratchet scope declaration', () => {
+  const { repoRoot, pkg, declared } = loadScopeFixture();
 
   it('declares the unit-scope excludes it enforces', () => {
     assert.ok(
@@ -101,6 +107,20 @@ describe('coverage ratchet scope', () => {
     }
   });
 
+  it('excludes only files that exist, so a rename cannot leave a dead exclude', () => {
+    for (const excluded of declared.unitScopeExcludes) {
+      const existingPrefix = excluded.split('*', 1)[0].replace(/\/$/, '');
+      assert.ok(
+        fs.existsSync(path.join(repoRoot, existingPrefix)),
+        `${excluded} is excluded from the ratchet but no such file exists`,
+      );
+    }
+  });
+});
+
+describe('coverage ratchet venue parity', () => {
+  const { repoRoot, pkg, declared } = loadScopeFixture();
+
   it('measures the same set in the report a human reads', () => {
     assert.deepEqual(
       excludesOf(pkg.scripts.coverage).sort(),
@@ -123,15 +143,5 @@ describe('coverage ratchet scope', () => {
   it('runs the subprocess ratchet in the full CI venue', () => {
     const ciFull = fs.readFileSync(path.join(repoRoot, 'bin', 'ci-full.sh'), 'utf8');
     assert.match(ciFull, /npm run coverage:subprocess/);
-  });
-
-  it('excludes only files that exist, so a rename cannot leave a dead exclude', () => {
-    for (const excluded of declared.unitScopeExcludes) {
-      const existingPrefix = excluded.split('*', 1)[0].replace(/\/$/, '');
-      assert.ok(
-        fs.existsSync(path.join(repoRoot, existingPrefix)),
-        `${excluded} is excluded from the ratchet but no such file exists`,
-      );
-    }
   });
 });
