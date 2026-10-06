@@ -92,6 +92,9 @@ class GasTracker {
         this.schedule = gasSchedule;
         this.ceiling  = gasCeiling;
         this.used     = 0;
+        // Set when a charge crossed the ceiling, so the host can fail a run whose
+        // exhaustion fault was caught inside the isolate before it reached the host.
+        this.exhausted = false;
     }
 
     charge(amount) {
@@ -106,8 +109,10 @@ class GasTracker {
         if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)
             throw new Error('gas charge amount must be a non-negative finite number, got: ' + amount);
         this.used += amount;
-        if (this.used > this.ceiling)
+        if (this.used > this.ceiling) {
+            this.exhausted = true;
             throw new GasExhaustedError(this.used, this.ceiling);
+        }
     }
 
     chargeComputation() {
