@@ -1610,7 +1610,8 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 // Keep the scalar mainnet literal for existing consumers that pin or parse it.
 const JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = 9999999999;
 
-// Keep mainnet and testnet unarmed while regtest exercises the rule from genesis.
+// Mainnet stays unarmed, testnet arms at block time 1791061097 (2026-10-03 20:58:17 UTC)
+// and regtest exercises the rule from genesis.
 // Resolve unknown or missing networks like mainnet to retain replay-safe behaviour.
 const JSON_STRINGIFY_HOOK_ACTIVATION = Object.seal({
     mainnet: JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
