@@ -1610,7 +1610,8 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 // Keep the scalar mainnet literal for existing consumers that pin or parse it.
 const JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = 9999999999;
 
-// Keep mainnet and testnet unarmed while regtest exercises the rule from genesis.
+// Mainnet stays unarmed, testnet arms at block time 1791061097 (2026-10-03 20:58:17 UTC)
+// and regtest exercises the rule from genesis.
 // Resolve unknown or missing networks like mainnet to retain replay-safe behaviour.
 const JSON_STRINGIFY_HOOK_ACTIVATION = Object.seal({
     mainnet: JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
@@ -1787,9 +1788,8 @@ function isRestPatternMeterActive(network, blockTime) {
 
 // Activation for metering the native work the other size charges miss: iterator
 // helpers (toArray, drop), String isWellFormed/toWellFormed, the Set algebra family
-// and Function.prototype.apply with a long argument list, plus failing a run whose
-// gas-exhaustion fault was caught inside the isolate (the Object.* statics wrappers
-// swallow it). Every one moves gasUsed or a run's status, so it is gated. Mainnet and
+// and Function.prototype.apply with a long argument list. Every one moves gasUsed,
+// so it is gated. Mainnet and
 // testnet are unarmed (null) until a release cut schedules an instant; regtest runs
 // the rule from genesis. Unknown or missing networks resolve like mainnet.
 const ITER_SET_METER_ACTIVATION = Object.seal({
@@ -1802,6 +1802,12 @@ function isIterSetMeterActive(network, blockTime) {
     if (!Number.isFinite(gate)) return false;
     return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
 }
+
+// Activation for failing a run whose gas-exhaustion fault was caught inside the
+// isolate (the Object.* statics wrappers swallow it) and so reached the host as a
+// success. Post-gate such a run is out_of_gas at the ceiling; pre-gate it replays as
+// the success it settled as. Resolver and map live in gas.js beside the tracker flag.
+const { isGasCeilingSuccessActive, GAS_CEILING_SUCCESS_ACTIVATION } = GasTracker;
 
 // Activation for the contract.slash `token` wire-delimiter guard. Every
 // other emit validator rejects a '|' in a field the indexer may pipe-join;
@@ -2601,7 +2607,9 @@ class XChainVM {
             context.global.setSync('__BINARY_ALLOC_GATE_BLOCK_TIME', BINARY_ALLOC_GATE_BLOCK_TIME);
             // Second, later flag day: the JSON.stringify value-hook resolution
             // (__resolveForStringify). Injected the same way and stripped by the same
-            // harness cleanup pass, so contract code never sees it.
+            // harness cleanup pass, so contract code never sees it. The resolver yields
+            // 0 on regtest, 1791061097 (2026-10-03 20:58:17 UTC) on testnet, and the
+            // unarmed mainnet literal everywhere else.
             context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
             const __iterSetMeterOn = isIterSetMeterActive(opts.network, __blockTime);
             context.global.setSync('__ITER_SET_METER_ON', __iterSetMeterOn);
@@ -2748,7 +2756,7 @@ class XChainVM {
                 Error.prepareStackTrace = __hostPrepare;
             }
 
-            if (__iterSetMeterOn && gasTracker.exhausted) {
+            if (gasTracker.exhausted && isGasCeilingSuccessActive(opts.network, __blockTime)) {
                 return this.errorResult(gasTracker, emissionCollector,
                     'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }
@@ -2978,6 +2986,7 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // JSON.stringify value-hook resolution flag day, exported for the
 // consensus-params freeze guard because a divergent value forks the fleet.
 // The network-aware map and resolver below are authoritative for execution.
+// Testnet is armed at block time 1791061097 (2026-10-03 20:58:17 UTC); mainnet stays unarmed.
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
 module.exports.JSON_STRINGIFY_HOOK_ACTIVATION = JSON_STRINGIFY_HOOK_ACTIVATION;
 module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
