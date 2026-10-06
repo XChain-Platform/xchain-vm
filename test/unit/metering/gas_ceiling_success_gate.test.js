@@ -40,6 +40,11 @@ describe('gas-ceiling success gate', function () {
             }
         });
 
+        it('is frozen: regtest from genesis, mainnet and testnet unarmed until a release cut', function () {
+            assert.deepStrictEqual({ ...GAS_CEILING_SUCCESS_ACTIVATION }, { mainnet: null, testnet: null, regtest: 0 });
+            assert.ok(Object.isFrozen(GAS_CEILING_SUCCESS_ACTIVATION));
+        });
+
         it('honours a scheduled instant strictly at or after it', function () {
             const gate = 1800000000;
             const original = GAS_CEILING_SUCCESS_ACTIVATION.testnet;
