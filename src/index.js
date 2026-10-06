@@ -160,7 +160,7 @@ const HARNESS_SOURCE = `
     // so a from-genesis replay reproduces the historical gas at every height.
     var __meterUpgradeOn = (typeof __blockTime === 'number' &&
         typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
-        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME);
+        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME); var __iterMeterOn = globalThis.__ITER_SET_METER_ON === true;
 
     var __fill = Array.prototype.fill;
     if (typeof __fill === 'function') __lockMethod(Array.prototype, 'fill', function() {
@@ -1532,6 +1532,44 @@ const HARNESS_SOURCE = `
         return val;
     });
     // ----- end G4 -----
+
+    // ----- Native iteration, string and apply metering (gated) -----
+    if (__iterMeterOn) {
+        var __sizeOf = function(o) {
+            var s = o == null ? 0 : o.size;
+            return typeof s === 'number' ? s : 0;
+        };
+        ['isWellFormed', 'toWellFormed'].forEach(function(m) { __meterLen(String.prototype, m); });
+        ['union', 'intersection', 'difference', 'symmetricDifference',
+         'isSubsetOf', 'isSupersetOf', 'isDisjointFrom'].forEach(function(m) {
+            var orig = Set.prototype[m];
+            if (typeof orig !== 'function') return;
+            __lockMethod(Set.prototype, m, function(other) {
+                __allocGas(__sizeOf(this) + __sizeOf(other));
+                return orig.apply(this, arguments);
+            });
+        });
+        var __iterProto = Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]()));
+        var __iterToArray = __iterProto.toArray;
+        if (typeof __iterToArray === 'function') __lockMethod(__iterProto, 'toArray', function() {
+            var r = __iterToArray.apply(this, arguments);
+            if (r && typeof r.length === 'number') __allocGas(r.length);
+            return r;
+        });
+        var __iterDrop = __iterProto.drop;
+        if (typeof __iterDrop === 'function') __lockMethod(__iterProto, 'drop', function(count) {
+            var c = +count;
+            if (c > 0) __allocGas(c);
+            return __iterDrop.apply(this, arguments);
+        });
+        var __fnProto = Object.getPrototypeOf(function() {});
+        var __applyNative = __fnProto.call.bind(__fnProto.apply);
+        __lockMethod(__fnProto, 'apply', function(thisArg, args) {
+            if (args != null && typeof args.length === 'number' && args.length > __GROW_THRESHOLD) __gas(args.length);
+            return __applyNative(this, thisArg, args);
+        });
+    }
+    // ----- end native iteration metering -----
 })();
 `;
 
@@ -1745,6 +1783,24 @@ const REST_PATTERN_METER_GATE_BLOCK_TIME = 1798761600;
 function isRestPatternMeterActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= REST_PATTERN_METER_GATE_BLOCK_TIME;
+}
+
+// Activation for metering the native work the other size charges miss: iterator
+// helpers (toArray, drop), String isWellFormed/toWellFormed, the Set algebra family
+// and Function.prototype.apply with a long argument list, plus failing a run whose
+// gas-exhaustion fault was caught inside the isolate (the Object.* statics wrappers
+// swallow it). Every one moves gasUsed or a run's status, so it is gated. Mainnet and
+// testnet are unarmed (null) until a release cut schedules an instant; regtest runs
+// the rule from genesis. Unknown or missing networks resolve like mainnet.
+const ITER_SET_METER_ACTIVATION = Object.seal({
+    mainnet: null,
+    testnet: null,
+    regtest: 0,
+});
+function isIterSetMeterActive(network, blockTime) {
+    const gate = ITER_SET_METER_ACTIVATION[network];
+    if (!Number.isFinite(gate)) return false;
+    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
 }
 
 // Activation for the contract.slash `token` wire-delimiter guard. Every
@@ -2546,6 +2602,8 @@ class XChainVM {
             // (__resolveForStringify). Injected the same way and stripped by the same
             // harness cleanup pass, so contract code never sees it.
             context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
+            const __iterSetMeterOn = isIterSetMeterActive(opts.network, __blockTime);
+            context.global.setSync('__ITER_SET_METER_ON', __iterSetMeterOn);
 
             // Run harness script to assemble xchain object inside isolate.
             // Reuse cached V8 bytecode when available: the harness source is a
@@ -2687,6 +2745,11 @@ class XChainVM {
                 // Restore host stack-capture settings (see note above).
                 Error.stackTraceLimit = __hostStackLimit;
                 Error.prepareStackTrace = __hostPrepare;
+            }
+
+            if (__iterSetMeterOn && gasTracker.exhausted) {
+                return this.errorResult(gasTracker, emissionCollector,
+                    'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }
 
             // Collect results
