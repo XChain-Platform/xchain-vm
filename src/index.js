@@ -2626,7 +2626,7 @@ class XChainVM {
             const __specEvalOrder = isMeteringEvalOrderActive(opts.network, __moBlockTime);
             // Same block-time route resolves the call/new argument-spread metering gate
             // (isCallSpreadMeterActive); below it the spread is emitted verbatim (legacy).
-            const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime);
+            const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime) || __iterSetMeterOn;
             // ...and the destructuring-rest metering gate (isRestPatternMeterActive).
             // Below it a rest destructure is emitted verbatim (legacy flat __gas(1)), so
             // a pre-gate block replays byte-identically; at/after it the rest SOURCE is
