@@ -214,6 +214,58 @@ const PATTERN_NODE_TYPES = new Set([
     'ArrayPattern', 'ObjectPattern', 'Property', 'AssignmentPattern', 'RestElement'
 ]);
 
+// Classifies a RestElement from its ancestor stack (outermost first; the node itself
+// is not on it). Returns null when the rest is metered, else the construct kind.
+function bannedRestKind(stack) {
+    const parent = stack.length >= 1 ? stack[stack.length - 1] : null;
+    const gp     = stack.length >= 2 ? stack[stack.length - 2] : null;
+    // METERED: the rest sits at the TOP level of a pattern whose source is an
+    // addressable expression. Exactly the two shapes transformAllocators rewrites;
+    // keep the two predicates in lockstep or the ban and the meter disagree.
+    if (parent && (parent.type === 'ArrayPattern' || parent.type === 'ObjectPattern') && gp) {
+        if (gp.type === 'VariableDeclarator' && gp.id === parent && gp.init) return null;
+        if (gp.type === 'AssignmentExpression' && gp.operator === '=' && gp.left === parent) return null;
+    }
+    // Otherwise classify by the construct that OWNS the destructure.
+    let i = stack.length - 1;
+    while (i >= 0 && PATTERN_NODE_TYPES.has(stack[i].type)) i--;
+    const owner = i >= 0 ? stack[i] : null;
+    if (!owner) return 'nested rest';
+    if (owner.type === 'FunctionDeclaration' || owner.type === 'FunctionExpression'
+        || owner.type === 'ArrowFunctionExpression')
+        return 'rest parameter';
+    if (owner.type === 'CatchClause') return 'catch-clause rest';
+    if (owner.type === 'ForOfStatement' || owner.type === 'ForInStatement')
+        return 'for-loop-head rest';
+    // A declarator with NO init is a for-of/for-in head (`for (const [...c] of xs)`);
+    // the metered branch above already returned for every declarator that has one.
+    if (owner.type === 'VariableDeclarator' && !owner.init)
+        return 'for-loop-head rest';
+    return 'nested rest';
+}
+
+// Raw-key recursion over the AST, collecting every RestElement the meter cannot charge.
+function collectBannedRest(node, stack, hits) {
+    if (!node || typeof node.type !== 'string') return;
+    if (node.type === 'RestElement') {
+        const kind = bannedRestKind(stack);
+        if (kind) hits.push({ kind, line: node.loc ? node.loc.start.line : '?' });
+    }
+    stack.push(node);
+    const keys = Object.keys(node);
+    for (let k = 0; k < keys.length; k++) {
+        const key = keys[k];
+        if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue;
+        const child = node[key];
+        if (Array.isArray(child)) {
+            for (let j = 0; j < child.length; j++) collectBannedRest(child[j], stack, hits);
+        } else {
+            collectBannedRest(child, stack, hits);
+        }
+    }
+    stack.pop();
+}
+
 /**
  * Scan contract code for destructuring REST positions the allocator meter cannot reach.
  *
@@ -264,55 +316,7 @@ function findBannedRest(code) {
     // route through the Pattern dispatch and are visited, which is what makes the gap
     // look like it isn't there.) Walk the raw node keys instead - the same generic
     // recursion transformAllocators uses, which cannot miss a node type by construction.
-    const stack = [];
-    function classify(node) {
-        // `stack` holds this node's ancestors, outermost first; node is not on it.
-        const parent = stack.length >= 1 ? stack[stack.length - 1] : null;
-        const gp     = stack.length >= 2 ? stack[stack.length - 2] : null;
-        // METERED: the rest sits at the TOP level of a pattern whose source is an
-        // addressable expression. Exactly the two shapes transformAllocators rewrites;
-        // keep the two predicates in lockstep or the ban and the meter disagree.
-        if (parent && (parent.type === 'ArrayPattern' || parent.type === 'ObjectPattern') && gp) {
-            if (gp.type === 'VariableDeclarator' && gp.id === parent && gp.init) return;
-            if (gp.type === 'AssignmentExpression' && gp.operator === '=' && gp.left === parent) return;
-        }
-        // Otherwise classify by the construct that OWNS the destructure.
-        let i = stack.length - 1;
-        while (i >= 0 && PATTERN_NODE_TYPES.has(stack[i].type)) i--;
-        const owner = i >= 0 ? stack[i] : null;
-        let kind = 'nested rest';
-        if (owner) {
-            if (owner.type === 'FunctionDeclaration' || owner.type === 'FunctionExpression'
-                || owner.type === 'ArrowFunctionExpression')
-                kind = 'rest parameter';
-            else if (owner.type === 'CatchClause') kind = 'catch-clause rest';
-            else if (owner.type === 'ForOfStatement' || owner.type === 'ForInStatement')
-                kind = 'for-loop-head rest';
-            // A declarator with NO init is a for-of/for-in head (`for (const [...c] of xs)`);
-            // the metered branch above already returned for every declarator that has one.
-            else if (owner.type === 'VariableDeclarator' && !owner.init)
-                kind = 'for-loop-head rest';
-        }
-        hits.push({ kind, line: node.loc ? node.loc.start.line : '?' });
-    }
-    function visit(node) {
-        if (!node || typeof node.type !== 'string') return;
-        if (node.type === 'RestElement') classify(node);
-        stack.push(node);
-        const keys = Object.keys(node);
-        for (let k = 0; k < keys.length; k++) {
-            const key = keys[k];
-            if (key === 'type' || key === 'start' || key === 'end' || key === 'loc') continue;
-            const child = node[key];
-            if (Array.isArray(child)) {
-                for (let j = 0; j < child.length; j++) visit(child[j]);
-            } else {
-                visit(child);
-            }
-        }
-        stack.pop();
-    }
-    visit(ast);
+    collectBannedRest(ast, [], hits);
     return hits;
 }
 
