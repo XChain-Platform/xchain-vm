@@ -22,7 +22,7 @@
 const assert = require('assert');
 const cr = require('../../src/consensus-runtime.js');
 const vm = require('../../src/index.js');
-const lintCore = require('../../src/lint_core.js');
+const lintCore = require('../../src/lint-core.js');
 const metering = require('../../src/metering.js');
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
@@ -64,7 +64,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // CONSENSUS_RULES is the closed set of lint findings the on-chain deploy
         // validator (validateSyntax) acts on; adding/removing one changes which
         // contracts the chain accepts (a hashed deploy verdict). Freeze it sorted so
-        // a lint_core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
+        // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
         // Epoch 4 added 'banned-rest' (the REST_PATTERN_METER deploy half).
         const GOLDEN_CONSENSUS_RULES = [
             'banned-async', 'banned-generator', 'banned-literal', 'banned-math',

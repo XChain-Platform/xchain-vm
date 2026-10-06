@@ -106,7 +106,7 @@
 // @ts-nocheck
 
 const XChainVM = require('../index.js');
-const { MAX_CODE_SIZE } = require('../lint_core.js');
+const { MAX_CODE_SIZE } = require('../lint-core.js');
 const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../protocol/constants.js');
 const {
     GATE_BLOCK_TIMES,

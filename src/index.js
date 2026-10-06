@@ -160,7 +160,7 @@ const HARNESS_SOURCE = `
     // so a from-genesis replay reproduces the historical gas at every height.
     var __meterUpgradeOn = (typeof __blockTime === 'number' &&
         typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
-        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME);
+        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME); var __iterMeterOn = globalThis.__ITER_SET_METER_ON === true;
 
     var __fill = Array.prototype.fill;
     if (typeof __fill === 'function') __lockMethod(Array.prototype, 'fill', function() {
@@ -1532,6 +1532,44 @@ const HARNESS_SOURCE = `
         return val;
     });
     // ----- end G4 -----
+
+    // ----- Native iteration, string and apply metering (gated) -----
+    if (__iterMeterOn) {
+        var __sizeOf = function(o) {
+            var s = o == null ? 0 : o.size;
+            return typeof s === 'number' ? s : 0;
+        };
+        ['isWellFormed', 'toWellFormed'].forEach(function(m) { __meterLen(String.prototype, m); });
+        ['union', 'intersection', 'difference', 'symmetricDifference',
+         'isSubsetOf', 'isSupersetOf', 'isDisjointFrom'].forEach(function(m) {
+            var orig = Set.prototype[m];
+            if (typeof orig !== 'function') return;
+            __lockMethod(Set.prototype, m, function(other) {
+                __allocGas(__sizeOf(this) + __sizeOf(other));
+                return orig.apply(this, arguments);
+            });
+        });
+        var __iterProto = Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]()));
+        var __iterToArray = __iterProto.toArray;
+        if (typeof __iterToArray === 'function') __lockMethod(__iterProto, 'toArray', function() {
+            var r = __iterToArray.apply(this, arguments);
+            if (r && typeof r.length === 'number') __allocGas(r.length);
+            return r;
+        });
+        var __iterDrop = __iterProto.drop;
+        if (typeof __iterDrop === 'function') __lockMethod(__iterProto, 'drop', function(count) {
+            var c = +count;
+            if (c > 0) __allocGas(c);
+            return __iterDrop.apply(this, arguments);
+        });
+        var __fnProto = Object.getPrototypeOf(function() {});
+        var __applyNative = __fnProto.call.bind(__fnProto.apply);
+        __lockMethod(__fnProto, 'apply', function(thisArg, args) {
+            if (args != null && typeof args.length === 'number' && args.length > __GROW_THRESHOLD) __gas(args.length);
+            return __applyNative(this, thisArg, args);
+        });
+    }
+    // ----- end native iteration metering -----
 })();
 `;
 
@@ -1587,7 +1625,7 @@ function jsonStringifyHookGateTime(network) {
 // Coordinated activation (block time, unix seconds) for the async/Promise
 // contract-surface change (CONSENSUS_VERSION '2'): the sandbox strips the global
 // `Promise` (sandbox.js) and the deploy validator rejects async/await/Promise
-// (lint_core CONSENSUS_RULES 'banned-async'). Both are consensus-affecting: a
+// (lint-core CONSENSUS_RULES 'banned-async'). Both are consensus-affecting: a
 // node that strips Promise / rejects an async DEPLOY and a node that does not
 // produce a different gasUsed/status (→ contract_hash → fee debit, and a
 // different deploy verdict), so a mixed-version fleet forks on the first
@@ -1622,7 +1660,7 @@ function isAsyncSurfaceActive(network, blockTime) {
 // consensus package (flag-day Pkg 4): the hardened deploy-linter rule set
 // (exponentiation ban, reserved control bindings, SAFE_MATH complement,
 // dynamic import(), shorthand { Promise }, shadowed-local Promise relaxation
-// in lint_core.js), the CONTRACT_WRAPPER control-binding closure move, and the
+// in lint-core.js), the CONTRACT_WRAPPER control-binding closure move, and the
 // corroborated error-classifier tightening below. All are consensus-visible
 // (deploy verdicts / execution status / gasUsed), so they flip fleet-wide at
 // the ratified flag-day anchor, the same instant banned-async activates (zero
@@ -1745,6 +1783,24 @@ const REST_PATTERN_METER_GATE_BLOCK_TIME = 1798761600;
 function isRestPatternMeterActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= REST_PATTERN_METER_GATE_BLOCK_TIME;
+}
+
+// Activation for metering the native work the other size charges miss: iterator
+// helpers (toArray, drop), String isWellFormed/toWellFormed, the Set algebra family
+// and Function.prototype.apply with a long argument list, plus failing a run whose
+// gas-exhaustion fault was caught inside the isolate (the Object.* statics wrappers
+// swallow it). Every one moves gasUsed or a run's status, so it is gated. Mainnet and
+// testnet are unarmed (null) until a release cut schedules an instant; regtest runs
+// the rule from genesis. Unknown or missing networks resolve like mainnet.
+const ITER_SET_METER_ACTIVATION = Object.seal({
+    mainnet: null,
+    testnet: null,
+    regtest: 0,
+});
+function isIterSetMeterActive(network, blockTime) {
+    const gate = ITER_SET_METER_ACTIVATION[network];
+    if (!Number.isFinite(gate)) return false;
+    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
 }
 
 // Activation for the contract.slash `token` wire-delimiter guard. Every
@@ -2547,6 +2603,8 @@ class XChainVM {
             // (__resolveForStringify). Injected the same way and stripped by the same
             // harness cleanup pass, so contract code never sees it.
             context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
+            const __iterSetMeterOn = isIterSetMeterActive(opts.network, __blockTime);
+            context.global.setSync('__ITER_SET_METER_ON', __iterSetMeterOn);
 
             // Run harness script to assemble xchain object inside isolate.
             // Reuse cached V8 bytecode when available: the harness source is a
@@ -2569,7 +2627,7 @@ class XChainVM {
             const __specEvalOrder = isMeteringEvalOrderActive(opts.network, __moBlockTime);
             // Same block-time route resolves the call/new argument-spread metering gate
             // (isCallSpreadMeterActive); below it the spread is emitted verbatim (legacy).
-            const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime);
+            const __meterCallSpread = isCallSpreadMeterActive(opts.network, __moBlockTime) || __iterSetMeterOn;
             // ...and the destructuring-rest metering gate (isRestPatternMeterActive).
             // Below it a rest destructure is emitted verbatim (legacy flat __gas(1)), so
             // a pre-gate block replays byte-identically; at/after it the rest SOURCE is
@@ -2688,6 +2746,11 @@ class XChainVM {
                 // Restore host stack-capture settings (see note above).
                 Error.stackTraceLimit = __hostStackLimit;
                 Error.prepareStackTrace = __hostPrepare;
+            }
+
+            if (__iterSetMeterOn && gasTracker.exhausted) {
+                return this.errorResult(gasTracker, emissionCollector,
+                    'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }
 
             // Collect results
@@ -3002,7 +3065,7 @@ module.exports.HostFaultError = require('./errors.js').HostFaultError;
 // digest it: the sandbox strip set and the deploy validator's CONSENSUS_RULES.
 // Any change to either must bump CONSENSUS_VERSION + re-golden in lockstep.
 module.exports.STRIPPED_GLOBAL_NAMES = require('./sandbox.js').STRIPPED_GLOBAL_NAMES;
-module.exports.CONSENSUS_RULES = require('./lint_core.js').CONSENSUS_RULES;
+module.exports.CONSENSUS_RULES = require('./lint-core.js').CONSENSUS_RULES;
 // The sandbox neuters more than the global deletes: prototype-method strips
 // (regex + locale/ICU), the prototype .constructor neuters, and the SafeMath
 // member whitelist are each consensus-critical surface. Expose them frozen so the
@@ -3012,13 +3075,13 @@ module.exports.STRIPPED_PROTO_METHODS = require('./sandbox.js').STRIPPED_PROTO_M
 module.exports.NEUTERED_PROTO_CONSTRUCTORS = require('./sandbox.js').NEUTERED_PROTO_CONSTRUCTORS;
 module.exports.SAFE_MATH_MEMBERS = require('./sandbox.js').SAFE_MATH_MEMBERS;
 // Fail loudly if any frozen export goes missing (e.g. an internal rename in
-// sandbox.js / lint_core.js). Without this, the re-export silently becomes
+// sandbox.js / lint-core.js). Without this, the re-export silently becomes
 // undefined and the cross-repo freeze guards that digest it would skip rather
 // than redden, defeating the whole point of the surface freeze.
 if(!module.exports.STRIPPED_GLOBAL_NAMES)
     throw new Error('xchain-vm: sandbox.js no longer exports STRIPPED_GLOBAL_NAMES (frozen consensus surface)');
 if(!module.exports.CONSENSUS_RULES)
-    throw new Error('xchain-vm: lint_core.js no longer exports CONSENSUS_RULES (frozen consensus surface)');
+    throw new Error('xchain-vm: lint-core.js no longer exports CONSENSUS_RULES (frozen consensus surface)');
 if(!module.exports.STRIPPED_PROTO_METHODS)
     throw new Error('xchain-vm: sandbox.js no longer exports STRIPPED_PROTO_METHODS (frozen consensus surface)');
 if(!module.exports.NEUTERED_PROTO_CONSTRUCTORS)
