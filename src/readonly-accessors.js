@@ -40,13 +40,37 @@
 
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 
+// Readonly accessor own-key lookups: from the gate on, a snapshot key that names an
+// inherited member ('constructor', '__proto__') resolves as absent. Mainnet stays
+// unarmed (null) so history replays unchanged; unknown networks resolve like mainnet.
+const ACCESSOR_OWN_KEY_ACTIVATION = Object.freeze({
+    mainnet: null,
+    testnet: 0,
+    regtest: 0,
+});
+function isAccessorOwnKeyActive(network, blockTime) {
+    const gate = ACCESSOR_OWN_KEY_ACTIVATION[Object.prototype.hasOwnProperty.call(ACCESSOR_OWN_KEY_ACTIVATION, network) ? network : 'mainnet'];
+    if (!Number.isFinite(gate)) return false;
+    if (gate === 0) return true;
+    const t = Number(blockTime);
+    return Number.isFinite(t) && t >= gate;
+}
+
 // A value is a "legacy accessor object" (not a snapshot) if it already
 // exposes the method named `probe`. Snapshots are plain data and never do.
 function isAccessor(obj, probe) {
     return obj && typeof obj[probe] === 'function';
 }
 
-function buildOracleAccessor(snap) {
+// Own-key read used once the consensus gate is armed: a pair, round or id such as
+// 'constructor' or '__proto__' names an inherited member, never a snapshot entry.
+// Below the gate the plain index read is kept so replay stays byte-identical.
+function lookup(map, key, ownKeys) {
+    if (!ownKeys) return map[key];
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+}
+
+function buildOracleAccessor(snap, ownKeys = false) {
     if (snap == null) return null;
     if (isAccessor(snap, 'getPrice')) return snap; // legacy passthrough
     const prices = snap.prices || {};
@@ -63,10 +87,13 @@ function buildOracleAccessor(snap) {
     // that predates the field) means nothing is hidden.
     const roundFloor = Number(snap.roundFloor) > 0 ? Number(snap.roundFloor) : 0;
     return {
-        getPrice: (coinPair) => (prices[coinPair] != null ? prices[coinPair] : null),
+        getPrice: (coinPair) => {
+            const p = lookup(prices, coinPair, ownKeys);
+            return p != null ? p : null;
+        },
         getPriceAtRound: (coinPair, roundNumber) => {
-            const byRound = rounds[coinPair];
-            const r = byRound ? byRound[String(roundNumber)] : undefined;
+            const byRound = lookup(rounds, coinPair, ownKeys);
+            const r = byRound ? lookup(byRound, String(roundNumber), ownKeys) : undefined;
             if (r != null) return r;
             // Below the floor the honest answer is "cannot know", including for a
             // pair the snapshot carries nothing for: the pair's rows for that round
@@ -82,7 +109,7 @@ function buildOracleAccessor(snap) {
     };
 }
 
-function buildContractStakeAccessor(snap) {
+function buildContractStakeAccessor(snap, ownKeys = false) {
     if (snap == null) return null;
     if (isAccessor(snap, 'getStake')) return snap; // legacy passthrough
     const stakeByPubkeyTick = snap.stakeByPubkeyTick || {};
@@ -91,17 +118,17 @@ function buildContractStakeAccessor(snap) {
     return {
         getStake: (pubkey, token) => {
             const key = String(pubkey || '').toLowerCase() + '|' + String(token || '');
-            return stakeByPubkeyTick[key] || '0';
+            return lookup(stakeByPubkeyTick, key, ownKeys) || '0';
         },
-        getTotalStaked: (token) => totalByTick[String(token || '')] || '0',
+        getTotalStaked: (token) => lookup(totalByTick, String(token || ''), ownKeys) || '0',
         getStakers: (token) => {
-            const arr = stakersByTick[String(token || '')];
+            const arr = lookup(stakersByTick, String(token || ''), ownKeys);
             return Array.isArray(arr) ? arr : [];
         }
     };
 }
 
-function buildCrossChainAccessor(snap) {
+function buildCrossChainAccessor(snap, ownKeys = false) {
     if (snap == null) return null;
     if (isAccessor(snap, 'getAttestation')) return snap; // legacy passthrough
     const attestations = snap.attestations || {};
@@ -110,34 +137,36 @@ function buildCrossChainAccessor(snap) {
     return {
         getAttestation: (chain, actionIndex) => {
             const k = String(chain) + ':' + String(actionIndex);
-            return attestations[k] != null ? attestations[k] : null;
+            const v = lookup(attestations, k, ownKeys);
+            return v != null ? v : null;
         },
         isSettled: (chain, actionIndex) => {
             const k = String(chain) + ':' + String(actionIndex);
-            return settled[k] === true;
+            return lookup(settled, k, ownKeys) === true;
         },
         // Terminal outcome of a cross-chain call this chain originated:
         // { status, payload } or null while in flight (keys are call_ids).
         getCallResult: (callId) => {
-            const r = calls[String(callId).toLowerCase()];
+            const r = lookup(calls, String(callId).toLowerCase(), ownKeys);
             return r != null ? { status: String(r.status), payload: String(r.payload) } : null;
         }
     };
 }
 
-function buildAttestationAccessor(snap) {
+function buildAttestationAccessor(snap, ownKeys = false) {
     if (snap == null) return null;
     if (isAccessor(snap, 'getResponse')) return snap; // legacy passthrough
     const responses = snap.responses || {};
     return {
         getResponse: (requestId) => {
             if (typeof requestId !== 'string') return null;
-            return responses[requestId] != null ? responses[requestId] : null;
+            const v = lookup(responses, requestId, ownKeys);
+            return v != null ? v : null;
         }
     };
 }
 
-function buildPollAccessor(snap) {
+function buildPollAccessor(snap, ownKeys = false) {
     if (snap == null) return null;
     if (isAccessor(snap, 'getPollResult')) return snap; // legacy passthrough
     const polls = snap.polls || {};
@@ -150,7 +179,7 @@ function buildPollAccessor(snap) {
         // Return the host entry verbatim: never project or whitelist its fields
         // (dropping a flag-gated field makes an electorate-pinned contract revert).
         getPollResult: (pollIndex) => {
-            const p = polls[String(pollIndex)];
+            const p = lookup(polls, String(pollIndex), ownKeys);
             return p != null ? p : null;
         }
     };
@@ -160,15 +189,16 @@ function buildPollAccessor(snap) {
  * Resolve all four read-only-data fields from execute() opts into synchronous
  * accessor objects, accepting either plain snapshots or legacy accessor objects.
  * @param {object} opts - execute() options
+ * @param {boolean} [ownKeys] - resolve snapshot keys as own properties only (consensus-gated)
  * @returns {{oracleData, crossChainData, attestationData, contractStakeData}}
  */
-function resolveAccessors(opts) {
+function resolveAccessors(opts, ownKeys = false) {
     return {
-        oracleData:        buildOracleAccessor(opts.oracleData),
-        crossChainData:    buildCrossChainAccessor(opts.crossChainData),
-        attestationData:   buildAttestationAccessor(opts.attestationData),
-        contractStakeData: buildContractStakeAccessor(opts.contractStakeData),
-        pollData:          buildPollAccessor(opts.pollData)
+        oracleData:        buildOracleAccessor(opts.oracleData, ownKeys),
+        crossChainData:    buildCrossChainAccessor(opts.crossChainData, ownKeys),
+        attestationData:   buildAttestationAccessor(opts.attestationData, ownKeys),
+        contractStakeData: buildContractStakeAccessor(opts.contractStakeData, ownKeys),
+        pollData:          buildPollAccessor(opts.pollData, ownKeys)
     };
 }
 
@@ -178,5 +208,7 @@ module.exports = {
     buildCrossChainAccessor,
     buildAttestationAccessor,
     buildPollAccessor,
-    resolveAccessors
+    resolveAccessors,
+    ACCESSOR_OWN_KEY_ACTIVATION,
+    isAccessorOwnKeyActive
 };
