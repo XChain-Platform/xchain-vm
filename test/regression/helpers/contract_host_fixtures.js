@@ -67,6 +67,22 @@ function makeContractStakeData() {
     };
 }
 
+// Stake accessor whose reads return mathjs BigNumber values, the form the
+// indexer's snapshot accessors hand back. A BigNumber serialises to an object
+// across the isolate bridge, so this exercises the wire shape of every read.
+function makeBigNumberStakeData() {
+    const { bignumber } = require('mathjs');
+    const amounts = { [PK_A]: '1500.00000000', [PK_B]: '0.000000000000000001' };
+    return {
+        getStake: (pubkey, token) => {
+            const hit = token === 'TOKENX' ? amounts[String(pubkey || '').toLowerCase()] : undefined;
+            return bignumber(hit === undefined ? '0' : hit);
+        },
+        getTotalStaked: () => bignumber('1500.000000000000000001'),
+        getStakers: () => []
+    };
+}
+
 // Deterministic attestation-response accessor. Returns a fixed, fully-serialised
 // response for one known request_id and null otherwise. The shape is
 // { status, payload, providerId, blockIndex, validatorCount } matching what the host stores.
@@ -231,4 +247,6 @@ const CONTRACT_HOST_FIXTURES = [
     }
 ];
 
-module.exports = { CONTRACT_HOST_FIXTURES, makeContractStakeData, makeAttestationData };
+module.exports = {
+    CONTRACT_HOST_FIXTURES, makeContractStakeData, makeBigNumberStakeData, makeAttestationData, PK_A, PK_B
+};
