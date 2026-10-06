@@ -38,7 +38,7 @@ const { buildGateway }  = require('./gateway.js');
 const { normalizeRootDiscriminator } = require('./gateway-emit.js');
 const { stripGlobals }  = require('./sandbox.js');
 const { ContractRevertError, GasExhaustedError, HostFaultError } = require('./errors.js');
-const { resolveAccessors } = require('./readonly-accessors.js');
+const { resolveAccessors, isAccessorOwnKeyActive } = require('./readonly-accessors.js');
 // Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
 const { CONSENSUS_MAX_WALL_MS, resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
@@ -2423,7 +2423,8 @@ class XChainVM {
             // Resolve read-only data into synchronous accessor objects. Accepts
             // either plain serializable snapshots (the canonical form, required by
             // subprocess mode) or legacy closure accessors (in-process back-compat).
-            const accessors = resolveAccessors(opts);
+            const accessors = resolveAccessors(opts, isAccessorOwnKeyActive(
+                opts.network, opts.blockContext && opts.blockContext.timestamp));
 
             // Build gateway on host side
             // F-MO gate: math output metering (charge for an oversized pow()/format
