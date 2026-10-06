@@ -38,9 +38,11 @@
  *   - failure atomicity: on a reverted / out-of-gas / errored call the VM
  *     returns empty stateChanges + emittedActions, so nothing is committed.
  *   - metering activation: the default block time sits at the VM's newest
- *     block-time flag-day, so the gas-metering legs every live chain runs today
- *     are ON and gasUsed is a live-rule-set number. Pin an earlier
- *     block.timestamp to simulate the pre-activation rules (it warns once).
+ *     ELAPSED block-time flag-day, the configured network's own per-network time
+ *     gates included (testnet's armed JSON.stringify hook and meta-required
+ *     instants), so the rules every live chain runs today are ON and gasUsed is a
+ *     live-rule-set number. Pin an earlier block.timestamp to simulate the
+ *     pre-activation rules (it warns once).
  *   - height-gate activation: the default block HEIGHT sits at the newest armed
  *     per-coin activation for the configured (coin, network), so a mainnet
  *     simulation runs the Package-3 sandbox and the other height-keyed gates the
@@ -111,12 +113,13 @@ const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../protocol/constants.js
 const {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
-    isArmedGateTime,
     GUARD_GAS_CEILING,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 } = require('./simulator/constants.js');
-const { liveBlockTime, defaultBlockHeight } = require('./simulator/block_time_gates.js');
+const {
+    liveBlockTime, scheduledBlockTime, gatesAheadOf, defaultBlockHeight
+} = require('./simulator/block_time_gates.js');
 const worldStateSetters = require('./simulator/world_state_setters.js');
 const gateWarnings = require('./simulator/gate_warnings.js');
 const execution = require('./simulator/execution.js');
@@ -143,7 +146,8 @@ const SCHEDULED_BLOCK_TIME = GATE_BLOCK_TIMES.length
 
 // Back-compatible name for the seed a default simulator takes, kept exported (and
 // re-exported from toolkit/index.js) for callers that read it. It is the LIVE
-// anchor; SCHEDULED_BLOCK_TIME above is the preview anchor.
+// anchor; SCHEDULED_BLOCK_TIME above is the preview anchor. Both are the
+// network-agnostic values; an instance anchors on its own network's (see below).
 const DEFAULT_BLOCK_TIME = liveBlockTime();
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -167,9 +171,10 @@ function initializeBlockContext(opts) {
     // Resolved per construction, never once at module load, so a process that
     // outlives a flag day picks the new rules up on its next simulator. Held on
     // the instance because warnIfPreGate measures against THIS simulator's live
-    // anchor rather than a module-wide one.
-    this._liveBlockTime = liveBlockTime();
-    const time0 = (this.rules === 'scheduled') ? SCHEDULED_BLOCK_TIME : this._liveBlockTime;
+    // anchor, and both anchors fold in this network's own per-network time gates.
+    this._liveBlockTime = liveBlockTime(undefined, this.network);
+    const scheduled = scheduledBlockTime(this.network);
+    const time0 = (this.rules === 'scheduled') ? scheduled : this._liveBlockTime;
 
     // Height, like the timestamp, is DERIVED from the activations it has to
     // clear; the hash follows the height so it keeps advanceBlock's own naming.
@@ -187,15 +192,12 @@ function initializeBlockContext(opts) {
     // ahead of the live chain by constant name, epoch value and UTC date. Suppressed
     // when an explicit block.timestamp won, because then the caller chose the instant
     // and the mode did not seed anything.
-    if (this.rules === 'scheduled' && Number(this.block.timestamp) === SCHEDULED_BLOCK_TIME) {
-        const early = Object.keys(XChainVM)
-            .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && isArmedGateTime(XChainVM[k]))
-            .filter((k) => XChainVM[k] > this._liveBlockTime)
-            .map((k) => k + ' (' + XChainVM[k] + ', ' + new Date(XChainVM[k] * 1000).toISOString() + ')');
+    if (this.rules === 'scheduled' && Number(this.block.timestamp) === scheduled) {
+        const early = gatesAheadOf(this._liveBlockTime, this.network);
         if (early.length) {
             console.warn(
                 '[xchain-vm simulator] rules: scheduled simulates block time ' +
-                SCHEDULED_BLOCK_TIME + ', which activates ' + early.length + ' gate(s) ahead ' +
+                scheduled + ', which activates ' + early.length + ' gate(s) ahead ' +
                 'of the live chain: ' + early.join(', ') + '. Gas and deploy verdicts from ' +
                 'this simulator are a PREVIEW, not what a chain charges today.'
             );
@@ -220,7 +222,9 @@ class ContractSimulator {
      *        hardening, the state-key gates, the Package-3 sandbox bundle),
      *        which regtest/testnet activate from genesis. Gas-METERING
      *        activation carries no network term at all: it follows
-     *        opts.block.timestamp (see DEFAULT_BLOCK_TIME). On mainnet the
+     *        opts.block.timestamp (see DEFAULT_BLOCK_TIME). The DEFAULT
+     *        timestamp does depend on it: it also clears this network's own
+     *        elapsed per-network time gates (TIME_NETWORK_GATES). On mainnet the
      *        Package-3 sandbox, the execute-time re-lint and the lint
      *        global-alias refinement are per-coin block-HEIGHT gates, so there
      *        they follow opts.block.height and opts.coin together.

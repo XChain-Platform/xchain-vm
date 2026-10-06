@@ -113,6 +113,19 @@ const CONTRACT_META_REQUIRED_TIMES = Object.freeze({
     regtest: 0
 });
 
+// Block-TIME gates keyed per NETWORK rather than by one scalar, so GATE_BLOCK_TIMES
+// (scalar-only by design) never sees them. Each entry reads its instant off the
+// source that decides it, never a retyped value; the live anchor folds in the
+// configured network's elapsed entries. test/toolkit/simulator_block_time.test.js
+// holds this table complete against the VM's exported network-keyed time maps.
+const TIME_NETWORK_GATES = Object.freeze([
+    { label: 'JSON.stringify value hooks', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',
+        resolve: (network) => XChainVM.jsonStringifyHookGateTime(network) },
+    { label: 'CONTRACT_META_REQUIRED', source: 'CONTRACT_META_REQUIRED_TIMES',
+        resolve: (network) => CONTRACT_META_REQUIRED_TIMES[
+            Object.prototype.hasOwnProperty.call(CONTRACT_META_REQUIRED_TIMES, network) ? network : 'mainnet'] }
+]);
+
 module.exports = {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
@@ -120,6 +133,7 @@ module.exports = {
     isArmedGateTime,
     HEIGHT_GATES,
     CONTRACT_META_REQUIRED_TIMES,
+    TIME_NETWORK_GATES,
     GUARD_GAS_CEILING,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
