@@ -35,7 +35,7 @@
  ********************************************************************/
 // @ts-nocheck
 
-const { lintSource, findFloatWarnings, CONSENSUS_RULES } = require('../lint_core.js');
+const { lintSource, findFloatWarnings, CONSENSUS_RULES } = require('../lint-core.js');
 const { checkContractMeta, getExportedMeta, isValidMetaText } = require('./gate/meta_validation.js');
 
 // Heuristic gas-budget estimate. Ported from xchain-sdk ContractUtils
@@ -112,7 +112,7 @@ function runGate(code) {
     const advisories = allErrors.filter((e) => !DEPLOY_BLOCKING.has(e.rule));
 
     const warnings = Array.isArray(lint.warnings) ? lint.warnings.slice() : [];
-    // Defensive: if a future lint_core stops folding float warnings in, keep them.
+    // Defensive: if a future lint-core stops folding float warnings in, keep them.
     if (warnings.length === 0) {
         try {
             for (const w of (findFloatWarnings(code) || [])) warnings.push(w);

@@ -14,7 +14,7 @@
 'use strict';
 
 const assert = require('assert');
-const { lintSource } = require('../../../src/lint_core.js');
+const { lintSource } = require('../../../src/lint-core.js');
 const corpus = require('../../fixtures/lint/optional_chain_bypass_corpus.json');
 
 describe('optional-chain pre-activation lint verdicts', function () {
