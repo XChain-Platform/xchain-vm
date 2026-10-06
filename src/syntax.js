@@ -45,7 +45,7 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  * @param {boolean} [opts.enforceBannedAsync=true] - whether the 'banned-async'
  *        rule (async/await/Promise) is deploy-blocking. CONSENSUS-GATED: the
  *        indexer passes the resolved VM_BANNED_ASYNC flag-day activation
- *        (deploy/index.js) so that BELOW the flag day an async/Promise DEPLOY resolves
+ *        (actions/deploy/lint.js) so that BELOW the flag day an async/Promise DEPLOY resolves
  *        exactly as it did pre-activation (accepted), and a from-genesis replay
  *        reproduces the historical verdict. Defaults to true so author-facing
  *        callers (the SDK/CLI linter, unit tests) always see the rule.
@@ -54,7 +54,7 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  *        bindings, SAFE_MATH complement, dynamic import(), shorthand
  *        { Promise }, shadowed-local Promise relaxation) applies. CONSENSUS-
  *        GATED identically to enforceBannedAsync: the indexer passes the
- *        resolved VM_LINT_HARDENING activation (deploy/index.js) so a from-genesis
+ *        resolved VM_LINT_HARDENING activation (actions/deploy/lint.js) so a from-genesis
  *        replay reproduces historical verdicts. Defaults to true.
  * @param {boolean} [opts.enforceLintGlobalAlias=true] - whether the
  *        LINT_GLOBAL_ALIAS refinement applies: sloppy-mode `this` and the
@@ -64,7 +64,7 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  *        its OWN per-coin block-HEIGHT epoch rather than VM_LINT_HARDENING's,
  *        because that gate is already open on every network and riding it would
  *        retroactively reject contracts the chain already accepted. The indexer
- *        passes the resolved activation (deploy/index.js). Defaults to true.
+ *        passes the resolved activation (actions/deploy/lint.js). Defaults to true.
  * @param {boolean} [opts.enforceLintOptionalChain=true] - whether the xchain-vm
  *        LINT_OPTIONAL_CHAIN_ACTIVATION refinement applies. The indexer passes
  *        vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION.
@@ -73,7 +73,7 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  *        'banned-generator' rule (function*, generator methods, yield) is
  *        deploy-blocking. CONSENSUS-GATED identically to enforceBannedAsync, but
  *        on the Pkg 3 per-coin block-HEIGHT flag-day (not a block-time gate): the
- *        indexer passes the resolved activation (deploy/index.js) so BELOW the height a
+ *        indexer passes the resolved activation (actions/deploy/lint.js) so BELOW the height a
  *        generator DEPLOY resolves exactly as it did pre-activation (accepted)
  *        and a from-genesis replay reproduces the historical verdict. Defaults to
  *        true so author-facing callers (SDK/CLI linter, unit tests) always see it.
@@ -83,7 +83,7 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  *        for-of/for-in head) is deploy-blocking. CONSENSUS-GATED on the
  *        REST_PATTERN_METER block-time flag-day, the same gate that activates the
  *        metering rewrite for the rest forms that DO have an addressable source; the
- *        indexer passes the resolved activation (deploy/index.js) so BELOW the flag-day such
+ *        indexer passes the resolved activation (actions/deploy/lint.js) so BELOW the flag-day such
  *        a deploy resolves exactly as it did pre-activation (accepted) and a
  *        from-genesis replay reproduces the historical verdict. Defaults to true so
  *        author-facing callers (SDK/CLI linter, unit tests) always see it.
@@ -115,10 +115,10 @@ function validateSyntax(code, opts) {
     // it is a contract verdict. A failure to SPAWN the isolate (host memory
     // pressure, thread-creation failure, a native binding that loaded but
     // cannot create isolates) is a property of THIS machine. Reporting the host
-    // fault as 'syntax error: ...' let deploy/index.js commit
+    // fault as 'syntax error: ...' let actions/deploy/lint.js commit
     // 'invalid: CODE_ENCODING' for a contract every healthy peer accepts: a
     // validator-local, host-condition-induced ledger divergence, the same class
-    // the deploy/index.js EXECUTOR_UNAVAILABLE throw exists to close for a VM that
+    // the actions/deploy/lint.js EXECUTOR_UNAVAILABLE throw exists to close for a VM that
     // failed to load at all. HostFaultError carries that code, which
     // faultGuard.rethrowIfInfraFault treats as an infra halt, so the block
     // rolls back and retries and NO verdict is written.

@@ -145,7 +145,7 @@ module.exports = {
      * @param {object} [opts]
      * @param {boolean} [opts.enforceBannedAsync=true] - block async/await/Promise
      *        (CONSENSUS_RULES 'banned-async'). CONSENSUS-GATED on the indexer:
-     *        deploy/index.js passes the resolved VM_BANNED_ASYNC activation so a
+     *        actions/deploy/lint.js passes the resolved VM_BANNED_ASYNC activation so a
      *        from-genesis replay reproduces the historical accept-below verdict.
      *        Defaults to true for author-facing callers (SDK linter, unit tests).
      * @returns {{ valid: boolean, error?: string }}
