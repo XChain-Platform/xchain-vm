@@ -2602,7 +2602,9 @@ class XChainVM {
             context.global.setSync('__BINARY_ALLOC_GATE_BLOCK_TIME', BINARY_ALLOC_GATE_BLOCK_TIME);
             // Second, later flag day: the JSON.stringify value-hook resolution
             // (__resolveForStringify). Injected the same way and stripped by the same
-            // harness cleanup pass, so contract code never sees it.
+            // harness cleanup pass, so contract code never sees it. The resolver yields
+            // 0 on regtest, 1791061097 (2026-10-03 20:58:17 UTC) on testnet, and the
+            // unarmed mainnet literal everywhere else.
             context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
             const __iterSetMeterOn = isIterSetMeterActive(opts.network, __blockTime);
             context.global.setSync('__ITER_SET_METER_ON', __iterSetMeterOn);
