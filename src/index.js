@@ -1788,9 +1788,8 @@ function isRestPatternMeterActive(network, blockTime) {
 
 // Activation for metering the native work the other size charges miss: iterator
 // helpers (toArray, drop), String isWellFormed/toWellFormed, the Set algebra family
-// and Function.prototype.apply with a long argument list, plus failing a run whose
-// gas-exhaustion fault was caught inside the isolate (the Object.* statics wrappers
-// swallow it). Every one moves gasUsed or a run's status, so it is gated. Mainnet and
+// and Function.prototype.apply with a long argument list. Every one moves gasUsed,
+// so it is gated. Mainnet and
 // testnet are unarmed (null) until a release cut schedules an instant; regtest runs
 // the rule from genesis. Unknown or missing networks resolve like mainnet.
 const ITER_SET_METER_ACTIVATION = Object.seal({
@@ -1803,6 +1802,12 @@ function isIterSetMeterActive(network, blockTime) {
     if (!Number.isFinite(gate)) return false;
     return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
 }
+
+// Activation for failing a run whose gas-exhaustion fault was caught inside the
+// isolate (the Object.* statics wrappers swallow it) and so reached the host as a
+// success. Post-gate such a run is out_of_gas at the ceiling; pre-gate it replays as
+// the success it settled as. Resolver and map live in gas.js beside the tracker flag.
+const { isGasCeilingSuccessActive, GAS_CEILING_SUCCESS_ACTIVATION } = GasTracker;
 
 // Activation for the contract.slash `token` wire-delimiter guard. Every
 // other emit validator rejects a '|' in a field the indexer may pipe-join;
@@ -2751,7 +2756,7 @@ class XChainVM {
                 Error.prepareStackTrace = __hostPrepare;
             }
 
-            if (__iterSetMeterOn && gasTracker.exhausted) {
+            if (gasTracker.exhausted && isGasCeilingSuccessActive(opts.network, __blockTime)) {
                 return this.errorResult(gasTracker, emissionCollector,
                     'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }
