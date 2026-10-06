@@ -2980,10 +2980,6 @@ module.exports.isLintOptionalChainActive = isLintOptionalChainActive;
 // metering fleet-wide. Exposed so the consensus-params freeze guard can pin it,
 // the value is consensus-critical (a divergent flag day forks the fleet).
 module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
-// Activation map and resolver for failing a run whose gas-exhaustion fault was swallowed
-// inside the isolate; exported for the consensus-params freeze guard.
-module.exports.GAS_CEILING_SUCCESS_ACTIVATION = GAS_CEILING_SUCCESS_ACTIVATION;
-module.exports.isGasCeilingSuccessActive = isGasCeilingSuccessActive;
 // JSON.stringify value-hook resolution flag day, exported for the
 // consensus-params freeze guard because a divergent value forks the fleet.
 // The network-aware map and resolver below are authoritative for execution.
