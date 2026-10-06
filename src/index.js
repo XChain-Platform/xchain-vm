@@ -488,7 +488,8 @@ const HARNESS_SOURCE = `
     // flag day above has already passed: blocks executed under it must replay
     // byte-for-byte, so the hook resolution cannot be folded into it. A gate value of
     // 0 means active since genesis; the per-network resolver injected by the host keeps
-    // a pre-launch network's activation from changing mainnet replay behaviour.
+    // a pre-launch network's activation from changing mainnet replay behaviour. Testnet
+    // is armed at block time 1791061097 (2026-10-03 20:58:17 UTC); mainnet is unarmed.
     var __jsonHookGuardOn = (__nrGuardOn &&
         typeof __blockTime === 'number' &&
         typeof __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME === 'number' &&
@@ -2981,6 +2982,7 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // JSON.stringify value-hook resolution flag day, exported for the
 // consensus-params freeze guard because a divergent value forks the fleet.
 // The network-aware map and resolver below are authoritative for execution.
+// Testnet is armed at block time 1791061097 (2026-10-03 20:58:17 UTC); mainnet stays unarmed.
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
 module.exports.JSON_STRINGIFY_HOOK_ACTIVATION = JSON_STRINGIFY_HOOK_ACTIVATION;
 module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
