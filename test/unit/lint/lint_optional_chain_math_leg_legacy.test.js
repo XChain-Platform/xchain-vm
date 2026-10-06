@@ -14,7 +14,7 @@
 'use strict';
 
 const assert = require('assert');
-const { lintSource } = require('../../../src/lint_core.js');
+const { lintSource } = require('../../../src/lint-core.js');
 const { validateSyntax } = require('../../../src/syntax.js');
 const corpus = require('../../fixtures/lint/optional_chain_math_leg_legacy_corpus.json');
 

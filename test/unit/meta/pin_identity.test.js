@@ -21,9 +21,9 @@ function realPin() {
 describe('bin/pin_identity grade', () => {
     it('pins exactly the three vendored lint files', () => {
         assert.deepStrictEqual(PINNED_FILES, [
-            'src/lint_core.js',
+            'src/lint-core.js',
             'src/metering.js',
-            'src/stripped_globals.js',
+            'src/stripped-globals.js',
         ]);
     });
 
@@ -47,10 +47,10 @@ describe('bin/pin_identity grade', () => {
 describe('bin/pin_identity grade entry set', () => {
     it('reports a dropped entry as missing from the pin', () => {
         const pin = realPin();
-        delete pin.files['src/stripped_globals.js'];
+        delete pin.files['src/stripped-globals.js'];
         const diffs = grade(pin);
         assert.strictEqual(diffs.length, 1);
-        assert.ok(diffs[0].includes('src/stripped_globals.js'));
+        assert.ok(diffs[0].includes('src/stripped-globals.js'));
         assert.ok(diffs[0].includes('missing from pin (dropped entry)'));
     });
 
@@ -92,8 +92,8 @@ describe('bin/pin_identity notGradedFields', () => {
     it('lists prose and sdk fields but never canonical', () => {
         const out = notGradedFields({
             what: 'x',
-            files: { 'src/lint_core.js': { canonical: 'abc', vendoredInSdk: true } },
+            files: { 'src/lint-core.js': { canonical: 'abc', vendoredInSdk: true } },
         });
-        assert.deepStrictEqual(out, ['what', 'files.src/lint_core.js.vendoredInSdk']);
+        assert.deepStrictEqual(out, ['what', 'files.src/lint-core.js.vendoredInSdk']);
     });
 });
