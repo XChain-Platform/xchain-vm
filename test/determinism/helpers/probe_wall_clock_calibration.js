@@ -18,8 +18,16 @@
  * gas-ceiling batch weights on a measured ~750 ms worst-case burn, i.e. about
  * 40x headroom. This probe re-derives that figure instead of trusting the
  * comment: it refuses to call a run a calibration off the PINNED runtime, runs
- * past every ARMED flag-day so the activated metering is what gets measured,
- * and reports the headroom ratio against CONSENSUS_MAX_WALL_MS.
+ * as a MAINNET node past every ARMED flag-day so the activated metering is what
+ * gets measured, and reports the headroom ratio against CONSENSUS_MAX_WALL_MS.
+ *
+ * "Every armed flag-day" means both kinds: the block-time gates (the latest
+ * armed *_GATE_BLOCK_TIME export) and the per-coin block-HEIGHT gates listed in
+ * HEIGHT_GATES for the probe contract's coin (Pkg 3 sandbox, execute-time lint,
+ * lint global-alias, lint optional-chain). The height gates only resolve on a
+ * named network, so the probe passes NETWORK explicitly, and it refuses to run
+ * when an armed gate is not active at the probe block. Unarmed gates stay off,
+ * as they do on a real mainnet node.
  *
  * Two vector groups:
  *   - metered: shapes the schedule is meant to price. The worst of these is the
@@ -34,7 +42,8 @@
  *   node test/determinism/helpers/probe_wall_clock_calibration.js [--runs N] [--allow-unpinned]
  *
  * Exit: 0 clean, 2 on a metered headroom breach or advisory (< 10x), 1 on a
- * runtime mismatch without --allow-unpinned.
+ * runtime mismatch without --allow-unpinned or on an armed gate that is not
+ * active at the probe block.
  ********************************************************************/
 // @ts-nocheck
 const os = require('os');
@@ -49,6 +58,18 @@ const ADVISORY_RATIO = 10;
 const K = 100000;
 // Gate constants at or above this are unarmed sentinels, not scheduled flag-days.
 const UNARMED_SENTINEL = 9999999999;
+// Probe as a mainnet node (the height gates key on '<COIN>:mainnet', not on a missing network).
+const NETWORK = 'mainnet';
+const CONTRACT = 'C:BTC:1';
+// Floor for the probe height; raised to any armed height gate that sits above it.
+const MIN_HEIGHT = 10000000;
+// Per-coin height gates, read from the exports (a null entry is unarmed, an absent one is refused).
+const HEIGHT_GATES = [
+    { name: 'pkg3-sandbox', table: XChainVM.PKG3_SANDBOX_ACTIVATION, active: XChainVM.isPkg3SandboxActive },
+    { name: 'exec-lint', table: XChainVM.EXEC_LINT_ACTIVATION, active: XChainVM.isExecLintActive },
+    { name: 'lint-global-alias', table: XChainVM.LINT_GLOBAL_ALIAS_ACTIVATION, active: XChainVM.isLintGlobalAliasActive },
+    { name: 'lint-optional-chain', table: XChainVM.LINT_OPTIONAL_CHAIN_ACTIVATION, active: XChainVM.isLintOptionalChainActive },
+];
 
 const argv = process.argv.slice(2);
 const RUNS = Math.max(1, parseInt(argv[argv.indexOf('--runs') + 1], 10) || 3);
@@ -76,13 +97,38 @@ const VECTORS = [
     { group: 'unmetered-suspect', id: 'Set union loop', body: `var x=new Set(),y=new Set();for(var j=0;j<${K};j++){x.add(j);y.add(j+${K});}var t=0;for(;;){t+=x.union(y).size;}` },
 ];
 
-// Build the post-gate block: the latest ARMED flag-day, read from the exports.
-function postGateBlock() {
+// Read one height gate's armed threshold for the probe coin (null when unarmed).
+function armedHeight(gate, coin) {
+    // Refuse a renamed export, which would otherwise read as an unarmed gate.
+    if (!gate.table || typeof gate.active !== 'function') throw new Error(`height gate ${gate.name} is not exported`);
+    // Refuse a key the table lacks, so a wrong network or coin cannot pass as unarmed (null is unarmed).
+    const key = `${coin}:${NETWORK}`;
+    if (!Object.prototype.hasOwnProperty.call(gate.table, key)) throw new Error(`height gate ${gate.name} has no entry for ${key}`);
+    const h = gate.table[key];
+    return Number.isFinite(h) ? h : null;
+}
+
+// Build the post-gate block: the latest ARMED flag-day time and every armed height, from the exports.
+function postGateBlock(coin) {
     const armed = Object.keys(XChainVM)
         .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && typeof XChainVM[k] === 'number')
         .map((k) => XChainVM[k])
         .filter((t) => t < UNARMED_SENTINEL);
-    return { height: 10000000, timestamp: Math.max(...armed), hash: 'calibration' };
+    const heights = HEIGHT_GATES.map((g) => armedHeight(g, coin)).filter((h) => h !== null);
+    return { height: Math.max(MIN_HEIGHT, ...heights), timestamp: Math.max(...armed), hash: 'calibration' };
+}
+
+// Refuse a probe block where an armed gate is off; return the height gates that are on.
+function checkGates(block, coin) {
+    // The enforced budget must be the consensus bound, not the harness's 500 ms default.
+    if (!XChainVM.isConsensusWallClockActive(NETWORK, block.timestamp)) throw new Error('consensus wall clock not active at the probe block');
+    const on = [];
+    for (const g of HEIGHT_GATES) {
+        const isOn = g.active(NETWORK, coin, block.height);
+        if (armedHeight(g, coin) !== null && !isOn) throw new Error(`armed height gate ${g.name} not active at the probe block`);
+        if (isOn) on.push(g.name);
+    }
+    return on;
 }
 
 // Refuse to label a run a calibration unless the runtime matches PINNED.
@@ -110,7 +156,7 @@ async function measure(vm, vector, block) {
     const runs = [];
     for (let i = 0; i < RUNS; i++) {
         const t0 = process.hrtime.bigint();
-        const res = await execute(vm, wrap(vector.body), { blockContext: block });
+        const res = await execute(vm, wrap(vector.body), { blockContext: block, network: NETWORK, contractAddress: CONTRACT });
         const ms = Number(process.hrtime.bigint() - t0) / 1e6;
         runs.push({ ms, gasUsed: res.gasUsed, term: terminationOf(res), err: String(res.error || '').slice(0, 40) });
     }
@@ -149,10 +195,11 @@ function summarise(label, rows) {
 
 async function main() {
     const label = checkPin();
-    const block = postGateBlock();
-    // The enforced budget must be the consensus bound, not the harness's 500 ms default.
-    if (!XChainVM.isConsensusWallClockActive(undefined, block.timestamp)) throw new Error('consensus wall clock not active at the probe block');
+    const coin = XChainVM.pkg3CoinFromAddress(CONTRACT);
+    const block = postGateBlock(coin);
+    const heightGatesOn = checkGates(block, coin);
     console.log(`${label}block time ${block.timestamp}, gas ceiling ${GAS_CEILING}, runs ${RUNS}`);
+    console.log(`${label}network ${NETWORK}, coin ${coin}, height ${block.height}, height gates on: ${heightGatesOn.join(', ') || 'none'}`);
     const vm = createVM({ maxCpuTimeMs: CONSENSUS_MAX_WALL_MS, gasCeiling: GAS_CEILING });
     const rows = [];
     for (const vector of VECTORS) {

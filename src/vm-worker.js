@@ -160,6 +160,11 @@ function dispatchMessage(msg) {
 
 process.on('message', dispatchMessage);
 
+// Ignore group signals (Ctrl-C, a systemd control-group stop): the parent owns this
+// worker's lifecycle and only ever kills it with SIGKILL, so the indexer's graceful
+// drain finishes the in-flight block on real results instead of halting it.
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => {});
+
 // If the parent disconnects (shutdown / crash), flush any pending coverage
 // (best-effort; races the parent's SIGKILL) and exit cleanly.
 process.on('disconnect', () => { flushCoverage(); process.exit(0); });
