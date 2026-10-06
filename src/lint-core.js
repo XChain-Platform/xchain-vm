@@ -34,13 +34,13 @@
 
 // @ts-nocheck
 
-const constants = require('./lint_core/constants.js');
+const constants = require('./lint-core/constants.js');
 const { STRIPPED_GLOBAL_NAMES, ADVISORY_STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
 const { CONTRACT_ECMA_VERSION } = require('./metering.js');
-const banned_syntax = require('./lint_core/banned_syntax.js');
-const banned_globals = require('./lint_core/banned_globals.js');
-const { analyzeContract } = require('./lint_core/contract_analysis.js');
-const { lintSource } = require('./lint_core/result_composition.js');
+const banned_syntax = require('./lint-core/banned_syntax.js');
+const banned_globals = require('./lint-core/banned_globals.js');
+const { analyzeContract } = require('./lint-core/contract_analysis.js');
+const { lintSource } = require('./lint-core/result_composition.js');
 
 module.exports = {
     lintSource,
