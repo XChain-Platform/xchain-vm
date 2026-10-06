@@ -488,8 +488,7 @@ const HARNESS_SOURCE = `
     // flag day above has already passed: blocks executed under it must replay
     // byte-for-byte, so the hook resolution cannot be folded into it. A gate value of
     // 0 means active since genesis; the per-network resolver injected by the host keeps
-    // a pre-launch network's activation from changing mainnet replay behaviour. Testnet
-    // is armed at block time 1791061097 (2026-10-03 20:58:17 UTC); mainnet is unarmed.
+    // a pre-launch network's activation from changing mainnet replay behaviour.
     var __jsonHookGuardOn = (__nrGuardOn &&
         typeof __blockTime === 'number' &&
         typeof __JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME === 'number' &&
