@@ -66,7 +66,7 @@
       "test/integration/process_executor.test/08_the_dispatch_time_watchdog_still_kills_a_hung_worker_deterministic_clamp.test.js",
       "test/integration/process_executor.test/09_a_single_in_flight_worker_death_still_fabricates_resolves_not_rejects.test.js",
       "test/integration/process_executor.test/10_shutdown_rejects_a_never_dispatched_queued_execution_with_host_fault_error.test.js",
-      "test/integration/process_executor.test/11_shutdown_still_resolves_an_in_flight_dispatched_execution_with_the_host_terminated_result.test.js",
+      "test/integration/process_executor.test/11_shutdown_rejects_an_in_flight_dispatched_execution_with_host_fault_error.test.js",
       "test/integration/process_executor.test/12_a_dispatched_execution_rejects_on_a_host_local_isolate_spawn_failure_never_out_of_resource.test.js",
       "test/integration/process_executor.test/13_a_queued_execution_behind_a_host_fault_still_dispatches_the_slot_is_released.test.js",
       "test/integration/process_executor.test/14_a_hostfault_for_an_unknown_id_is_ignored.test.js",

@@ -31,8 +31,9 @@
  *
  * The two failure kinds are NOT interchangeable. An execution that never
  * reached the contract because of a LOCAL host fault (no isolate could be
- * spawned on this machine) REJECTS with HostFaultError, so the caller halts
- * and retries; only an execution where the contract actually ran and killed
+ * spawned on this machine, opts that cannot cross IPC, a worker killed from
+ * outside, a shutdown) REJECTS with HostFaultError, so the caller halts and
+ * retries; only an execution where the contract actually ran and killed
  * the worker resolves hostTerminatedResult.
  ********************************************************************/
 // @ts-nocheck
@@ -56,6 +57,10 @@ const BROKEN_RESPAWN_BACKOFF_MS = 2000;
 // the spawn-failure → HostFaultError machinery (halt and retry, a local
 // fault), now that the per-request watchdog no longer covers queue wait.
 const WORKER_READY_TIMEOUT_MS = 30000;
+
+// Fatal signals a contract can raise in its own worker (V8 abort, native crash).
+// Any other signal came from outside (OOM killer, a group SIGTERM): a host fault.
+const SELF_INFLICTED_SIGNALS = new Set(['SIGABRT', 'SIGTRAP', 'SIGILL', 'SIGSEGV', 'SIGBUS', 'SIGFPE']);
 
 // Deterministic result for any non-gas host termination (crash / hang).
 // gasUsed = ceiling matches src/index.js's timeout/OOM/stack clamp so the
@@ -220,7 +225,15 @@ class ProcessExecutor {
         while (this._queue.length && this._pending.size === 0 &&
                this._child && this._sawReady && this._child.connected) {
             const entry = this._queue[0];
-            if (!this.send({ type: 'execute', id: entry.id, opts: entry.opts })) break;
+            try { this._child.send({ type: 'execute', id: entry.id, opts: entry.opts }); }
+            catch (e) {
+                // A throw on a live channel is this entry's opts failing to serialize
+                // (a BigInt, a cycle). Settle it as a host fault so the queue keeps moving.
+                if (!this._child.connected) break;
+                this._queue.shift();
+                entry.reject(new HostFaultError('executor input not serializable: ' + e.message));
+                continue;
+            }
             this._queue.shift();
             // Watchdog starts at DISPATCH, not acceptance. The timeout must
             // bound ONE contract's execution: started at acceptance it also
@@ -264,15 +277,18 @@ class ProcessExecutor {
         this._child = null;
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
 
-        // Resolve only DISPATCHED (in-flight) requests deterministically. A crash
-        // here means the contract that was actually executing aborted the host. The
-        // block must still advance. Queued (not-yet-dispatched) requests are left
-        // intact: they never started, so they re-dispatch to the respawned worker
-        // (flush on its 'ready') and run normally, identical on every validator.
+        // Settle only DISPATCHED requests. A self-inflicted death (non-zero exit, or a
+        // SELF_INFLICTED_SIGNALS signal) is the contract aborting the host: resolve it
+        // deterministically so the block advances. Exit 0 (the worker's disconnect
+        // handler) or an outside signal is local: reject so the caller halts. The
+        // executor's own kills empty _pending first; queued requests re-dispatch.
         const kind = signal ? ('signal ' + signal) : ('exit ' + code);
+        const selfInflicted = signal
+            ? SELF_INFLICTED_SIGNALS.has(signal) : (Number.isInteger(code) && code !== 0);
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
-            entry.resolve(hostTerminatedResult(entry.ceiling, kind));
+            if (selfInflicted) entry.resolve(hostTerminatedResult(entry.ceiling, kind));
+            else entry.reject(new HostFaultError('executor worker terminated externally (' + kind + ')'));
         }
         this._pending.clear();
 
@@ -352,9 +368,11 @@ class ProcessExecutor {
     async shutdown() {
         this._shuttingDown = true;
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
+        // A local shutdown is not a contract outcome, even for a dispatched request
+        // whose contract had started: every peer finishes it normally, so reject it.
         for (const [id, entry] of this._pending) {
             if (entry.timer) clearTimeout(entry.timer);
-            entry.resolve(hostTerminatedResult(entry.ceiling, 'shutdown'));
+            entry.reject(new HostFaultError('executor shutting down'));
         }
         this._pending.clear();
         for (const entry of this._queue) {

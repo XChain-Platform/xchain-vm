@@ -160,8 +160,9 @@ const run = (vm, code, blockContext, network) =>
         assert.ok(/amount must be a positive decimal string/.test(hi.error || ''), hi.error);
     });
 
-    // Tie the wide regex's own digit literal (gateway/contract_stake.js) to the exported
-    // ceiling, so the two VM-side copies of 18 cannot diverge with every literal case green.
+    // Pin the wide amount form to the exported ceiling end to end through contract.slash:
+    // src/gateway/slash_limits.js builds it as amountForm(MAX_SLASH_AMOUNT_DECIMALS), so this
+    // fails if a hard-coded regex returns or the form and the ceiling stop matching.
     it('the wide amount form admits exactly MAX_SLASH_AMOUNT_DECIMALS fractional digits', async function () {
         assert.ok(Number.isInteger(MAX_DP) && MAX_DP > 8, 'MAX_SLASH_AMOUNT_DECIMALS must stay exported');
         const atCeiling = '1.' + '1'.repeat(MAX_DP);
