@@ -58,6 +58,15 @@ function validateSlashArgs(pubkey, token, amount, readOnlyData) {
         throw new Error('contract.slash: amount must be a positive decimal string');
 }
 
+// An accessor may hand back a BigNumber; its JSON form is an object, so a contract
+// would read a different type than gateway.d.ts declares. Reads cross the isolate
+// boundary as the plain decimal string.
+function asDecimalString(value) {
+    if (value !== null && typeof value === 'object' && typeof value.toFixed === 'function')
+        return value.toFixed();
+    return typeof value === 'number' ? String(value) : value;
+}
+
 // The contract namespace: stake reads (metered) and the metered slash emission.
 function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasSchedule) {
     return {
@@ -72,7 +81,7 @@ function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasS
                 gasTracker.charge(gasSchedule.VM_STATE_READ);
                 if (!readOnlyData.contractStakeData) return '0';
                 if (typeof pubkey !== 'string' || typeof token !== 'string') return '0';
-                return readOnlyData.contractStakeData.getStake(pubkey, token);
+                return asDecimalString(readOnlyData.contractStakeData.getStake(pubkey, token));
             },
             // Total active staked amount across all stakers for (token) on THIS contract.
             getTotalStaked: (token) => {
