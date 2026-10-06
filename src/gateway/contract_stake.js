@@ -88,7 +88,7 @@ function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasS
                 gasTracker.charge(gasSchedule.VM_STATE_READ);
                 if (!readOnlyData.contractStakeData) return '0';
                 if (typeof token !== 'string') return '0';
-                return asDecimalString(readOnlyData.contractStakeData.getTotalStaked(token));
+                return readOnlyData.contractStakeData.getTotalStaked(token);
             },
             // Array of { pubkey, amount } stakers on THIS contract for (token).
             // Capped at 1000 entries, sorted by amount DESC. See plan §12.10.
@@ -96,10 +96,7 @@ function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasS
                 gasTracker.charge(gasSchedule.VM_STATE_READ);
                 if (!readOnlyData.contractStakeData) return [];
                 if (typeof token !== 'string') return [];
-                const stakers = readOnlyData.contractStakeData.getStakers(token);
-                if (!Array.isArray(stakers)) return stakers;
-                return stakers.map(s => (s && typeof s === 'object')
-                    ? { ...s, amount: asDecimalString(s.amount) } : s);
+                return readOnlyData.contractStakeData.getStakers(token);
             },
             // Slash a staker on THIS contract. Authorization is implicit: contractStakeData
             // is scoped to the executing contract, and the emission carries contractIndex
