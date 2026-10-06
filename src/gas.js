@@ -65,11 +65,31 @@ function effectiveCeiling(requested, configCeiling) {
     return configCeiling;
 }
 
+// Activation for failing a run that reached the host as a success although a charge
+// crossed the ceiling inside the isolate (a contract-side catch, or an Object.* statics
+// wrapper, swallowed the exhaustion fault). It moves a run's status and gasUsed, so it
+// is gated. Mainnet and testnet are unarmed (null) until a release cut schedules an
+// instant; regtest runs the rule from genesis. Unknown or missing networks resolve like
+// mainnet.
+const GAS_CEILING_SUCCESS_ACTIVATION = Object.freeze({
+    mainnet: null,
+    testnet: null,
+    regtest: 0,
+});
+function isGasCeilingSuccessActive(network, blockTime) {
+    const gate = Object.hasOwn(GAS_CEILING_SUCCESS_ACTIVATION, network)
+        ? GAS_CEILING_SUCCESS_ACTIVATION[network] : null;
+    if (!Number.isFinite(gate)) return false;
+    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
+}
+
 class GasTracker {
     // The key list and the ceiling resolver ride on the class itself, so the module
     // has one export shape and `require('./gas.js').effectiveCeiling` still reads them.
     static CANONICAL_GAS_KEYS = CANONICAL_GAS_KEYS;
     static effectiveCeiling = effectiveCeiling;
+    static GAS_CEILING_SUCCESS_ACTIVATION = GAS_CEILING_SUCCESS_ACTIVATION;
+    static isGasCeilingSuccessActive = isGasCeilingSuccessActive;
 
     constructor(gasSchedule, gasCeiling) {
         // Validate schedule: all values must be non-negative integers
