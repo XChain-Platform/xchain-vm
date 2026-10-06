@@ -1610,7 +1610,8 @@ const BINARY_ALLOC_GATE_BLOCK_TIME = 1786060800;
 // Keep the scalar mainnet literal for existing consumers that pin or parse it.
 const JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = 9999999999;
 
-// Keep mainnet and testnet unarmed while regtest exercises the rule from genesis.
+// Mainnet stays unarmed, testnet arms at block time 1791061097 (2026-10-03 20:58:17 UTC)
+// and regtest exercises the rule from genesis.
 // Resolve unknown or missing networks like mainnet to retain replay-safe behaviour.
 const JSON_STRINGIFY_HOOK_ACTIVATION = Object.seal({
     mainnet: JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
@@ -2606,7 +2607,9 @@ class XChainVM {
             context.global.setSync('__BINARY_ALLOC_GATE_BLOCK_TIME', BINARY_ALLOC_GATE_BLOCK_TIME);
             // Second, later flag day: the JSON.stringify value-hook resolution
             // (__resolveForStringify). Injected the same way and stripped by the same
-            // harness cleanup pass, so contract code never sees it.
+            // harness cleanup pass, so contract code never sees it. The resolver yields
+            // 0 on regtest, 1791061097 (2026-10-03 20:58:17 UTC) on testnet, and the
+            // unarmed mainnet literal everywhere else.
             context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
             const __iterSetMeterOn = isIterSetMeterActive(opts.network, __blockTime);
             context.global.setSync('__ITER_SET_METER_ON', __iterSetMeterOn);
@@ -2983,6 +2986,7 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 // JSON.stringify value-hook resolution flag day, exported for the
 // consensus-params freeze guard because a divergent value forks the fleet.
 // The network-aware map and resolver below are authoritative for execution.
+// Testnet is armed at block time 1791061097 (2026-10-03 20:58:17 UTC); mainnet stays unarmed.
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
 module.exports.JSON_STRINGIFY_HOOK_ACTIVATION = JSON_STRINGIFY_HOOK_ACTIVATION;
 module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
