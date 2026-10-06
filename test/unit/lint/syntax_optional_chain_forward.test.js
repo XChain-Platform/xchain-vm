@@ -18,7 +18,7 @@
 const assert = require('assert');
 
 function withLintSourceStub(run) {
-    const lintCorePath = require.resolve('../../../src/lint_core.js');
+    const lintCorePath = require.resolve('../../../src/lint-core.js');
     const syntaxPath = require.resolve('../../../src/syntax.js');
     const cachedLintCore = require.cache[lintCorePath];
     const cachedSyntax = require.cache[syntaxPath];

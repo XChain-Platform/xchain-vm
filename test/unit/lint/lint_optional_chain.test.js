@@ -16,7 +16,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { lintSource } = require('../../../src/lint_core.js');
+const { lintSource } = require('../../../src/lint-core.js');
 const { validateSyntax } = require('../../../src/syntax.js');
 
 const fixtureDirectory = path.join(__dirname, '../../fixtures/lint');

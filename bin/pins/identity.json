@@ -5,8 +5,8 @@
   "note": "Declared, not graded: no tool, test or script in this repo reads this file, so a stale path or digest here fails nothing; the live parity gate is test/unit/lint_parity.test.js, which builds the sdk path itself. Every key, digest and sdkPath below is the AT1 record, unchanged; sdkPathAtOrigin records the sdk's spelling of the same file after its snake_case rename.",
   "algorithm": "sha256",
   "files": {
-    "src/lint_core.js": {
-      "canonical": "8f8a57481b7d3e6c63c142d8574357ab9021582e91fee74e53899c987d9405ea",
+    "src/lint-core.js": {
+      "canonical": "8219c316f17be6c7c6a223a0cb9e2cdc651d17b45bd8085c5781a271d91f7468",
       "vendoredInSdk": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
@@ -17,8 +17,8 @@
       "sdkPath": "xchain-sdk/src/contract/metering.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/metering.js"
     },
-    "src/stripped_globals.js": {
-      "canonical": "580f415bcb94f5c98012945ab30c120f13928a0f7390c2ee4fe2a081432255fb",
+    "src/stripped-globals.js": {
+      "canonical": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
       "vendoredInSdk": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
       "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/stripped_globals.js"

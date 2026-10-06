@@ -47,11 +47,11 @@ const crypto = require('crypto');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 
-// The vendored lint trio, in snake_case after the structure pass renames.
+// The vendored lint trio, in kebab-case after the structure pass renames.
 const PINNED_FILES = [
-    'src/lint_core.js',
+    'src/lint-core.js',
     'src/metering.js',
-    'src/stripped_globals.js',
+    'src/stripped-globals.js',
 ];
 
 const ALGORITHM = 'sha256';

@@ -22,7 +22,7 @@
 const assert = require('assert');
 const cr = require('../../../src/consensus-runtime.js');
 const vm = require('../../../src/index.js');
-const lintCore = require('../../../src/lint_core.js');
+const lintCore = require('../../../src/lint-core.js');
 const metering = require('../../../src/metering.js');
 
 // The indexer's protocol-change sources as [file, text] pairs: src/protocol_changes.js plus
