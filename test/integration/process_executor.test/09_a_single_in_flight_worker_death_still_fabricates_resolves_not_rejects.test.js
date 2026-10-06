@@ -24,20 +24,21 @@
 
 const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAVE_IVM } = require('./support/executor_setup.js');
 
-    // The deterministic case is UNCHANGED: a single worker death during an
+    // The deterministic case is UNCHANGED: a SELF-INFLICTED worker death during an
     // in-flight execution still RESOLVES a fabricated host-termination (every
     // validator sees the same poisoned-contract outcome); it must NOT reject.
+    // SIGABRT stands in for the V8 fatal abort a host-aborting contract raises.
 (HAVE_IVM ? describe : describe.skip)('process_executor: out-of-process execution', function () {
     this.timeout(60000);
 
-    it('a single in-flight worker death still FABRICATES (resolves), not rejects', async function () {
+    it('a single in-flight self-inflicted worker abort still FABRICATES (resolves), not rejects', async function () {
         const ProcessExecutor = require('../../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
         try {
             await exec.execute({ ...BASE, code: `module.exports = function(){ return 1; };` }); // ensure ready
             const inFlight = exec.execute({ ...BASE, code: `module.exports = function(){ return 2; };` });
-            if (exec._child) exec._child.kill('SIGKILL'); // crash mid-flight (not _broken)
+            if (exec._child) exec._child.kill('SIGABRT'); // abort mid-flight (not _broken)
             const r = await inFlight;
             assert.strictEqual(r.success, false, 'in-flight crash should resolve a host-termination');
             assert.strictEqual(r.gasUsed, GAS_CEILING, 'fabricated result clamps gasUsed to the ceiling');

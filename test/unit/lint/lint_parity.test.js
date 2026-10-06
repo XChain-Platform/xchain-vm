@@ -61,14 +61,23 @@ function requireSiblingOrSkip(ctx, present, what) {
 
 // All bad fixtures use syntax V8 accepts, so validateSyntax clears step 1 and the
 // failure must come from a shared (lint-core) rule, making the messages comparable.
+// Each names the consensus rule it trips, and every CONSENSUS_RULES member needs one.
+// The flag-day rules run at default options, where every gate is on (lintSource's epoch).
 const BAD_FIXTURES = [
-    { name: 'banned-math',           code: 'function f(){ return Math.sqrt(4); }' },
-    { name: 'banned-literal-bigint', code: 'function f(){ return 2n; }' },
-    { name: 'banned-literal-regex',  code: 'function f(){ return /a+/.test("x"); }' },
-    { name: 'reserved-gas',          code: 'function f(){ var __gas = 1; return __gas; }' },
-    { name: 'reserved-alloc',        code: 'function f(){ return __concat([1],[2]); }' },
-    { name: 'unsupported-syntax',    code: 'var x = 1_000; function f(){ return x; }' }
+    { name: 'banned-math',           rule: 'banned-math',         code: 'function f(){ return Math.sqrt(4); }' },
+    { name: 'banned-literal-bigint', rule: 'banned-literal',      code: 'function f(){ return 2n; }' },
+    { name: 'banned-literal-regex',  rule: 'banned-literal',      code: 'function f(){ return /a+/.test("x"); }' },
+    { name: 'reserved-gas',          rule: 'reserved-identifier', code: 'function f(){ var __gas = 1; return __gas; }' },
+    { name: 'reserved-alloc',        rule: 'reserved-identifier', code: 'function f(){ return __concat([1],[2]); }' },
+    { name: 'unsupported-syntax',    rule: 'unsupported-syntax',  code: 'var x = 1_000; function f(){ return x; }' },
+    { name: 'banned-async',          rule: 'banned-async',        code: 'function f(){ return 1; } async function g(){ return 1; }' },
+    { name: 'banned-generator',      rule: 'banned-generator',    code: 'module.exports = function(x){ return 1; }; function* g(){ yield 1; }' },
+    { name: 'banned-wasm',           rule: 'banned-wasm',         code: 'module.exports = function(x){ return typeof WebAssembly; };' },
+    { name: 'banned-rest',           rule: 'banned-rest',         code: 'module.exports = function(){ function s(...n){ return n.length; } return s(1,2); };' }
 ];
+// Consensus rules whose deploy message cannot equal lintSource's, so only the verdict compares.
+// invalid-type: validateSyntax's V8 compile rejects a non-string first ("syntax error: ...").
+const VERDICT_ONLY_RULES = new Set(['invalid-type']);
 const FLOAT_FIXTURE = 'var x = 3.14; function f(){ return x; }';
 const GOOD_FIXTURE  = 'function init(){ return 1; } function add(a,b){ return a + b; }';
 
@@ -108,8 +117,33 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                 assert.strictEqual(v.valid, l.errors.length === 0);
                 assert.strictEqual(v.error, l.errors[0].message,
                     fx.name + ' message drift:\n  deploy: ' + v.error + '\n  lint  : ' + l.errors[0].message);
+                // Confirm the fixture trips the rule it claims, at error severity.
+                assert.strictEqual(l.errors[0].rule, fx.rule, fx.name + ' trips ' + l.errors[0].rule + ', not ' + fx.rule);
+                assert.strictEqual(l.errors[0].severity, 'error');
             });
         }
+    });
+});
+
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
+    describe('every consensus rule is covered', function () {
+        it('invalid-type: both engines reject a non-string (verdict only)', function () {
+            assert.strictEqual(validateSyntax(null).valid, false, 'deploy validator must reject a non-string source');
+            assert.strictEqual(lintSource(null).errors[0].rule, 'invalid-type');
+        });
+
+        it('the fixtures plus the verdict-only set are exactly CONSENSUS_RULES', function () {
+            // A stale or renamed exclusion fails here, and no rule is counted twice.
+            for (const rule of VERDICT_ONLY_RULES)
+                assert.ok(CONSENSUS_RULES.has(rule), 'VERDICT_ONLY_RULES names ' + rule + ', which is not a consensus rule');
+            const fixtureRules = new Set(BAD_FIXTURES.map((fx) => fx.rule));
+            for (const rule of fixtureRules)
+                assert.ok(!VERDICT_ONLY_RULES.has(rule), rule + ' is in both BAD_FIXTURES and VERDICT_ONLY_RULES');
+            // Require a parity fixture for every new consensus rule, so none ships unchecked.
+            assert.deepStrictEqual([...fixtureRules, ...VERDICT_ONLY_RULES].sort(), [...CONSENSUS_RULES].sort(),
+                'adding a rule to CONSENSUS_RULES requires a BAD_FIXTURES entry in this file ' +
+                '(or a commented VERDICT_ONLY_RULES entry when message parity is structurally impossible)');
+        });
     });
 });
 
