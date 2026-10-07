@@ -28,6 +28,10 @@ const metering = require('../../src/metering.js');
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('APPLY_LENGTH_METER_ACTIVATION is sealed and unarmed outside regtest', function () {
+        assert.ok(Object.hasOwn(vm, 'APPLY_LENGTH_METER_ACTIVATION'));
+        assert.ok(Object.prototype.propertyIsEnumerable.call(vm, 'APPLY_LENGTH_METER_ACTIVATION'));
+        assert.ok(Object.hasOwn(vm, 'isApplyLengthMeterActive'));
+        assert.ok(Object.prototype.propertyIsEnumerable.call(vm, 'isApplyLengthMeterActive'));
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
             { mainnet: null, testnet: null, regtest: 0 });
         assert.ok(Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
