@@ -27,6 +27,19 @@ const metering = require('../../src/metering.js');
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
+    it('APPLY_LENGTH_METER_ACTIVATION is sealed and unarmed outside regtest', function () {
+        assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
+            { mainnet: null, testnet: null, regtest: 0 });
+        assert.ok(Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
+        assert.strictEqual(vm.isApplyLengthMeterActive('regtest', 0), true);
+        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
+            assert.strictEqual(vm.isApplyLengthMeterActive(network, 4102444800), false);
+        }
+    });
+});
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
         assert.strictEqual(cr.CONSENSUS_VERSION, '5');
         assert.strictEqual(vm.CONSENSUS_VERSION, '5', 're-export must match');

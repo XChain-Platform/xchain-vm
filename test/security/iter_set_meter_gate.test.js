@@ -11,11 +11,11 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Native iteration, string, Set algebra and apply metering gate.
+ * Native iteration, string and Set algebra metering gate.
  *
  * Iterator helpers (toArray, drop), String isWellFormed/toWellFormed, the Set
- * algebra family and Function.prototype.apply do O(n) native work that the AST
- * meter bills at a flat unit per call. The metering is gated: regtest runs it
+ * algebra family do O(n) native work that the AST meter bills at a flat unit per
+ * call. The metering is gated: regtest runs it
  * from genesis, mainnet and testnet are unarmed (null). The same gate fails a run
  * whose gas-exhaustion fault was swallowed by an Object.* statics wrapper.
  ********************************************************************/
@@ -35,15 +35,13 @@ const VECTORS = {
     'Iterator drop': `${ARR}var t=0;for(;;){t+=a.values().drop(${K}-1).next().value;}`,
     'String isWellFormed': `var s=String.fromCharCode(0x100).repeat(${K});var t=0;for(;;){if(s.isWellFormed())t++;}`,
     'String toWellFormed': `var s=String.fromCharCode(0xD800).repeat(${K});var t=0;for(;;){t+=s.toWellFormed().length;}`,
-    'Function apply': `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f.apply(null,a);}`,
     'Call spread': `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f(...a);}`,
-    'Math.max apply': `${ARR}var t=0;for(;;){t+=Math.max.apply(null,a);}`,
     'Set union': `var x=new Set(),y=new Set();for(var j=0;j<${K};j++){x.add(j);y.add(j+${K});}var t=0;for(;;){t+=x.union(y).size;}`,
 };
 const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference',
     'isSubsetOf', 'isSupersetOf', 'isDisjointFrom'];
 
-(XChainVM ? describe : describe.skip)('iterator, string, Set algebra and apply metering gate', function () {
+(XChainVM ? describe : describe.skip)('iterator, string and Set algebra metering gate', function () {
     this.timeout(120000);
 
     let vm;
@@ -75,13 +73,12 @@ const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference
         }
     });
 
-    it('Iterator toArray and drop, isWellFormed/toWellFormed and apply are charged by size', async function () {
+    it('Iterator toArray and drop plus isWellFormed/toWellFormed are charged by size', async function () {
         const bodies = {
             toArray: `${ARR}a.values().toArray();return 1;`,
             drop: `${ARR}a.values().drop(${K - 1}).next();return 1;`,
             isWellFormed: `var s='x'.repeat(${K});s.isWellFormed();return 1;`,
             toWellFormed: `var s='x'.repeat(${K});s.toWellFormed();return 1;`,
-            apply: `${ARR}Math.max.apply(null,a);return 1;`,
         };
         for (const id of Object.keys(bodies)) {
             const armed = await on(bodies[id], { gasCeiling: undefined });

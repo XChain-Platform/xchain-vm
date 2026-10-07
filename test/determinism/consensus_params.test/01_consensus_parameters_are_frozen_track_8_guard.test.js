@@ -57,6 +57,19 @@ function indexerFlagDayLiterals(sources, name) {
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
+    it('APPLY_LENGTH_METER_ACTIVATION is sealed and unarmed outside regtest', function () {
+        assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
+            { mainnet: null, testnet: null, regtest: 0 });
+        assert.ok(Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
+        assert.strictEqual(vm.isApplyLengthMeterActive('regtest', 0), true);
+        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
+            assert.strictEqual(vm.isApplyLengthMeterActive(network, 4102444800), false);
+        }
+    });
+});
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
     it('BINARY_ALLOC_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // The F3-binary ArrayBuffer/TypedArray byte-length gas charge activates
         // fleet-wide at this block time. It is hashed (gasUsed → contract_hash) and
