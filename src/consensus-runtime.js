@@ -148,7 +148,11 @@ const REFERENCE_NODE = 'v22.22.3';
 // once before deterministic depth checking and native serialization. Below the gate,
 // the historical serializer path remains unchanged; hook-free values retain identical
 // bytes and gas on both sides of the gate.
-const CONSENSUS_VERSION = '5';
+//
+// Epoch '6' (this bump) adds 'banned-with' to the deploy validator's CONSENSUS_RULES:
+// the `with` statement rebinds free identifiers at runtime and so sidesteps every
+// identifier-precise ban. The rule is error-severity and AST-precise.
+const CONSENSUS_VERSION = '6';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash

@@ -10,6 +10,7 @@ const {
     findReservedControlBinding, findBannedLiterals, findBannedRest, findFloatWarnings
 } = require('./banned_syntax.js');
 const { findBannedAsync, findBannedGenerator, findBannedWasm, findBannedStrippedGlobals } = require('./banned_globals.js');
+const { findBannedWith } = require('./banned_with.js');
 const { analyzeContract } = require('./contract_analysis.js');
 
 function lineOrNull(hit) {
@@ -203,6 +204,22 @@ function pushRestErrors(code, errors) {
     }
 }
 
+// 6e. Banned `with` statement. A with block resolves free identifiers against an
+//     arbitrary object at runtime, which defeats every identifier-precise ban
+//     (reserved helpers, stripped globals, Math members) from inside the block.
+function pushWithErrors(code, errors) {
+    for (const hit of findBannedWith(code)) {
+        errors.push({
+            rule: 'banned-with',
+            message: 'banned statement: with at line ' + hit.line +
+                     '; a with block rebinds free identifiers to an object at runtime, which bypasses the ' +
+                     'identifier-based deploy bans and the metering rewrite. Read the properties through the object instead',
+            line: lineOrNull(hit),
+            severity: 'error'
+        });
+    }
+}
+
 function pushWasmErrors(code, globalAlias, optionalChain, errors) {
     for (const hit of findBannedWasm(code, globalAlias, optionalChain)) {
         errors.push({
@@ -271,7 +288,7 @@ function pushStrippedGlobalWarnings(code, globalAlias, optionalChain, warnings) 
  * (step 1) is NOT here; it needs isolated-vm and stays in syntax.js.
  *
  * Consensus errors are returned in deploy-check order (metering -> reserved ->
- * banned-math -> banned-literal -> banned-async -> banned-generator -> banned-wasm)
+ * banned-math -> banned-literal -> banned-async -> banned-generator -> banned-wasm -> banned-with)
  * FIRST, so errors[0] (filtered to CONSENSUS_RULES) is exactly the failure
  * validateSyntax surfaces. Move-2 findings (advisory) are appended after and never
  * affect the deploy verdict.
@@ -326,6 +343,7 @@ function lintSource(code, opts) {
     pushGeneratorErrors(code, errors);
     pushRestErrors(code, errors);
     pushWasmErrors(code, globalAlias, optionalChain, errors);
+    pushWithErrors(code, errors);
 
     const warnings = findFloatWarnings(code);
     pushProtoMethodWarnings(code, warnings);

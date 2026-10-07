@@ -109,7 +109,11 @@ const CONSENSUS_RULES = new Set([
     // set. Its on-chain activation is threaded through validateSyntax as
     // enforceBannedRest, so below the flag-day a from-genesis replay reproduces the
     // historical accepted verdict.
-    'banned-rest'
+    'banned-rest',
+    // The `with` statement rebinds free identifiers at runtime, so every
+    // identifier-precise ban above could be sidestepped from inside a with block.
+    // Error-severity and AST-precise (a WithStatement node), hence deploy-blocking.
+    'banned-with'
 ]);
 
 const TYPED_ARRAY_CTORS = new Set([

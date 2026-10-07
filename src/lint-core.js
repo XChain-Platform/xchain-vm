@@ -39,6 +39,7 @@ const { STRIPPED_GLOBAL_NAMES, ADVISORY_STRIPPED_GLOBAL_NAMES } = require('./str
 const { CONTRACT_ECMA_VERSION } = require('./metering.js');
 const banned_syntax = require('./lint-core/banned_syntax.js');
 const banned_globals = require('./lint-core/banned_globals.js');
+const banned_with = require('./lint-core/banned_with.js');
 const { analyzeContract } = require('./lint-core/contract_analysis.js');
 const { lintSource } = require('./lint-core/result_composition.js');
 
@@ -50,6 +51,7 @@ module.exports = {
     findBannedAsync: banned_globals.findBannedAsync,
     findBannedGenerator: banned_globals.findBannedGenerator,
     findBannedWasm: banned_globals.findBannedWasm,
+    findBannedWith: banned_with.findBannedWith,
     findBannedRest: banned_syntax.findBannedRest,
     findBannedExponentiation: banned_syntax.findBannedExponentiation,
     findBannedProtoMethods: banned_syntax.findBannedProtoMethods,
