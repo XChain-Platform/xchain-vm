@@ -134,16 +134,17 @@ module.exports = {
      * would break those callers silently.
      *
      * The gate is the indexer's, resolved at THIS simulator's epoch rather than
-     * hardcoded on: xchain-indexer/src/actions/deploy/index.js checks the UTF-8 size cap
-     * and then calls vm.validateSyntax with six epoch-resolved ban flags. It reads
+     * hardcoded on: xchain-indexer/src/actions/deploy/validate.js checks the UTF-8 size
+     * cap, and xchain-indexer/src/actions/deploy/lint.js then calls vm.validateSyntax
+     * with the epoch-resolved ban flags its resolveLintFlags returns. It reads
      * those flags from its own protocolChanges table and per-coin activation
      * modules; the VM's exported predicates are the twins index.js already uses for
      * the execute-time re-lint (see the flag map above isExecLintActive's caller),
      * so they resolve the same verdict without a second copy of the thresholds.
-     * The two height-keyed flags take the CONFIGURED coin, matching deploy/index.js,
+     * The per-coin height-keyed flags take the CONFIGURED coin, matching actions/deploy/lint.js,
      * which reads its node's COIN rather than deriving one from the address.
      *
-     * banned-rest is the sixth and rides the REST_PATTERN_METER block-time flag-day,
+     * banned-rest rides the REST_PATTERN_METER block-time flag-day,
      * so it resolves from isRestPatternMeterActive exactly as the execute-time
      * re-lint does. Omitting the key is not neutral: syntax.js defaults every
      * enforce* flag to ON, so a missing flag enforces a rule the chain has not
