@@ -160,8 +160,7 @@ const HARNESS_SOURCE = `
     // so a from-genesis replay reproduces the historical gas at every height.
     var __meterUpgradeOn = (typeof __blockTime === 'number' &&
         typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
-        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME);
-    var __iterMeterOn = globalThis.__ITER_SET_METER_ON === true;
+        __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME); var __iterMeterOn = globalThis.__ITER_SET_METER_ON === true;
     var __applyLengthMeterOn = globalThis.__APPLY_LENGTH_METER_ON === true;
 
     var __fill = Array.prototype.fill;
@@ -1565,9 +1564,6 @@ const HARNESS_SOURCE = `
             return __iterDrop.apply(this, arguments);
         });
     }
-    // ----- end native iteration metering -----
-
-    // ----- Function.prototype.apply argument-length metering (gated) -----
     if (__applyLengthMeterOn) {
         var __fnProto = Object.getPrototypeOf(function() {});
         var __applyNative = __fnProto.call.bind(__fnProto.apply);
@@ -1576,7 +1572,7 @@ const HARNESS_SOURCE = `
             return __applyNative(this, thisArg, args);
         });
     }
-    // ----- end Function.prototype.apply metering -----
+    // ----- end native metering -----
 })();
 `;
 
@@ -1792,38 +1788,16 @@ function isRestPatternMeterActive(network, blockTime) {
     if (network === 'testnet' || network === 'regtest') return true;
     return Number.isFinite(blockTime) && blockTime >= REST_PATTERN_METER_GATE_BLOCK_TIME;
 }
-
-// Activation for metering the native work the other size charges miss: iterator
-// helpers (toArray, drop), String isWellFormed/toWellFormed and the Set algebra
-// family. Every one moves gasUsed, so it is gated. Mainnet and
-// testnet are unarmed (null) until a release cut schedules an instant; regtest runs
-// the rule from genesis. Unknown or missing networks resolve like mainnet.
-const ITER_SET_METER_ACTIVATION = Object.seal({
-    mainnet: null,
-    testnet: null,
-    regtest: 0,
-});
+const ITER_SET_METER_ACTIVATION = Object.seal({ mainnet: null, testnet: null, regtest: 0 });
 function isIterSetMeterActive(network, blockTime) {
     const gate = ITER_SET_METER_ACTIVATION[network];
-    if (!Number.isFinite(gate)) return false;
-    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
+    return Number.isFinite(gate) && (gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate));
 }
-
-// Function.prototype.apply performs native work proportional to the argument-list
-// length. Its charge has an independent activation so scheduling iterator and Set
-// metering cannot silently re-price apply calls. Mainnet and testnet are unarmed;
-// regtest exercises the rule from genesis.
-const APPLY_LENGTH_METER_ACTIVATION = Object.seal({
-    mainnet: null,
-    testnet: null,
-    regtest: 0,
-});
-function isApplyLengthMeterActive(network, blockTime) {
+const APPLY_LENGTH_METER_ACTIVATION = Object.seal({ mainnet: null, testnet: null, regtest: 0 });
+const isApplyLengthMeterActive = (network, blockTime) => {
     const gate = APPLY_LENGTH_METER_ACTIVATION[network];
-    if (!Number.isFinite(gate)) return false;
-    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
-}
-
+    return Number.isFinite(gate) && (gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate));
+};
 // Activation for failing a run whose gas-exhaustion fault was caught inside the
 // isolate (the Object.* statics wrappers swallow it) and so reached the host as a
 // success. Post-gate such a run is out_of_gas at the ceiling; pre-gate it replays as
@@ -2635,8 +2609,7 @@ class XChainVM {
             context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
             const __iterSetMeterOn = isIterSetMeterActive(opts.network, __blockTime);
             context.global.setSync('__ITER_SET_METER_ON', __iterSetMeterOn);
-            context.global.setSync('__APPLY_LENGTH_METER_ON',
-                isApplyLengthMeterActive(opts.network, __blockTime));
+            context.global.setSync('__APPLY_LENGTH_METER_ON', isApplyLengthMeterActive(opts.network, __blockTime));
 
             // Run harness script to assemble xchain object inside isolate.
             // Reuse cached V8 bytecode when available: the harness source is a
@@ -3047,9 +3020,10 @@ module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_
 // REST_PATTERN_METER.
 module.exports.REST_PATTERN_METER_GATE_BLOCK_TIME = REST_PATTERN_METER_GATE_BLOCK_TIME;
 module.exports.isRestPatternMeterActive = isRestPatternMeterActive;
-// Independent activation for Function.prototype.apply argument-length metering.
-module.exports.APPLY_LENGTH_METER_ACTIVATION = APPLY_LENGTH_METER_ACTIVATION;
-module.exports.isApplyLengthMeterActive = isApplyLengthMeterActive;
+const applyLengthMeterExports = Object.create(Object.getPrototypeOf(module.exports), {
+    APPLY_LENGTH_METER_ACTIVATION: { value: APPLY_LENGTH_METER_ACTIVATION }, isApplyLengthMeterActive: { value: isApplyLengthMeterActive },
+});
+Object.setPrototypeOf(module.exports, applyLengthMeterExports);
 // Coordinated flag-day (block time) that activates canonical string state keys
 // (String(key) normalization for primitives, deterministic rejection of
 // non-primitive keys) so the key-size/NUL/keyCount guards apply to every key.

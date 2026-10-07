@@ -25,6 +25,28 @@ const LATE = { height: 100, timestamp: 4000000000, hash: 'abc123' };
 const ARR = `var a=new Array(${K}).fill(7);`;
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
+function registerGateIsolationTest(run) {
+    it('disarming apply does not disarm iterator metering', async function () {
+        const activation = runtime.APPLY_LENGTH_METER_ACTIVATION;
+        const saved = activation.regtest;
+        activation.regtest = null;
+        try {
+            const applyBody = `${ARR}Math.max.apply(null,a);return 1;`;
+            const iterBody = `${ARR}a.values().toArray();return 1;`;
+            const applyRegtest = await run(applyBody, 'regtest');
+            const applyMainnet = await run(applyBody, 'mainnet');
+            const iterRegtest = await run(iterBody, 'regtest', { gasCeiling: undefined });
+            const iterMainnet = await run(iterBody, 'mainnet');
+            assert.strictEqual(applyRegtest.gasUsed, applyMainnet.gasUsed,
+                'apply must follow its own disabled gate');
+            assert.ok(iterRegtest.gasUsed >= iterMainnet.gasUsed + K - 10,
+                'iterator metering must remain controlled by ITER_SET_METER');
+        } finally {
+            activation.regtest = saved;
+        }
+    });
+}
+
 (XChainVM ? describe : describe.skip)('Function.prototype.apply length metering gate', function () {
     this.timeout(120000);
 
@@ -71,23 +93,5 @@ const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
         assert.strictEqual(gas.undefined, gas.unknown);
     });
 
-    it('disarming apply does not disarm iterator metering', async function () {
-        const activation = runtime.APPLY_LENGTH_METER_ACTIVATION;
-        const saved = activation.regtest;
-        activation.regtest = null;
-        try {
-            const applyBody = `${ARR}Math.max.apply(null,a);return 1;`;
-            const iterBody = `${ARR}a.values().toArray();return 1;`;
-            const applyRegtest = await run(applyBody, 'regtest');
-            const applyMainnet = await run(applyBody, 'mainnet');
-            const iterRegtest = await run(iterBody, 'regtest', { gasCeiling: undefined });
-            const iterMainnet = await run(iterBody, 'mainnet');
-            assert.strictEqual(applyRegtest.gasUsed, applyMainnet.gasUsed,
-                'apply must follow its own disabled gate');
-            assert.ok(iterRegtest.gasUsed >= iterMainnet.gasUsed + K - 10,
-                'iterator metering must remain controlled by ITER_SET_METER');
-        } finally {
-            activation.regtest = saved;
-        }
-    });
+    registerGateIsolationTest(run);
 });

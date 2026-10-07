@@ -41,6 +41,25 @@ const VECTORS = {
 const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference',
     'isSubsetOf', 'isSupersetOf', 'isDisjointFrom'];
 
+function registerSwallowedExhaustionTest() {
+    it('a swallowed Object.keys gas exhaustion fails the run once active', async function () {
+        const small = createVM({ gasCeiling: 5000, maxCpuTimeMs: WALL_MS });
+        small.beginBlock();
+        try {
+            const body = `var a=new Array(3000).fill(1);Object.keys(a);return 5;`;
+            const armed = await execute(small, wrap(body), { method: 'default', network: 'regtest', blockContext: LATE });
+            assert.strictEqual(armed.success, false);
+            assert.match(armed.error, /^out_of_gas:/, armed.error);
+            assert.strictEqual(armed.gasUsed, 5000);
+            const legacy = await execute(small, wrap(body), { method: 'default', network: 'mainnet', blockContext: LATE });
+            assert.strictEqual(legacy.success, true, 'pre-activation replay keeps the swallowed fault');
+            assert.ok(legacy.gasUsed > 5000, 'the legacy run completed past its ceiling');
+        } finally {
+            if (small.endBlock) small.endBlock();
+        }
+    });
+}
+
 (XChainVM ? describe : describe.skip)('iterator, string and Set algebra metering gate', function () {
     this.timeout(120000);
 
@@ -101,20 +120,5 @@ const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference
         assert.strictEqual(gas.undefined, gas.unknown);
     });
 
-    it('a swallowed Object.keys gas exhaustion fails the run once active', async function () {
-        const small = createVM({ gasCeiling: 5000, maxCpuTimeMs: WALL_MS });
-        small.beginBlock();
-        try {
-            const body = `var a=new Array(3000).fill(1);Object.keys(a);return 5;`;
-            const armed = await execute(small, wrap(body), { method: 'default', network: 'regtest', blockContext: LATE });
-            assert.strictEqual(armed.success, false);
-            assert.match(armed.error, /^out_of_gas:/, armed.error);
-            assert.strictEqual(armed.gasUsed, 5000);
-            const legacy = await execute(small, wrap(body), { method: 'default', network: 'mainnet', blockContext: LATE });
-            assert.strictEqual(legacy.success, true, 'pre-activation replay keeps the swallowed fault');
-            assert.ok(legacy.gasUsed > 5000, 'the legacy run completed past its ceiling');
-        } finally {
-            if (small.endBlock) small.endBlock();
-        }
-    });
+    registerSwallowedExhaustionTest();
 });
