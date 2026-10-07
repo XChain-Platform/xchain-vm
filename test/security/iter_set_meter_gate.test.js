@@ -11,11 +11,11 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * Native iteration, string, Set algebra and apply metering gate.
+ * Native iteration, string and Set algebra metering gate.
  *
  * Iterator helpers (toArray, drop), String isWellFormed/toWellFormed, the Set
- * algebra family and Function.prototype.apply do O(n) native work that the AST
- * meter bills at a flat unit per call. The metering is gated: regtest runs it
+ * algebra family do O(n) native work that the AST meter bills at a flat unit per
+ * call. The metering is gated: regtest runs it
  * from genesis, mainnet and testnet are unarmed (null). The same gate fails a run
  * whose gas-exhaustion fault was swallowed by an Object.* statics wrapper.
  ********************************************************************/
@@ -35,15 +35,32 @@ const VECTORS = {
     'Iterator drop': `${ARR}var t=0;for(;;){t+=a.values().drop(${K}-1).next().value;}`,
     'String isWellFormed': `var s=String.fromCharCode(0x100).repeat(${K});var t=0;for(;;){if(s.isWellFormed())t++;}`,
     'String toWellFormed': `var s=String.fromCharCode(0xD800).repeat(${K});var t=0;for(;;){t+=s.toWellFormed().length;}`,
-    'Function apply': `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f.apply(null,a);}`,
     'Call spread': `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f(...a);}`,
-    'Math.max apply': `${ARR}var t=0;for(;;){t+=Math.max.apply(null,a);}`,
     'Set union': `var x=new Set(),y=new Set();for(var j=0;j<${K};j++){x.add(j);y.add(j+${K});}var t=0;for(;;){t+=x.union(y).size;}`,
 };
 const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference',
     'isSubsetOf', 'isSupersetOf', 'isDisjointFrom'];
 
-(XChainVM ? describe : describe.skip)('iterator, string, Set algebra and apply metering gate', function () {
+function registerSwallowedExhaustionTest() {
+    it('a swallowed Object.keys gas exhaustion fails the run once active', async function () {
+        const small = createVM({ gasCeiling: 5000, maxCpuTimeMs: WALL_MS });
+        small.beginBlock();
+        try {
+            const body = `var a=new Array(3000).fill(1);Object.keys(a);return 5;`;
+            const armed = await execute(small, wrap(body), { method: 'default', network: 'regtest', blockContext: LATE });
+            assert.strictEqual(armed.success, false);
+            assert.match(armed.error, /^out_of_gas:/, armed.error);
+            assert.strictEqual(armed.gasUsed, 5000);
+            const legacy = await execute(small, wrap(body), { method: 'default', network: 'mainnet', blockContext: LATE });
+            assert.strictEqual(legacy.success, true, 'pre-activation replay keeps the swallowed fault');
+            assert.ok(legacy.gasUsed > 5000, 'the legacy run completed past its ceiling');
+        } finally {
+            if (small.endBlock) small.endBlock();
+        }
+    });
+}
+
+(XChainVM ? describe : describe.skip)('iterator, string and Set algebra metering gate', function () {
     this.timeout(120000);
 
     let vm;
@@ -75,13 +92,12 @@ const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference
         }
     });
 
-    it('Iterator toArray and drop, isWellFormed/toWellFormed and apply are charged by size', async function () {
+    it('Iterator toArray and drop plus isWellFormed/toWellFormed are charged by size', async function () {
         const bodies = {
             toArray: `${ARR}a.values().toArray();return 1;`,
             drop: `${ARR}a.values().drop(${K - 1}).next();return 1;`,
             isWellFormed: `var s='x'.repeat(${K});s.isWellFormed();return 1;`,
             toWellFormed: `var s='x'.repeat(${K});s.toWellFormed();return 1;`,
-            apply: `${ARR}Math.max.apply(null,a);return 1;`,
         };
         for (const id of Object.keys(bodies)) {
             const armed = await on(bodies[id], { gasCeiling: undefined });
@@ -104,20 +120,5 @@ const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference
         assert.strictEqual(gas.undefined, gas.unknown);
     });
 
-    it('a swallowed Object.keys gas exhaustion fails the run once active', async function () {
-        const small = createVM({ gasCeiling: 5000, maxCpuTimeMs: WALL_MS });
-        small.beginBlock();
-        try {
-            const body = `var a=new Array(3000).fill(1);Object.keys(a);return 5;`;
-            const armed = await execute(small, wrap(body), { method: 'default', network: 'regtest', blockContext: LATE });
-            assert.strictEqual(armed.success, false);
-            assert.match(armed.error, /^out_of_gas:/, armed.error);
-            assert.strictEqual(armed.gasUsed, 5000);
-            const legacy = await execute(small, wrap(body), { method: 'default', network: 'mainnet', blockContext: LATE });
-            assert.strictEqual(legacy.success, true, 'pre-activation replay keeps the swallowed fault');
-            assert.ok(legacy.gasUsed > 5000, 'the legacy run completed past its ceiling');
-        } finally {
-            if (small.endBlock) small.endBlock();
-        }
-    });
+    registerSwallowedExhaustionTest();
 });
