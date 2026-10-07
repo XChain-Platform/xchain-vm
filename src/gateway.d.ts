@@ -224,11 +224,36 @@ export interface XChainState {
     delete(key: string): boolean;
 }
 
-/** Validator-attested price oracle. */
+/**
+ * One oracle price row, as the production host returns it. Read `.price`, never
+ * the row itself: a row can be present with its price withheld.
+ */
+export interface OraclePriceRow {
+    /** Price as a decimal string, or null when the price is withheld. */
+    price: string | null;
+    /** Oracle round the price was published in. */
+    roundNumber: number;
+    /** Consensus timestamp of the publishing block (0 on an outsideWindow row). */
+    timestamp: number;
+    /** Set on a latest price withheld because it is stale. */
+    stale?: boolean;
+    /**
+     * Set on a round older than the preloaded history: it may well have been
+     * published, so it must never be treated as "never published".
+     */
+    outsideWindow?: boolean;
+}
+
+/**
+ * Validator-attested price oracle. The production host returns an
+ * OraclePriceRow; a bare price string comes only from a legacy or mocked
+ * accessor, so normalize both (object: read `.price`; string: the price).
+ */
 export interface XChainOracle {
-    /** Latest price for a pair (e.g. 'BTC/USD'), or null. */
-    getPrice(coinPair: string): string | null;
-    getPriceAtRound(coinPair: string, roundNumber: number): string | null;
+    /** Latest row for a pair (e.g. 'BTC/USD'), or null when no price is visible. */
+    getPrice(coinPair: string): OraclePriceRow | string | null;
+    /** Row for one round, or null when that in-window round was never published. */
+    getPriceAtRound(coinPair: string, roundNumber: number): OraclePriceRow | string | null;
     /** Blocks since the oracle snapshot (gas-free, deterministic). */
     getSnapshotAge(): number;
 }

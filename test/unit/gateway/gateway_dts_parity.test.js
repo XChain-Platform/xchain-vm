@@ -123,3 +123,79 @@ describe('gateway.d.ts TokenInfo matches the runtime token-info payload', functi
         assert.ok(!/\[\s*key\s*:\s*string\s*\]/.test(body), 'an index signature lets a misspelled key type-check');
     });
 });
+
+// Slice the OraclePriceRow interface body out of the .d.ts.
+function oraclePriceRowBody() {
+    const open = DTS.indexOf('export interface OraclePriceRow {');
+    assert.ok(open >= 0, 'OraclePriceRow interface missing from gateway.d.ts');
+    const close = DTS.indexOf('\n}', open);
+    assert.ok(close > open, 'OraclePriceRow interface is unterminated');
+    return DTS.substring(open, close);
+}
+
+// List member names declared at the head of a line in an interface body.
+function interfaceMembers(body) {
+    const members = [];
+    const memberRe = /^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\??[ \t]*:/gm;
+    let m;
+    while ((m = memberRe.exec(body)) !== null) members.push(m[1]);
+    return members;
+}
+
+// Mirrors the producer rows in xchain-indexer src/db/prices/oracle_vm_snapshot.js;
+// update this fixture when that shape changes.
+function buildOracleFixture() {
+    const { buildOracleAccessor } = require('../../../src/readonly-accessors.js');
+    return buildOracleAccessor({
+        prices: {
+            'BTC/USD': { price: '60000', roundNumber: 12, timestamp: 1700000000 },
+            'ETH/USD': { price: null, roundNumber: 9, timestamp: 1690000000, stale: true }
+        },
+        rounds: { 'BTC/USD': { 12: { price: '60000', roundNumber: 12, timestamp: 1700000000 } } },
+        roundFloor: 10,
+        snapshotAge: 1
+    });
+}
+
+// The oracle reads return a row object in production, and the price-bet family
+// tells an evicted round from an unpublished one by its outsideWindow member, so
+// the row shape is pinned against rows built by the real accessor, not by name.
+describe('gateway.d.ts OraclePriceRow matches the runtime oracle rows', function () {
+    const body = oraclePriceRowBody();
+    const members = interfaceMembers(body);
+    const oracle = buildOracleFixture();
+
+    it('declares every key a runtime oracle row carries', function () {
+        const rows = [
+            oracle.getPrice('BTC/USD'),
+            oracle.getPrice('ETH/USD'),
+            oracle.getPriceAtRound('BTC/USD', 12),
+            oracle.getPriceAtRound('BTC/USD', 3)
+        ];
+        assert.strictEqual(rows[3].outsideWindow, true, 'fixture must reach the below-floor row');
+        const keys = new Set();
+        for (const r of rows) {
+            assert.strictEqual(typeof r, 'object', 'fixture row is not an object');
+            Object.keys(r).forEach((k) => keys.add(k));
+        }
+        const missing = [...keys].filter((k) => !members.includes(k));
+        assert.deepStrictEqual(missing, [], 'oracle row keys missing from OraclePriceRow: ' + missing.join(', '));
+    });
+
+    it('types each OraclePriceRow member as the runtime carries it', function () {
+        assert.ok(/^[ \t]*price\s*:\s*string\s*\|\s*null\s*;/m.test(body), 'price must be string | null');
+        assert.ok(/^[ \t]*roundNumber\s*:\s*number\s*;/m.test(body), 'roundNumber must be number');
+        assert.ok(/^[ \t]*timestamp\s*:\s*number\s*;/m.test(body), 'timestamp must be number');
+        assert.ok(/^[ \t]*stale\?\s*:\s*boolean\s*;/m.test(body), 'stale must be an optional boolean');
+        assert.ok(/^[ \t]*outsideWindow\?\s*:\s*boolean\s*;/m.test(body), 'outsideWindow must be an optional boolean');
+    });
+
+    it('types both oracle price reads as returning OraclePriceRow', function () {
+        for (const name of ['getPrice', 'getPriceAtRound']) {
+            const re = new RegExp('^[ \\t]*' + name + '\\([^)]*\\)\\s*:\\s*([^;]+);', 'm');
+            const sig = re.exec(DTS);
+            assert.ok(sig, name + ' declaration missing');
+            assert.ok(/\bOraclePriceRow\b/.test(sig[1]), name + ' must return OraclePriceRow, got: ' + sig[1].trim());
+        }
+    });
+});
