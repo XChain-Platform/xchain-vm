@@ -3009,6 +3009,8 @@ module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
 // Expose the iter/Set/apply meter map and resolver for tooling to read, so it derives arming.
 module.exports.ITER_SET_METER_ACTIVATION = ITER_SET_METER_ACTIVATION;
 module.exports.isIterSetMeterActive = isIterSetMeterActive;
+module.exports.GAS_CEILING_SUCCESS_ACTIVATION = GAS_CEILING_SUCCESS_ACTIVATION;
+module.exports.isGasCeilingSuccessActive = isGasCeilingSuccessActive;
 // Coordinated flag-day (block time) that activates the async/Promise contract
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.

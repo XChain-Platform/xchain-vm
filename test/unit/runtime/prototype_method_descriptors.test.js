@@ -70,6 +70,8 @@ const BASE_STATIC_ROWS = [
     ["jsonStringifyHookGateTime", true, true, true, "function", 1],
     ["ITER_SET_METER_ACTIVATION", true, true, true, "object", null],
     ["isIterSetMeterActive", true, true, true, "function", 2],
+    ["GAS_CEILING_SUCCESS_ACTIVATION", true, true, true, "object", null],
+    ["isGasCeilingSuccessActive", true, true, true, "function", 2],
     ["ASYNC_SURFACE_GATE_BLOCK_TIME", true, true, true, "number", null],
     ["isAsyncSurfaceActive", true, true, true, "function", 2],
     ["STATE_KEY_NUL_GATE_BLOCK_TIME", true, true, true, "number", null],
