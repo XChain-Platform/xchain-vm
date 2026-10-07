@@ -64,6 +64,24 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     });
 });
 describe('consensus parameters are frozen (track 8 guard)', function () {
+    it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
+        assert.strictEqual(cr.CONSENSUS_VERSION, '6');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '6', 're-export must match');
+    });
+});
+describe('consensus parameters are frozen (track 8 guard)', function () {
+    it('PINNED runtime equals the golden (re-pinning is a consensus event)', function () {
+        assert.deepStrictEqual(cr.PINNED, {
+            v8:      '12.4.254.21-node.56',
+            icu:     '78.2',
+            unicode: '17.0',
+            cldr:    '48.0',
+            modules: '127'
+        });
+        assert.ok(Object.isFrozen(cr.PINNED));
+    });
+});
+describe('consensus parameters are frozen (track 8 guard)', function () {
     it('BINARY_ALLOC_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // The F3-binary ArrayBuffer/TypedArray byte-length gas charge activates
         // fleet-wide at this block time. It is hashed (gasUsed → contract_hash) and
