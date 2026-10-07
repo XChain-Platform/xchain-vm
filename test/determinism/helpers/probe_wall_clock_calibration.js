@@ -94,6 +94,8 @@ const VECTORS = [
     { group: 'unmetered-suspect', id: 'String toWellFormed loop', body: `var s=String.fromCharCode(0xD800).repeat(${K});var t=0;for(;;){t+=s.toWellFormed().length;}` },
     { group: 'unmetered-suspect', id: 'Function apply loop', body: `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f.apply(null,a);}` },
     { group: 'unmetered-suspect', id: 'Math.max.apply loop', body: `${ARR}var t=0;for(;;){t+=Math.max.apply(null,a);}` },
+    { group: 'unmetered-suspect', id: 'ArrayBuffer resize loop', body: `var b=new ArrayBuffer(8,{maxByteLength:${K}});var t=0;for(;;){b.resize(${K});b.resize(0);t++;}` },
+    { group: 'unmetered-suspect', id: 'ArrayBuffer transfer loop', body: `var b=new ArrayBuffer(${K});var t=0;for(;;){b=b.transfer();t++;}` },
     { group: 'unmetered-suspect', id: 'Set union loop', body: `var x=new Set(),y=new Set();for(var j=0;j<${K};j++){x.add(j);y.add(j+${K});}var t=0;for(;;){t+=x.union(y).size;}` },
 ];
 

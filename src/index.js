@@ -1575,6 +1575,26 @@ const HARNESS_SOURCE = `
             if (args != null && typeof args.length === 'number' && args.length > __GROW_THRESHOLD) __gas(args.length);
             return __applyNative(this, thisArg, args);
         });
+        // resize/transfer allocate (and zero or copy) a new backing store sized by
+        // their argument, so charge that byte length the way the constructor does.
+        // The argument is coerced once here and the number handed to the native, so
+        // a valueOf hook runs a single time.
+        var __abProto = typeof ArrayBuffer === 'function' ? ArrayBuffer.prototype : null;
+        var __abLenDesc = __abProto ? __getOwnDesc(__abProto, 'byteLength') : null;
+        var __abLenGet = __abLenDesc && __abLenDesc.get;
+        ['resize', 'transfer', 'transferToFixedLength'].forEach(function(m) {
+            var orig = __abProto ? __abProto[m] : null;
+            if (typeof orig !== 'function') return;
+            __lockMethod(__abProto, m, function(newLen) {
+                var n = newLen;
+                if (n !== undefined) n = +n;
+                else if (m !== 'resize' && typeof __abLenGet === 'function') {
+                    try { n = __abLenGet.call(this); } catch (e) { n = 0; }
+                }
+                __allocGas(n);
+                return n === undefined ? orig.call(this) : orig.call(this, n);
+            });
+        });
     }
     // ----- end native metering -----
 })();
