@@ -40,9 +40,16 @@
  *   - metering activation: the default block time sits at the VM's newest
  *     ELAPSED block-time flag-day, the configured network's own per-network time
  *     gates included (testnet's armed JSON.stringify hook and meta-required
- *     instants), so the rules every live chain runs today are ON and gasUsed is a
- *     live-rule-set number. Pin an earlier block.timestamp to simulate the
- *     pre-activation rules (it warns once).
+ *     instants), so the block-time rules every live chain runs today are ON. Pin
+ *     an earlier block.timestamp to simulate the pre-activation rules (it warns
+ *     once).
+ *   - network: the default is regtest, which also runs network-keyed gates that
+ *     are on there from genesis but not yet armed on every live chain (the
+ *     iter/Set/apply meter and gas-ceiling success on mainnet and testnet, the
+ *     JSON.stringify hook on mainnet), so a default gasUsed, and for a swallowed
+ *     gas exhaustion the status, can differ from what a live chain settles. Pass
+ *     network: 'mainnet' (`xchain-foundry simulate --network mainnet`) to
+ *     reproduce mainnet.
  *   - height-gate activation: the default block HEIGHT sits at the newest armed
  *     per-coin activation for the configured (coin, network), so a mainnet
  *     simulation runs the Package-3 sandbox and the other height-keyed gates the
@@ -218,11 +225,15 @@ class ContractSimulator {
      * @param {object} [opts]
      * @param {string} [opts.coin='BTC']     - coin ticker for default C:{COIN}:{i} addresses
      * @param {string} [opts.network='regtest'] - VM network. This selects the
-     *        NETWORK-AWARE gates only (the async/Promise surface, lint
-     *        hardening, the state-key gates, the Package-3 sandbox bundle),
-     *        which regtest/testnet activate from genesis. Gas-METERING
-     *        activation carries no network term at all: it follows
-     *        opts.block.timestamp (see DEFAULT_BLOCK_TIME). The DEFAULT
+     *        NETWORK-AWARE gates (the async/Promise surface, lint hardening,
+     *        the state-key gates, the Package-3 sandbox bundle, and the
+     *        network-keyed metering gates: the iter/Set/apply meter,
+     *        gas-ceiling success and the JSON.stringify hook), which regtest
+     *        activates from genesis. Some of these are not yet armed on
+     *        mainnet or testnet, so the regtest default can report a gasUsed
+     *        or status no live chain settles; pass 'mainnet' to reproduce
+     *        mainnet. The scalar block-time meters carry no network term:
+     *        they follow opts.block.timestamp (see DEFAULT_BLOCK_TIME). The DEFAULT
      *        timestamp does depend on it: it also clears this network's own
      *        elapsed per-network time gates (TIME_NETWORK_GATES). On mainnet the
      *        Package-3 sandbox, the execute-time re-lint and the lint

@@ -23,7 +23,9 @@ const XChainVM = require('../../index.js');
 // hardening, state-key, Pkg-3 sandbox) that regtest activates from genesis. On
 // mainnet the height-keyed gates are keyed on block HEIGHT per coin instead, which is
 // what defaultBlockHeight() below derives (see HEIGHT_GATES). So
-// `network: 'regtest'` does NOT turn the meters on; only the block time does. A
+// `network: 'regtest'` does NOT turn these scalar meters on; only the block time
+// does. (The network-keyed meters, such as the iter/Set/apply meter and gas-ceiling
+// success, are the exception: regtest runs them from genesis, mainnet not yet.) A
 // default below the newest flag-day meters under a rule set no live chain runs:
 // measured on Node 22 / Linux, `new Uint8Array(100000)` costs 225 gas at the old
 // 1700000000 default and 100228 gas at the flag-day.

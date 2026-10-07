@@ -28,8 +28,8 @@ const RESERVED_CONTROL_BINDINGS = [
 // The deploy code-size cap, in UTF-8 BYTES. Inlined (not required from
 // index.js or protocol/constants.js) for the same reason SAFE_MATH_MEMBERS is
 // duplicated above: this file must be BYTE-IDENTICAL to the SDK's vendored copy
-// at xchain-sdk/src/contract/lint-core.js, and constants.js sits at a different
-// relative depth in each tree, so no single require() line resolves in both.
+// at xchain-sdk/src/contract/lint-core/constants.js; protocol/constants.js sits
+// at a different depth in each tree, so no one require() line resolves in both.
 // It MUST stay equal to src/protocol/constants.js MAX_CODE_SIZE (and therefore
 // to the indexer's deploy.js cap); a parity test asserts it.
 const MAX_CODE_SIZE = 65536;

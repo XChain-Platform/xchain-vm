@@ -18,8 +18,10 @@
  * which the SDK/CLI consume) MUST agree on every acorn-coverable verdict: same
  * valid flag AND byte-identical first-error message, or contract authors get
  * false greens / false reds. This is the authoritative cross-engine check;
- * because the SDK vendors lint-core/metering byte-identically (asserted below),
- * proving validateSyntax ⇆ lintSource here transitively covers the SDK linter.
+ * because the SDK vendors lint-core/metering byte-identically (asserted below
+ * for the three entry files AND every file under src/lint-core/ and
+ * src/metering/, which hold the rules), proving validateSyntax ⇆ lintSource here
+ * transitively covers the SDK linter.
  *
  * Requires isolated-vm → Node 22 (see .nvmrc).
  ********************************************************************/
@@ -40,9 +42,25 @@ const CONTRACTS_DIR  = path.join(__dirname, '..', '..', '..', '..', 'xchain-cont
 // path that must resolve at BOTH vendored depths, so the copy has to travel with
 // lint-core.js in the same change or the SDK linter cannot load.
 const VENDORED_FILES = ['lint-core.js', 'metering.js', 'stripped-globals.js'];
+// The two entry files are thin requires over these directories, which hold the actual rules and gas placement.
+const VENDORED_DIRS = ['lint-core', 'metering'];
 
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+// List every regular file under base as sorted '/'-separated relative paths ([] when base is absent).
+function listFiles(base, rel = '') {
+    let entries;
+    try { entries = fs.readdirSync(path.join(base, rel), { withFileTypes: true }); }
+    catch (e) { if (e.code === 'ENOENT') return []; throw e; }
+    let out = [];
+    for (const entry of entries) {
+        const child = rel ? rel + '/' + entry.name : entry.name;
+        if (entry.isDirectory()) out = out.concat(listFiles(base, child));
+        else if (entry.isFile()) out.push(child);
+    }
+    return out.sort();
 }
 
 // Required-sibling gate. By default a missing sibling checkout skips its parity
@@ -96,8 +114,39 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                 );
             });
         }
-    });
 
+        for (const dir of VENDORED_DIRS) {
+            const canonical = listFiles(path.join(VM_SRC_DIR, dir));
+            // Fail closed on a vacuous pass: a renamed or emptied directory must go red, never generate zero checks
+            it('src/' + dir + '/ is present and non-empty, so its drift checks cannot pass vacuously', function () {
+                assert.ok(canonical.length > 0, 'NO CANONICAL FILES: src/' + dir +
+                    '/ is missing or empty, so the per-file drift guard below would check nothing.');
+            });
+            // Refuse a file added, removed or renamed on one side only, which a per-file hash of one side cannot see
+            it('xchain-sdk/src/contract/' + dir + '/ file set matches src/' + dir + '/', function () {
+                requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                const vendored = listFiles(path.join(SDK_VENDOR_DIR, dir));
+                const missingInSdk = canonical.filter((f) => !vendored.includes(f));
+                const onlyInSdk = vendored.filter((f) => !canonical.includes(f));
+                assert.ok(missingInSdk.length === 0 && onlyInSdk.length === 0,
+                    'VENDOR DRIFT: ' + dir + '/ file sets differ. Missing from the SDK copy: [' + missingInSdk.join(', ') +
+                    ']. Present only in the SDK copy: [' + onlyInSdk.join(', ') + '].');
+            });
+            for (const rel of canonical) {
+                const f = dir + '/' + rel;
+                it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
+                    requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                    const vendored = path.join(SDK_VENDOR_DIR, f);
+                    assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
+                    assert.strictEqual(sha256(vendored), sha256(path.join(VM_SRC_DIR, f)),
+                        'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.');
+                });
+            }
+        }
+    });
+});
+
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     describe('good fixture', function () {
         it('valid under both validateSyntax and lintSource', function () {
             assert.strictEqual(validateSyntax(GOOD_FIXTURE).valid, true);

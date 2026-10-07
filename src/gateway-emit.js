@@ -87,11 +87,9 @@ function buildCallIdPreimage(fields) {
            fields.emissionIndex + ':' + fields.targetChain;
 }
 
-// Cross-CHAIN call (XCALL) protocol constants. Vendored single source of truth:
-// ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
-// constants.js); mirrored in src/index.js exports and re-validated host-side by
-// the indexer. Deriving from the vendored module makes a bare-literal drift
-// impossible by construction.
+// Read the cross-CHAIN call (XCALL) bounds from the vendored ./protocol/constants.js, never
+// as bare literals. Only the ones test/determinism/xcall-constants-cross-repo.test.js gates
+// are checked against the sibling and documentation copies; the indexer re-validates host-side.
 const PROTO = require('./protocol/constants.js');
 const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;
 const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;

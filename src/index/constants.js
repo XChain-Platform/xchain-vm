@@ -20,10 +20,9 @@
  ********************************************************************/
 // @ts-nocheck
 
-// Maximum smart-contract code size (64 KiB). Vendored single source of truth:
-// ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
-// constants.js, MAX_CODE_SIZE); kept equal to the SDK and indexer by the
-// cross-service regression suite (exported at the bottom of this module).
+// Maximum smart-contract code size (64 KiB), read from the vendored ../protocol/constants.js.
+// test/determinism/xcall-constants-cross-repo.test.js checks its value against the
+// SDK, indexer and documentation copies (exported at the bottom of this module).
 const PROTO = require('../protocol/constants.js');
 const MAX_CODE_SIZE = PROTO.MAX_CODE_SIZE;
 

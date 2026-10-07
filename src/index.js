@@ -2990,6 +2990,9 @@ module.exports.BINARY_ALLOC_GATE_BLOCK_TIME = BINARY_ALLOC_GATE_BLOCK_TIME;
 module.exports.JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME = JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME;
 module.exports.JSON_STRINGIFY_HOOK_ACTIVATION = JSON_STRINGIFY_HOOK_ACTIVATION;
 module.exports.jsonStringifyHookGateTime = jsonStringifyHookGateTime;
+// Expose the iter/Set/apply meter map and resolver for tooling to read, so it derives arming.
+module.exports.ITER_SET_METER_ACTIVATION = ITER_SET_METER_ACTIVATION;
+module.exports.isIterSetMeterActive = isIterSetMeterActive;
 // Coordinated flag-day (block time) that activates the async/Promise contract
 // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
 // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
