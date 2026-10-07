@@ -30,10 +30,12 @@ let ContractSimulator = null;
 let liveBlockTime = null;
 let XChainVM = null;
 let TIME_NETWORK_GATES = null;
+let GasTracker = null;
 try {
     ({ ContractSimulator, liveBlockTime } = require('../../src/toolkit/simulator.js'));
     ({ TIME_NETWORK_GATES } = require('../../src/toolkit/simulator/constants.js'));
     XChainVM = require('../../src/index.js');
+    GasTracker = require('../../src/gas.js');
 } catch (e) {
     console.log('Skipping simulator network block-time tests (isolated-vm unavailable):', e.message);
 }
@@ -42,6 +44,15 @@ const NETWORKS = ['mainnet', 'testnet', 'regtest'];
 const UNARMED_SENTINEL = 9999999999;
 const NOW = () => Math.floor(Date.now() / 1000);
 const armed = (t) => Number.isFinite(t) && t > 0 && t < UNARMED_SENTINEL;
+
+// Height maps stay far below 1e9; any bare-network map holding a time-sized
+// value is a time gate the live anchor must fold in, or the enumeration goes red.
+const isTimeMap = (v) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+    const keys = Object.keys(v);
+    return keys.length > 0 && keys.every((n) => NETWORKS.includes(n)) &&
+        keys.some((n) => Number.isFinite(v[n]) && v[n] >= 1e9);
+};
 
 // A toJSON hook that hands the serializer a spine one level past the depth guard:
 // with the hook gate ON it faults out_of_stack, with it OFF it serializes.
@@ -70,18 +81,22 @@ async function runQuiet(opts, src, method) {
     this.timeout(30000);
 
     it('lists every VM network-keyed block-time map in TIME_NETWORK_GATES', function () {
-        // Height maps stay far below 1e9; any bare-network map holding a time-sized
-        // value is a time gate the live anchor must fold in, or this goes red.
-        const timeMaps = Object.keys(XChainVM).filter((k) => {
-            const v = XChainVM[k];
-            if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
-            const keys = Object.keys(v);
-            return keys.length > 0 && keys.every((n) => NETWORKS.includes(n)) &&
-                keys.some((n) => Number.isFinite(v[n]) && v[n] >= 1e9);
-        });
+        // GasTracker statics are scanned too, since the entry deliberately does not re-export them.
+        const timeMaps = Object.keys(XChainVM).filter((k) => isTimeMap(XChainVM[k])).concat(
+            Object.getOwnPropertyNames(GasTracker).filter((k) => /_ACTIVATION$/.test(k) && isTimeMap(GasTracker[k])));
         assert.ok(timeMaps.includes('JSON_STRINGIFY_HOOK_ACTIVATION'), 'the enumeration found nothing to check');
         const named = TIME_NETWORK_GATES.map((g) => g.source);
         for (const k of timeMaps) assert.ok(named.includes(k), k + ' is missing from TIME_NETWORK_GATES');
+    });
+
+    it('resolves the gas-ceiling success gate exactly as its consensus predicate does', function () {
+        const entry = TIME_NETWORK_GATES.find((g) => g.source === 'GAS_CEILING_SUCCESS_ACTIVATION');
+        assert.ok(entry, 'GAS_CEILING_SUCCESS_ACTIVATION is missing from TIME_NETWORK_GATES');
+        const map = GasTracker.GAS_CEILING_SUCCESS_ACTIVATION;
+        for (const network of NETWORKS.concat('nosuchnet')) {
+            assert.strictEqual(entry.resolve(network), Object.hasOwn(map, network) ? map[network] : null,
+                'the gas-ceiling success entry resolves ' + network + ' differently from the gate map');
+        }
     });
 
     it('folds a network gate into the live anchor exactly at its instant', function () {
@@ -112,6 +127,8 @@ async function runQuiet(opts, src, method) {
             }
             assert.strictEqual(XChainVM.isRestPatternMeterActive(network, ts), XChainVM.isRestPatternMeterActive(network, now),
                 'a default ' + network + ' simulator must resolve the rest-pattern gate as the live chain does');
+            assert.strictEqual(GasTracker.isGasCeilingSuccessActive(network, ts), GasTracker.isGasCeilingSuccessActive(network, now),
+                'a default ' + network + ' simulator must resolve the gas-ceiling success gate as the live chain does');
         }
     });
 });

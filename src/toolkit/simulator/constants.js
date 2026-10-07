@@ -14,6 +14,7 @@
 // @ts-nocheck
 
 const XChainVM = require('../../index.js');
+const GasTracker = require('../../gas.js');
 
 // Default simulated block time. Every block-TIME-keyed metering activation in
 // the VM -- F3 binary-constructor and F3-globals metering, the O(n)-copy meter
@@ -118,14 +119,18 @@ const CONTRACT_META_REQUIRED_TIMES = Object.freeze({
 // Block-TIME gates keyed per NETWORK rather than by one scalar, so GATE_BLOCK_TIMES
 // (scalar-only by design) never sees them. Each entry reads its instant off the
 // source that decides it, never a retyped value; the live anchor folds in the
-// configured network's elapsed entries. test/toolkit/simulator_block_time.test.js
-// holds this table complete against the VM's exported network-keyed time maps.
+// configured network's elapsed entries. test/toolkit/simulator_network_block_time.test.js
+// holds this table complete against the VM's exported and GasTracker network-keyed time maps.
 const TIME_NETWORK_GATES = Object.freeze([
     { label: 'JSON.stringify value hooks', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',
         resolve: (network) => XChainVM.jsonStringifyHookGateTime(network) },
     { label: 'CONTRACT_META_REQUIRED', source: 'CONTRACT_META_REQUIRED_TIMES',
         resolve: (network) => CONTRACT_META_REQUIRED_TIMES[
-            Object.prototype.hasOwnProperty.call(CONTRACT_META_REQUIRED_TIMES, network) ? network : 'mainnet'] }
+            Object.prototype.hasOwnProperty.call(CONTRACT_META_REQUIRED_TIMES, network) ? network : 'mainnet'] },
+    // Resolve exactly as isGasCeilingSuccessActive does: a network the map does not name is unarmed.
+    { label: 'gas-ceiling success', source: 'GAS_CEILING_SUCCESS_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(GasTracker.GAS_CEILING_SUCCESS_ACTIVATION, network)
+            ? GasTracker.GAS_CEILING_SUCCESS_ACTIVATION[network] : null) }
 ]);
 
 module.exports = {
