@@ -3019,8 +3019,10 @@ module.exports.CALL_SPREAD_METER_GATE_BLOCK_TIME = CALL_SPREAD_METER_GATE_BLOCK_
 // REST_PATTERN_METER.
 module.exports.REST_PATTERN_METER_GATE_BLOCK_TIME = REST_PATTERN_METER_GATE_BLOCK_TIME;
 module.exports.isRestPatternMeterActive = isRestPatternMeterActive;
-module.exports.APPLY_LENGTH_METER_ACTIVATION = APPLY_LENGTH_METER_ACTIVATION;
-module.exports.isApplyLengthMeterActive = isApplyLengthMeterActive;
+const applyLengthMeterExports = Object.create(Object.getPrototypeOf(module.exports), {
+    APPLY_LENGTH_METER_ACTIVATION: { value: APPLY_LENGTH_METER_ACTIVATION }, isApplyLengthMeterActive: { value: isApplyLengthMeterActive },
+});
+Object.setPrototypeOf(module.exports, applyLengthMeterExports);
 // Coordinated flag-day (block time) that activates canonical string state keys
 // (String(key) normalization for primitives, deterministic rejection of
 // non-primitive keys) so the key-size/NUL/keyCount guards apply to every key.
