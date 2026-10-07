@@ -1794,10 +1794,9 @@ function isIterSetMeterActive(network, blockTime) {
     return Number.isFinite(gate) && (gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate));
 }
 const APPLY_LENGTH_METER_ACTIVATION = Object.seal({ mainnet: null, testnet: null, regtest: 0 });
-const isApplyLengthMeterActive = (network, blockTime) => {
-    const gate = APPLY_LENGTH_METER_ACTIVATION[network];
-    return Number.isFinite(gate) && (gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate));
-};
+const isApplyLengthMeterActive = (network, blockTime) => Number.isFinite(APPLY_LENGTH_METER_ACTIVATION[network]) &&
+    (APPLY_LENGTH_METER_ACTIVATION[network] === 0 ||
+        (Number.isFinite(blockTime) && blockTime >= APPLY_LENGTH_METER_ACTIVATION[network]));
 // Activation for failing a run whose gas-exhaustion fault was caught inside the
 // isolate (the Object.* statics wrappers swallow it) and so reached the host as a
 // success. Post-gate such a run is out_of_gas at the ceiling; pre-gate it replays as
