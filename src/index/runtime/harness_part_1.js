@@ -169,7 +169,7 @@ module.exports = `
     // Give a metering wrapper the original constructor's STATIC surface without
     // standing the wrapper behind the original on the prototype chain.
     //
-    // The wrappers used to do __setProto(Wrapped, Orig), which resolved the
+    // The wrappers avoid __setProto(Wrapped, Orig), which would resolve the
     // statics by inheriting them from the very object being replaced. That reads
     // as harmless and is not: it builds a constructor whose [[Prototype]] is a
     // shape no built-in has (Uint8Array inheriting from Uint8Array rather than
