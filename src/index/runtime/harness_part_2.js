@@ -383,4 +383,5 @@ module.exports = `    // a post-launch change: it is correct only inside that re
             if (fr.n > 1) __gasFunc(fr.n);                       // per-node scan width
             if (dirty) materialize(fr);
             return fr;
-        };`;
+        };
+`;

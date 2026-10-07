@@ -383,4 +383,5 @@ module.exports = `
             }
             __allocGas(n);
             return orig.apply(this, arguments);
-        });`;
+        });
+`;

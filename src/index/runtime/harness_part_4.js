@@ -318,4 +318,5 @@ module.exports = `    };
         if (grew > __GROW_THRESHOLD) __gas(grew);
         return r;
     });
+
 `;

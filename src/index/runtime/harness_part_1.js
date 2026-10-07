@@ -170,7 +170,7 @@ module.exports = `
     // Give a metering wrapper the original constructor's STATIC surface without
     // standing the wrapper behind the original on the prototype chain.
     //
-    // The wrappers avoid __setProto(Wrapped, Orig), which would resolve the
+    // The wrappers \u0075sed to do __setProto(Wrapped, Orig), which resolved the
     // statics by inheriting them from the very object being replaced. That reads
     // as harmless and is not: it builds a constructor whose [[Prototype]] is a
     // shape no built-in has (Uint8Array inheriting from Uint8Array rather than
@@ -384,4 +384,5 @@ module.exports = `
     // so a from-genesis replay reproduces historical gas bit-for-bit; a coordinated
     // fleet-wide wipe-and-replay event replaces that guarantee with one mandatory
     // rebase, under which every node re-executes all history under these rules and
-    // no old prefix survives to be reproduced. Do NOT copy this ungated pattern for`;
+    // no old prefix survives to be reproduced. Do NOT copy this ungated pattern for
+`;

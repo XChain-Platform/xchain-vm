@@ -25,6 +25,6 @@ const part3 = require('./harness_part_3.js');
 const part4 = require('./harness_part_4.js');
 const part5 = require('./harness_part_5.js');
 
-const HARNESS_SOURCE = [part1, part2, part3, part4, part5].join('\n');
+const HARNESS_SOURCE = [part1, part2, part3, part4, part5].join('');
 
 module.exports = { HARNESS_SOURCE };
