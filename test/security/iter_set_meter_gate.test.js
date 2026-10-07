@@ -36,6 +36,8 @@ const VECTORS = {
     'String isWellFormed': `var s=String.fromCharCode(0x100).repeat(${K});var t=0;for(;;){if(s.isWellFormed())t++;}`,
     'String toWellFormed': `var s=String.fromCharCode(0xD800).repeat(${K});var t=0;for(;;){t+=s.toWellFormed().length;}`,
     'Call spread': `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f(...a);}`,
+    'ArrayBuffer resize': `var b=new ArrayBuffer(8,{maxByteLength:${K}});var t=0;for(;;){b.resize(${K});b.resize(0);t++;}`,
+    'ArrayBuffer transfer': `var b=new ArrayBuffer(${K});var t=0;for(;;){b=b.transfer();t++;}`,
     'Set union': `var x=new Set(),y=new Set();for(var j=0;j<${K};j++){x.add(j);y.add(j+${K});}var t=0;for(;;){t+=x.union(y).size;}`,
 };
 const SET_METHODS = ['union', 'intersection', 'difference', 'symmetricDifference',
@@ -118,6 +120,43 @@ function registerSwallowedExhaustionTest() {
         }
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
+    });
+
+    it('ArrayBuffer resize, transfer and transferToFixedLength are charged by byte length', async function () {
+        const bodies = {
+            resize: `var b=new ArrayBuffer(8,{maxByteLength:${K}});b.resize(${K});return b.byteLength;`,
+            transfer: `var b=new ArrayBuffer(8);var c=b.transfer(${K});return c.byteLength;`,
+            transferToFixedLength: `var b=new ArrayBuffer(8);var c=b.transferToFixedLength(${K});return c.byteLength;`,
+        };
+        for (const id of Object.keys(bodies)) {
+            const armed = await on(bodies[id], { gasCeiling: undefined });
+            const unarmed = await off(bodies[id]);
+            assert.strictEqual(armed.success, true, `${id}: ${armed.error}`);
+            assert.strictEqual(armed.returnValue, String(K), id);
+            assert.ok(armed.gasUsed >= unarmed.gasUsed + K - 10, `${id}: ${armed.gasUsed} vs ${unarmed.gasUsed}`);
+        }
+    });
+
+    it('ArrayBuffer transfer without a length is charged by the source byte length', async function () {
+        const body = `var b=new ArrayBuffer(${K});var c=b.transfer();return c.byteLength;`;
+        const armed = await on(body, { gasCeiling: undefined });
+        const unarmed = await off(body);
+        assert.strictEqual(armed.success, true, armed.error);
+        assert.strictEqual(armed.returnValue, String(K));
+        assert.ok(armed.gasUsed >= unarmed.gasUsed + K - 10, `${armed.gasUsed} vs ${unarmed.gasUsed}`);
+    });
+
+    it('ArrayBuffer resize coerces its argument once and keeps native range errors', async function () {
+        const body = `var n=0;var b=new ArrayBuffer(8,{maxByteLength:16});
+            b.resize({valueOf:function(){n++;return 12;}});
+            var e1='';try{b.resize(17);}catch(e){e1=e.name;}
+            var e2='';try{new ArrayBuffer(8).resize(4);}catch(e){e2=e.name;}
+            return n+':'+b.byteLength+':'+e1+':'+e2;`;
+        const armed = await on(body);
+        const unarmed = await off(body);
+        assert.strictEqual(armed.success, true, armed.error);
+        assert.strictEqual(JSON.parse(armed.returnValue), '1:12:RangeError:TypeError');
+        assert.strictEqual(unarmed.returnValue, armed.returnValue);
     });
 
     registerSwallowedExhaustionTest();
