@@ -254,7 +254,7 @@ export interface XChainOracle {
     getPrice(coinPair: string): OraclePriceRow | string | null;
     /** Row for one round, or null when that in-window round was never published. */
     getPriceAtRound(coinPair: string, roundNumber: number): OraclePriceRow | string | null;
-    /** Blocks since the oracle snapshot (gas-free, deterministic). */
+    /** Age of the oracle snapshot in consensus seconds (gas-free, deterministic). */
     getSnapshotAge(): number;
 }
 

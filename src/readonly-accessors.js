@@ -26,7 +26,7 @@
  * expected methods), it is passed through unchanged, so existing in-process
  * callers/tests keep working without migration.
  *
- * Snapshot shapes (all plain JSON):
+ * Snapshot shapes (all plain JSON; snapshotAge is in consensus seconds):
  *   oracle:        { snapshotAge:Number, prices:{ [pair]:{price,roundNumber,timestamp} },
  *                    rounds:{ [pair]:{ [round]:{price,roundNumber,timestamp} } },
  *                    roundFloor:Number }   // oldest round `rounds` guarantees, 0 = all of it
