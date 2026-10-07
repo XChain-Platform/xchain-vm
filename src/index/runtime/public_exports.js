@@ -42,6 +42,7 @@ const consensusRuntime = require('../../consensus-runtime.js');
 const { HostFaultError } = require('../../errors.js');
 const sandbox = require('../../sandbox.js');
 const lintCore = require('../../lint-core.js');
+const { APPLY_LENGTH_METER_ACTIVATION, isApplyLengthMeterActive } = require('../apply_length_meter.js');
 
 function attachHeightGates(target) {
     // Expose the canonical code-size cap so the cross-service regression suite can
@@ -218,6 +219,10 @@ function attachStatics(target) {
     attachTimeGates(target);
     attachCallLimits(target);
     attachFrozenSurface(target);
+    const applyLengthMeterExports = Object.create(Object.getPrototypeOf(target), {
+        APPLY_LENGTH_METER_ACTIVATION: { value: APPLY_LENGTH_METER_ACTIVATION }, isApplyLengthMeterActive: { value: isApplyLengthMeterActive },
+    });
+    Object.setPrototypeOf(target, applyLengthMeterExports);
 }
 
 module.exports = { attachStatics };

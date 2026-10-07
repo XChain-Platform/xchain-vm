@@ -91,6 +91,9 @@ describe('Read-only accessors', function () {
             assert.strictEqual(buildOracleAccessor({ snapshotAge: 9 }).getSnapshotAge(), 9);
             assert.strictEqual(buildOracleAccessor({}).getSnapshotAge(), Number.MAX_SAFE_INTEGER);
         });
+        it('getSnapshotAge passes the snapshot seconds through unscaled', function () {
+            assert.strictEqual(buildOracleAccessor({ snapshotAge: 90 }).getSnapshotAge(), 90);
+        });
     });
 });
 

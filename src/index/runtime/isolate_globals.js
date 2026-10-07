@@ -19,6 +19,7 @@
 
 const { MAX_STACK_DEPTH_MUSL } = require('../constants.js');
 const { BINARY_ALLOC_GATE_BLOCK_TIME, jsonStringifyHookGateTime, isIterSetMeterActive } = require('./activations.js');
+const { isApplyLengthMeterActive } = require('../apply_length_meter.js');
 
 function injectExecutionGlobals(context, opts, pkg3SandboxOn, limits) {
         // Inject the deterministic recursion bound. The harness captures this
@@ -77,6 +78,7 @@ function injectExecutionGlobals(context, opts, pkg3SandboxOn, limits) {
         context.global.setSync('__JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME', jsonStringifyHookGateTime(opts.network));
         const __iterSetMeterOn = isIterSetMeterActive(opts.network, __blockTime);
         context.global.setSync('__ITER_SET_METER_ON', __iterSetMeterOn);
+        context.global.setSync('__APPLY_LENGTH_METER_ON', isApplyLengthMeterActive(opts.network, __blockTime));
         return __iterSetMeterOn;
 }
 

@@ -109,6 +109,7 @@ module.exports = `
     var __meterUpgradeOn = (typeof __blockTime === 'number' &&
         typeof __BINARY_ALLOC_GATE_BLOCK_TIME === 'number' &&
         __blockTime >= __BINARY_ALLOC_GATE_BLOCK_TIME); var __iterMeterOn = globalThis.__ITER_SET_METER_ON === true;
+    var __applyLengthMeterOn = globalThis.__APPLY_LENGTH_METER_ON === true;
 
     var __fill = Array.prototype.fill;
     if (typeof __fill === 'function') __lockMethod(Array.prototype, 'fill', function() {

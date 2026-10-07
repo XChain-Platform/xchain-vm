@@ -82,7 +82,7 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
     });
     // ----- end G4 -----
 
-    // ----- Native iteration, string and apply metering (gated) -----
+    // ----- Native iteration and string metering (gated) -----
     if (__iterMeterOn) {
         var __sizeOf = function(o) {
             var s = o == null ? 0 : o.size;
@@ -111,13 +111,35 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
             if (c > 0) __allocGas(c);
             return __iterDrop.apply(this, arguments);
         });
+    }
+    if (__applyLengthMeterOn) {
         var __fnProto = Object.getPrototypeOf(function() {});
         var __applyNative = __fnProto.call.bind(__fnProto.apply);
         __lockMethod(__fnProto, 'apply', function(thisArg, args) {
             if (args != null && typeof args.length === 'number' && args.length > __GROW_THRESHOLD) __gas(args.length);
             return __applyNative(this, thisArg, args);
         });
+        // resize/transfer allocate (and zero or copy) a new backing store sized by
+        // their argument, so charge that byte length the way the constructor does.
+        // The argument is coerced once here and the number handed to the native, so
+        // a valueOf hook runs a single time.
+        var __abProto = typeof ArrayBuffer === 'function' ? ArrayBuffer.prototype : null;
+        var __abLenDesc = __abProto ? __getOwnDesc(__abProto, 'byteLength') : null;
+        var __abLenGet = __abLenDesc && __abLenDesc.get;
+        ['resize', 'transfer', 'transferToFixedLength'].forEach(function(m) {
+            var orig = __abProto ? __abProto[m] : null;
+            if (typeof orig !== 'function') return;
+            __lockMethod(__abProto, m, function(newLen) {
+                var n = newLen;
+                if (n !== undefined) n = +n;
+                else if (m !== 'resize' && typeof __abLenGet === 'function') {
+                    try { n = __abLenGet.call(this); } catch (e) { n = 0; }
+                }
+                __allocGas(n);
+                return n === undefined ? orig.call(this) : orig.call(this, n);
+            });
+        });
     }
-    // ----- end native iteration metering -----
+    // ----- end native metering -----
 })();
 `;
