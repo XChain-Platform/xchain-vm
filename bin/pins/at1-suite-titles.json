@@ -1414,8 +1414,8 @@
         "test/unit/vm-worker.test.js": "61da1fba928ff3fb",
         "test/unit/wrapper-control-bindings.test.js": "9580326e21a45485",
         "test/unit/xcall-bounds-parity.test.js": "d42a00ccb4967c7c",
-        "test/unit/lint/lint_destructure_heights.test.js/index.test.js": "03e5be0396e94f65",
-        "test/unit/lint/lint_destructure_threading.test.js/index.test.js": "5ce9047e4e761aad"
+        "test/unit/lint/lint_destructure_heights.test.js": "03e5be0396e94f65",
+        "test/unit/lint/lint_destructure_threading.test.js": "5ce9047e4e761aad"
       }
     }
   }
