@@ -28,9 +28,7 @@ describe('Consensus runtime pin', function () {
             assert.ok(Object.isFrozen(CONSENSUS_STATUS_TOKENS));
             assert.ok(Object.isFrozen(STATUS_ERROR_PREFIXES));
             assert.deepStrictEqual(CONSENSUS_STATUS_TOKENS, ['reverted', 'out_of_resource', 'failed']);
-            // Epoch 5: JSON.stringify value hooks are resolved before the depth guard
-            // after their dedicated flag day.
-            assert.strictEqual(CONSENSUS_VERSION, '5');
+            assert.strictEqual(CONSENSUS_VERSION, '6');
             assert.strictEqual(REFERENCE_NODE, 'v22.22.3');
         });
     });

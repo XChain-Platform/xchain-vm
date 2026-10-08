@@ -41,8 +41,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '5');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '5', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '6');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '6', 're-export must match');
     });
 });
 
@@ -78,10 +78,9 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // validator (validateSyntax) acts on; adding/removing one changes which
         // contracts the chain accepts (a hashed deploy verdict). Freeze it sorted so
         // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
-        // Epoch 4 added 'banned-rest' (the REST_PATTERN_METER deploy half).
         const GOLDEN_CONSENSUS_RULES = [
             'banned-async', 'banned-generator', 'banned-literal', 'banned-math',
-            'banned-rest', 'banned-wasm', 'invalid-type', 'reserved-identifier',
+            'banned-rest', 'banned-wasm', 'banned-with', 'invalid-type', 'reserved-identifier',
             'unsupported-syntax'
         ];
         assert.deepStrictEqual([...vm.CONSENSUS_RULES].sort(), GOLDEN_CONSENSUS_RULES,

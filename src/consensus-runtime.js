@@ -148,7 +148,7 @@ const REFERENCE_NODE = 'v22.22.3';
 // once before deterministic depth checking and native serialization. Below the gate,
 // the historical serializer path remains unchanged; hook-free values retain identical
 // bytes and gas on both sides of the gate.
-const CONSENSUS_VERSION = '5';
+const CONSENSUS_VERSION = '6';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash
