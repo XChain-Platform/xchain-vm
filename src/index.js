@@ -52,6 +52,10 @@ const {
     LINT_BANNED_WITH_ACTIVATION,
     isLintBannedWithActive,
 } = require('./index/lint_banned_with_heights.js');
+const {
+    BIGINT_SURFACE_STRIP_ACTIVATION,
+    isBigIntSurfaceStripActive,
+} = require('./index/bigint_surface_strip_heights.js');
 
 const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
 const executeWithBannedWithGate = executeMethods.execute;
@@ -153,10 +157,12 @@ installMethods(
 module.exports = XChainVM;
 setTimeoutLog((message) => console.error(message));
 attachStatics(XChainVM);
-const bannedWithExports = Object.create(Object.getPrototypeOf(XChainVM), {
+const heightGateExports = Object.create(Object.getPrototypeOf(XChainVM), {
     LINT_BANNED_WITH_ACTIVATION: { value: LINT_BANNED_WITH_ACTIVATION, enumerable: true },
     isLintBannedWithActive: { value: isLintBannedWithActive, enumerable: true },
+    BIGINT_SURFACE_STRIP_ACTIVATION: { value: BIGINT_SURFACE_STRIP_ACTIVATION, enumerable: true },
+    isBigIntSurfaceStripActive: { value: isBigIntSurfaceStripActive, enumerable: true },
 });
-Object.setPrototypeOf(XChainVM, bannedWithExports);
+Object.setPrototypeOf(XChainVM, heightGateExports);
 module.exports.GAS_CEILING_SUCCESS_ACTIVATION = GasTracker.GAS_CEILING_SUCCESS_ACTIVATION;
 module.exports.isGasCeilingSuccessActive = GasTracker.isGasCeilingSuccessActive;

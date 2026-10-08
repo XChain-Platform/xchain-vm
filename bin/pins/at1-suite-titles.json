@@ -502,6 +502,14 @@
       "execute-time consensus source-lint enforcement @regression @tier1 verdict cache keyed by the metering sha256 key partitions on the five consensus flag bits, not just the source",
       "execute-time consensus source-lint enforcement @regression @tier1 verdict cache keyed by the metering sha256 key returns the verdict a fresh validateSyntax call produces"
     ],
+    "39e57d4b7dbf2f07": [
+      "BigInt surface strip activation exports a frozen map with six unarmed entries",
+      "BigInt surface strip activation is active on regtest at genesis",
+      "BigInt surface strip activation is exported by the VM entry point",
+      "BigInt surface strip activation keeps every mainnet and testnet chain unarmed",
+      "BigInt surface strip activation rejects an unknown network, null coin and non-finite height",
+      "BigInt surface strip activation resolves local armed thresholds and absent keys"
+    ],
     "4187b661120eb61e": [
       "consensus wall-clock budget: the enforcing path a gated execution runs against the protocol budget, whatever the node configured",
       "consensus wall-clock budget: the enforcing path an ungated execution still runs against the node knob (replay parity + non-consensus callers)",
@@ -1329,8 +1337,8 @@
   },
   "scripts": {
     "test": {
-      "fileCount": 59,
-      "titleCount": 1208,
+      "fileCount": 60,
+      "titleCount": 1214,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1382,6 +1390,7 @@
         "test/unit/read-manifest.test.js": "6fd03d7e8ef88554",
         "test/unit/readonly-accessors.test.js": "040ba6bc59c4375f",
         "test/unit/sandbox.test.js": "9a6638760ddfe268",
+        "test/unit/sandbox/bigint_surface_strip_heights.test.js": "39e57d4b7dbf2f07",
         "test/unit/scripts-mutation-report.test.js": "b3d7c9ed4f762088",
         "test/unit/security/configuration/dependency-advisories.test.js": "0f2abe37f99c5a17",
         "test/unit/sibling-coverage.test.js": "d8d1e52267ea606f",
