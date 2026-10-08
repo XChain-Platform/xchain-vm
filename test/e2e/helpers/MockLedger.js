@@ -34,7 +34,16 @@ const math = create(all, { number: 'BigNumber', precision: 64 });
 const { buildOracleAccessor } = require('../../../src/readonly-accessors.js');
 
 class MockLedger {
-    constructor() {
+    /**
+     * @param {object} [start] - block position the ledger opens at and reset() returns to
+     * @param {number} [start.blockHeight=1]
+     * @param {number} [start.blockTimestamp=1700000000] - the bare default predates every flag day
+     */
+    constructor(start) {
+        this.start = {
+            blockHeight:    start?.blockHeight ?? 1,
+            blockTimestamp: start?.blockTimestamp ?? 1700000000
+        };
         this.balances         = {};  // { address: { tick: quantityStr } }
         this.contracts        = {};  // { contractAddress: { code, deployer, blockIndex } }
         this.contractState    = {};  // { contractAddress: { key: value } }
@@ -46,10 +55,10 @@ class MockLedger {
         this.crossChain       = {};  // { "chain:idx": attestation }
         this.pollResults      = {};  // { pollIndex: frozen VOTE poll result }
         this.attestations     = {};  // { requestId: { status, payload, providerId, blockIndex, validatorCount } }
-        this.blockHeight      = 1;
-        this.blockTimestamp    = 1700000000;
-        this.blockHash        = 'e2e_block_hash_1';
-        this.gasPrice         = '1';  // 1 XCHAIN per unit gas (simplified)
+        this.blockHeight      = this.start.blockHeight;
+        this.blockTimestamp   = this.start.blockTimestamp;
+        this.blockHash        = 'e2e_block_hash_' + this.blockHeight;
+        this.gasPrice        = '1';  // 1 XCHAIN per unit gas (simplified)
         this.gasAddress       = 'GAS_ADDRESS';
         this.gasToken         = 'XCHAIN';
     }
@@ -349,9 +358,9 @@ class MockLedger {
         this.oracleRoundFloor = 0;
         this.crossChain = {};
         this.pollResults = {};
-        this.blockHeight = 1;
-        this.blockTimestamp = 1700000000;
-        this.blockHash = 'e2e_block_hash_1';
+        this.blockHeight = this.start.blockHeight;
+        this.blockTimestamp = this.start.blockTimestamp;
+        this.blockHash = 'e2e_block_hash_' + this.blockHeight;
     }
 }
 

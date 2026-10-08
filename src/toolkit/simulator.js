@@ -121,6 +121,7 @@ const {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
     GUARD_GAS_CEILING,
+    DEFAULT_GAS_CEILING,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 } = require('./simulator/constants.js');
@@ -239,7 +240,7 @@ class ContractSimulator {
      *        Package-3 sandbox, the execute-time re-lint and the lint
      *        global-alias refinement are per-coin block-HEIGHT gates, so there
      *        they follow opts.block.height and opts.coin together.
-     * @param {number} [opts.gasCeiling=1000000]
+     * @param {number} [opts.gasCeiling=DEFAULT_GAS_CEILING] - top-level EXECUTE ceiling (1000000 on chain)
      * @param {object} [opts.gasSchedule]    - override the canonical schedule
      * @param {object} [opts.limits]         - override the default resource limits
      * @param {string} [opts.rules='live']    - which rule set the default block time
@@ -271,7 +272,7 @@ class ContractSimulator {
     constructor(opts = {}) {
         this.coin = opts.coin || 'BTC';
         this.network = opts.network || 'regtest';
-        this.gasCeiling = opts.gasCeiling || 1000000;
+        this.gasCeiling = opts.gasCeiling || DEFAULT_GAS_CEILING;
         this.gasSchedule = Object.assign({}, DEFAULT_GAS_SCHEDULE, opts.gasSchedule || {});
         this.limits = Object.assign({}, DEFAULT_LIMITS, opts.limits || {});
         this.defaultCaller = opts.defaultCaller || 'sim_caller';
@@ -320,5 +321,5 @@ Object.assign(
 module.exports = {
     ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME,
     SCHEDULED_BLOCK_TIME, liveBlockTime,
-    GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER
+    GUARD_GAS_CEILING, DEFAULT_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER
 };

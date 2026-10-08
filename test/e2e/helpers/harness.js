@@ -23,36 +23,60 @@ const path = require('path');
 const MockLedger  = require('./MockLedger.js');
 const MockIndexer = require('./MockIndexer.js');
 
-const GAS_SCHEDULE = {
-    VM_COMPUTATION:    1,
-    VM_STATE_READ:     100,
-    VM_STATE_WRITE:    200,
-    VM_STATE_DELETE:   100,
-    VM_ORACLE_READ:    100,
-    VM_CROSSCHAIN_READ: 100,
-    VM_ATTEST_REQUEST: 5000,
-    VM_EMISSION:       500, VM_XCALL_REQUEST: 2000, VM_XCALL_CALLBACK: 20000
-};
+// Fee and limit defaults and the chain anchors load with the VM. Guarded so a
+// host without isolated-vm still loads this module and its suites skip, as before.
+let SIM = null, GATES = null, SIM_LOAD_ERROR = null;
+try {
+    SIM   = require('../../../src/toolkit/simulator.js');
+    GATES = require('../../../src/toolkit/simulator/block_time_gates.js');
+} catch (e) { SIM_LOAD_ERROR = e; }
 
-const DEFAULT_LIMITS = {
-    maxCpuTimeMs:      5000,
-    maxMemory:         8,
-    maxEmissions:      50,
-    maxStateKeys:      10000,
-    maxStateValueSize: 65536,
-    maxCodeSize:       65536
-};
+// Wall budget kept tighter than the simulator's so a runaway contract fails fast;
+// the VM honours it only below the consensus wall-clock gate (wallClockBudgetMs).
+const E2E_MAX_CPU_TIME_MS = 5000;
+
+// The simulator's frozen schedule itself, never a retyped copy, so a re-pricing
+// reaches every suite on this harness.
+const GAS_SCHEDULE   = SIM ? SIM.DEFAULT_GAS_SCHEDULE : null;
+const DEFAULT_LIMITS = SIM
+    ? Object.freeze({ ...SIM.DEFAULT_LIMITS, maxCpuTimeMs: E2E_MAX_CPU_TIME_MS })
+    : null;
+
+/**
+ * Chain position a harness opens at: the rule set mainnet runs today. Time is the
+ * newest elapsed flag day, height clears every armed height gate for (coin, network).
+ * An explicit `network: null` keeps the no-network path at height 1.
+ */
+function resolveStart(overrides) {
+    const o = overrides || {};
+    const network = Object.prototype.hasOwnProperty.call(o, 'network') ? o.network : 'mainnet';
+    const coin = o.coin || 'BTC';
+    const height = network == null ? 1 : GATES.defaultBlockHeight(coin, network);
+    return {
+        network, coin,
+        blockHeight:    o.blockHeight ?? height,
+        blockTimestamp: o.blockTimestamp ?? GATES.liveBlockTime(undefined, network ?? undefined)
+    };
+}
 
 class E2EHarness {
     /**
      * @param {Function} XChainVM - The VM constructor (passed in to allow skip if unavailable)
-     * @param {object} [overrides] - Override gasCeiling or limits
+     * @param {object} [overrides] - Override gasCeiling or limits, or the start position
+     * @param {string|null} [overrides.network='mainnet'] - null runs without a network
+     * @param {string} [overrides.coin='BTC']
+     * @param {number} [overrides.blockHeight] - defaults to defaultBlockHeight(coin, network)
+     * @param {number} [overrides.blockTimestamp] - defaults to liveBlockTime()
      */
     constructor(XChainVM, overrides) {
-        this.ledger  = new MockLedger();
+        if (!SIM) throw SIM_LOAD_ERROR;
+        const start = resolveStart(overrides);
+        this.network = start.network;
+        this.coin    = start.coin;
+        this.ledger  = new MockLedger(start);
         this.indexer = new MockIndexer(this.ledger);
         this.vm = new XChainVM({
-            gasSchedule: GAS_SCHEDULE,
+            gasSchedule: { ...GAS_SCHEDULE },
             gasCeiling:  overrides?.gasCeiling || 1000000,
             limits:      { ...DEFAULT_LIMITS, ...(overrides?.limits || {}) }
         });
@@ -132,7 +156,8 @@ class E2EHarness {
             oracleData:      this.ledger.buildOracleAccessor(),
             crossChainData:  this.ledger.buildCrossChainAccessor(),
             pollData:        this.ledger.buildPollAccessor(),
-            attestationData: this.ledger.buildAttestationAccessor()
+            attestationData: this.ledger.buildAttestationAccessor(),
+            ...(this.network == null ? {} : { network: this.network })
         });
 
         // On success, apply state changes and process emitted actions
@@ -226,4 +251,4 @@ class E2EHarness {
     }
 }
 
-module.exports = { E2EHarness, GAS_SCHEDULE, DEFAULT_LIMITS };
+module.exports = { E2EHarness, GAS_SCHEDULE, DEFAULT_LIMITS, E2E_MAX_CPU_TIME_MS };
