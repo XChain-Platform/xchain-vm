@@ -42,9 +42,9 @@ describe('gas-ceiling success gate resolver', function () {
         assert.ok(Object.isFrozen(GAS_CEILING_SUCCESS_ACTIVATION));
     });
 
-    it('stays off the entry point statics, which a descriptor pin freezes', function () {
-        assert.strictEqual(vmModule.isGasCeilingSuccessActive, undefined);
-        assert.strictEqual(vmModule.GAS_CEILING_SUCCESS_ACTIVATION, undefined);
+    it('is exposed on the entry point statics', function () {
+        assert.strictEqual(vmModule.isGasCeilingSuccessActive, isGasCeilingSuccessActive);
+        assert.strictEqual(vmModule.GAS_CEILING_SUCCESS_ACTIVATION, GAS_CEILING_SUCCESS_ACTIVATION);
     });
 });
 
