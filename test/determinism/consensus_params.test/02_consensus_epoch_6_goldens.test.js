@@ -53,5 +53,8 @@ describe('consensus epoch 7 goldens', function () {
             { rule: 'banned-with', line: 2, severity: 'error' },
             { rule: 'banned-with', line: 1, severity: 'error' }
         ]);
+        for (const finding of findings) {
+            assert.match(finding.message, /^banned statement: with at line \d+;/);
+        }
     });
 });
