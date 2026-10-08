@@ -1343,8 +1343,8 @@
   },
   "scripts": {
     "test": {
-      "fileCount": 59,
-      "titleCount": 1208,
+      "fileCount": 61,
+      "titleCount": 1218,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
