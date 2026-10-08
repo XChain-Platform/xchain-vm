@@ -27,7 +27,7 @@ const ivm = require('isolated-vm');
 // the three consumers cannot drift. That module is dependency-free on purpose:
 // this file requires isolated-vm at the top level, and the other two consumers
 // must load where no isolate exists.
-const { STRIPPED_GLOBAL_NAMES, BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
+const { STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
@@ -70,6 +70,10 @@ const STRIPPED_PROTO_METHODS = Object.freeze([
 // Same consensus-critical / frozen / digested treatment as the lists above.
 const NEUTERED_PROTO_CONSTRUCTORS = Object.freeze([
     'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp'
+]);
+
+const BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES = Object.freeze([
+    'BigInt64Array', 'BigUint64Array'
 ]);
 
 const BIGINT_SURFACE_STRIPPED_PROTO_METHODS = Object.freeze([
@@ -206,6 +210,12 @@ const stripScriptRegExpAndProtoMethods = () => `
 
 const stripScriptBigIntSurface = (enabled) => enabled ? `
     (function() {
+        var globalNames = ${JSON.stringify(BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES)};
+        for (var g = 0; g < globalNames.length; g++) {
+            try { delete globalThis[globalNames[g]]; } catch(e) {}
+            try { globalThis[globalNames[g]] = undefined; } catch(e) {}
+        }
+
         var protoMethods = ${JSON.stringify(BIGINT_SURFACE_STRIPPED_PROTO_METHODS)};
         for (var i = 0; i < protoMethods.length; i++) {
             var proto = _PROTOS[protoMethods[i].proto];
@@ -337,13 +347,13 @@ const stripScriptSafeMath = () => `
 // is simply absent from `names` and never deleted (exactly how a pre-activation
 // node behaves). Everything after the toDelete loop is fixed neutering logic that
 // does not depend on the list.
-const buildStripScript = (names, stripBigIntSurface) => [
+const buildStripScript = (names, stripPkg3Surface) => [
     stripScriptProtoCapture(),
     stripScriptDeleteGlobals(names),
     stripScriptFunctionCtors(),
     stripScriptProtoCtors(),
     stripScriptRegExpAndProtoMethods(),
-    stripScriptBigIntSurface(stripBigIntSurface),
+    stripScriptBigIntSurface(stripPkg3Surface),
     stripScriptErrorStacks(),
     stripScriptDefineProperty(),
     stripScriptHostGlobals(),
@@ -365,24 +375,21 @@ const buildStripScript = (names, stripBigIntSurface) => [
  * @param {boolean} [opts.stripWasm=false] - delete the global `WebAssembly`.
  *        CONSENSUS-GATED on the per-coin Pkg 3 bundle HEIGHT flag-day (index.js
  *        isPkg3SandboxActive): below it WebAssembly is LEFT IN PLACE (historical
- *        replay), at/after it the global is absent fleet-wide. Same gated-entry
- *        pattern as Promise.
- * @param {boolean} [opts.stripBigIntSurface=false] - delete the BigInt typed-array
- *        globals and neuter the DataView BigInt64 methods plus
- *        BigInt.prototype.constructor. Left intact by default for replay.
+ *        replay), at/after it WebAssembly and the BigInt native surface are absent
+ *        fleet-wide. The host injects this single flag for the whole Pkg 3 sandbox
+ *        bundle so its strip legs cannot activate independently.
  */
 function stripGlobals(isolate, context, opts) {
     const stripPromise = !!(opts && opts.stripPromise);
     const stripWasm    = !!(opts && opts.stripWasm);
-    const stripBigIntSurface = !!(opts && opts.stripBigIntSurface);
+    const stripPkg3Surface = stripWasm;
     // Gated entries stay in the applied list only once their own flag-day is active,
     // exactly as a pre-activation node leaves them in place. Promise: block-time
     // async-surface gate. WebAssembly: per-coin Pkg 3 height gate. Every other entry
     // is stripped unconditionally from genesis.
     const names = STRIPPED_GLOBAL_NAMES.filter((n) =>
-        (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm))
-        .concat(stripBigIntSurface ? BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES : []);
-    const script = isolate.compileScriptSync(buildStripScript(names, stripBigIntSurface));
+        (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm));
+    const script = isolate.compileScriptSync(buildStripScript(names, stripPkg3Surface));
     script.runSync(context);
 }
 

@@ -66,10 +66,6 @@
  *     Removed to close the unmetered-CPU DoS surface; contracts use the metered
  *     xchain.math bignumber API. BigInt literals (10n) are rejected at deploy
  *     time (syntax.js) since a global delete cannot disable literal syntax.
- *   - BigInt64Array / BigUint64Array: their constructors and bulk operations
- *     retain the native BigInt surface after the BigInt global is gone. They
- *     are held in a separate flag-day-gated set so historical execution keeps
- *     the pre-activation globals while new execution removes them.
  *   - WebAssembly (flag-day Pkg 3, 75190596): a core V8 global reachable from
  *     contract code. A wasm body carries NO __gas instrumentation (the AST meter
  *     only touches the JS source), so WebAssembly.instantiate/compile/Module/
@@ -105,10 +101,6 @@ const STRIPPED_GLOBAL_NAMES = Object.freeze([
     'Intl', 'Temporal', 'structuredClone', 'performance'
 ]);
 
-const BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES = Object.freeze([
-    'BigInt64Array', 'BigUint64Array'
-]);
-
 // The entries whose strip is CONSENSUS-GATED on a flag day (see the Promise and
 // WebAssembly notes above): below their activation the sandbox leaves the global
 // in place so a from-genesis replay reproduces the historical execution.
@@ -130,7 +122,6 @@ const ADVISORY_STRIPPED_GLOBAL_NAMES = Object.freeze(
 
 module.exports = {
     STRIPPED_GLOBAL_NAMES,
-    BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES,
     CONSENSUS_GATED_STRIPPED_GLOBALS,
     ADVISORY_STRIPPED_GLOBAL_NAMES
 };
