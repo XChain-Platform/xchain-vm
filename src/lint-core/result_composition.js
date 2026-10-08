@@ -289,7 +289,7 @@ function pushStrippedGlobalWarnings(code, globalAlias, optionalChain, warnings) 
  *
  * Consensus errors are returned in deploy-check order (metering -> reserved ->
  * banned-math -> banned-literal -> banned-async -> banned-generator -> banned-rest ->
- * banned-wasm -> banned-with) FIRST, so errors[0] (filtered to CONSENSUS_RULES) is exactly the
+ * banned-wasm) FIRST, so errors[0] (filtered to CONSENSUS_RULES) is exactly the
  * failure validateSyntax surfaces and the indexer records. That order is
  * consensus-visible: reordering the checks changes recorded verdict strings, so it
  * moves only behind a flag day. Move-2 findings (advisory) are appended after and

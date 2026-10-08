@@ -78,7 +78,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // validator (validateSyntax) acts on; adding/removing one changes which
         // contracts the chain accepts (a hashed deploy verdict). Freeze it sorted so
         // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
-        // Epoch 4 added 'banned-rest' (the REST_PATTERN_METER deploy half); epoch 6 added 'banned-with'.
         const GOLDEN_CONSENSUS_RULES = [
             'banned-async', 'banned-generator', 'banned-literal', 'banned-math',
             'banned-rest', 'banned-wasm', 'banned-with', 'invalid-type', 'reserved-identifier',

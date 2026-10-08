@@ -6,14 +6,8 @@ const walk  = require('acorn-walk');
 const { CONTRACT_ECMA_VERSION } = require('../metering.js');
 
 /**
- * Scan contract code for `with` statements. A `with (obj) { ... }` block resolves
- * every free identifier inside it against `obj` first, so a name the static
- * scanners and the metering transform treat as a plain global or a reserved
- * helper can be rebound to an attacker-chosen property at runtime, defeating
- * the identifier-precise bans. The statement is only legal in sloppy-mode
- * scripts, which is exactly how contract code is compiled.
- *
- * @param {string} code - Contract source code
+ * Find `with` statements that can bypass identifier-based rules.
+ * @param {string} code
  * @returns {Array<{line: (number|string)}>}
  */
 function findBannedWith(code) {
