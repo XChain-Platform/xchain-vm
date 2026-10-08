@@ -212,7 +212,6 @@ const stripScriptBigIntSurface = (enabled) => enabled ? `
             try { delete globalThis[globalNames[g]]; } catch(e) {}
             try { globalThis[globalNames[g]] = undefined; } catch(e) {}
         }
-
         var protoMethods = ${JSON.stringify(BIGINT_SURFACE_STRIPPED_PROTO_METHODS)};
         for (var i = 0; i < protoMethods.length; i++) {
             var proto = _PROTOS[protoMethods[i].proto];
@@ -226,16 +225,12 @@ const stripScriptBigIntSurface = (enabled) => enabled ? `
         for (var j = 0; j < ctorTargets.length; j++) {
             var ctorProto = _PROTOS[ctorTargets[j]];
             if (!ctorProto) throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: unmapped proto ' + ctorTargets[j]);
-            try {
-                Object.defineProperty(ctorProto, 'constructor',
-                    { value: undefined, writable: false, configurable: false });
-            } catch(e) {}
+            try { Object.defineProperty(ctorProto, 'constructor',
+                { value: undefined, writable: false, configurable: false }); } catch(e) {}
             var ctorDescriptor = Object.getOwnPropertyDescriptor(ctorProto, 'constructor');
-            if (!ctorDescriptor || ctorDescriptor.value !== undefined ||
-                ctorDescriptor.writable !== false || ctorDescriptor.configurable !== false)
+            if (!ctorDescriptor || ctorDescriptor.value !== undefined || ctorDescriptor.writable || ctorDescriptor.configurable)
                 throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: constructor remained mutable on ' + ctorTargets[j]);
         }
-
     })();
 ` : '';
 
