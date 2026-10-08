@@ -96,6 +96,10 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  * @param {boolean} [opts.enforceBannedWith=true] - whether the 'banned-with' rule
  *        is deploy-blocking. CONSENSUS-GATED on its own per-coin block-height
  *        activation. Defaults to true for author-facing callers.
+ * @param {boolean} [opts.enforceLintDestructure=true] - whether ObjectPattern
+ *        destructuring participates in the global-object and Math matchers.
+ *        CONSENSUS-GATED on its own per-coin block-height activation. Defaults
+ *        to true for author-facing callers.
  * @returns {{ valid: boolean, error?: string }}
  * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
  *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
@@ -112,6 +116,7 @@ function validateSyntax(code, opts) {
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
     const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
+    const enforceLintDestructure = !opts || opts.enforceLintDestructure !== false;
 
     // 1. V8 syntax check (the only step that requires isolated-vm).
     //
@@ -153,7 +158,8 @@ function validateSyntax(code, opts) {
     const blocking = lintSource(code, {
         hardened: enforceLintHardening,
         globalAlias: enforceLintGlobalAlias,
-        optionalChain: enforceLintOptionalChain
+        optionalChain: enforceLintOptionalChain,
+        destructure: enforceLintDestructure
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
         enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));
     if (blocking.length > 0)

@@ -1325,6 +1325,20 @@
     "fb6efc086e3c1f29": [
       "Preflight: sandbox engine must load executes a trivial contract end-to-end inside the isolate",
       "Preflight: sandbox engine must load loads the XChainVM engine (isolated-vm native binding)"
+    ],
+    "03e5be0396e94f65": [
+      "destructure lint activation exports a frozen map with six unarmed entries",
+      "destructure lint activation is active on regtest at genesis",
+      "destructure lint activation is exported by the VM entry point",
+      "destructure lint activation keeps every mainnet and testnet chain unarmed",
+      "destructure lint activation rejects an unknown network, null coin and non-finite height",
+      "destructure lint activation resolves local armed thresholds and absent keys"
+    ],
+    "5ce9047e4e761aad": [
+      "destructure lint threading execute lint resolves the contract coin and restores the private carrier",
+      "destructure lint threading partitions the verdict cache independently from banned-with and forwards the exact boolean",
+      "destructure lint threading simulator deploy lint resolves the configured network and coin",
+      "destructure lint threading validateSyntax defaults the lint-core destructure option on and forwards explicit values"
     ]
   },
   "scripts": {
@@ -1390,7 +1404,9 @@
         "test/unit/validator.test.js": "b6e5dbcaf7af8843",
         "test/unit/vm-worker.test.js": "61da1fba928ff3fb",
         "test/unit/wrapper-control-bindings.test.js": "9580326e21a45485",
-        "test/unit/xcall-bounds-parity.test.js": "d42a00ccb4967c7c"
+        "test/unit/xcall-bounds-parity.test.js": "d42a00ccb4967c7c",
+        "test/unit/lint/lint_destructure_heights.test.js": "03e5be0396e94f65",
+        "test/unit/lint/lint_destructure_threading.test.js": "5ce9047e4e761aad"
       }
     }
   }
