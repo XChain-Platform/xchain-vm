@@ -150,14 +150,20 @@ describe('BigInt native surface strip: prototype constructor and isolation', fun
                 [DataView.prototype, 'getBigInt64'],
                 [DataView.prototype, 'getBigUint64'],
                 [DataView.prototype, 'setBigInt64'],
-                [DataView.prototype, 'setBigUint64'],
-                [Object.getPrototypeOf(0n), 'constructor']
+                [DataView.prototype, 'setBigUint64']
             ];
-            return rows.every(function(row) {
+            var methodsLocked = rows.every(function(row) {
                 var descriptor = Object.getOwnPropertyDescriptor(row[0], row[1]);
                 return descriptor.value === undefined &&
                     descriptor.writable === false && descriptor.configurable === false;
             });
+            var bigIntProto = Object.getPrototypeOf(0n);
+            var inherited = Object.getOwnPropertyDescriptor(
+                Object.getPrototypeOf(bigIntProto), 'constructor');
+            return methodsLocked &&
+                Object.getOwnPropertyDescriptor(bigIntProto, 'constructor') === undefined &&
+                bigIntProto.constructor === undefined && inherited.value === undefined &&
+                inherited.writable === false && inherited.configurable === false;
         })()`, { stripWasm: true });
         assert.strictEqual(result, true);
     });

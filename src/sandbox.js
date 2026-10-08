@@ -201,6 +201,7 @@ const stripScriptRegExpAndProtoMethods = () => `
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
         }
+
     })();
 `;
 
@@ -221,16 +222,15 @@ const stripScriptBigIntSurface = (enabled) => enabled ? `
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
         }
-
         var ctorTargets = ${JSON.stringify(BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS)};
         for (var j = 0; j < ctorTargets.length; j++) {
             var ctorProto = _PROTOS[ctorTargets[j]];
             if (!ctorProto) throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: unmapped proto ' + ctorTargets[j]);
-            try {
-                Object.defineProperty(ctorProto, 'constructor',
-                    { value: undefined, writable: false, configurable: false });
-            } catch(e) {}
+            try { delete ctorProto.constructor; } catch(e) {}
+            if (ctorProto.constructor !== undefined)
+                throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: constructor remained on ' + ctorTargets[j]);
         }
+
     })();
 ` : '';
 
