@@ -55,6 +55,17 @@ async function deployAndRead(src, simOpts, deployOpts) {
     } finally { console.warn = real; await sim.close(); }
 }
 
+// Register the per-network resolution case for the strict-init gate.
+function registerStrictResolutionCase() {
+    it('resolves DEPLOY_INIT_STRICT per network, unknown networks like mainnet', function() {
+        assert.strictEqual(gate.isDeployInitStrictActive('mainnet', STRICT_AT - 1), false);
+        assert.strictEqual(gate.isDeployInitStrictActive('mainnet', STRICT_AT), true);
+        assert.strictEqual(gate.isDeployInitStrictActive('testnet', 0), true);
+        assert.strictEqual(gate.isDeployInitStrictActive('regtest', 0), true);
+        assert.strictEqual(gate.isDeployInitStrictActive('signet', STRICT_AT - 1), false);
+    });
+}
+
 (ContractSimulator ? describe : describe.skip)('Toolkit ContractSimulator: deploy constructor parity', function() {
     this.timeout(30000);
 
@@ -109,11 +120,5 @@ async function deployAndRead(src, simOpts, deployOpts) {
         assert.strictEqual(at.read, 'init');
     });
 
-    it('resolves DEPLOY_INIT_STRICT per network, unknown networks like mainnet', function() {
-        assert.strictEqual(gate.isDeployInitStrictActive('mainnet', STRICT_AT - 1), false);
-        assert.strictEqual(gate.isDeployInitStrictActive('mainnet', STRICT_AT), true);
-        assert.strictEqual(gate.isDeployInitStrictActive('testnet', 0), true);
-        assert.strictEqual(gate.isDeployInitStrictActive('regtest', 0), true);
-        assert.strictEqual(gate.isDeployInitStrictActive('signet', STRICT_AT - 1), false);
-    });
+    registerStrictResolutionCase();
 });
