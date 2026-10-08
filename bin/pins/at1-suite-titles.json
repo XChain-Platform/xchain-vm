@@ -977,9 +977,10 @@
       "Gateway (host-function surface) read-only context (0 gas) returns a defensive copy of params",
       "Gateway (host-function surface) state (metered, delegates to stateManager) get/has/set/delete delegate and charge the right gas"
     ],
-    "aa83a3faf040458a": [
+    "444fba1ae77dbf07": [
       "banned-with lint activation exports a frozen map with six unarmed entries",
       "banned-with lint activation is active on regtest at genesis",
+      "banned-with lint activation is exported by the VM entry point",
       "banned-with lint activation keeps every mainnet and testnet chain unarmed",
       "banned-with lint activation rejects an unknown network, null coin and non-finite height",
       "banned-with lint activation resolves local armed thresholds and absent keys"
@@ -1111,6 +1112,11 @@
       "REST_PATTERN_METER deploy-lint: banned-rest validateSyntax gating (enforceBannedRest) defaults to ON for author-facing callers (SDK/CLI linter, unit tests)",
       "REST_PATTERN_METER deploy-lint: banned-rest validateSyntax gating (enforceBannedRest) enforceBannedRest OFF accepts (pre-flag-day verdict, byte-identical replay)",
       "REST_PATTERN_METER deploy-lint: banned-rest validateSyntax gating (enforceBannedRest) enforceBannedRest ON rejects (post-flag-day verdict)"
+    ],
+    "b88631b2878d99d7": [
+      "banned-with execute-time lint threading partitions the verdict cache and forwards the exact boolean",
+      "banned-with execute-time lint threading simulator deploy lint resolves the configured network and coin",
+      "banned-with execute-time lint threading validateSyntax accepts below the gate and rejects at the gate"
     ],
     "be0f159f6ba7cc35": [
       "Toolkit transpile: TS -> ES the VM accepts detects TypeScript by extension",
@@ -1323,8 +1329,8 @@
   },
   "scripts": {
     "test": {
-      "fileCount": 58,
-      "titleCount": 1204,
+      "fileCount": 59,
+      "titleCount": 1208,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1366,7 +1372,8 @@
         "test/unit/lint-hardening.test.js": "ac2bf89e4f081529",
         "test/unit/lint-parity.test.js": "282f63051a53a366",
         "test/unit/lint-shared-rules.test.js": "c77bd66dbb559a2d",
-        "test/unit/lint/lint_banned_with_heights.test.js": "aa83a3faf040458a",
+        "test/unit/lint/lint_banned_with_heights.test.js": "444fba1ae77dbf07",
+        "test/unit/lint/banned_with/lint_banned_with_threading.test.js": "b88631b2878d99d7",
         "test/unit/math.test.js": "1ec905aa9509bdfe",
         "test/unit/metered-cache.test.js": "085cea6786ecc21c",
         "test/unit/metering.test.js": "645189e9f67b5f3f",

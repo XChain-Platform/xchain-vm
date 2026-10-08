@@ -24,6 +24,7 @@ const crypto = require('crypto');
 
 const { meterCode }     = require('../metering.js');
 const { validateSyntax, checkFloatWarnings } = require('../syntax.js');
+const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
 
 module.exports = {
     /**
@@ -101,6 +102,7 @@ module.exports = {
      * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
      * @param {boolean} enforceLintOptionalChain - LINT_OPTIONAL_CHAIN refinement
      * @param {string} [codeHash] - precomputed sha256(code) hex (see getMeteredCode)
+     * @param {boolean} [enforceBannedWith] - banned-with (own per-coin height gate)
      * @returns {{valid: boolean, error?: string}}
      */
     getLintVerdict(
@@ -113,13 +115,18 @@ module.exports = {
         enforceLintOptionalChain,
         codeHash
     ) {
+        const hasExplicitBannedWith = arguments.length > 8;
+        const enforceBannedWith = hasExplicitBannedWith
+            ? arguments[8] === true
+            : this[EXECUTE_LINT_BANNED_WITH] === true;
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
             (enforcePkg3Bans ? '1' : '0') +
             (enforceLintGlobalAlias ? '1' : '0') +
             (enforceBannedRest ? '1' : '0') +
-            (enforceLintOptionalChain === true ? '1' : '0');
+            (enforceLintOptionalChain === true ? '1' : '0') +
+            (hasExplicitBannedWith || enforceBannedWith ? (enforceBannedWith ? '1' : '0') : '');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -129,7 +136,8 @@ module.exports = {
             enforceBannedWasm:       enforcePkg3Bans,
             enforceLintGlobalAlias:  enforceLintGlobalAlias,
             enforceBannedRest:       enforceBannedRest,
-            enforceLintOptionalChain: enforceLintOptionalChain === true
+            enforceLintOptionalChain: enforceLintOptionalChain === true,
+            enforceBannedWith:       enforceBannedWith
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;

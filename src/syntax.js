@@ -26,11 +26,12 @@ const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
 const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
 
-function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWasm, bannedRest) {
+function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWasm, bannedRest, bannedWith) {
     if (error.rule === 'banned-async' && !bannedAsync) return false;
     if (error.rule === 'banned-generator' && !bannedGenerator) return false;
     if (error.rule === 'banned-wasm' && !bannedWasm) return false;
     if (error.rule === 'banned-rest' && !bannedRest) return false;
+    if (error.rule === 'banned-with' && !bannedWith) return false;
     return CONSENSUS_RULES.has(error.rule);
 }
 
@@ -92,6 +93,9 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  *        half of the Pkg 3 WebAssembly strip, CONSENSUS-GATED identically to
  *        enforceBannedGenerator on the same per-coin height flag-day. Defaults to
  *        true.
+ * @param {boolean} [opts.enforceBannedWith=true] - whether the 'banned-with' rule
+ *        is deploy-blocking. CONSENSUS-GATED on its own per-coin block-height
+ *        activation. Defaults to true for author-facing callers.
  * @returns {{ valid: boolean, error?: string }}
  * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
  *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
@@ -107,6 +111,7 @@ function validateSyntax(code, opts) {
     const enforceBannedGenerator = !opts || opts.enforceBannedGenerator !== false;
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
+    const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
 
     // 1. V8 syntax check (the only step that requires isolated-vm).
     //
@@ -143,13 +148,14 @@ function validateSyntax(code, opts) {
     // the on-chain verdict. When a flag-day rule is not yet active, drop it from
     // the blocking set (pre-activation parity): banned-async on the block-time
     // async gate, banned-generator/banned-wasm on the Pkg 3 per-coin height gate,
-    // banned-rest on the REST_PATTERN_METER block-time gate.
+    // banned-rest on the REST_PATTERN_METER block-time gate, banned-with on its
+    // own per-coin height gate.
     const blocking = lintSource(code, {
         hardened: enforceLintHardening,
         globalAlias: enforceLintGlobalAlias,
         optionalChain: enforceLintOptionalChain
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
-        enforceBannedGenerator, enforceBannedWasm, enforceBannedRest));
+        enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));
     if (blocking.length > 0)
         return { valid: false, error: blocking[0].message };
 
