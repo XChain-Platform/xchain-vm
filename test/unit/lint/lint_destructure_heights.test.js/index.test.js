@@ -20,8 +20,8 @@ const {
     LINT_DESTRUCTURE_ACTIVATION,
     resolveDestructureActive,
     isLintDestructureActive,
-} = require('../../../src/index/lint_destructure_heights.js');
-const XChainVM = require('../../../src/index.js');
+} = require('../../../../src/index/lint_destructure_heights.js');
+const XChainVM = require('../../../../src/index.js');
 
 describe('destructure lint activation', function () {
     const coins = ['BTC', 'LTC', 'DOGE'];
