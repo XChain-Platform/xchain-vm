@@ -97,6 +97,9 @@ const XCALL_MAX_HOPS            = PROTO.XCALL_MAX_HOPS;
 const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
 const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
 const XCALL_DEFAULT_DEADLINE    = 400;   // caller default only; not a protocol bound (absent from canonical)
+// Same-chain call limits, the emit-context fallback when a caller passes none (never literals).
+const VM_MAX_CALL_DEPTH         = PROTO.VM_MAX_CALL_DEPTH;
+const VM_MIN_CALL_GAS           = PROTO.VM_MIN_CALL_GAS;
 
 // VM_XCALL_REQUEST / VM_XCALL_CALLBACK are charged directly from the schedule
 // (like VM_EMISSION). Both are CANONICAL_GAS_KEYS, so GasTracker construction
@@ -112,8 +115,8 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     // emit API directly) -> depth 0 with the protocol defaults.
     const ctx = callContext || {};
     const callDepth    = Number.isInteger(ctx.callDepth)    ? ctx.callDepth    : 0;
-    const maxCallDepth = Number.isInteger(ctx.maxCallDepth) ? ctx.maxCallDepth : 4;
-    const minCallGas   = Number.isInteger(ctx.minCallGas)   ? ctx.minCallGas   : 5000;
+    const maxCallDepth = Number.isInteger(ctx.maxCallDepth) ? ctx.maxCallDepth : VM_MAX_CALL_DEPTH;
+    const minCallGas   = Number.isInteger(ctx.minCallGas)   ? ctx.minCallGas   : VM_MIN_CALL_GAS;
     const crossHops    = Number.isInteger(ctx.crossHops)    ? ctx.crossHops    : 0;
     // ctx.callPath (the deterministic '>'-joined call-path, root = '') and
     // ctx.rootActionIndex (the per-root discriminator, pinned at the root) enter

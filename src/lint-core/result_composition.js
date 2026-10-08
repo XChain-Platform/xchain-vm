@@ -271,10 +271,12 @@ function pushStrippedGlobalWarnings(code, globalAlias, optionalChain, warnings) 
  * (step 1) is NOT here; it needs isolated-vm and stays in syntax.js.
  *
  * Consensus errors are returned in deploy-check order (metering -> reserved ->
- * banned-math -> banned-literal -> banned-async -> banned-generator -> banned-wasm)
- * FIRST, so errors[0] (filtered to CONSENSUS_RULES) is exactly the failure
- * validateSyntax surfaces. Move-2 findings (advisory) are appended after and never
- * affect the deploy verdict.
+ * banned-math -> banned-literal -> banned-async -> banned-generator -> banned-rest ->
+ * banned-wasm) FIRST, so errors[0] (filtered to CONSENSUS_RULES) is exactly the
+ * failure validateSyntax surfaces and the indexer records. That order is
+ * consensus-visible: reordering the checks changes recorded verdict strings, so it
+ * moves only behind a flag day. Move-2 findings (advisory) are appended after and
+ * never affect the deploy verdict.
  *
  * @param {string} code - Contract source code
  * @param {object} [opts]
