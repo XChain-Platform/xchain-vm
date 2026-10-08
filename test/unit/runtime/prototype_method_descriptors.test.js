@@ -103,6 +103,8 @@ const BASE_STATIC_ROWS = [
     ["STRIPPED_PROTO_METHODS", true, true, true, "object", null],
     ["NEUTERED_PROTO_CONSTRUCTORS", true, true, true, "object", null],
     ["SAFE_MATH_MEMBERS", true, true, true, "object", null],
+    ["GAS_CEILING_SUCCESS_ACTIVATION", true, true, true, "object", null],
+    ["isGasCeilingSuccessActive", true, true, true, "function", 2],
 ];
 
 // The constructor sets this flag on itself the first time an embedder omits

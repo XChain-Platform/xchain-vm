@@ -25,6 +25,7 @@
 
 const IsolateManager    = require('./isolate.js');
 const ActionValidator   = require('./validator.js');
+const GasTracker         = require('./gas.js');
 // Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
 const { resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
@@ -157,3 +158,5 @@ const bannedWithExports = Object.create(Object.getPrototypeOf(XChainVM), {
     isLintBannedWithActive: { value: isLintBannedWithActive, enumerable: true },
 });
 Object.setPrototypeOf(XChainVM, bannedWithExports);
+module.exports.GAS_CEILING_SUCCESS_ACTIVATION = GasTracker.GAS_CEILING_SUCCESS_ACTIVATION;
+module.exports.isGasCeilingSuccessActive = GasTracker.isGasCeilingSuccessActive;
