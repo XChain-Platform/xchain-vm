@@ -734,6 +734,18 @@
       "constructor limits back-fill (bac14514) leaves the no-limits default object unchanged",
       "constructor limits back-fill (bac14514) preserves caller-supplied values (no clobbering)"
     ],
+    "1e210466e6f01f69": [
+      "BigInt native surface strip: gated sets adds the two globals when the host-injected Pkg 3 flag is true",
+      "BigInt native surface strip: gated sets freezes the exact gated surface sets",
+      "BigInt native surface strip: gated sets keeps the BigInt prototype neuters out of the pre-activation script",
+      "BigInt native surface strip: gated sets leaves the gated globals out of the deletion list by default and when false",
+      "BigInt native surface strip: prototype constructor and isolation locks every neutered property against recreation",
+      "BigInt native surface strip: prototype constructor and isolation neuters BigInt.prototype.constructor at activation",
+      "BigInt native surface strip: prototype constructor and isolation uses the WebAssembly host flag without coupling to the Promise gate",
+      "BigInt native surface strip: typed arrays and DataView keeps all three surfaces reachable below activation",
+      "BigInt native surface strip: typed arrays and DataView neuters every DataView BigInt64 method at activation",
+      "BigInt native surface strip: typed arrays and DataView removes both typed-array globals at activation"
+    ],
     "8515568eab568709": [
       "Gateway controller-guard mode (isGuard) guard mode (isGuard=true) disables async frameworks a synchronous emission (emit.send) still works in guard mode",
       "Gateway controller-guard mode (isGuard) guard mode (isGuard=true) disables async frameworks attestation.request throws and charges no gas",
@@ -1351,8 +1363,8 @@
   },
   "scripts": {
     "test": {
-      "fileCount": 62,
-      "titleCount": 1224,
+      "fileCount": 63,
+      "titleCount": 1234,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1404,6 +1416,7 @@
         "test/unit/read-manifest.test.js": "6fd03d7e8ef88554",
         "test/unit/readonly-accessors.test.js": "040ba6bc59c4375f",
         "test/unit/sandbox.test.js": "9a6638760ddfe268",
+        "test/unit/sandbox/bigint_surface_strip.test.js": "1e210466e6f01f69",
         "test/unit/sandbox/bigint_surface_strip_heights.test.js": "39e57d4b7dbf2f07",
         "test/unit/scripts-mutation-report.test.js": "b3d7c9ed4f762088",
         "test/unit/security/configuration/dependency-advisories.test.js": "0f2abe37f99c5a17",
