@@ -83,29 +83,11 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 describe('consensus parameters are frozen (track 8 guard)', function () {
     it('BINARY_ALLOC_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
-        // The F3-binary ArrayBuffer/TypedArray byte-length gas charge activates
-        // fleet-wide at this block time. It is hashed (gasUsed → contract_hash) and
-        // drives the fee debit, so two nodes that disagree on the flag day diverge
-        // on the first binary-allocating execution after the earlier of the two.
-        // Pin it like any other consensus parameter; changing it is a coordinated
-        // release-team event, NOT a silent edit. Matches the indexer's other 2.0.0
-        // flag-day activations (protocol_changes.js: 1786060800).
         assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1786060800);
     });
 });
 describe('consensus parameters are frozen (track 8 guard)', function () {
     it('CONSENSUS_MAX_WALL_MS is the frozen per-execution wall-clock budget', function () {
-        // Gas does not bound wall time: shapes exist whose wall-time-per-gas is far
-        // above the schedule's assumption, and for those the wall-clock net is what
-        // terminates the execution. While that net was the per-NODE
-        // limits.maxCpuTimeMs, a validator with a tighter budget recorded
-        // 'timeout:' + gasUsed clamped to the ceiling where a looser one committed
-        // the real state changes and the real gasUsed. Both are consensus-visible,
-        // so the budget is a consensus parameter and is pinned here; a node running
-        // a different value forks the fleet on the first execution that reaches it.
-        // Pinned AT the fleet's documented default so promoting it changed no
-        // default-configured node's outcome; TIGHTENING it is a separate consensus
-        // event (future flag-day + re-goldened baselines + atomic deploy).
         assert.strictEqual(vm.CONSENSUS_MAX_WALL_MS, 30000);
         assert.strictEqual(require('../../../src/consensus-wall-clock.js').CONSENSUS_MAX_WALL_MS,
             vm.CONSENSUS_MAX_WALL_MS, 'enforcing module and export must be the same value');
