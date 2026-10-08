@@ -57,8 +57,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '6');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '6', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '7');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '7', 're-export must match');
     });
 });
 
@@ -96,8 +96,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
         const GOLDEN_CONSENSUS_RULES = [
             'banned-async', 'banned-generator', 'banned-literal', 'banned-math',
-            'banned-rest', 'banned-wasm', 'banned-with', 'invalid-type', 'reserved-identifier',
-            'unsupported-syntax'
+            'banned-rest', 'banned-wasm', 'banned-with', 'invalid-type', 'nesting-depth',
+            'reserved-identifier', 'unsupported-syntax'
         ];
         assert.deepStrictEqual([...vm.CONSENSUS_RULES].sort(), GOLDEN_CONSENSUS_RULES,
             'deploy CONSENSUS_RULES drifted: a deploy-rule change must bump CONSENSUS_VERSION + regolden in both repos');

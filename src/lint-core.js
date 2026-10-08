@@ -40,8 +40,18 @@ const { CONTRACT_ECMA_VERSION } = require('./metering.js');
 const banned_syntax = require('./lint-core/banned_syntax.js');
 const banned_globals = require('./lint-core/banned_globals.js');
 const banned_with = require('./lint-core/banned_with.js');
+const nesting_depth = require('./lint-core/nesting_depth.js');
 const { analyzeContract } = require('./lint-core/contract_analysis.js');
-const { lintSource } = require('./lint-core/result_composition.js');
+const { lintSource: composeLintSource } = require('./lint-core/result_composition.js');
+
+function lintSource(code, opts) {
+    const enforceLintNestingDepth = !opts || opts.enforceLintNestingDepth !== false;
+    if (enforceLintNestingDepth) {
+        const finding = nesting_depth.nestingDepthFinding(code);
+        if (finding) return { errors: [finding], warnings: [] };
+    }
+    return composeLintSource(code, opts);
+}
 
 module.exports = {
     lintSource,
@@ -52,6 +62,8 @@ module.exports = {
     findBannedGenerator: banned_globals.findBannedGenerator,
     findBannedWasm: banned_globals.findBannedWasm,
     findBannedWith: banned_with.findBannedWith,
+    findNestingDepth: nesting_depth.findNestingDepth,
+    nestingDepthFinding: nesting_depth.nestingDepthFinding,
     findBannedRest: banned_syntax.findBannedRest,
     findBannedExponentiation: banned_syntax.findBannedExponentiation,
     findBannedProtoMethods: banned_syntax.findBannedProtoMethods,
@@ -59,6 +71,7 @@ module.exports = {
     findReservedControlBinding: banned_syntax.findReservedControlBinding,
     codeSizeBytes: banned_syntax.codeSizeBytes,
     MAX_CODE_SIZE: constants.MAX_CODE_SIZE,
+    MAX_NESTING_DEPTH: constants.MAX_NESTING_DEPTH,
     STRIPPED_PROTO_METHOD_NAMES: constants.STRIPPED_PROTO_METHOD_NAMES,
     STRIPPED_GLOBAL_NAMES,
     STRIPPED_GLOBAL_NAMES_MIRROR: STRIPPED_GLOBAL_NAMES,

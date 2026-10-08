@@ -24,7 +24,7 @@
 
 const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
-const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
+const { lintSource, nestingDepthFinding, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
 
 function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWasm, bannedRest, bannedWith) {
     if (error.rule === 'banned-async' && !bannedAsync) return false;
@@ -96,6 +96,8 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  * @param {boolean} [opts.enforceBannedWith=true] - whether the 'banned-with' rule
  *        is deploy-blocking. CONSENSUS-GATED on its own per-coin block-height
  *        activation. Defaults to true for author-facing callers.
+ * @param {boolean} [opts.enforceLintNestingDepth=true] - whether the pre-parse
+ *        nesting-depth rule is deploy-blocking. Defaults to true.
  * @returns {{ valid: boolean, error?: string }}
  * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
  *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
@@ -112,6 +114,12 @@ function validateSyntax(code, opts) {
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
     const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
+    const enforceLintNestingDepth = !opts || opts.enforceLintNestingDepth !== false;
+
+    if (enforceLintNestingDepth) {
+        const nesting = nestingDepthFinding(code);
+        if (nesting) return { valid: false, error: nesting.message };
+    }
 
     // 1. V8 syntax check (the only step that requires isolated-vm).
     //
@@ -153,7 +161,8 @@ function validateSyntax(code, opts) {
     const blocking = lintSource(code, {
         hardened: enforceLintHardening,
         globalAlias: enforceLintGlobalAlias,
-        optionalChain: enforceLintOptionalChain
+        optionalChain: enforceLintOptionalChain,
+        enforceLintNestingDepth: false
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
         enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));
     if (blocking.length > 0)

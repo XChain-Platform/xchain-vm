@@ -148,7 +148,10 @@ const REFERENCE_NODE = 'v22.22.3';
 // once before deterministic depth checking and native serialization. Below the gate,
 // the historical serializer path remains unchanged; hook-free values retain identical
 // bytes and gas on both sides of the gate.
-const CONSENSUS_VERSION = '6';
+//
+// Epoch '7' adds the pre-parse 'nesting-depth' deploy rule. A non-recursive token
+// scan rejects delimiter nesting above 64 before either JavaScript parser runs.
+const CONSENSUS_VERSION = '7';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash
