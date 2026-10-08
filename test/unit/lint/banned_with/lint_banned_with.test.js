@@ -21,7 +21,7 @@
 'use strict';
 
 const assert = require('assert');
-const { lintSource, findBannedWith, CONSENSUS_RULES } = require('../../../src/lint-core.js');
+const { lintSource, findBannedWith, CONSENSUS_RULES } = require('../../../../src/lint-core.js');
 
 const withErrors = (code) => lintSource(code).errors.filter((e) => e.rule === 'banned-with');
 
