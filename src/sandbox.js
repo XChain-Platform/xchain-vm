@@ -72,15 +72,11 @@ const NEUTERED_PROTO_CONSTRUCTORS = Object.freeze([
     'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp'
 ]);
 
-const BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES = Object.freeze([
-    'BigInt64Array', 'BigUint64Array'
-]);
+const BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES = Object.freeze(['BigInt64Array', 'BigUint64Array']);
 
 const BIGINT_SURFACE_STRIPPED_PROTO_METHODS = Object.freeze([
-    { proto: 'DataView', method: 'getBigInt64' },
-    { proto: 'DataView', method: 'getBigUint64' },
-    { proto: 'DataView', method: 'setBigInt64' },
-    { proto: 'DataView', method: 'setBigUint64' }
+    { proto: 'DataView', method: 'getBigInt64' }, { proto: 'DataView', method: 'getBigUint64' },
+    { proto: 'DataView', method: 'setBigInt64' }, { proto: 'DataView', method: 'setBigUint64' }
 ]);
 
 const BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS = Object.freeze(['BigInt']);
@@ -382,14 +378,13 @@ const buildStripScript = (names, stripPkg3Surface) => [
 function stripGlobals(isolate, context, opts) {
     const stripPromise = !!(opts && opts.stripPromise);
     const stripWasm    = !!(opts && opts.stripWasm);
-    const stripPkg3Surface = stripWasm;
     // Gated entries stay in the applied list only once their own flag-day is active,
     // exactly as a pre-activation node leaves them in place. Promise: block-time
     // async-surface gate. WebAssembly: per-coin Pkg 3 height gate. Every other entry
     // is stripped unconditionally from genesis.
     const names = STRIPPED_GLOBAL_NAMES.filter((n) =>
         (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm));
-    const script = isolate.compileScriptSync(buildStripScript(names, stripPkg3Surface));
+    const script = isolate.compileScriptSync(buildStripScript(names, stripWasm));
     script.runSync(context);
 }
 
