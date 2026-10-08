@@ -35,6 +35,25 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
     return CONSENSUS_RULES.has(error.rule);
 }
 
+function checkV8Syntax(code) {
+    let testIsolate;
+    try {
+        try {
+            testIsolate = new ivm.Isolate({ memoryLimit: 8 });
+        } catch (e) {
+            throw new HostFaultError('syntax validation isolate unavailable: ' + e.message);
+        }
+        try {
+            testIsolate.compileScriptSync(code);
+        } catch (e) {
+            return { valid: false, error: 'syntax error: ' + e.message };
+        }
+    } finally {
+        try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
+    }
+    return null;
+}
+
 /**
  * Validate contract code syntax before deployment. Runs a V8 syntax check
  * (the only step needing isolated-vm) then the acorn-coverable consensus rules
@@ -135,21 +154,8 @@ function validateSyntax(code, opts) {
     // failed to load at all. HostFaultError carries that code, which
     // faultGuard.rethrowIfInfraFault treats as an infra halt, so the block
     // rolls back and retries and NO verdict is written.
-    let testIsolate;
-    try {
-        try {
-            testIsolate = new ivm.Isolate({ memoryLimit: 8 });
-        } catch (e) {
-            throw new HostFaultError('syntax validation isolate unavailable: ' + e.message);
-        }
-        try {
-            testIsolate.compileScriptSync(code);
-        } catch (e) {
-            return { valid: false, error: 'syntax error: ' + e.message };
-        }
-    } finally {
-        try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
-    }
+    const syntaxError = checkV8Syntax(code);
+    if (syntaxError) return syntaxError;
 
     // 2-5. Acorn-coverable consensus rules. Block ONLY on consensus rules;
     // lintSource also returns Move-2 advisory findings, which must never change
