@@ -14,8 +14,8 @@
 'use strict';
 
 const assert = require('assert');
-const XChainVM = require('../../../src/index.js');
-const gateWarnings = require('../../../src/toolkit/simulator/gate_warnings.js');
+const XChainVM = require('../../../../src/index.js');
+const gateWarnings = require('../../../../src/toolkit/simulator/gate_warnings.js');
 
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200, VM_STATE_DELETE: 100,
@@ -32,8 +32,8 @@ function newVm() {
 }
 
 function withSyntaxSpy(fn) {
-    const syntaxPath = require.resolve('../../../src/syntax.js');
-    const lintPath = require.resolve('../../../src/index/lint_and_metering.js');
+    const syntaxPath = require.resolve('../../../../src/syntax.js');
+    const lintPath = require.resolve('../../../../src/index/lint_and_metering.js');
     const realSyntax = require.cache[syntaxPath];
     const realLint = require.cache[lintPath];
     const calls = [];
@@ -63,8 +63,8 @@ function withSyntaxSpy(fn) {
 }
 
 function withLintSourceSpy(fn) {
-    const lintCorePath = require.resolve('../../../src/lint-core.js');
-    const syntaxPath = require.resolve('../../../src/syntax.js');
+    const lintCorePath = require.resolve('../../../../src/lint-core.js');
+    const syntaxPath = require.resolve('../../../../src/syntax.js');
     const realLintCore = require.cache[lintCorePath];
     const realSyntax = require.cache[syntaxPath];
     const lintCore = realLintCore ? realLintCore.exports : require(lintCorePath);

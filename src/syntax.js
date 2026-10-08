@@ -96,10 +96,6 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  * @param {boolean} [opts.enforceBannedWith=true] - whether the 'banned-with' rule
  *        is deploy-blocking. CONSENSUS-GATED on its own per-coin block-height
  *        activation. Defaults to true for author-facing callers.
- * @param {boolean} [opts.enforceLintDestructure=true] - whether ObjectPattern
- *        destructuring participates in the global-object and Math matchers.
- *        CONSENSUS-GATED on its own per-coin block-height activation. Defaults
- *        to true for author-facing callers.
  * @returns {{ valid: boolean, error?: string }}
  * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
  *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
