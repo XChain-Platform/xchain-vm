@@ -121,6 +121,15 @@ const CONTRACT_META_REQUIRED_TIMES = Object.freeze({
     regtest: 0
 });
 
+// Mirror DEPLOY_INIT_STRICT, the indexer rule that a DEPLOY runs an exported `initialize` with or
+// without params (constructor_run.js planConstructor). No VM twin exists, so the cross-repo manifest
+// gate test pins these against the changes_3.js row; an unnamed network resolves like mainnet.
+const DEPLOY_INIT_STRICT_TIMES = Object.freeze({
+    mainnet: 1786060800,
+    testnet: 0,
+    regtest: 0
+});
+
 // Block-TIME gates keyed per NETWORK rather than by one scalar, so GATE_BLOCK_TIMES
 // (scalar-only by design) never sees them. Each entry reads its instant off the
 // source that decides it, never a retyped value; the live anchor folds in the
@@ -132,6 +141,9 @@ const TIME_NETWORK_GATES = Object.freeze([
     { label: 'CONTRACT_META_REQUIRED', source: 'CONTRACT_META_REQUIRED_TIMES',
         resolve: (network) => CONTRACT_META_REQUIRED_TIMES[
             Object.prototype.hasOwnProperty.call(CONTRACT_META_REQUIRED_TIMES, network) ? network : 'mainnet'] },
+    { label: 'DEPLOY_INIT_STRICT', source: 'DEPLOY_INIT_STRICT_TIMES',
+        resolve: (network) => DEPLOY_INIT_STRICT_TIMES[
+            Object.prototype.hasOwnProperty.call(DEPLOY_INIT_STRICT_TIMES, network) ? network : 'mainnet'] },
     // Resolve exactly as isGasCeilingSuccessActive does: a network the map does not name is unarmed.
     { label: 'gas-ceiling success', source: 'GAS_CEILING_SUCCESS_ACTIVATION',
         resolve: (network) => (Object.hasOwn(GasTracker.GAS_CEILING_SUCCESS_ACTIVATION, network)
@@ -145,6 +157,7 @@ module.exports = {
     isArmedGateTime,
     HEIGHT_GATES,
     CONTRACT_META_REQUIRED_TIMES,
+    DEPLOY_INIT_STRICT_TIMES,
     TIME_NETWORK_GATES,
     GUARD_GAS_CEILING,
     DEFAULT_GAS_CEILING,

@@ -16,6 +16,7 @@
 const XChainVM = require('../../index.js');
 const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
 const { isLintBannedWithActive } = require('../../index/lint_banned_with_heights.js');
+const { isLintDestructureActive } = require('../../index/lint_destructure_heights.js');
 const { HEIGHT_GATES } = require('./constants.js');
 const { heightGateThreshold, heightGateNeed, defaultBlockHeight } = require('./block_time_gates.js');
 const {
@@ -23,6 +24,15 @@ const {
     manifestPolicyError,
     contractMetaError
 } = require('./manifest_gate.js');
+
+// Judge a manifest read: the policy rows first, then the meta ladder once it is armed.
+function manifestLegVerdict(read, network, blockTime) {
+    const policy = manifestPolicyError(read);
+    if (policy) return { valid: false, error: policy };
+    if (!isContractMetaRequiredActive(network, blockTime)) return { valid: true };
+    const meta = contractMetaError(read);
+    return meta ? { valid: false, error: meta } : { valid: true };
+}
 
 module.exports = {
     // ---- block control ------------------------------------------------------
@@ -172,6 +182,9 @@ module.exports = {
             Object.defineProperty(options, 'enforceBannedWith', {
                 value: isLintBannedWithActive(this.network, this.coin, height)
             });
+            Object.defineProperty(options, 'enforceLintDestructure', {
+                value: isLintDestructureActive(this.network, this.coin, height)
+            });
             return this.vm.validateSyntax(src, options);
         } catch (e) {
             // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a
@@ -196,6 +209,18 @@ module.exports = {
      * @returns {Promise<{valid: (boolean|null), error?: string}>}
      */
     async manifestGateVerdict(src, contractAddress) {
+        return (await this.manifestGate(src, contractAddress)).verdict;
+    },
+
+    /**
+     * The third leg as manifestGateVerdict judges it, plus the read's `hasInitialize`,
+     * which deploy() needs for the chain's constructor trigger. A read that did not
+     * succeed reports false, as the indexer's applyManifestPolicy leaves it.
+     * @param {string} src - transpiled source that already passed the first two legs
+     * @param {string} contractAddress
+     * @returns {Promise<{verdict: {valid: (boolean|null), error?: string}, hasInitialize: boolean}>}
+     */
+    async manifestGate(src, contractAddress) {
         let read;
         try {
             read = await this.vm.readManifest(src, {
@@ -204,13 +229,11 @@ module.exports = {
                 blockContext: { height: this.block.height, timestamp: this.block.timestamp }
             });
         } catch (e) {
-            return { valid: null, error: 'deploy gate could not run on this host: ' + e.message };
+            const verdict = { valid: null, error: 'deploy gate could not run on this host: ' + e.message };
+            return { verdict, hasInitialize: false };
         }
-        const policy = manifestPolicyError(read);
-        if (policy) return { valid: false, error: policy };
-        if (!isContractMetaRequiredActive(this.network, this.block.timestamp)) return { valid: true };
-        const meta = contractMetaError(read);
-        return meta ? { valid: false, error: meta } : { valid: true };
+        const hasInitialize = !!(read && read.success && read.manifest && read.manifest.hasInitialize === true);
+        return { verdict: manifestLegVerdict(read, this.network, this.block.timestamp), hasInitialize };
     },
 
     /**

@@ -47,6 +47,9 @@ function resolveLimits(limits) {
     if (!Number.isInteger(out.maxCodeSize))       out.maxCodeSize       = MAX_CODE_SIZE;
     if (!Number.isInteger(out.maxStateValueSize)) out.maxStateValueSize = 65536;
     if (!Number.isInteger(out.maxStateKeys))      out.maxStateKeys      = 10000;
+    // Emission cap: a missing maxEmissions made EmissionCollector compare against
+    // undefined, so a partial limits object allowed unlimited emissions.
+    if (!Number.isInteger(out.maxEmissions))      out.maxEmissions      = DEFAULT_LIMITS.maxEmissions;
     return out;
 }
 

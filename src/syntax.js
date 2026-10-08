@@ -112,6 +112,7 @@ function validateSyntax(code, opts) {
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
     const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
+    const enforceLintDestructure = !opts || opts.enforceLintDestructure !== false;
 
     // 1. V8 syntax check (the only step that requires isolated-vm).
     //
@@ -153,7 +154,8 @@ function validateSyntax(code, opts) {
     const blocking = lintSource(code, {
         hardened: enforceLintHardening,
         globalAlias: enforceLintGlobalAlias,
-        optionalChain: enforceLintOptionalChain
+        optionalChain: enforceLintOptionalChain,
+        destructure: enforceLintDestructure
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
         enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));
     if (blocking.length > 0)

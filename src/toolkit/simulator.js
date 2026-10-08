@@ -79,8 +79,9 @@
  *   - REFUSE a deploy the chain's deploy gate would reject. deploy() runs that
  *     gate's three legs (code size, validateSyntax, then the manifest read with
  *     its permissions / maxTakeBps rows and the CONTRACT_META_REQUIRED meta
- *     ladder, all resolved at the configured network / coin / block) and hands
- *     the verdict back as `deployGate`, warning once on a
+ *     ladder, all resolved at the configured network / coin / block), then folds
+ *     a failed `initialize` in as the chain's `invalid: constructor failed: ...`
+ *     once those pass, and hands the verdict back as `deployGate`, warning once on a
  *     reject, but it still registers the contract: simulating a source the chain
  *     would not accept is a legitimate move, and this repo's own fixtures do it to
  *     measure the runtime strips. A `deployGate.valid === false` means the later

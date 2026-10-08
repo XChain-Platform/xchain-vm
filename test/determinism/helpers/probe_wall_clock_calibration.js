@@ -21,13 +21,17 @@
  * as a MAINNET node past every ARMED flag-day so the activated metering is what
  * gets measured, and reports the headroom ratio against CONSENSUS_MAX_WALL_MS.
  *
- * "Every armed flag-day" means both kinds: the block-time gates (the latest
- * armed *_GATE_BLOCK_TIME export) and the per-coin block-HEIGHT gates listed in
+ * "Every armed flag-day" means three kinds: the block-time gates (the latest
+ * armed *_GATE_BLOCK_TIME export), the per-coin block-HEIGHT gates listed in
  * HEIGHT_GATES for the probe contract's coin (Pkg 3 sandbox, execute-time lint,
- * lint global-alias, lint optional-chain). The height gates only resolve on a
+ * lint global-alias, lint optional-chain), and the per-network activation tables
+ * listed in NETWORK_GATES (iterator/Set meter, apply-length meter, gas-ceiling
+ * success, JSON.stringify hook; null is off, 0 is on from genesis), whose latest
+ * armed time is folded into the probe block. The height gates only resolve on a
  * named network, so the probe passes NETWORK explicitly, and it refuses to run
- * when an armed gate is not active at the probe block. Unarmed gates stay off,
- * as they do on a real mainnet node.
+ * when an armed gate is not active at the probe block or when a per-network
+ * activation table is not listed. Unarmed gates stay off, as they do on a real
+ * mainnet node.
  *
  * Two vector groups:
  *   - metered: shapes the schedule is meant to price. The worst of these is the
@@ -42,8 +46,9 @@
  *   node test/determinism/helpers/probe_wall_clock_calibration.js [--runs N] [--allow-unpinned]
  *
  * Exit: 0 clean, 2 on a metered headroom breach or advisory (< 10x), 1 on a
- * runtime mismatch without --allow-unpinned or on an armed gate that is not
- * active at the probe block.
+ * runtime mismatch without --allow-unpinned, on an armed gate that is not
+ * active at the probe block, or on a per-network activation table the probe
+ * does not list.
  ********************************************************************/
 // @ts-nocheck
 const os = require('os');
@@ -70,6 +75,16 @@ const HEIGHT_GATES = [
     { name: 'lint-global-alias', table: XChainVM.LINT_GLOBAL_ALIAS_ACTIVATION, active: XChainVM.isLintGlobalAliasActive },
     { name: 'lint-optional-chain', table: XChainVM.LINT_OPTIONAL_CHAIN_ACTIVATION, active: XChainVM.isLintOptionalChainActive },
 ];
+// Per-network time tables, read from the exports by name (a null entry is unarmed, an absent one is refused).
+const NETWORK_GATES = [
+    { name: 'iter-set-meter', source: 'ITER_SET_METER_ACTIVATION', active: XChainVM.isIterSetMeterActive },
+    { name: 'apply-length-meter', source: 'APPLY_LENGTH_METER_ACTIVATION', active: XChainVM.isApplyLengthMeterActive },
+    { name: 'gas-ceiling-success', source: 'GAS_CEILING_SUCCESS_ACTIVATION', active: XChainVM.isGasCeilingSuccessActive },
+    // No is-active export exists for this one; the in-isolate check compares against the gate time.
+    { name: 'json-stringify-hook', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',
+        active: (network, blockTime) => blockTime >= XChainVM.jsonStringifyHookGateTime(network) },
+].map((g) => ({ ...g, table: XChainVM[g.source] }));
+const NETWORK_KEYS = ['mainnet', 'testnet', 'regtest'];
 
 const argv = process.argv.slice(2);
 const RUNS = Math.max(1, parseInt(argv[argv.indexOf('--runs') + 1], 10) || 3);
@@ -110,14 +125,48 @@ function armedHeight(gate, coin) {
     return Number.isFinite(h) ? h : null;
 }
 
+// Read one per-network gate's armed time for NETWORK (null when unarmed).
+function armedTime(gate) {
+    // Refuse a renamed export, which would otherwise read as an unarmed gate.
+    if (!gate.table || typeof gate.active !== 'function') throw new Error(`network gate ${gate.name} is not exported`);
+    if (!Object.prototype.hasOwnProperty.call(gate.table, NETWORK)) throw new Error(`network gate ${gate.name} has no entry for ${NETWORK}`);
+    const t = gate.table[NETWORK];
+    return Number.isFinite(t) && t < UNARMED_SENTINEL ? t : null;
+}
+
+// Name every bare-network-keyed *_ACTIVATION export, own or inherited, that `gates` does not list.
+function unlistedNetworkTables(gates = NETWORK_GATES) {
+    const names = new Set();
+    for (let o = XChainVM; o && o !== Function.prototype && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
+        Object.getOwnPropertyNames(o).filter((k) => /_ACTIVATION$/.test(k)).forEach((k) => names.add(k));
+    }
+    const isNetworkTable = (v) => !!v && typeof v === 'object' && Object.keys(v).length > 0 &&
+        Object.keys(v).every((k) => NETWORK_KEYS.includes(k));
+    return [...names].filter((k) => isNetworkTable(XChainVM[k]) && !gates.some((g) => g.source === k));
+}
+
 // Build the post-gate block: the latest ARMED flag-day time and every armed height, from the exports.
-function postGateBlock(coin) {
+function postGateBlock(coin, gates = NETWORK_GATES) {
     const armed = Object.keys(XChainVM)
         .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && typeof XChainVM[k] === 'number')
         .map((k) => XChainVM[k])
         .filter((t) => t < UNARMED_SENTINEL);
+    const times = gates.map(armedTime).filter((t) => t !== null);
     const heights = HEIGHT_GATES.map((g) => armedHeight(g, coin)).filter((h) => h !== null);
-    return { height: Math.max(MIN_HEIGHT, ...heights), timestamp: Math.max(...armed), hash: 'calibration' };
+    return { height: Math.max(MIN_HEIGHT, ...heights), timestamp: Math.max(...armed, ...times), hash: 'calibration' };
+}
+
+// Refuse an unlisted per-network table or an armed one that is off at the block; return the ones that are on.
+function checkNetworkGates(block, gates = NETWORK_GATES) {
+    const unlisted = unlistedNetworkTables(gates);
+    if (unlisted.length) throw new Error(`per-network activation table not listed in NETWORK_GATES: ${unlisted.join(', ')}`);
+    const on = [];
+    for (const g of gates) {
+        const isOn = g.active(NETWORK, block.timestamp);
+        if (armedTime(g) !== null && !isOn) throw new Error(`armed network gate ${g.name} not active at the probe block`);
+        if (isOn) on.push(g.name);
+    }
+    return on;
 }
 
 // Refuse a probe block where an armed gate is off; return the height gates that are on.
@@ -200,8 +249,10 @@ async function main() {
     const coin = XChainVM.pkg3CoinFromAddress(CONTRACT);
     const block = postGateBlock(coin);
     const heightGatesOn = checkGates(block, coin);
+    const networkGatesOn = checkNetworkGates(block);
     console.log(`${label}block time ${block.timestamp}, gas ceiling ${GAS_CEILING}, runs ${RUNS}`);
     console.log(`${label}network ${NETWORK}, coin ${coin}, height ${block.height}, height gates on: ${heightGatesOn.join(', ') || 'none'}`);
+    console.log(`${label}network gates on: ${networkGatesOn.join(', ') || 'none'}`);
     const vm = createVM({ maxCpuTimeMs: CONSENSUS_MAX_WALL_MS, gasCeiling: GAS_CEILING });
     const rows = [];
     for (const vector of VECTORS) {
@@ -212,4 +263,7 @@ async function main() {
     process.exit(summarise(label, rows));
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Measure only when run directly, so a test can load the gate logic without the slow vectors.
+if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
+
+module.exports = { NETWORK_GATES, HEIGHT_GATES, armedTime, unlistedNetworkTables, postGateBlock, checkGates, checkNetworkGates };
