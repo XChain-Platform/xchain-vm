@@ -15,6 +15,7 @@
 
 const XChainVM = require('../../index.js');
 const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
+const { isLintBannedWithActive } = require('../../index/lint_banned_with_heights.js');
 const { HEIGHT_GATES } = require('./constants.js');
 const { heightGateThreshold, heightGateNeed, defaultBlockHeight } = require('./block_time_gates.js');
 const {
@@ -167,6 +168,9 @@ module.exports = {
             };
             Object.defineProperty(options, 'enforceLintOptionalChain', {
                 value: isLintOptionalChainActive(this.network, this.coin, height)
+            });
+            Object.defineProperty(options, 'enforceBannedWith', {
+                value: isLintBannedWithActive(this.network, this.coin, height)
             });
             return this.vm.validateSyntax(src, options);
         } catch (e) {

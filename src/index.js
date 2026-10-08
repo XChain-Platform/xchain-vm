@@ -47,6 +47,26 @@ const { assertExecutionMode } = require('./index/runtime/execution_mode.js');
 const { isConsensusWallClockActive } = require('./index/runtime/activations.js');
 const { attachStatics } = require('./index/runtime/public_exports.js');
 const { setTimeoutLog } = require('./index/runtime/timeout_log.js');
+const {
+    LINT_BANNED_WITH_ACTIVATION,
+    isLintBannedWithActive,
+} = require('./index/lint_banned_with_heights.js');
+
+const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
+const executeWithBannedWithGate = executeMethods.execute;
+executeMethods.execute = function execute(opts) {
+    const hadValue = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_BANNED_WITH);
+    const previous = this[EXECUTE_LINT_BANNED_WITH];
+    const coin = XChainVM.pkg3CoinFromAddress(opts && opts.contractAddress);
+    const height = opts && opts.blockContext && Number(opts.blockContext.height);
+    this[EXECUTE_LINT_BANNED_WITH] = isLintBannedWithActive(opts && opts.network, coin, height);
+    try {
+        return executeWithBannedWithGate.call(this, opts);
+    } finally {
+        if (hadValue) this[EXECUTE_LINT_BANNED_WITH] = previous;
+        else delete this[EXECUTE_LINT_BANNED_WITH];
+    }
+};
 
 class XChainVM {
     /**
@@ -132,3 +152,8 @@ installMethods(
 module.exports = XChainVM;
 setTimeoutLog((message) => console.error(message));
 attachStatics(XChainVM);
+const bannedWithExports = Object.create(Object.getPrototypeOf(XChainVM), {
+    LINT_BANNED_WITH_ACTIVATION: { value: LINT_BANNED_WITH_ACTIVATION, enumerable: true },
+    isLintBannedWithActive: { value: isLintBannedWithActive, enumerable: true },
+});
+Object.setPrototypeOf(XChainVM, bannedWithExports);

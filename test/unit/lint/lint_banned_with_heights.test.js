@@ -21,6 +21,7 @@ const {
     resolveBannedWithActive,
     isLintBannedWithActive,
 } = require('../../../src/index/lint_banned_with_heights.js');
+const XChainVM = require('../../../src/index.js');
 
 describe('banned-with lint activation', function () {
     const coins = ['BTC', 'LTC', 'DOGE'];
@@ -43,6 +44,11 @@ describe('banned-with lint activation', function () {
 
     it('is active on regtest at genesis', function () {
         assert.strictEqual(isLintBannedWithActive('regtest', 'BTC', 0), true);
+    });
+
+    it('is exported by the VM entry point', function () {
+        assert.strictEqual(XChainVM.LINT_BANNED_WITH_ACTIVATION, LINT_BANNED_WITH_ACTIVATION);
+        assert.strictEqual(XChainVM.isLintBannedWithActive, isLintBannedWithActive);
     });
 
     it('keeps every mainnet and testnet chain unarmed', function () {
