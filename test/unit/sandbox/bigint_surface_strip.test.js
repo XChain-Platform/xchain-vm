@@ -50,7 +50,7 @@ function evaluateAfterStrip(expression, opts) {
     }
 }
 
-describe('BigInt native surface strip', function () {
+describe('BigInt native surface strip: gated sets', function () {
     this.timeout(30000);
 
     it('freezes the exact gated surface sets', function () {
@@ -90,6 +90,11 @@ describe('BigInt native surface strip', function () {
         assert.ok(!source.includes('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS'));
     });
 
+});
+
+describe('BigInt native surface strip: typed arrays and DataView', function () {
+    this.timeout(30000);
+
     it('keeps all three surfaces reachable below activation', function () {
         const result = evaluateAfterStrip(`JSON.stringify([
             typeof BigInt64Array,
@@ -121,6 +126,11 @@ describe('BigInt native surface strip', function () {
         { stripBigIntSurface: true });
         assert.strictEqual(result, true);
     });
+
+});
+
+describe('BigInt native surface strip: prototype constructor and isolation', function () {
+    this.timeout(30000);
 
     it('neuters BigInt.prototype.constructor at activation', function () {
         assert.strictEqual(evaluateAfterStrip(
