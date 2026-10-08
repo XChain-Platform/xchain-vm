@@ -44,29 +44,9 @@ const CONTRACTS_DIR  = path.join(__dirname, '..', '..', '..', '..', 'xchain-cont
 const VENDORED_FILES = ['lint-core.js', 'metering.js', 'stripped-globals.js'];
 // The two entry files are thin requires over these directories, which hold the actual rules and gas placement.
 const VENDORED_DIRS = ['lint-core', 'metering'];
-const DEFERRED_SDK_VENDOR_STATE = new Map([
-    ['lint-core.js', '4eeab813e7cc57001291b68ba5bbe056319f6bc4303ee6989aea0f9da1fb4f24'],
-    ['lint-core/banned_with.js', null],
-    ['lint-core/constants.js', 'e55d431f2486c5eef4ac801f51556c21c8ab7f994f91932cb30dfc608727398f'],
-    ['lint-core/result_composition.js', '38e99fbfa2c0ea50884bf4ab18258ce3a2235026c21a65146d0e4999ac3aa6cc']
-]);
 
-function isDeferredSdkVendorPath(rel) {
-    return DEFERRED_SDK_VENDOR_STATE.has(rel);
-}
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-}
-function assertDeferredSdkVendorState(rel, file) {
-    const expected = DEFERRED_SDK_VENDOR_STATE.get(rel);
-    if (expected === null) {
-        assert.ok(!fs.existsSync(file),
-            'VENDOR DRIFT: SDK ' + rel + ' now exists; remove its epoch-delta exception and require byte identity.');
-        return;
-    }
-    assert.ok(fs.existsSync(file), 'VENDOR DRIFT: SDK ' + rel + ' is missing from ' + SDK_VENDOR_DIR);
-    assert.strictEqual(sha256(file), expected,
-        'VENDOR DRIFT: SDK ' + rel + ' changed outside the declared VM epoch delta.');
 }
 
 // List every regular file under base as sorted '/'-separated relative paths ([] when base is absent).
@@ -111,8 +91,7 @@ const BAD_FIXTURES = [
     { name: 'banned-async',          rule: 'banned-async',        code: 'function f(){ return 1; } async function g(){ return 1; }' },
     { name: 'banned-generator',      rule: 'banned-generator',    code: 'module.exports = function(x){ return 1; }; function* g(){ yield 1; }' },
     { name: 'banned-wasm',           rule: 'banned-wasm',         code: 'module.exports = function(x){ return typeof WebAssembly; };' },
-    { name: 'banned-rest',           rule: 'banned-rest',         code: 'module.exports = function(){ function s(...n){ return n.length; } return s(1,2); };' },
-    { name: 'banned-with',           rule: 'banned-with',         code: 'module.exports = function(o){ with (o) { return a; } };' }
+    { name: 'banned-rest',           rule: 'banned-rest',         code: 'module.exports = function(){ function s(...n){ return n.length; } return s(1,2); };' }
 ];
 // Consensus rules whose deploy message cannot equal lintSource's, so only the verdict compares.
 // invalid-type: validateSyntax's V8 compile rejects a non-string first ("syntax error: ...").
@@ -125,17 +104,12 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     describe('drift guard (SDK vendored copies byte-identical to canonical)', function () {
         const haveSDK = fs.existsSync(SDK_VENDOR_DIR);
         for (const f of VENDORED_FILES) {
-            const deferred = isDeferredSdkVendorPath(f);
-            it('xchain-sdk/src/contract/' + f + (deferred
-                ? ' remains at the pinned pre-epoch state'
-                : ' matches src/' + f), function () {
+            it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
                 requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
-                const vendored = path.join(SDK_VENDOR_DIR, f);
-                if (deferred) return assertDeferredSdkVendorState(f, vendored);
-                assert.ok(fs.existsSync(vendored),
+                assert.ok(fs.existsSync(path.join(SDK_VENDOR_DIR, f)),
                     'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
                 assert.strictEqual(
-                    sha256(vendored), sha256(path.join(VM_SRC_DIR, f)),
+                    sha256(path.join(SDK_VENDOR_DIR, f)), sha256(path.join(VM_SRC_DIR, f)),
                     'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.'
                 );
             });
@@ -154,22 +128,15 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                 const vendored = listFiles(path.join(SDK_VENDOR_DIR, dir));
                 const missingInSdk = canonical.filter((f) => !vendored.includes(f));
                 const onlyInSdk = vendored.filter((f) => !canonical.includes(f));
-                const unexpectedMissing = missingInSdk.filter((f) => !isDeferredSdkVendorPath(dir + '/' + f));
-                const unexpectedOnly = onlyInSdk.filter((f) => !isDeferredSdkVendorPath(dir + '/' + f));
-                assert.ok(unexpectedMissing.length === 0 && unexpectedOnly.length === 0,
-                    'VENDOR DRIFT: ' + dir + '/ file sets differ outside the declared VM epoch delta. ' +
-                    'Missing from the SDK copy: [' + unexpectedMissing.join(', ') +
-                    ']. Present only in the SDK copy: [' + unexpectedOnly.join(', ') + '].');
+                assert.ok(missingInSdk.length === 0 && onlyInSdk.length === 0,
+                    'VENDOR DRIFT: ' + dir + '/ file sets differ. Missing from the SDK copy: [' + missingInSdk.join(', ') +
+                    ']. Present only in the SDK copy: [' + onlyInSdk.join(', ') + '].');
             });
             for (const rel of canonical) {
                 const f = dir + '/' + rel;
-                const deferred = isDeferredSdkVendorPath(f);
-                it('xchain-sdk/src/contract/' + f + (deferred
-                    ? ' remains at the pinned pre-epoch state'
-                    : ' matches src/' + f), function () {
+                it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
                     requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
                     const vendored = path.join(SDK_VENDOR_DIR, f);
-                    if (deferred) return assertDeferredSdkVendorState(f, vendored);
                     assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
                     assert.strictEqual(sha256(vendored), sha256(path.join(VM_SRC_DIR, f)),
                         'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.');
