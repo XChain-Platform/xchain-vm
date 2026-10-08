@@ -1373,7 +1373,7 @@
         "test/unit/lint-parity.test.js": "282f63051a53a366",
         "test/unit/lint-shared-rules.test.js": "c77bd66dbb559a2d",
         "test/unit/lint/lint_banned_with_heights.test.js": "444fba1ae77dbf07",
-        "test/unit/lint/lint_banned_with_threading.test.js": "b88631b2878d99d7",
+        "test/unit/lint/banned_with/lint_banned_with_threading.test.js": "b88631b2878d99d7",
         "test/unit/math.test.js": "1ec905aa9509bdfe",
         "test/unit/metered-cache.test.js": "085cea6786ecc21c",
         "test/unit/metering.test.js": "645189e9f67b5f3f",
