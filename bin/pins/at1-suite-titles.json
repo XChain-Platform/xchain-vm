@@ -977,6 +977,13 @@
       "Gateway (host-function surface) read-only context (0 gas) returns a defensive copy of params",
       "Gateway (host-function surface) state (metered, delegates to stateManager) get/has/set/delete delegate and charge the right gas"
     ],
+    "aa83a3faf040458a": [
+      "banned-with lint activation exports a frozen map with six unarmed entries",
+      "banned-with lint activation is active on regtest at genesis",
+      "banned-with lint activation keeps every mainnet and testnet chain unarmed",
+      "banned-with lint activation rejects an unknown network, null coin and non-finite height",
+      "banned-with lint activation resolves local armed thresholds and absent keys"
+    ],
     "ac2bf89e4f081529": [
       "VM_LINT_HARDENING lint rules 5bff4687: reserved CONTRACT_WRAPPER control bindings rejects a reference to __contractCode under hardening",
       "VM_LINT_HARDENING lint rules 5bff4687: reserved CONTRACT_WRAPPER control bindings rejects a reference to __isCrossCall under hardening",
@@ -1316,8 +1323,8 @@
   },
   "scripts": {
     "test": {
-      "fileCount": 57,
-      "titleCount": 1199,
+      "fileCount": 58,
+      "titleCount": 1204,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1359,6 +1366,7 @@
         "test/unit/lint-hardening.test.js": "ac2bf89e4f081529",
         "test/unit/lint-parity.test.js": "282f63051a53a366",
         "test/unit/lint-shared-rules.test.js": "c77bd66dbb559a2d",
+        "test/unit/lint/lint_banned_with_heights.test.js": "aa83a3faf040458a",
         "test/unit/math.test.js": "1ec905aa9509bdfe",
         "test/unit/metered-cache.test.js": "085cea6786ecc21c",
         "test/unit/metering.test.js": "645189e9f67b5f3f",
