@@ -54,11 +54,9 @@ const DEFERRED_SDK_VENDOR_STATE = new Map([
 function isDeferredSdkVendorPath(rel) {
     return DEFERRED_SDK_VENDOR_STATE.has(rel);
 }
-
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
-
 function assertDeferredSdkVendorState(rel, file) {
     const expected = DEFERRED_SDK_VENDOR_STATE.get(rel);
     if (expected === null) {
