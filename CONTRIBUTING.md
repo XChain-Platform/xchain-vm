@@ -69,7 +69,7 @@ No database or external service is required for the unit, security, boundary, de
 node -e "const XChainVM = require('.'); console.log(new XChainVM({ gasSchedule: {}, gasCeiling: 1000 }));"
 ```
 
-The `xchain-lint` CLI runs deploy-time syntax and float-detection checks:
+The `xchain-lint` CLI runs deploy-time syntax, float-detection and contract-identity (`meta`) checks:
 
 ```bash
 npm run lint              # runs bin/lint.js (xchain-lint)

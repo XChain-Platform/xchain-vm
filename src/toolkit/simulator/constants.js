@@ -86,12 +86,17 @@ const HEIGHT_GATES = Object.freeze([
 // canonical value to import; this is a second home for that number and a
 // deliberate one. A guard's real headroom is 5x smaller than the simulator's
 // 1000000 default, which is the whole reason it is pinned here rather than
-// left to the author. test/determinism/simulator-defaults-cross-repo.test.js
+// left to the author. test/determinism/simulator_defaults_cross_repo.test.js
 // compares this constant against GAS_SCHEDULE.VM_GUARD_GAS_CEILING in the
 // sibling coin configs, so a coin-side re-pricing reddens this repo instead of
 // leaving simulate quoting stale headroom; test/toolkit/simulator.test.js keeps
 // a literal pin for a standalone clone with no sibling to read.
 const GUARD_GAS_CEILING = 200000;
+
+// Gas ceiling a top-level EXECUTE runs under on chain, mirrored because the indexer
+// exports no requireable copy (actions/execute/index.js holds it module-private);
+// test/determinism/simulator_gas_ceiling_cross_repo.test.js compares the two.
+const DEFAULT_GAS_CEILING = 1000000;
 
 // Method name the indexer invokes on a token's bound controller contract
 // (xchain-indexer/src/actions/execute/controller_guard.js GUARD_METHOD).
@@ -142,6 +147,7 @@ module.exports = {
     CONTRACT_META_REQUIRED_TIMES,
     TIME_NETWORK_GATES,
     GUARD_GAS_CEILING,
+    DEFAULT_GAS_CEILING,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 };
