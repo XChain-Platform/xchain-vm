@@ -48,6 +48,22 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
+    it('BIGINT_SURFACE_STRIP_ACTIVATION is frozen and unarmed outside regtest', function () {
+        assert.deepStrictEqual(vm.BIGINT_SURFACE_STRIP_ACTIVATION, {
+            'BTC:mainnet': null,
+            'LTC:mainnet': null,
+            'DOGE:mainnet': null,
+            'BTC:testnet': null,
+            'LTC:testnet': null,
+            'DOGE:testnet': null,
+        });
+        assert.ok(Object.isFrozen(vm.BIGINT_SURFACE_STRIP_ACTIVATION));
+        assert.strictEqual(vm.isBigIntSurfaceStripActive('regtest', 'BTC', 0), true);
+    });
+});
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
     it('LINT_BANNED_WITH_ACTIVATION is frozen and unarmed outside regtest', function () {
         assert.deepStrictEqual(vm.LINT_BANNED_WITH_ACTIVATION, {
             'BTC:mainnet': null,
