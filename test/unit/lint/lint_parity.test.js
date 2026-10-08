@@ -44,9 +44,41 @@ const CONTRACTS_DIR  = path.join(__dirname, '..', '..', '..', '..', 'xchain-cont
 const VENDORED_FILES = ['lint-core.js', 'metering.js', 'stripped-globals.js'];
 // The two entry files are thin requires over these directories, which hold the actual rules and gas placement.
 const VENDORED_DIRS = ['lint-core', 'metering'];
+const SDK_EPOCH_DELTA = new Map([
+    ['lint-core.js', { vm: 'b888eebaf05d0aa7e28e9505923039619dfdc43a3f76b3b40cc9f29d4d9f2cc1', sdk: '4eeab813e7cc57001291b68ba5bbe056319f6bc4303ee6989aea0f9da1fb4f24' }],
+    ['lint-core/banned_with.js', { vm: 'abd21de570b9475e1693c9f21377046be09c0171abcc3dffd6522260233348c3', sdk: null }],
+    ['lint-core/constants.js', { vm: '63006353868c41f9d2739eec8c04eba205836b268673cb57cd0db10792b4c647', sdk: 'e55d431f2486c5eef4ac801f51556c21c8ab7f994f91932cb30dfc608727398f' }],
+    ['lint-core/result_composition.js', { vm: '5058fc159119169d4ee60ac3e370e3fa5fbac46e2ecf088c8a8aedc51bfae11a', sdk: '38e99fbfa2c0ea50884bf4ab18258ce3a2235026c21a65146d0e4999ac3aa6cc' }]
+]);
 
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function vendorStateLabel(rel) {
+    return SDK_EPOCH_DELTA.has(rel) ? ' is at the pinned epoch delta' : ' matches src/' + rel;
+}
+
+function assertVendorState(rel) {
+    const canonical = path.join(VM_SRC_DIR, rel);
+    const vendored = path.join(SDK_VENDOR_DIR, rel);
+    const delta = SDK_EPOCH_DELTA.get(rel);
+    if (!delta) {
+        assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + rel + ' is missing from ' + SDK_VENDOR_DIR);
+        assert.strictEqual(sha256(vendored), sha256(canonical),
+            'VENDOR DRIFT: SDK ' + rel + ' differs from xchain-vm canonical; re-sync the copy.');
+        return;
+    }
+    assert.strictEqual(sha256(canonical), delta.vm,
+        'VENDOR DRIFT: VM ' + rel + ' changed outside the pinned epoch delta.');
+    if (delta.sdk === null) {
+        assert.ok(!fs.existsSync(vendored),
+            'VENDOR DRIFT: SDK ' + rel + ' now exists; remove its pinned epoch delta.');
+        return;
+    }
+    assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + rel + ' is missing from ' + SDK_VENDOR_DIR);
+    assert.strictEqual(sha256(vendored), delta.sdk,
+        'VENDOR DRIFT: SDK ' + rel + ' changed outside the pinned epoch delta.');
 }
 
 // List every regular file under base as sorted '/'-separated relative paths ([] when base is absent).
@@ -102,17 +134,12 @@ const GOOD_FIXTURE  = 'function init(){ return 1; } function add(a,b){ return a 
 
 describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
 
-    describe('drift guard (SDK vendored copies byte-identical to canonical)', function () {
+    describe('drift guard (SDK vendored copies byte-identical or at the pinned epoch delta)', function () {
         const haveSDK = fs.existsSync(SDK_VENDOR_DIR);
         for (const f of VENDORED_FILES) {
-            it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
+            it('xchain-sdk/src/contract/' + f + vendorStateLabel(f), function () {
                 requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
-                assert.ok(fs.existsSync(path.join(SDK_VENDOR_DIR, f)),
-                    'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
-                assert.strictEqual(
-                    sha256(path.join(SDK_VENDOR_DIR, f)), sha256(path.join(VM_SRC_DIR, f)),
-                    'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.'
-                );
+                assertVendorState(f);
             });
         }
 
@@ -129,18 +156,19 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                 const vendored = listFiles(path.join(SDK_VENDOR_DIR, dir));
                 const missingInSdk = canonical.filter((f) => !vendored.includes(f));
                 const onlyInSdk = vendored.filter((f) => !canonical.includes(f));
-                assert.ok(missingInSdk.length === 0 && onlyInSdk.length === 0,
+                const unexpectedMissing = missingInSdk.filter((f) => {
+                    const delta = SDK_EPOCH_DELTA.get(dir + '/' + f);
+                    return !delta || delta.sdk !== null;
+                });
+                assert.ok(unexpectedMissing.length === 0 && onlyInSdk.length === 0,
                     'VENDOR DRIFT: ' + dir + '/ file sets differ. Missing from the SDK copy: [' + missingInSdk.join(', ') +
                     ']. Present only in the SDK copy: [' + onlyInSdk.join(', ') + '].');
             });
             for (const rel of canonical) {
                 const f = dir + '/' + rel;
-                it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
+                it('xchain-sdk/src/contract/' + f + vendorStateLabel(f), function () {
                     requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
-                    const vendored = path.join(SDK_VENDOR_DIR, f);
-                    assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
-                    assert.strictEqual(sha256(vendored), sha256(path.join(VM_SRC_DIR, f)),
-                        'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.');
+                    assertVendorState(f);
                 });
             }
         }
