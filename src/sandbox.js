@@ -27,7 +27,7 @@ const ivm = require('isolated-vm');
 // the three consumers cannot drift. That module is dependency-free on purpose:
 // this file requires isolated-vm at the top level, and the other two consumers
 // must load where no isolate exists.
-const { STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
+const { STRIPPED_GLOBAL_NAMES, BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
@@ -72,6 +72,15 @@ const NEUTERED_PROTO_CONSTRUCTORS = Object.freeze([
     'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp'
 ]);
 
+const BIGINT_SURFACE_STRIPPED_PROTO_METHODS = Object.freeze([
+    { proto: 'DataView', method: 'getBigInt64' },
+    { proto: 'DataView', method: 'getBigUint64' },
+    { proto: 'DataView', method: 'setBigInt64' },
+    { proto: 'DataView', method: 'setBigUint64' }
+]);
+
+const BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS = Object.freeze(['BigInt']);
+
 // The FROZEN whitelist of Math members the deterministic SafeMath subset exposes.
 // Math.random and the transcendentals (sqrt/pow/log/log2/log10) are intentionally
 // ABSENT (non-deterministic / up-to-1-ULP cross-arch differences); contracts use
@@ -82,20 +91,21 @@ const SAFE_MATH_MEMBERS = Object.freeze([
     'floor', 'ceil', 'round', 'abs', 'min', 'max', 'sign', 'trunc', 'PI', 'E'
 ]);
 
-// Opens the strip IIFE and captures the six built-in prototypes before any
+// Opens the strip IIFE and captures the built-in prototypes before any
 // global is deleted; both neuter loops resolve their targets through this map.
 const stripScriptProtoCapture = () => `
 (function() {
     // Capture built-in prototype references ONCE, up front, before any global is
     // deleted (RegExp's global is removed further down). Both neuter loops below
-    // resolve their target proto through this single six-key map. Fail-closed: an
+    // resolve their target proto through this single map. Fail-closed: an
     // entry in NEUTERED_PROTO_CONSTRUCTORS or STRIPPED_PROTO_METHODS naming a proto
     // absent here THROWS and aborts sandbox setup, rather than silently no-opping
     // while the consensus-params freeze guard (which digests only list membership)
     // stays green and certifies a neuter that never ran (item 5309).
     var _PROTOS = {
         Object: Object.prototype, Array: Array.prototype, String: String.prototype,
-        Number: Number.prototype, Boolean: Boolean.prototype, RegExp: RegExp.prototype
+        Number: Number.prototype, Boolean: Boolean.prototype, RegExp: RegExp.prototype,
+        DataView: DataView.prototype, BigInt: BigInt.prototype
     };
 `;
 
@@ -193,6 +203,30 @@ const stripScriptRegExpAndProtoMethods = () => `
         }
     })();
 `;
+
+const stripScriptBigIntSurface = (enabled) => enabled ? `
+    (function() {
+        var protoMethods = ${JSON.stringify(BIGINT_SURFACE_STRIPPED_PROTO_METHODS)};
+        for (var i = 0; i < protoMethods.length; i++) {
+            var proto = _PROTOS[protoMethods[i].proto];
+            if (!proto) throw new Error('BIGINT_SURFACE_STRIPPED_PROTO_METHODS: unmapped proto ' + protoMethods[i].proto);
+            try {
+                Object.defineProperty(proto, protoMethods[i].method,
+                    { value: undefined, writable: false, configurable: false });
+            } catch(e) {}
+        }
+
+        var ctorTargets = ${JSON.stringify(BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS)};
+        for (var j = 0; j < ctorTargets.length; j++) {
+            var ctorProto = _PROTOS[ctorTargets[j]];
+            if (!ctorProto) throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: unmapped proto ' + ctorTargets[j]);
+            try {
+                Object.defineProperty(ctorProto, 'constructor',
+                    { value: undefined, writable: false, configurable: false });
+            } catch(e) {}
+        }
+    })();
+` : '';
 
 // Pins Error stack text to the empty string (stackTraceLimit 0 plus a frozen
 // prepareStackTrace) so no V8 frame data can reach hashed state.
@@ -303,12 +337,13 @@ const stripScriptSafeMath = () => `
 // is simply absent from `names` and never deleted (exactly how a pre-activation
 // node behaves). Everything after the toDelete loop is fixed neutering logic that
 // does not depend on the list.
-const buildStripScript = (names) => [
+const buildStripScript = (names, stripBigIntSurface) => [
     stripScriptProtoCapture(),
     stripScriptDeleteGlobals(names),
     stripScriptFunctionCtors(),
     stripScriptProtoCtors(),
     stripScriptRegExpAndProtoMethods(),
+    stripScriptBigIntSurface(stripBigIntSurface),
     stripScriptErrorStacks(),
     stripScriptDefineProperty(),
     stripScriptHostGlobals(),
@@ -332,24 +367,32 @@ const buildStripScript = (names) => [
  *        isPkg3SandboxActive): below it WebAssembly is LEFT IN PLACE (historical
  *        replay), at/after it the global is absent fleet-wide. Same gated-entry
  *        pattern as Promise.
+ * @param {boolean} [opts.stripBigIntSurface=false] - delete the BigInt typed-array
+ *        globals and neuter the DataView BigInt64 methods plus
+ *        BigInt.prototype.constructor. Left intact by default for replay.
  */
 function stripGlobals(isolate, context, opts) {
     const stripPromise = !!(opts && opts.stripPromise);
     const stripWasm    = !!(opts && opts.stripWasm);
+    const stripBigIntSurface = !!(opts && opts.stripBigIntSurface);
     // Gated entries stay in the applied list only once their own flag-day is active,
     // exactly as a pre-activation node leaves them in place. Promise: block-time
     // async-surface gate. WebAssembly: per-coin Pkg 3 height gate. Every other entry
     // is stripped unconditionally from genesis.
     const names = STRIPPED_GLOBAL_NAMES.filter((n) =>
-        (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm));
-    const script = isolate.compileScriptSync(buildStripScript(names));
+        (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm))
+        .concat(stripBigIntSurface ? BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES : []);
+    const script = isolate.compileScriptSync(buildStripScript(names, stripBigIntSurface));
     script.runSync(context);
 }
 
 module.exports = {
     stripGlobals,
     STRIPPED_GLOBAL_NAMES,
+    BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES,
     STRIPPED_PROTO_METHODS,
     NEUTERED_PROTO_CONSTRUCTORS,
+    BIGINT_SURFACE_STRIPPED_PROTO_METHODS,
+    BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS,
     SAFE_MATH_MEMBERS
 };

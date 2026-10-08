@@ -726,6 +726,18 @@
       "constructor limits back-fill (bac14514) leaves the no-limits default object unchanged",
       "constructor limits back-fill (bac14514) preserves caller-supplied values (no clobbering)"
     ],
+    "7cf52b78aa9b8407": [
+      "BigInt native surface strip adds exactly the two gated globals when the flag is true",
+      "BigInt native surface strip does not couple the BigInt surface flag to the Promise or WebAssembly gates",
+      "BigInt native surface strip freezes the exact gated surface sets",
+      "BigInt native surface strip keeps all three surfaces reachable below activation",
+      "BigInt native surface strip keeps the BigInt prototype neuters out of the pre-activation script",
+      "BigInt native surface strip leaves the gated globals out of the deletion list by default and when false",
+      "BigInt native surface strip locks every neutered property to undefined",
+      "BigInt native surface strip neuters BigInt.prototype.constructor at activation",
+      "BigInt native surface strip neuters every DataView BigInt64 method at activation",
+      "BigInt native surface strip removes both typed-array globals at activation"
+    ],
     "8515568eab568709": [
       "Gateway controller-guard mode (isGuard) guard mode (isGuard=true) disables async frameworks a synchronous emission (emit.send) still works in guard mode",
       "Gateway controller-guard mode (isGuard) guard mode (isGuard=true) disables async frameworks attestation.request throws and charges no gas",
@@ -1329,8 +1341,8 @@
   },
   "scripts": {
     "test": {
-      "fileCount": 59,
-      "titleCount": 1208,
+      "fileCount": 60,
+      "titleCount": 1218,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1382,6 +1394,7 @@
         "test/unit/read-manifest.test.js": "6fd03d7e8ef88554",
         "test/unit/readonly-accessors.test.js": "040ba6bc59c4375f",
         "test/unit/sandbox.test.js": "9a6638760ddfe268",
+        "test/unit/sandbox/bigint_surface_strip.test.js": "7cf52b78aa9b8407",
         "test/unit/scripts-mutation-report.test.js": "b3d7c9ed4f762088",
         "test/unit/security/configuration/dependency-advisories.test.js": "0f2abe37f99c5a17",
         "test/unit/sibling-coverage.test.js": "d8d1e52267ea606f",

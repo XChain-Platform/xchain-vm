@@ -75,6 +75,14 @@ function executeCode(vm, code) {
                 try {
                     return this.constructor.constructor('return typeof process')();
                 } catch(e) { return 'blocked'; }
+            };`,
+            'bigint-surface-pre-activation': `module.exports = function(xchain) {
+                return [typeof BigInt64Array, typeof BigUint64Array,
+                    typeof DataView.prototype.getBigInt64,
+                    typeof DataView.prototype.getBigUint64,
+                    typeof DataView.prototype.setBigInt64,
+                    typeof DataView.prototype.setBigUint64,
+                    typeof (new BigInt64Array(1)[0]).constructor].join(',');
             };`
         };
 
