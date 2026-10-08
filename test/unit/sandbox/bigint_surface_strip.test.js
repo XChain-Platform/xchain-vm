@@ -144,7 +144,7 @@ describe('BigInt native surface strip: prototype constructor and isolation', fun
             '(0n).constructor === undefined', { stripWasm: true }), true);
     });
 
-    it('locks every neutered property to undefined', function () {
+    it('locks every neutered property against recreation', function () {
         const result = evaluateAfterStrip(`(function() {
             var rows = [
                 [DataView.prototype, 'getBigInt64'],
@@ -158,12 +158,16 @@ describe('BigInt native surface strip: prototype constructor and isolation', fun
                     descriptor.writable === false && descriptor.configurable === false;
             });
             var bigIntProto = Object.getPrototypeOf(0n);
-            var inherited = Object.getOwnPropertyDescriptor(
-                Object.getPrototypeOf(bigIntProto), 'constructor');
+            var descriptor = Object.getOwnPropertyDescriptor(bigIntProto, 'constructor');
+            bigIntProto.constructor = function replacement() {};
+            var assignmentBlocked = bigIntProto.constructor === undefined;
+            var deletionBlocked = delete bigIntProto.constructor;
+            var afterMutation = Object.getOwnPropertyDescriptor(bigIntProto, 'constructor');
             return methodsLocked &&
-                Object.getOwnPropertyDescriptor(bigIntProto, 'constructor') === undefined &&
-                bigIntProto.constructor === undefined && inherited.value === undefined &&
-                inherited.writable === false && inherited.configurable === false;
+                descriptor.value === undefined && descriptor.writable === false &&
+                descriptor.configurable === false && assignmentBlocked &&
+                deletionBlocked === false && afterMutation.value === undefined &&
+                afterMutation.writable === false && afterMutation.configurable === false;
         })()`, { stripWasm: true });
         assert.strictEqual(result, true);
     });
