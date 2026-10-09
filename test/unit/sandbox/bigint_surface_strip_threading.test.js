@@ -75,6 +75,28 @@ async function assertParallelIsolation() {
     assert.strictEqual(unarmed.returnValue, '"function"');
 }
 
+function readPinnedSdkFile(sdkRoot, commit, sdkPath) {
+    const spec = commit + ':' + sdkPath;
+    const roots = [sdkRoot];
+    try {
+        const origin = childProcess.execFileSync(
+            'git', ['-C', sdkRoot, 'remote', 'get-url', 'origin'], { encoding: 'utf8' }
+        ).trim().replace(/^file:\/\//, '');
+        if (path.isAbsolute(origin)) roots.push(origin);
+    } catch (_) {
+        // no origin remote: the sibling checkout is the only candidate
+    }
+    for (const root of roots) {
+        try {
+            childProcess.execFileSync('git', ['-C', root, 'cat-file', '-e', commit + '^{commit}'], { stdio: 'ignore' });
+        } catch (_) {
+            continue;
+        }
+        return childProcess.execFileSync('git', ['-C', root, 'show', spec]);
+    }
+    return childProcess.execFileSync('git', ['-C', sdkRoot, 'show', spec]);
+}
+
 function assertPinnedSdkVendorParity() {
     const entry = identityPin.files['src/stripped-globals.js'];
     assert.match(entry.sdkCommit, /^[0-9a-f]{40}$/);
@@ -84,9 +106,7 @@ function assertPinnedSdkVendorParity() {
     ).trim();
     const sdkRoot = path.resolve(commonGitDir, '..', '..', 'xchain-sdk');
     const sdkPath = entry.sdkPath.replace(/^xchain-sdk\//, '');
-    const vendored = childProcess.execFileSync(
-        'git', ['-C', sdkRoot, 'show', entry.sdkCommit + ':' + sdkPath]
-    );
+    const vendored = readPinnedSdkFile(sdkRoot, entry.sdkCommit, sdkPath);
 
     assert.deepStrictEqual(vendored, fs.readFileSync(path.join(REPO_ROOT, 'src/stripped-globals.js')));
 }

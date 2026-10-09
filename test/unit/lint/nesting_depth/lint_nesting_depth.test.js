@@ -23,6 +23,28 @@ const identityPin = require('../../../../bin/pins/identity.json');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 
+function readPinnedSdkFile(sdkRoot, commit, sdkPath) {
+    const spec = commit + ':' + sdkPath;
+    const roots = [sdkRoot];
+    try {
+        const origin = childProcess.execFileSync(
+            'git', ['-C', sdkRoot, 'remote', 'get-url', 'origin'], { encoding: 'utf8' }
+        ).trim().replace(/^file:\/\//, '');
+        if (path.isAbsolute(origin)) roots.push(origin);
+    } catch (_) {
+        // no origin remote: the sibling checkout is the only candidate
+    }
+    for (const root of roots) {
+        try {
+            childProcess.execFileSync('git', ['-C', root, 'cat-file', '-e', commit + '^{commit}'], { stdio: 'ignore' });
+        } catch (_) {
+            continue;
+        }
+        return childProcess.execFileSync('git', ['-C', root, 'show', spec]);
+    }
+    return childProcess.execFileSync('git', ['-C', sdkRoot, 'show', spec]);
+}
+
 function parenthesized(depth) {
     return 'module.exports = ' + '('.repeat(depth) + '1' + ')'.repeat(depth) + ';';
 }
@@ -47,9 +69,7 @@ describe('deploy-lint: nesting-depth', function () {
 
         for (const rel of canonicalFiles) {
             const sdkPath = rel.replace(/^src\//, 'src/contract/');
-            const vendored = childProcess.execFileSync(
-                'git', ['-C', sdkRoot, 'show', entry.sdkCommit + ':' + sdkPath]
-            );
+            const vendored = readPinnedSdkFile(sdkRoot, entry.sdkCommit, sdkPath);
             assert.deepStrictEqual(vendored, fs.readFileSync(path.join(REPO_ROOT, rel)), sdkPath);
         }
     });
