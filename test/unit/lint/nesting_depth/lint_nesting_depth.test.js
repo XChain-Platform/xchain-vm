@@ -9,6 +9,9 @@
 'use strict';
 
 const assert = require('assert');
+const childProcess = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const {
     CONSENSUS_RULES,
     MAX_NESTING_DEPTH,
@@ -16,6 +19,9 @@ const {
     lintSource
 } = require('../../../../src/lint-core.js');
 const { validateSyntax } = require('../../../../src/syntax.js');
+const identityPin = require('../../../../bin/pins/identity.json');
+
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 
 function parenthesized(depth) {
     return 'module.exports = ' + '('.repeat(depth) + '1' + ')'.repeat(depth) + ';';
@@ -26,6 +32,28 @@ function depthErrors(code, opts) {
 }
 
 describe('deploy-lint: nesting-depth', function () {
+    it('matches the pinned companion SDK lint vendor byte for byte', function () {
+        const entry = identityPin.files['src/lint-core.js'];
+        assert.match(entry.sdkCommit, /^[0-9a-f]{40}$/);
+        const commonGitDir = childProcess.execFileSync(
+            'git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+            { cwd: REPO_ROOT, encoding: 'utf8' }
+        ).trim();
+        const sdkRoot = path.resolve(commonGitDir, '..', '..', 'xchain-sdk');
+        const canonicalFiles = ['src/lint-core.js'].concat(
+            fs.readdirSync(path.join(REPO_ROOT, 'src/lint-core')).sort()
+                .map((name) => 'src/lint-core/' + name)
+        );
+
+        for (const rel of canonicalFiles) {
+            const sdkPath = rel.replace(/^src\//, 'src/contract/');
+            const vendored = childProcess.execFileSync(
+                'git', ['-C', sdkRoot, 'show', entry.sdkCommit + ':' + sdkPath]
+            );
+            assert.deepStrictEqual(vendored, fs.readFileSync(path.join(REPO_ROOT, rel)), sdkPath);
+        }
+    });
+
     it('freezes the rule and limit as consensus parameters', function () {
         assert.ok(CONSENSUS_RULES.has('nesting-depth'));
         assert.strictEqual(MAX_NESTING_DEPTH, 64);
