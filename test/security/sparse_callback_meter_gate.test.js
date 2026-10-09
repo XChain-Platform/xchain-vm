@@ -46,20 +46,7 @@ async function sparse_callback_methods_are_charged_after_the_call(run, receiver)
     }
 }
 
-(XChainVM ? describe : describe.skip)('sparse callback Array method metering gate', function () {
-    this.timeout(120000);
-
-    let vm;
-    beforeEach(function () {
-        vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: WALL_MS });
-        vm.beginBlock();
-    });
-    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
-
-    const run = (body, network, extra) => execute(vm, wrap(body), {
-        method: 'default', network, blockContext: LATE, ...extra,
-    });
-
+function registerSparseScanCases(run) {
     it('charges every hole-skipping callback method on a sparse Array', async function () {
         await sparse_callback_methods_are_charged_after_the_call(
             run, `var a=new Array(${K});`);
@@ -93,7 +80,9 @@ async function sparse_callback_methods_are_charged_after_the_call(run, receiver)
         assert.strictEqual(r.success, false);
         assert.match(r.error, /^out_of_gas:/, r.error);
     });
+}
 
+function registerNetworkCases(run) {
     it('leaves the legacy flat charge on unarmed and unknown networks', async function () {
         const body = `var a=new Array(${K});a.some(function(){return false;});return 1;`;
         const gas = {};
@@ -105,7 +94,9 @@ async function sparse_callback_methods_are_charged_after_the_call(run, receiver)
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
     });
+}
 
+function registerActivationCase(run) {
     it('uses the apply-length activation without changing native results', async function () {
         const body = `var a=new Array(4);a[2]=7;return [
             a.map(function(v){return v+1;}).join(','),
@@ -131,4 +122,25 @@ async function sparse_callback_methods_are_charged_after_the_call(run, receiver)
             activation.regtest = saved;
         }
     });
-});
+}
+
+function sparseCallbackMeteringSuite() {
+    this.timeout(120000);
+
+    let vm;
+    beforeEach(function () {
+        vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: WALL_MS });
+        vm.beginBlock();
+    });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
+
+    const run = (body, network, extra) => execute(vm, wrap(body), {
+        method: 'default', network, blockContext: LATE, ...extra,
+    });
+    registerSparseScanCases(run);
+    registerNetworkCases(run);
+    registerActivationCase(run);
+}
+
+(XChainVM ? describe : describe.skip)(
+    'sparse callback Array method metering gate', sparseCallbackMeteringSuite);
