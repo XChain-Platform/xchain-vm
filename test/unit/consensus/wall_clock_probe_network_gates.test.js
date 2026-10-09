@@ -82,3 +82,20 @@ describe('wall-clock calibration probe: per-network activation tables', function
         }
     });
 });
+
+describe('wall-clock calibration probe: callback Array methods', function () {
+    const vectorsById = new Map(probe.VECTORS.map((vector) => [vector.id, vector]));
+
+    for (const [id, shape] of [
+        ['Sparse some loop', /new Array\(100000\).*\.some\(/],
+        ['Array-like forEach loop', /\{length:100000\}.*Array\.prototype\.forEach\.call/],
+        ['Sparse flatMap loop', /new Array\(100000\).*\.flatMap\(/],
+    ]) {
+        it(`includes the ${id} suspect vector`, function () {
+            const vector = vectorsById.get(id);
+            assert.ok(vector, `${id} must remain in the calibration probe`);
+            assert.strictEqual(vector.group, 'unmetered-suspect');
+            assert.match(vector.body, shape);
+        });
+    }
+});

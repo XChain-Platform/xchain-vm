@@ -107,6 +107,9 @@ const VECTORS = [
     { group: 'metered', id: 'JSON.stringify loop', body: `${ARR}var t=0;for(;;){t+=JSON.stringify(a).length;}` },
     { group: 'metered', id: 'string split loop', body: `var s=('7,').repeat(${K});var t=0;for(;;){t+=s.split(',').length;}` },
     { group: 'metered', id: 'string spread loop', body: `var s=('7').repeat(${K});var t=0;for(;;){t+=[...s].length;}` },
+    { group: 'unmetered-suspect', id: 'Sparse some loop', body: `var a=new Array(${K});var t=0;for(;;){if(a.some(function(){return false;}))t++;}` },
+    { group: 'unmetered-suspect', id: 'Array-like forEach loop', body: `var a={length:${K}};var t=0;for(;;){Array.prototype.forEach.call(a,function(){t++;});}` },
+    { group: 'unmetered-suspect', id: 'Sparse flatMap loop', body: `var a=new Array(${K});var t=0;for(;;){t+=a.flatMap(function(v){return [v];}).length;}` },
     { group: 'unmetered-suspect', id: 'Iterator toArray loop', body: `${ARR}var t=0;for(;;){t+=a.values().toArray().length;}` },
     { group: 'unmetered-suspect', id: 'Iterator drop loop', body: `${ARR}var t=0;for(;;){t+=a.values().drop(${K}-1).next().value;}` },
     { group: 'unmetered-suspect', id: 'String isWellFormed loop', body: `${TWO_BYTE}var t=0;for(;;){if(s.isWellFormed())t++;}` },
@@ -270,4 +273,4 @@ async function main() {
 // Measure only when run directly, so a test can load the gate logic without the slow vectors.
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
 
-module.exports = { NETWORK_GATES, HEIGHT_GATES, armedTime, unlistedNetworkTables, postGateBlock, checkGates, checkNetworkGates };
+module.exports = { VECTORS, NETWORK_GATES, HEIGHT_GATES, armedTime, unlistedNetworkTables, postGateBlock, checkGates, checkNetworkGates };
