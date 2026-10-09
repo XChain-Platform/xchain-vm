@@ -7,7 +7,7 @@
   "files": {
     "src/lint-core.js": {
       "canonical": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
-      "vendoredInSdk": "b888eebaf05d0aa7e28e9505923039619dfdc43a3f76b3b40cc9f29d4d9f2cc1",
+      "vendoredInSdk": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },
