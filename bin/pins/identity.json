@@ -2,7 +2,7 @@
   "what": "Identity pin for the vendored contract-lint trio, taken before the structure pass moved anything.",
   "why": "lint-parity.test.js is the only gate holding the vm canonical and the sdk copy byte-identical: there is no sync script. A rename that re-vendors the trio must reproduce these digests under the new names, or the two linters have drifted.",
   "takenAt": "AT1, xchain-vm at 8570dea0983a0508aae29761440c5a936b180047",
-  "note": "Declared, not graded: no tool, test or script in this repo reads this file, so a stale path or digest here fails nothing; the live parity gate is test/unit/lint_parity.test.js, which builds the sdk path itself. Every key, digest and sdkPath below is the AT1 record, unchanged; sdkPathAtOrigin records the sdk's spelling of the same file after its snake_case rename.",
+  "note": "Canonical digests are graded by bin/pin_identity.js. SDK metadata is descriptive except for the stripped-globals sdkCommit, which bigint_surface_strip_threading.test.js resolves from the sibling SDK repository and compares byte-for-byte with the VM canonical file.",
   "algorithm": "sha256",
   "files": {
     "src/lint-core.js": {
@@ -20,6 +20,7 @@
     "src/stripped-globals.js": {
       "canonical": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
       "vendoredInSdk": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
+      "sdkCommit": "558576f6b11183e52a629df15b37f18db9a5fcef",
       "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/stripped_globals.js"
     }

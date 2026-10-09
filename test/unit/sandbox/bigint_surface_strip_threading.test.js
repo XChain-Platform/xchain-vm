@@ -14,8 +14,14 @@
 'use strict';
 
 const assert = require('assert');
+const childProcess = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const sandbox = require('../../../src/sandbox.js');
 const XChainVM = require('../../../src/index.js');
+const identityPin = require('../../../bin/pins/identity.json');
+
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200, VM_STATE_DELETE: 100,
@@ -70,6 +76,22 @@ async function assertParallelIsolation() {
 }
 
 describe('BigInt surface strip execute threading', function () {
+    it('matches the pinned companion SDK commit byte for byte', function () {
+        const entry = identityPin.files['src/stripped-globals.js'];
+        assert.match(entry.sdkCommit, /^[0-9a-f]{40}$/);
+        const commonGitDir = childProcess.execFileSync(
+            'git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+            { cwd: REPO_ROOT, encoding: 'utf8' }
+        ).trim();
+        const sdkRoot = path.resolve(commonGitDir, '..', '..', 'xchain-sdk');
+        const sdkPath = entry.sdkPath.replace(/^xchain-sdk\//, '');
+        const vendored = childProcess.execFileSync(
+            'git', ['-C', sdkRoot, 'show', entry.sdkCommit + ':' + sdkPath]
+        );
+
+        assert.deepStrictEqual(vendored, fs.readFileSync(path.join(REPO_ROOT, 'src/stripped-globals.js')));
+    });
+
     it('passes the unarmed map decision beside Package 3 compatibility', async function () {
         const { result, observed } = await executeWithStripOptions({
             code: "module.exports = function(){ return [typeof BigInt64Array, typeof BigUint64Array, typeof DataView.prototype.getBigInt64, typeof globalThis['Web' + 'Assembly']]; };",
