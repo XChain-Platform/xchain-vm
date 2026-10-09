@@ -24,7 +24,7 @@
 
 const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
-const { lintSource, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
+const { lintSource, nestingDepthFinding, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
 
 function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWasm, bannedRest, bannedWith) {
     if (error.rule === 'banned-async' && !bannedAsync) return false;
@@ -33,6 +33,25 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
     if (error.rule === 'banned-rest' && !bannedRest) return false;
     if (error.rule === 'banned-with' && !bannedWith) return false;
     return CONSENSUS_RULES.has(error.rule);
+}
+
+function checkV8Syntax(code) {
+    let testIsolate;
+    try {
+        try {
+            testIsolate = new ivm.Isolate({ memoryLimit: 8 });
+        } catch (e) {
+            throw new HostFaultError('syntax validation isolate unavailable: ' + e.message);
+        }
+        try {
+            testIsolate.compileScriptSync(code);
+        } catch (e) {
+            return { valid: false, error: 'syntax error: ' + e.message };
+        }
+    } finally {
+        try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
+    }
+    return null;
 }
 
 /**
@@ -96,6 +115,8 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
  * @param {boolean} [opts.enforceBannedWith=true] - whether the 'banned-with' rule
  *        is deploy-blocking. CONSENSUS-GATED on its own per-coin block-height
  *        activation. Defaults to true for author-facing callers.
+ * @param {boolean} [opts.enforceLintNestingDepth=true] - whether the pre-parse
+ *        nesting-depth rule is deploy-blocking. Defaults to true.
  * @returns {{ valid: boolean, error?: string }}
  * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
  *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
@@ -112,7 +133,13 @@ function validateSyntax(code, opts) {
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
     const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
+    const enforceLintNestingDepth = !opts || opts.enforceLintNestingDepth !== false;
     const enforceLintDestructure = !opts || opts.enforceLintDestructure !== false;
+
+    if (enforceLintNestingDepth) {
+        const nesting = nestingDepthFinding(code);
+        if (nesting) return { valid: false, error: nesting.message };
+    }
 
     // 1. V8 syntax check (the only step that requires isolated-vm).
     //
@@ -128,21 +155,8 @@ function validateSyntax(code, opts) {
     // failed to load at all. HostFaultError carries that code, which
     // faultGuard.rethrowIfInfraFault treats as an infra halt, so the block
     // rolls back and retries and NO verdict is written.
-    let testIsolate;
-    try {
-        try {
-            testIsolate = new ivm.Isolate({ memoryLimit: 8 });
-        } catch (e) {
-            throw new HostFaultError('syntax validation isolate unavailable: ' + e.message);
-        }
-        try {
-            testIsolate.compileScriptSync(code);
-        } catch (e) {
-            return { valid: false, error: 'syntax error: ' + e.message };
-        }
-    } finally {
-        try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
-    }
+    const syntaxError = checkV8Syntax(code);
+    if (syntaxError) return syntaxError;
 
     // 2-5. Acorn-coverable consensus rules. Block ONLY on consensus rules;
     // lintSource also returns Move-2 advisory findings, which must never change
@@ -155,6 +169,7 @@ function validateSyntax(code, opts) {
         hardened: enforceLintHardening,
         globalAlias: enforceLintGlobalAlias,
         optionalChain: enforceLintOptionalChain,
+        enforceLintNestingDepth: false,
         destructure: enforceLintDestructure
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
         enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));

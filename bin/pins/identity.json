@@ -2,12 +2,13 @@
   "what": "Identity pin for the vendored contract-lint trio, taken before the structure pass moved anything.",
   "why": "lint-parity.test.js is the only gate holding the vm canonical and the sdk copy byte-identical: there is no sync script. A rename that re-vendors the trio must reproduce these digests under the new names, or the two linters have drifted.",
   "takenAt": "AT1, xchain-vm at 8570dea0983a0508aae29761440c5a936b180047",
-  "note": "Canonical digests are graded by bin/pin_identity.js. SDK metadata is descriptive except for the stripped-globals sdkCommit, which bigint_surface_strip_threading.test.js resolves from the sibling SDK repository and compares byte-for-byte with the VM canonical file.",
+  "note": "Canonical digests are graded by bin/pin_identity.js. SDK metadata records the sibling commits that carry the byte-identical vendor copies; dedicated parity tests resolve those copies from the sibling SDK repository.",
   "algorithm": "sha256",
   "files": {
     "src/lint-core.js": {
-      "canonical": "b888eebaf05d0aa7e28e9505923039619dfdc43a3f76b3b40cc9f29d4d9f2cc1",
-      "vendoredInSdk": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
+      "canonical": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
+      "vendoredInSdk": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
+      "sdkCommit": "b3cdaa502d4f716821f7d2b24911672f601eb66a",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },

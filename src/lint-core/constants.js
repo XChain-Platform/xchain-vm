@@ -33,6 +33,7 @@ const RESERVED_CONTROL_BINDINGS = [
 // It MUST stay equal to src/protocol/constants.js MAX_CODE_SIZE (and therefore
 // to the indexer's deploy.js cap); a parity test asserts it.
 const MAX_CODE_SIZE = 65536;
+const MAX_NESTING_DEPTH = 64;
 
 // The sandbox's hard-neutered prototype METHODS (sandbox.js
 // STRIPPED_PROTO_METHODS). Duplicated here for the dependency-light reason
@@ -88,6 +89,7 @@ const ADVISORY_STRIPPED_GLOBALS = ADVISORY_STRIPPED_GLOBAL_NAMES;
 // section.
 const CONSENSUS_RULES = new Set([
     'invalid-type',
+    'nesting-depth',
     'unsupported-syntax',
     'reserved-identifier',
     'banned-math',
@@ -127,6 +129,7 @@ module.exports = {
     SAFE_MATH_MEMBERS,
     RESERVED_CONTROL_BINDINGS,
     MAX_CODE_SIZE,
+    MAX_NESTING_DEPTH,
     STRIPPED_PROTO_METHOD_NAMES,
     REGEX_COERCING_METHODS,
     STRIPPED_GLOBAL_NAMES,

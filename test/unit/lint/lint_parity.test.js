@@ -93,6 +93,7 @@ const BAD_FIXTURES = [
     { name: 'banned-wasm',           rule: 'banned-wasm',         code: 'module.exports = function(x){ return typeof WebAssembly; };' },
     { name: 'banned-rest',           rule: 'banned-rest',         code: 'module.exports = function(){ function s(...n){ return n.length; } return s(1,2); };' },
     { name: 'banned-with',           rule: 'banned-with',         code: 'module.exports = function(o){ with (o) { return a; } };' }
+    ,{ name: 'nesting-depth',        rule: 'nesting-depth',       code: 'module.exports = ' + '('.repeat(65) + '1' + ')'.repeat(65) + ';' }
 ];
 // Consensus rules whose deploy message cannot equal lintSource's, so only the verdict compares.
 // invalid-type: validateSyntax's V8 compile rejects a non-string first ("syntax error: ...").
