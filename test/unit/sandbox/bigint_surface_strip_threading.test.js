@@ -75,22 +75,24 @@ async function assertParallelIsolation() {
     assert.strictEqual(unarmed.returnValue, '"function"');
 }
 
-describe('BigInt surface strip execute threading', function () {
-    it('matches the pinned companion SDK commit byte for byte', function () {
-        const entry = identityPin.files['src/stripped-globals.js'];
-        assert.match(entry.sdkCommit, /^[0-9a-f]{40}$/);
-        const commonGitDir = childProcess.execFileSync(
-            'git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
-            { cwd: REPO_ROOT, encoding: 'utf8' }
-        ).trim();
-        const sdkRoot = path.resolve(commonGitDir, '..', '..', 'xchain-sdk');
-        const sdkPath = entry.sdkPath.replace(/^xchain-sdk\//, '');
-        const vendored = childProcess.execFileSync(
-            'git', ['-C', sdkRoot, 'show', entry.sdkCommit + ':' + sdkPath]
-        );
+function assertPinnedSdkVendorParity() {
+    const entry = identityPin.files['src/stripped-globals.js'];
+    assert.match(entry.sdkCommit, /^[0-9a-f]{40}$/);
+    const commonGitDir = childProcess.execFileSync(
+        'git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+        { cwd: REPO_ROOT, encoding: 'utf8' }
+    ).trim();
+    const sdkRoot = path.resolve(commonGitDir, '..', '..', 'xchain-sdk');
+    const sdkPath = entry.sdkPath.replace(/^xchain-sdk\//, '');
+    const vendored = childProcess.execFileSync(
+        'git', ['-C', sdkRoot, 'show', entry.sdkCommit + ':' + sdkPath]
+    );
 
-        assert.deepStrictEqual(vendored, fs.readFileSync(path.join(REPO_ROOT, 'src/stripped-globals.js')));
-    });
+    assert.deepStrictEqual(vendored, fs.readFileSync(path.join(REPO_ROOT, 'src/stripped-globals.js')));
+}
+
+describe('BigInt surface strip execute threading', function () {
+    it('matches the pinned companion SDK commit byte for byte', assertPinnedSdkVendorParity);
 
     it('passes the unarmed map decision beside Package 3 compatibility', async function () {
         const { result, observed } = await executeWithStripOptions({
