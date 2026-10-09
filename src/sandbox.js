@@ -364,15 +364,9 @@ const buildStripScript = (names, stripBigIntSurface) => [
  * @param {ivm.Context} context
  * @param {object} [opts]
  * @param {boolean} [opts.stripPromise=false] - delete the global `Promise`.
- *        CONSENSUS-GATED on a block-time flag-day (see index.js): below the
- *        flag day (or for an un-gated/un-timestamped caller) Promise is LEFT
- *        IN PLACE, exactly as pre-activation nodes leave it, so a from-genesis
- *        replay reproduces the historical execution; at/after it Promise is
- *        stripped fleet-wide. queueMicrotask is always stripped (unchanged).
+ *        This is block-time gated so historical replays retain Promise.
  * @param {boolean} [opts.stripWasm=false] - delete the global `WebAssembly`.
- *        CONSENSUS-GATED on the per-coin Pkg 3 bundle HEIGHT flag-day (index.js
- *        isPkg3SandboxActive): below it WebAssembly is LEFT IN PLACE (historical
- *        replay), at/after it WebAssembly is absent fleet-wide.
+ *        This is height gated so historical replays retain WebAssembly.
  * @param {boolean} [opts.stripBigIntSurface=false] - remove BigInt typed-array
  *        globals and neuter the related DataView and prototype constructor surface.
  */
