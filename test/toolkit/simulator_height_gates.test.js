@@ -58,13 +58,44 @@ function heightWarningsFor(network, height, contractAddress) {
     return lines;
 }
 
+// Name every per-coin *_ACTIVATION export, own or inherited: some gates sit on an
+// object under the class rather than as own statics, and Object.keys never sees them.
+function exportedHeightGateMaps() {
+    const names = new Set();
+    for (let o = XChainVM; o && o !== Function.prototype && o !== Object.prototype;
+        o = Object.getPrototypeOf(o)) {
+        Object.getOwnPropertyNames(o).forEach((k) => names.add(k));
+    }
+    return [...names].filter((k) => /_ACTIVATION$/.test(k) &&
+        XChainVM[k] && typeof XChainVM[k] === 'object' &&
+        Object.keys(XChainVM[k]).some((key) => COIN_NETWORK_KEY.test(key)));
+}
+
+// Shadow the inherited, non-writable banned-with exports with an armed BTC:mainnet
+// map and a predicate of the real resolver's shape, then delete the shadows.
+function withArmedBannedWith(height, fn) {
+    const shadow = (name, value) => Object.defineProperty(XChainVM, name,
+        { value, writable: true, configurable: true, enumerable: true });
+    try {
+        shadow('LINT_BANNED_WITH_ACTIVATION', Object.freeze({ 'BTC:mainnet': height }));
+        shadow('isLintBannedWithActive', (network, coin, h) => network === 'regtest' ||
+            (coin === 'BTC' && network === 'mainnet' && Number(h) >= height));
+        return fn();
+    } finally {
+        delete XChainVM.LINT_BANNED_WITH_ACTIVATION;
+        delete XChainVM.isLintBannedWithActive;
+    }
+}
+
 describe('toolkit: simulator HEIGHT_GATES covers every VM height gate', function () {
 
     it('lists every exported per-coin activation map with an exported predicate', function () {
-        const exported = Object.keys(XChainVM).filter((k) => /_ACTIVATION$/.test(k) &&
-            XChainVM[k] && typeof XChainVM[k] === 'object' &&
-            Object.keys(XChainVM[k]).some((key) => COIN_NETWORK_KEY.test(key)));
-        assert.ok(exported.length >= 4, 'expected the VM to export its height-gate maps: ' + exported);
+        const exported = exportedHeightGateMaps();
+        for (const name of ['LINT_BANNED_WITH_ACTIVATION', 'LINT_DESTRUCTURE_ACTIVATION',
+            'BIGINT_SURFACE_STRIP_ACTIVATION']) {
+            assert.ok(exported.includes(name), name + ' was not enumerated: ' + exported);
+        }
+        assert.ok(exported.length >= 7, 'expected the VM to export its height-gate maps: ' + exported);
         const listed = HEIGHT_GATES.map((g) => g.map);
         for (const name of exported) {
             assert.ok(listed.includes(name), name + ' is a VM height gate missing from HEIGHT_GATES');
@@ -73,6 +104,12 @@ describe('toolkit: simulator HEIGHT_GATES covers every VM height gate', function
             assert.strictEqual(typeof XChainVM[g.isActive], 'function', g.isActive + ' is not exported');
             assert.ok(XChainVM[g.map] && typeof XChainVM[g.map] === 'object', g.map + ' is not exported');
         }
+        // An armed inherited gate must move the default height.
+        withArmedBannedWith(99999999, () =>
+            assert.strictEqual(defaultBlockHeight('BTC', 'mainnet'), 99999999));
+        assert.strictEqual(defaultBlockHeight('BTC', 'mainnet'),
+            XChainVM.PKG3_SANDBOX_ACTIVATION['BTC:mainnet']);
+        assert.ok(Object.isFrozen(XChainVM.LINT_BANNED_WITH_ACTIVATION));
     });
 
     it('keeps the default heights the shipped optional-chain map implies', function () {

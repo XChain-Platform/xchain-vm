@@ -24,8 +24,6 @@ const crypto = require('crypto');
 
 const { meterCode }     = require('../metering.js');
 const { validateSyntax, checkFloatWarnings } = require('../syntax.js');
-const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
-const EXECUTE_LINT_DESTRUCTURE = '_executeLintDestructure';
 
 module.exports = {
     /**
@@ -103,8 +101,10 @@ module.exports = {
      * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
      * @param {boolean} enforceLintOptionalChain - LINT_OPTIONAL_CHAIN refinement
      * @param {string} [codeHash] - precomputed sha256(code) hex (see getMeteredCode)
-     * @param {boolean} [enforceBannedWith] - banned-with (own per-coin height gate)
-     * @param {boolean} [enforceLintDestructure] - destructure refinement (own per-coin height gate)
+     * @param {boolean} [enforceBannedWith] - banned-with (own per-coin height gate);
+     *        omitted means off, like the optional-chain bit
+     * @param {boolean} [enforceLintDestructure] - destructure refinement (own per-coin
+     *        height gate); omitted means off
      * @returns {{valid: boolean, error?: string}}
      */
     getLintVerdict(
@@ -115,18 +115,12 @@ module.exports = {
         enforceLintGlobalAlias,
         enforceBannedRest,
         enforceLintOptionalChain,
-        codeHash
+        codeHash,
+        enforceBannedWith,
+        enforceLintDestructure
     ) {
-        const hasExplicitBannedWith = arguments.length > 8;
-        const enforceBannedWith = hasExplicitBannedWith
-            ? arguments[8] === true
-            : this[EXECUTE_LINT_BANNED_WITH] === true;
-        const hasExplicitLintDestructure = arguments.length > 9;
-        const enforceLintDestructure = hasExplicitLintDestructure
-            ? arguments[9] === true
-            : this[EXECUTE_LINT_DESTRUCTURE] === true;
-        const hasHeightLintBits = hasExplicitBannedWith || hasExplicitLintDestructure ||
-            enforceBannedWith || enforceLintDestructure;
+        const bannedWith = enforceBannedWith === true;
+        const lintDestructure = enforceLintDestructure === true;
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
@@ -134,9 +128,8 @@ module.exports = {
             (enforceLintGlobalAlias ? '1' : '0') +
             (enforceBannedRest ? '1' : '0') +
             (enforceLintOptionalChain === true ? '1' : '0') +
-            (hasHeightLintBits
-                ? (enforceBannedWith ? '1' : '0') + (enforceLintDestructure ? '1' : '0')
-                : '');
+            (bannedWith ? '1' : '0') +
+            (lintDestructure ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -147,8 +140,8 @@ module.exports = {
             enforceLintGlobalAlias:  enforceLintGlobalAlias,
             enforceBannedRest:       enforceBannedRest,
             enforceLintOptionalChain: enforceLintOptionalChain === true,
-            enforceBannedWith:       enforceBannedWith,
-            enforceLintDestructure:  enforceLintDestructure
+            enforceBannedWith:       bannedWith,
+            enforceLintDestructure:  lintDestructure
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;

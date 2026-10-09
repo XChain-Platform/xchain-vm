@@ -17,8 +17,9 @@
  *
  * Before size metering, the compute builtins were charged ~1 gas at the
  * call site regardless of input size (~66,000 native element-touches per
- * gas, see probe). `src/index.js` now extends F3-style size metering to
- * them. Run this acceptance tier explicitly with:
+ * gas, see probe). The G1 section of `src/index/runtime/harness_part_3.js`
+ * now extends F3-style size metering to them. Run this acceptance tier
+ * explicitly with:
  *
  *     npm run test:known-red
  *

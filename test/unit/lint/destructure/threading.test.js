@@ -151,8 +151,10 @@ describe('destructure lint threading', function () {
         const vm = newVm();
         const seen = [];
         const realGetLintVerdict = vm.getLintVerdict;
+        // Both height-gated flags must arrive as explicit arguments 9 and 10 (banned-with,
+        // destructure), never through state set on the instance around execute().
         vm.getLintVerdict = function (...args) {
-            seen.push(Reflect.get(this, '_executeLintDestructure'));
+            seen.push([args[8], args[9]]);
             return realGetLintVerdict.apply(this, args);
         };
         const code = 'module.exports = function(){ return 1; };';
@@ -173,7 +175,7 @@ describe('destructure lint threading', function () {
 
         assert.strictEqual(regtest.success, true, regtest.error);
         assert.strictEqual(mainnet.success, true, mainnet.error);
-        assert.deepStrictEqual(seen, [true, false]);
-        assert.strictEqual(Object.hasOwn(vm, '_executeLintDestructure'), false);
+        assert.deepStrictEqual(seen, [[true, true], [false, false]]);
+        assert.deepStrictEqual(Object.getOwnPropertyNames(vm).filter((k) => k.startsWith('_executeLint')), []);
     });
 });

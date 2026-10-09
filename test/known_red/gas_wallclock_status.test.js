@@ -32,6 +32,11 @@
  * ceiling fires no longer changes consensus. gasUsed is clamped to the
  * ceiling on both paths, so the fee was already fork-safe.
  *
+ * The race exists only below the consensus wall-clock gate, so the runs pin
+ * a pre-gate block and assert their per-node budgets. The suite also asserts
+ * the two runs took different ceilings; a host that cannot produce both
+ * reports pending rather than passing on a race it never ran.
+ *
  * Run this acceptance tier with:
  *     npm run test:known-red
  *
@@ -47,34 +52,65 @@ const { createVM, execute, hashResult, consensusError } = require('../fuzz/helpe
 // A pure gas-burning loop: while(true){} with __gas(1) per iteration.
 const LOOP = fs.readFileSync(path.join(__dirname, '../fixtures/contracts/infinite_loop.js'), 'utf8');
 
+// Pin a block below the consensus wall-clock gate (no network, pre-gate time):
+// above it every node gets the same fixed budget and the race cannot occur.
+const PRE_GATE_BLOCK = { height: 100, timestamp: 1700000000, hash: 'abc123' };
+
 async function run(maxCpuTimeMs) {
     const vm = createVM({ maxCpuTimeMs }); // gas ceiling stays at the 1,000,000 default
+    const budgetMs = vm.wallClockBudgetMs({ blockContext: PRE_GATE_BLOCK });
     if (typeof vm.beginBlock === 'function') vm.beginBlock();
-    const r = await execute(vm, LOOP, { method: 'default', params: [], state: {}, contractIndex: 1 });
+    const r = await execute(vm, LOOP, {
+        method: 'default', params: [], state: {}, contractIndex: 1, blockContext: PRE_GATE_BLOCK
+    });
     if (typeof vm.endBlock === 'function') vm.endBlock();
-    return r;
+    return { r, budgetMs };
+}
+
+// Classify which ceilings the two runs took: 'race', 'host-limited' or 'mismatch'.
+function raceOutcome(fastError, slowError) {
+    const gas = (e) => /^out_of_gas\b/.test(String(e));
+    const clock = (e) => /^timeout\b/.test(String(e));
+    if (gas(fastError) && clock(slowError)) return 'race';
+    if ((gas(fastError) && gas(slowError)) || (clock(fastError) && clock(slowError))) return 'host-limited';
+    return 'mismatch';
 }
 
 describe('gas-vs-wall-clock status must not fork', function () {
     this.timeout(60000);
 
-    let fast, slow;
+    let fast, slow, fastBudgetMs, slowBudgetMs;
     before(async function () {
         // FAST validator: generous budget → the gas ceiling wins (out_of_gas).
-        fast = await run(5000);
+        ({ r: fast, budgetMs: fastBudgetMs } = await run(5000));
         // SLOW/loaded validator: tight budget (host-speed proxy) → the
         // wall-clock net wins (timeout). A host N× slower trips a 5000 ms net
         // at the same gasUsed a fast host trips a 5000/N ms net at.
-        slow = await run(1);
+        ({ r: slow, budgetMs: slowBudgetMs } = await run(1));
+    });
+
+    it('each run gets its own per-node wall-clock budget (pre-gate regime)', function () {
+        assert.strictEqual(fastBudgetMs, 5000,
+            `fast run budget is ${fastBudgetMs} ms, not 5000: the consensus wall-clock gate is active for this block`);
+        assert.strictEqual(slowBudgetMs, 1,
+            `slow run budget is ${slowBudgetMs} ms, not 1: the consensus wall-clock gate is active, so the slow run cannot take the timeout path`);
     });
 
     it('both runs terminate in the resource-exhaustion family', function () {
         assert.strictEqual(fast.success, false, `fast run should fail: ${JSON.stringify(fast.error)}`);
         assert.strictEqual(slow.success, false, `slow run should fail: ${JSON.stringify(slow.error)}`);
-        // Sanity: the two raw errors really did take different ceilings (else
-        // the probe isn't exercising the race on this host).
-        // (Not asserted hard: on a very fast host both could be out_of_gas;
-        // the consensus assertions below hold regardless.)
+    });
+
+    it('the two runs took different ceilings (the race was exercised)', function () {
+        const outcome = raceOutcome(fast.error, slow.error);
+        if (outcome === 'race') return;
+        const raw = `fast=${JSON.stringify(fast.error)} slow=${JSON.stringify(slow.error)}`;
+        if (outcome === 'host-limited') {
+            // Report pending, not passing: the consensus checks below would hold trivially.
+            console.warn(`gas-vs-wall-clock race not exercised on this host (${raw}); skipping`);
+            this.skip();
+        }
+        assert.fail(`expected fast=out_of_gas and slow=timeout, got ${raw}`);
     });
 
     it('gasUsed is clamped to the ceiling on both paths (fee is fork-safe)', function () {

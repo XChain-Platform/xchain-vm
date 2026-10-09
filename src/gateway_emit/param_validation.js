@@ -14,7 +14,7 @@
  * XChain VM Emit API: parameter shape checks
  *
  * The required-field and field-type checks every emit method shares,
- * used by the emit API builder (../gateway_emit/index.js) and its same-chain
+ * used by the emit API builder (../gateway-emit.js) and its same-chain
  * emits (same_chain.js).
  ********************************************************************/
 // @ts-nocheck

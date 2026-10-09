@@ -28,14 +28,14 @@ function injectDepthGlobals(context, pkg3SandboxOn, limits) {
 
         // platform-dependent native depth (see MAX_STACK_DEPTH). Package 3:
         // at/after the per-coin ~961000 height window (isPkg3SandboxActive) the
-        // bound drops to MAX_STACK_DEPTH_MUSL, so a musl validator's native
+        // bound drops to MAX_STACK_DEPTH_MUSL (its comment says what is and is not
 
-        // reviver/join walk cannot overflow below the bound; below the window the
+        // measured on musl); below the window the
         // injected value is limits.maxStackDepth (the 512 default),
-        // byte-identical to today. The one injected __DEPTH_LIMIT is read by BOTH
+        // byte-identical to today. This __DEPTH_LIMIT is read only by the
 
-        // the intra-contract recursion guard and the F-NR native-depth guard, so
-        // gating it here moves both consistently. The coin is derived from the
+        // intra-contract recursion guard; the F-NR native-depth guard reads the
+        // clamped __NR_DEPTH_LIMIT injected below. The coin is derived from the
         // C:<COIN>:<idx> contract address so LTC/DOGE mainnet (tips already past a
 
         // bare BTC 961000) stay pre-activation until their own calendar height.
@@ -49,7 +49,7 @@ function injectDepthGlobals(context, pkg3SandboxOn, limits) {
 
         // that has not yet reached its PKG3_SANDBOX_ACTIVATION height when the
         // block-time gate arms would otherwise run the guard at 512, above the
-        // measured musl native onset (~292 reviver / ~379 join) and back inside the
+        // bound MAX_STACK_DEPTH_MUSL holds the musl native sinks to, back inside the
 
         // heterogeneous-OS fork the guard exists to close. Nothing enforces that
         // ordering in code, and a chain running behind its projected height is the

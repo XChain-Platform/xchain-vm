@@ -20,6 +20,8 @@
 
 const { GasExhaustedError } = require('../../errors.js');
 const { isLintOptionalChainActive } = require('../lint_optional_chain_heights.js');
+const { isLintBannedWithActive } = require('../lint_banned_with_heights.js');
+const { isLintDestructureActive } = require('../lint_destructure_heights.js');
 const {
     isAsyncSurfaceActive, isLintHardeningActive, isRestPatternMeterActive,
     isPkg3SandboxActive, isLintGlobalAliasActive, EXEC_LINT_GAS_BYTES_PER_UNIT,
@@ -27,6 +29,20 @@ const {
 } = require('./activations.js');
 
 /**
+ * The eight flags are resolved by the SAME predicates the rest of the VM already
+ * uses, which are the execution-side twins of the flags the indexer threads into
+ * deploy/index.js validateSyntax, so the execute-time verdict agrees with what a deploy
+ * in this block would have produced:
+ *   banned-async                    -> isAsyncSurfaceActive   (block time)
+ *   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
+ *   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
+ *   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
+ *   banned-rest (unmeterable rest)  -> isRestPatternMeterActive (block time)
+ *   LINT_OPTIONAL_CHAIN refinement  -> isLintOptionalChainActive (per-coin height)
+ *   banned-with                     -> isLintBannedWithActive (per-coin height)
+ *   LINT_DESTRUCTURE refinement     -> isLintDestructureActive (per-coin height)
+ * The last two travel after codeHash as explicit arguments.
+ *
  * @returns {object|null} an error result when the lint gate refuses the
  *   execution, null when execution may proceed.
  */
@@ -36,16 +52,6 @@ function checkExecLint(vm, opts, gasTracker, emissionCollector, codeStr, codeByt
     // syntax once that ban is live. Deploy-time validation alone cannot do this: it ran
     // under the rule set of the deploy block and its verdict was final.
     //
-    // The six flags are resolved by the SAME predicates the rest of the VM already
-    // uses, which are the execution-side twins of the flags the indexer threads into
-    // deploy/index.js validateSyntax, so the execute-time verdict agrees with what a deploy
-    // in this block would have produced:
-    //   banned-async                    -> isAsyncSurfaceActive   (block time)
-    //   VM_LINT_HARDENING rule set      -> isLintHardeningActive  (block time)
-    //   banned-generator + banned-wasm  -> isPkg3SandboxActive    (per-coin height)
-    //   LINT_GLOBAL_ALIAS refinement    -> isLintGlobalAliasActive (per-coin height)
-    //   banned-rest (unmeterable rest)  -> isRestPatternMeterActive (block time)
-    //   LINT_OPTIONAL_CHAIN refinement  -> isLintOptionalChainActive (per-coin height)
     // The whole check rides its own per-coin height gate (isExecLintActive), armed at
     // genesis on every named network: below it, which now means only a chain the
     // resolver cannot place, nothing is charged and nothing is checked, so the
@@ -76,7 +82,9 @@ function checkExecLint(vm, opts, gasTracker, emissionCollector, codeStr, codeByt
             isLintGlobalAliasActive(opts.network, coin, height),
             isRestPatternMeterActive(opts.network, __lintBlockTime),
             isLintOptionalChainActive(opts.network, coin, height),
-            codeHash
+            codeHash,
+            isLintBannedWithActive(opts.network, coin, height),
+            isLintDestructureActive(opts.network, coin, height)
         );
         if (!__lintVerdict.valid) {
             // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus-runtime.js);

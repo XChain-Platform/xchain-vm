@@ -63,20 +63,24 @@ const GATE_FALLBACK_BLOCK_TIME = 1786060800;
 
 // The sibling class of activations, keyed on block HEIGHT per coin rather than on
 // block time: the Package-3 sandbox bundle, the execute-time source re-lint, the
-// lint global-alias refinement and the lint optional-chain refinement all resolve
-// `<COIN>:<network>` against a threshold map. Whether a gate is on from genesis is
+// lint global-alias, optional-chain and destructure refinements, the banned-with
+// lint and the BigInt surface strip all resolve `<COIN>:<network>` against a
+// threshold map. Whether a gate is on from genesis is
 // decided per gate by its own predicate, never per network (the optional-chain
 // gate is genesis-on for regtest only and needs a threshold on testnet). A default
 // of 1 below an armed threshold runs the PRE-activation rule set, which BTC:mainnet
 // left behind at 961000 (~2026-08-04). Each entry names the exported map and the
 // exported predicate, so the toolkit reads the consensus decision instead of
 // restating it; test/toolkit/simulator_height_gates.test.js holds the table
-// complete against the VM's exported `*_ACTIVATION` maps.
+// complete against the VM's exported `*_ACTIVATION` maps, own and inherited.
 const HEIGHT_GATES = Object.freeze([
     { label: 'Pkg-3 sandbox',          map: 'PKG3_SANDBOX_ACTIVATION',        isActive: 'isPkg3SandboxActive' },
     { label: 'execute-time re-lint',   map: 'EXEC_LINT_ACTIVATION',           isActive: 'isExecLintActive' },
     { label: 'lint global-alias',      map: 'LINT_GLOBAL_ALIAS_ACTIVATION',   isActive: 'isLintGlobalAliasActive' },
-    { label: 'lint optional-chain',    map: 'LINT_OPTIONAL_CHAIN_ACTIVATION', isActive: 'isLintOptionalChainActive' }
+    { label: 'lint optional-chain',    map: 'LINT_OPTIONAL_CHAIN_ACTIVATION', isActive: 'isLintOptionalChainActive' },
+    { label: 'lint banned-with',       map: 'LINT_BANNED_WITH_ACTIVATION',    isActive: 'isLintBannedWithActive' },
+    { label: 'lint destructure',       map: 'LINT_DESTRUCTURE_ACTIVATION',    isActive: 'isLintDestructureActive' },
+    { label: 'BigInt surface strip',   map: 'BIGINT_SURFACE_STRIP_ACTIVATION', isActive: 'isBigIntSurfaceStripActive' }
 ]);
 
 // Gas ceiling a controller guard runs under. The indexer reads it from

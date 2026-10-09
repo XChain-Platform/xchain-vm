@@ -202,17 +202,20 @@ function codeFingerprint(code) {
 // ceiling fires does not read as a false differential.
 async function runCase(vm, c) {
     let result;
+    const execOpts = {
+        code:            c.code,
+        method:          c.method || 'default',
+        params:          c.params || [],
+        state:           c.state || {},
+        caller:          'test_addr',
+        contractAddress: 'C:BTC:1',
+        blockContext:    c.blockContext || DEFAULT_BLOCK_CONTEXT,
+        contractIndex:   1
+    };
+    // A case may name its network (the post-gate profile); legacy cases never do.
+    if (c.network !== undefined) execOpts.network = c.network;
     try {
-        result = await vm.execute({
-            code:            c.code,
-            method:          c.method || 'default',
-            params:          c.params || [],
-            state:           c.state || {},
-            caller:          'test_addr',
-            contractAddress: 'C:BTC:1',
-            blockContext:    DEFAULT_BLOCK_CONTEXT,
-            contractIndex:   1
-        });
+        result = await vm.execute(execOpts);
     } catch (e) {
         // vm.execute() must never throw; if it does, that is itself a
         // divergence signal, so fold it into a deterministic synthetic result.
@@ -222,7 +225,7 @@ async function runCase(vm, c) {
             emittedActions: [], logs: []
         };
     }
-    return {
+    const entry = {
         index:      c.index,
         codeHash:   codeFingerprint(c.code),
         resultHash: hashResult(result),
@@ -230,6 +233,8 @@ async function runCase(vm, c) {
         success:    result.success,
         error:      result.error
     };
+    if (c.label) entry.label = c.label;
+    return entry;
 }
 
 // Run a whole corpus under one execution mode. Fresh VM per case (no
@@ -291,12 +296,15 @@ async function buildManifest(opts) {
 function diffManifests(a, b) {
     const divergences = [];
 
-    if (a.seed !== b.seed || a.cases !== b.cases) {
+    // A manifest with no profile field predates the post-gate profile: legacy.
+    const pa = a.profile || 'legacy';
+    const pb = b.profile || 'legacy';
+    if (a.seed !== b.seed || a.cases !== b.cases || pa !== pb) {
         divergences.push({
             index: -1,
             kind:  'corpus-mismatch',
             detail: `manifests describe different corpora: ` +
-                    `seed/cases ${a.seed}/${a.cases} vs ${b.seed}/${b.cases}. ` +
+                    `seed/cases/profile ${a.seed}/${a.cases}/${pa} vs ${b.seed}/${b.cases}/${pb}. ` +
                     `A differential is only meaningful over the identical corpus.`
         });
         return divergences;

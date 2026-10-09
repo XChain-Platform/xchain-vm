@@ -60,27 +60,6 @@ const {
     LINT_DESTRUCTURE_ACTIVATION,
     isLintDestructureActive,
 } = require('./index/lint_destructure_heights.js');
-const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
-const EXECUTE_LINT_DESTRUCTURE = '_executeLintDestructure';
-const executeWithHeightLintGates = executeMethods.execute;
-executeMethods.execute = function execute(opts) {
-    const hadBannedWith = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_BANNED_WITH);
-    const previousBannedWith = this[EXECUTE_LINT_BANNED_WITH];
-    const hadDestructure = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_DESTRUCTURE);
-    const previousDestructure = this[EXECUTE_LINT_DESTRUCTURE];
-    const coin = XChainVM.pkg3CoinFromAddress(opts && opts.contractAddress);
-    const height = opts && opts.blockContext && Number(opts.blockContext.height);
-    this[EXECUTE_LINT_BANNED_WITH] = isLintBannedWithActive(opts && opts.network, coin, height);
-    this[EXECUTE_LINT_DESTRUCTURE] = isLintDestructureActive(opts && opts.network, coin, height);
-    try {
-        return executeWithHeightLintGates.call(this, opts);
-    } finally {
-        if (hadBannedWith) this[EXECUTE_LINT_BANNED_WITH] = previousBannedWith;
-        else delete this[EXECUTE_LINT_BANNED_WITH];
-        if (hadDestructure) this[EXECUTE_LINT_DESTRUCTURE] = previousDestructure;
-        else delete this[EXECUTE_LINT_DESTRUCTURE];
-    }
-};
 
 class XChainVM {
     /**

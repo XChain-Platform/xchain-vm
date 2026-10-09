@@ -173,18 +173,24 @@ const LINT_GLOBAL_ALIAS_ACTIVATION = Object.freeze({
     'DOGE:mainnet': 0,
 });
 
+// Resolve one testnet/regtest-genesis per-coin height gate against its frozen table.
+// isPkg3SandboxActive stays separate: it tests `!== undefined`, so a null entry differs.
+function resolvePerCoinHeightGate(table, network, coin, blockHeight) {
+    if (network === 'testnet' || network === 'regtest') return true;
+    const b = Number(blockHeight);
+    if (!Number.isFinite(b)) return false;
+    const threshold = (coin != null) ? table[coin + ':' + network] : undefined;
+    // Number.isFinite rejects both the absent key (undefined) and the unarmed sentinel (null).
+    if (!Number.isFinite(threshold)) return false;
+    return b >= threshold;
+}
+
 // Whether the lint global-alias refinement is active for (network, coin) at blockHeight.
 // testnet/regtest: genesis. mainnet: per-coin height threshold; an unrecognized network, an
 // unresolvable coin, a non-finite height, or an UNARMED (null) per-coin entry all resolve to
 // inactive (legacy, byte-identical below).
 function isLintGlobalAliasActive(network, coin, blockHeight) {
-    if (network === 'testnet' || network === 'regtest') return true;
-    const b = Number(blockHeight);
-    if (!Number.isFinite(b)) return false;
-    const threshold = (coin != null) ? LINT_GLOBAL_ALIAS_ACTIVATION[coin + ':' + network] : undefined;
-    // Number.isFinite rejects both the absent key (undefined) and the unarmed sentinel (null).
-    if (!Number.isFinite(threshold)) return false;
-    return b >= threshold;
+    return resolvePerCoinHeightGate(LINT_GLOBAL_ALIAS_ACTIVATION, network, coin, blockHeight);
 }
 
 // Gas granularity for the execute-time lint. validateSyntax spawns an ivm.Isolate for the
@@ -205,13 +211,7 @@ const EXEC_LINT_GAS_BYTES_PER_UNIT = 256;
 // `vm_exec_lint_activation.VM_EXEC_LINT_ACTIVATION` in xchain-indexer/src/protocol_changes/gates_3.js)
 // and isPkg3SandboxActive above.
 function isExecLintActive(network, coin, blockHeight) {
-    if (network === 'testnet' || network === 'regtest') return true;
-    const b = Number(blockHeight);
-    if (!Number.isFinite(b)) return false;
-    const threshold = (coin != null) ? EXEC_LINT_ACTIVATION[coin + ':' + network] : undefined;
-    // Number.isFinite rejects both the absent key (undefined) and the unarmed sentinel (null).
-    if (!Number.isFinite(threshold)) return false;
-    return b >= threshold;
+    return resolvePerCoinHeightGate(EXEC_LINT_ACTIVATION, network, coin, blockHeight);
 }
 
 

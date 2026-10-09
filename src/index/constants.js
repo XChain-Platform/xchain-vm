@@ -15,7 +15,7 @@
  *
  * The code-size, call, recursion and cross-chain (XCALL) bounds the VM
  * enforces and re-exports for the cross-service parity suites. Vendored
- * from ./protocol/constants.js and gateway-emit.js, never re-declared as
+ * from ../protocol/constants.js and ../gateway-emit.js, never re-declared as
  * literals; a part of the entry so the bounds read as one table.
  ********************************************************************/
 // @ts-nocheck
@@ -26,7 +26,7 @@
 const PROTO = require('../protocol/constants.js');
 const MAX_CODE_SIZE = PROTO.MAX_CODE_SIZE;
 
-// Cross-contract call protocol constants. Vendored from ./protocol/constants.js
+// Cross-contract call protocol constants. Vendored from ../protocol/constants.js
 // (VM_MAX_CALL_DEPTH / VM_MIN_CALL_GAS); the indexer re-validates both host-side
 // (xchain-indexer/src/actions/execute/index.js) so an older bundled VM cannot
 // bypass them. Exported below for the cross-service regression suite.
@@ -48,16 +48,30 @@ const MIN_CALL_GAS   = PROTO.VM_MIN_CALL_GAS;
 // via the pinned consensus runtime version.
 const MAX_STACK_DEPTH = 512;
 
-// Musl-safe recursion bound. On a musl/Alpine 128KB pthread stack the
-// native JSON.parse reviver walk and Array.prototype.join recurse in C++ to the
-// value's nesting depth and overflow BELOW 512 (measured near ~292 reviver / ~379
-// join), so a musl-built validator could fork from a glibc/macOS one on a value
-// nested between the musl overflow onset and 512. The Package 3 bundle gate below
-// (isPkg3SandboxActive) swaps the injected __DEPTH_LIMIT from MAX_STACK_DEPTH to
-// this lower bound at/after the coordinated deploy window; 256 sits below the
-// tightest musl onset with margin while leaving ample headroom for any plausible
-// contract nesting. Both the intra-contract recursion guard and the F-NR native-
-// depth guard read the single injected __DEPTH_LIMIT, so lowering it moves both.
+// Musl-safe recursion bound. A musl/Alpine validator runs contracts on a 128KB
+// pthread stack, so the native-recursive sinks (JSON.stringify, Array.prototype.join
+// and flat, the JSON.parse reviver walk) overflow at a shallower nesting depth than
+// on glibc or macOS, and a value nested past that onset could fork a musl validator
+// from the rest of the fleet.
+//
+// What is measured: drills on real aarch64 musl put the guard-off native onset near
+// 2000 for join, 4000 for JSON.stringify and 6000 for flat, with every depth up to
+// 512 clean under the guard, so for those three sinks 256 is a conservative margin.
+// What is not: the reviver walk has never been run on musl, and neither has x86-64
+// musl. Node 22 probes on reduced thread stacks (not musl) put the reviver onset near
+// 200 at 100KB and near 290 at 128KB, and isolated-vm leaves a musl pool thread about
+// 104KB usable, so whether 256 clears it on musl is unmeasured. The ~290 figure in
+// runtime/harness_part_2.js is that probe, not a musl run; it stays byte-identical
+// because the harness text is compiled ahead of contract code. Do not raise this
+// bound without a real-musl reviver-walk drill.
+//
+// The Package 3 bundle gate (isPkg3SandboxActive, runtime/activation_heights.js)
+// swaps the injected __DEPTH_LIMIT from MAX_STACK_DEPTH to this bound at/after the
+// coordinated deploy window; __DEPTH_LIMIT is what the intra-contract recursion
+// guard reads. The F-NR native-depth guard reads __NR_DEPTH_LIMIT instead, which
+// runtime/isolate_globals.js sets to Math.min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL),
+// so it stays at or below this bound even when its block-time gate arms before a
+// coin reaches its height. Do not collapse __NR_DEPTH_LIMIT back to __DEPTH_LIMIT.
 const MAX_STACK_DEPTH_MUSL = 256;
 
 // Cross-CHAIN call (XCALL) protocol constants. Canonical values:

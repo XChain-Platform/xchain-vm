@@ -11,6 +11,17 @@
 # The corpus is a pure function of DIFF_SEED, so each leg samples the SAME
 # inputs independently and only the output hashes are compared (see
 # test/fuzz/helpers/differential.js). Bump DIFF_CASES for a deeper sweep on demand.
+#
+# Each leg records two profiles. "legacy" is the historical pre-gate corpus.
+# "post-gate" re-runs it past the F-NR block-time gate and the musl-safe height
+# gate, plus fixed depth cases at the 256 bound, which is where a musl thread
+# stack can fork from glibc (test/fuzz/helpers/differential_postgate.js). Every
+# leg also runs the depth security suites on its own libc.
+#
+# Every leg is pinned to the consensus runtime (src/consensus-runtime.js) and
+# records refuse an off-pin engine. The diff job asserts the exact leg set and
+# each leg's platform identity before comparing, so a dropped leg or a lost
+# container stanza fails the run instead of shrinking it.
 name: vm-differential-fuzz
 
 # Least privilege for the default GITHUB_TOKEN: every job here only reads the repo.
@@ -50,29 +61,35 @@ jobs:
           - leg: linux-x64-glibc      # reference
             runner: ubuntu-latest
             container: ""
+            libc: glibc
           - leg: linux-arm64-glibc    # cross-ARCH
             runner: ubuntu-24.04-arm
             container: ""
+            libc: glibc
           - leg: linux-x64-musl       # cross-BUILD (musl libc)
             runner: ubuntu-latest
-            container: node:22-alpine
+            # The pinned engine release, by digest so a re-tag cannot move it.
+            container: node:22.22.3-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd
+            libc: musl
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      # The alpine container ships Node 22 already; the bare runners need it.
-      # isolated-vm has no musl prebuild, so the alpine leg needs build tools.
+      # The alpine container ships the pinned Node already; the bare runners
+      # need it. The alpine leg builds isolated-vm from source, so it needs tools.
       - name: Install build toolchain (musl leg only)
-        if: ${{ matrix.container == 'node:22-alpine' }}
+        if: ${{ matrix.libc == 'musl' }}
         run: apk add --no-cache python3 make g++ git
 
-      - name: Use Node.js 22
+      # Pinned to the consensus runtime; a floating "22" resolves to a release
+      # the runtime gate refuses (see ci.yml).
+      - name: Use Node.js 22.22.3
         if: ${{ matrix.container == '' }}
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.22.3"
 
       # Build isolated-vm from source so the native V8 binding matches THIS
       # leg's arch/libc (a prebuild from another arch would be the very drift
@@ -85,15 +102,34 @@ jobs:
       - name: Record differential manifest
         run: |
           node test/fuzz/helpers/differential_run.js record \
-            --seed "$DIFF_SEED" --cases "$DIFF_CASES" \
+            --seed "$DIFF_SEED" --cases "$DIFF_CASES" --require-pinned-runtime \
             --out "differential.${{ matrix.leg }}.json"
 
-      - name: Upload manifest
+      - name: Record post-gate differential manifest
+        run: |
+          node test/fuzz/helpers/differential_run.js record \
+            --seed "$DIFF_SEED" --cases "$DIFF_CASES" --require-pinned-runtime \
+            --profile post-gate \
+            --out "differential-postgate.${{ matrix.leg }}.json"
+
+      - name: Upload manifests
         uses: actions/upload-artifact@v4
         with:
           name: differential-${{ matrix.leg }}
-          path: differential.${{ matrix.leg }}.json
+          path: |
+            differential.${{ matrix.leg }}.json
+            differential-postgate.${{ matrix.leg }}.json
+          if-no-files-found: error
           retention-days: 14
+
+      # The depth gate and native-recursion suites on this leg's own libc and
+      # arch; the shared CI gate runs them on one glibc runner only. Both suites
+      # skip when the engine cannot load, so --forbid-pending turns a skip red.
+      - name: Depth security suites
+        run: >-
+          npx mocha --timeout 60000 --forbid-pending
+          test/security/musl_stack_depth_gate.test.js
+          test/security/native_recursion_depth.test.js
 
   # Diff every leg against the x86_64/glibc reference. Any per-case consensus
   # hash divergence exits non-zero here and fails the gate.
@@ -104,10 +140,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js 22
+      - name: Use Node.js 22.22.3
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.22.3"
 
       # compare only diffs already-recorded JSON manifests (no VM execution,
       # so isolated-vm need not build from source here), but differential.js
@@ -123,26 +159,38 @@ jobs:
           pattern: differential-*
           merge-multiple: true
 
+      # Every expected leg must be present, distinct, on the pinned engine and
+      # the platform it is named for; a missing leg is a failure, not a skip.
+      - name: Check the leg set
+        run: |
+          set -e
+          for p in legacy post-gate; do
+            node test/fuzz/helpers/differential_run.js check-legs manifests \
+              --seed "$DIFF_SEED" --cases "$DIFF_CASES" --profile "$p"
+          done
+
       - name: Diff each build against the x86_64/glibc reference
         run: |
           set -e
-          REF="manifests/differential.linux-x64-glibc.json"
-          test -f "$REF" || { echo "reference manifest missing"; exit 1; }
           divergence=0
           crash=0
-          for m in manifests/differential.*.json; do
-            [ "$m" = "$REF" ] && continue
-            echo "::group::compare $(basename "$m") vs reference"
-            out="$(node test/fuzz/helpers/differential_run.js compare "$REF" "$m" 2>&1)" && rc=0 || rc=$?
-            printf '%s\n' "$out"
-            if [ "$rc" -ne 0 ]; then
-              if printf '%s\n' "$out" | grep -q 'DIFFERENTIAL DIVERGENCE:'; then
-                divergence=1
-              else
-                crash=1
+          for prefix in differential differential-postgate; do
+            REF="manifests/${prefix}.linux-x64-glibc.json"
+            test -f "$REF" || { echo "reference manifest missing: $REF"; exit 1; }
+            for leg in linux-arm64-glibc linux-x64-musl; do
+              m="manifests/${prefix}.${leg}.json"
+              echo "::group::compare $(basename "$m") vs reference"
+              out="$(node test/fuzz/helpers/differential_run.js compare "$REF" "$m" 2>&1)" && rc=0 || rc=$?
+              printf '%s\n' "$out"
+              if [ "$rc" -ne 0 ]; then
+                if printf '%s\n' "$out" | grep -q 'DIFFERENTIAL DIVERGENCE:'; then
+                  divergence=1
+                else
+                  crash=1
+                fi
               fi
-            fi
-            echo "::endgroup::"
+              echo "::endgroup::"
+            done
           done
           if [ "$crash" -ne 0 ]; then
             echo "::error::VM differential fuzz tool crashed before it could render a verdict (see the compare group's output above); this is not a consensus divergence"

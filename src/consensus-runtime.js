@@ -44,6 +44,23 @@
  * fleet activation (a mixed-engine fleet can fork). The canonical runtime
  * below was confirmed BYTE-IDENTICAL on linux/arm64 and linux/amd64
  * (node:22-bookworm) on 2026-06-07.
+ *
+ * PLATFORMS. Only glibc linux/amd64 and linux/arm64 are confirmed
+ * byte-identical. checkConsensusRuntime() compares engine strings only and does
+ * not detect libc, so a musl/Alpine or darwin host carrying the same strings
+ * passes it; no host-derived value may ever select a consensus bound. A musl
+ * host's 128KB thread stack makes native-recursive builtins overflow far
+ * shallower than glibc, and its parity rests on three things holding:
+ *   - __NR_DEPTH_LIMIT stays clamped to MAX_STACK_DEPTH_MUSL
+ *     (index/runtime/isolate_globals.js, index/constants.js);
+ *   - every native-recursive builtin goes through the iterative F-NR depth
+ *     pre-check (index/runtime/harness_part_2.js), so a new or un-stripped
+ *     native-recursive path that skips it diverges on musl silently;
+ *   - the F-NR guard is active, which it is only at/after its block-time flag
+ *     day (BINARY_ALLOC_GATE_BLOCK_TIME); blocks below it run the native sinks
+ *     unguarded.
+ * MAX_STACK_DEPTH_MUSL's comment says which musl onsets are measured. The only
+ * automated musl coverage is the musl leg of the differential-fuzz workflow.
  ********************************************************************/
 // @ts-nocheck
 
@@ -123,31 +140,45 @@ const REFERENCE_NODE = 'v22.22.3';
 // flag-day (mainnet) so a from-genesis replay reproduces the historical
 // accept-below/reject-above verdict.
 //
-// Epoch '3' (this bump) adds the WebAssembly global to the sandbox strip set
+// Epoch '3' adds the WebAssembly global to the sandbox strip set
 // (STRIPPED_GLOBAL_NAMES) to close the unmetered native-execution /
 // consensus-fork surface a wasm body (no __gas) re-opens. UNLIKE the epoch-2
-// gates, this bundle is gated on a PER-COIN block-HEIGHT flag-day (index.js
-// isPkg3SandboxActive / PKG3_SANDBOX_ACTIVATION), riding the ~961000 Cohort-B
+// gates, this bundle is gated on a PER-COIN block-HEIGHT flag-day
+// (index/runtime/activation_heights.js isPkg3SandboxActive /
+// PKG3_SANDBOX_ACTIVATION), riding the ~961000 Cohort-B
 // window, so below each coin's height WebAssembly is left in place and a
 // from-genesis replay is byte-identical. The musl-safe recursion bound rides
 // the same per-coin gate.
 //
-// Epoch '4' (this bump) adds 'banned-rest' to the deploy validator's CONSENSUS_RULES:
+// Epoch '4' adds 'banned-rest' to the deploy validator's CONSENSUS_RULES:
 // the destructuring-rest positions the allocator meter cannot charge by wrapping a
 // source expression (parameter lists, rest nested inside another pattern, catch-clause
 // rest, for-of/for-in heads). It is the deploy half of the REST_PATTERN_METER change,
 // whose execution half charges the rest forms that DO have an addressable source. Gated
-// on a coordinated block-TIME flag-day of its own (index.js isRestPatternMeterActive /
+// on a coordinated block-TIME flag-day of its own (index/runtime/activations.js
+// isRestPatternMeterActive /
 // REST_PATTERN_METER_GATE_BLOCK_TIME, and the indexer's REST_PATTERN_METER twin), NOT on
 // the contract-era instant, which is already in the past: below the flag-day the rule is
 // dropped from the blocking set and no rest destructure is metered, so a from-genesis
 // replay reproduces the historical accept-below/reject-above verdict and gasUsed.
 //
-// Epoch '5' (this bump) adds the JSON.stringify value-hook resolver. At its dedicated
+// Epoch '5' adds the JSON.stringify value-hook resolver. At its dedicated
 // block-time flag day, toJSON methods, replacer functions, and accessors are resolved
 // once before deterministic depth checking and native serialization. Below the gate,
 // the historical serializer path remains unchanged; hook-free values retain identical
 // bytes and gas on both sides of the gate.
+//
+// Epoch '6' adds 'banned-with' to the deploy validator's CONSENSUS_RULES: a `with`
+// statement is rejected, because a with-object can shadow the injected __gas meter
+// callback and run a loop unmetered (test/security/with_gas_hijack.test.js). LIKE
+// epoch 3 and UNLIKE the block-time gates of epochs 2, 4 and 5, it rides a PER-COIN
+// block-HEIGHT flag-day of its own (index/lint_banned_with_heights.js
+// LINT_BANNED_WITH_ACTIVATION / isLintBannedWithActive; the indexer's deploy lint reads
+// its twin of the same map). Execute-time lint gets the bit as an explicit argument from
+// index/runtime/exec_lint.js; always active on regtest, and a null threshold leaves that
+// coin unarmed. Below each coin's height syntax.js drops the rule from the blocking
+// set, so a from-genesis replay reproduces the historical accept-below/reject-above
+// verdict.
 //
 // Epoch '7' adds the pre-parse 'nesting-depth' deploy rule. A non-recursive token
 // scan rejects delimiter nesting above 64 before either JavaScript parser runs.

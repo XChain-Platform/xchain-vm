@@ -142,7 +142,7 @@ const DEEP_OBJ = `var o={};for(var i=0;i<50000;i++){o={a:o};}`;
     //
     // The parse sink recurses natively in the REVIVER walk
     // (InternalizeJSONProperty), whose overflow point is the host thread stack:
-    // measured on Node 22, JSON.parse(deep, fn) throws a catchable RangeError
+    // Node 22 thread-stack probes (not a musl run) show a catchable RangeError
     // past depth ~290 on a 128KB stack, ~1200 on 512KB, ~4800 on 2MB. The guard
     // bounds the NESTING of the input text before the native parser sees it, so
     // the outcome is the same un-swallowable out_of_stack on every host.

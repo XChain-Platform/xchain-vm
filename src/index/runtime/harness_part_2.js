@@ -15,6 +15,13 @@
  *
  * A contiguous slice of the in-isolate prelude; harness_source.js joins the
  * slices in order.
+ *
+ * Two comments inside the template are stale and stay byte-identical, because
+ * editing them would move in-isolate line positions (see the NOTE in
+ * activations.js). The F-NR sinks read __NR_DEPTH_LIMIT, the min of __DEPTH_LIMIT
+ * and MAX_STACK_DEPTH_MUSL injected in isolate_globals.js, not __DEPTH_LIMIT. The
+ * ~290 reviver figure is a Node 22 thread-stack probe, not a musl run (see
+ * MAX_STACK_DEPTH_MUSL in ../constants.js).
  ********************************************************************/
 // @ts-nocheck
 

@@ -24,7 +24,8 @@
  * "Every armed flag-day" means three kinds: the block-time gates (the latest
  * armed *_GATE_BLOCK_TIME export), the per-coin block-HEIGHT gates listed in
  * HEIGHT_GATES for the probe contract's coin (Pkg 3 sandbox, execute-time lint,
- * lint global-alias, lint optional-chain), and the per-network activation tables
+ * lint global-alias, lint optional-chain, lint banned-with, lint destructure,
+ * BigInt surface strip), and the per-network activation tables
  * listed in NETWORK_GATES (iterator/Set meter, apply-length meter, gas-ceiling
  * success, JSON.stringify hook; null is off, 0 is on from genesis), whose latest
  * armed time is folded into the probe block. The height gates only resolve on a
@@ -74,6 +75,9 @@ const HEIGHT_GATES = [
     { name: 'exec-lint', table: XChainVM.EXEC_LINT_ACTIVATION, active: XChainVM.isExecLintActive },
     { name: 'lint-global-alias', table: XChainVM.LINT_GLOBAL_ALIAS_ACTIVATION, active: XChainVM.isLintGlobalAliasActive },
     { name: 'lint-optional-chain', table: XChainVM.LINT_OPTIONAL_CHAIN_ACTIVATION, active: XChainVM.isLintOptionalChainActive },
+    { name: 'lint-banned-with', table: XChainVM.LINT_BANNED_WITH_ACTIVATION, active: XChainVM.isLintBannedWithActive },
+    { name: 'lint-destructure', table: XChainVM.LINT_DESTRUCTURE_ACTIVATION, active: XChainVM.isLintDestructureActive },
+    { name: 'bigint-surface-strip', table: XChainVM.BIGINT_SURFACE_STRIP_ACTIVATION, active: XChainVM.isBigIntSurfaceStripActive },
 ];
 // Per-network time tables, read from the exports by name (a null entry is unarmed, an absent one is refused).
 const NETWORK_GATES = [

@@ -18,8 +18,9 @@
  * own history is a sequence of discovering native shapes whose wall-time-per-
  * gas is far above the schedule's assumption (a 120k-char decodeURIComponent
  * loop burned ~13.5 s of wall clock while gasUsed stayed at ~540k; see the
- * F3-globals note in index.js). For those shapes the WALL-CLOCK net, not the
- * gas ceiling, is the constraint that actually terminates the execution.
+ * F3-globals note in src/index/runtime/harness_part_1.js). For those shapes
+ * the WALL-CLOCK net, not the gas ceiling, is the constraint that actually
+ * terminates the execution.
  *
  * That net used to be `limits.maxCpuTimeMs`, a per-NODE configuration value
  * (30000 by default) explicitly documented as "not a consensus value". Two
@@ -71,7 +72,10 @@ const CONSENSUS_MAX_WALL_MS = 30000;
  *
  * @param {boolean} gated       whether the consensus bound is active for this
  *                              execution (network + block time; the resolver
- *                              lives in index.js beside the flag-day constant).
+ *                              XChainVM#wallClockBudgetMs lives in index.js and
+ *                              reads isConsensusWallClockActive, which rides the
+ *                              BINARY_ALLOC_GATE_BLOCK_TIME flag-day in
+ *                              index/runtime/activations.js).
  * @param {number}  nodeLimitMs the node's own limits.maxCpuTimeMs, which binds
  *                              ONLY while the execution is ungated.
  * @returns {number} milliseconds passed to the isolate's execution timeout.
