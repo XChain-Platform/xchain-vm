@@ -1,0 +1,97 @@
+{
+  "note": "Expected lint verdicts for statically named ObjectPattern reads with the destructure refinement active and inactive.",
+  "cases": [
+    {
+      "source": "const { Promise: LocalPromise } = globalThis;",
+      "activeRules": ["banned-async"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { Promise: { resolve } } = globalThis;",
+      "activeRules": ["banned-async"],
+      "legacyRules": []
+    },
+    {
+      "source": "({ Promise: localPromise } = globalThis);",
+      "activeRules": ["banned-async"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { WebAssembly: Wasm } = globalThis;",
+      "activeRules": ["banned-wasm"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { WebAssembly: { compile } } = globalThis;",
+      "activeRules": ["banned-wasm"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { ['WebAssembly']: Wasm } = globalThis;",
+      "activeRules": ["banned-wasm"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { pow: deterministicPow } = Math;",
+      "activeRules": ["banned-math"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { pow: { call } } = Math;",
+      "activeRules": ["banned-math"],
+      "legacyRules": []
+    },
+    {
+      "source": "({ log: deterministicLog } = globalThis.Math);",
+      "activeRules": ["banned-math"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { Math: { sqrt: deterministicSqrt } } = globalThis;",
+      "activeRules": ["banned-math"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { Math: { pow: { call } } } = globalThis;",
+      "activeRules": ["banned-math"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { random: deterministicRandom } = Math;",
+      "activeRules": ["banned-math"],
+      "legacyRules": []
+    },
+    {
+      "source": "const { globalThis: { WebAssembly: Wasm } } = globalThis;",
+      "activeRules": ["banned-wasm"],
+      "legacyRules": [],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const { Promise: LocalPromise } = (globalThis?.globalThis);",
+      "activeRules": ["banned-async"],
+      "legacyRules": [],
+      "aliasOffRules": []
+    },
+    {
+      "source": "const { floor: deterministicFloor } = Math;",
+      "activeRules": [],
+      "legacyRules": []
+    },
+    {
+      "source": "const { Promise: LocalPromise, Math: { pow: localPow } } = other;",
+      "activeRules": [],
+      "legacyRules": []
+    },
+    {
+      "source": "const key = 'pow'; const { [key]: localPow } = Math;",
+      "activeRules": [],
+      "legacyRules": []
+    },
+    {
+      "source": "const { Promise: LocalPromise, WebAssembly: Wasm, Math: { pow: deterministicPow } } = globalThis;",
+      "activeRules": ["banned-math", "banned-async", "banned-wasm"],
+      "legacyRules": []
+    }
+  ]
+}
