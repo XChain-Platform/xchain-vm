@@ -45,6 +45,59 @@ function staticMemberKey(node) {
     return node.property.type === 'Identifier' ? node.property.name : null;
 }
 
+// Return the static key selected by an ObjectPattern Property. Dynamic computed
+// keys are intentionally unresolved, matching staticMemberKey's data-flow limit.
+function staticPatternKey(property) {
+    if (!property || property.type !== 'Property' || !property.key) return null;
+    if (property.computed) {
+        const holder = { computed: true, property: property.key };
+        return staticComputedKey(holder);
+    }
+    if (property.key.type === 'Identifier') return property.key.name;
+    if (property.key.type === 'Literal' && typeof property.key.value === 'string')
+        return property.key.value;
+    return null;
+}
+
+// Collect statically named reads made by a variable-declaration or assignment
+// ObjectPattern. Each entry retains the source expression and the property path read
+// from it, so the global-object and Math scanners can share one shape analysis.
+function objectPatternEntries(node) {
+    let pattern = null;
+    let source = null;
+    if (node && node.type === 'VariableDeclarator' && node.id
+        && node.id.type === 'ObjectPattern' && node.init) {
+        pattern = node.id;
+        source = node.init;
+    } else if (node && node.type === 'AssignmentExpression' && node.operator === '='
+        && node.left && node.left.type === 'ObjectPattern') {
+        pattern = node.left;
+        source = node.right;
+    }
+    if (!pattern || !source) return [];
+
+    const entries = [];
+    const collect = (pat, path) => {
+        for (const property of pat.properties || []) {
+            if (!property || property.type !== 'Property') continue;
+            const key = staticPatternKey(property);
+            if (key === null) continue;
+            const nextPath = path.concat(key);
+            entries.push({ source, path: nextPath, property });
+            const value = property.value;
+            const nested = value && value.type === 'ObjectPattern'
+                ? value
+                : value && value.type === 'AssignmentPattern'
+                    && value.left && value.left.type === 'ObjectPattern'
+                    ? value.left
+                    : null;
+            if (nested) collect(nested, nextPath);
+        }
+    };
+    collect(pattern, []);
+    return entries;
+}
+
 // True if `node` statically denotes the GLOBAL OBJECT.
 //
 // Legacy spelling (always recognized): the bare identifier `globalThis`.
@@ -82,6 +135,25 @@ function isGlobalObjectRef(node, aliased, optionalChain) {
         return staticMemberKey(node) === 'globalThis'
             && isGlobalObjectRef(node.object, aliased, optionalChain);
     return false;
+}
+
+// True when following a static ObjectPattern property path from `node` still
+// denotes the global object. Only the globalThis self-reference preserves it.
+function isGlobalObjectPathRef(node, path, aliased, optionalChain) {
+    if (!isGlobalObjectRef(node, aliased, optionalChain)) return false;
+    if (!path || path.length === 0) return true;
+    if (!aliased) return false;
+    return path.every((key) => key === 'globalThis');
+}
+
+// True when following a static ObjectPattern property path from `node` denotes
+// Math. This covers `{ pow } = Math`, `{ pow } = globalThis.Math`, and the
+// nested `{ Math: { pow } } = globalThis` spelling without tracking aliases.
+function isMathObjectPathRef(node, path, aliased, optionalChain) {
+    if (!path || path.length === 0)
+        return isMathObjectRef(node, aliased, optionalChain);
+    if (path[path.length - 1] !== 'Math') return false;
+    return isGlobalObjectPathRef(node, path.slice(0, -1), aliased, optionalChain);
 }
 
 // True if binding pattern `pat` declares `name` (Identifier / default /
@@ -135,9 +207,12 @@ function scopeDeclares(node, name) {
 
 module.exports = {
     isMathObjectRef,
+    isMathObjectPathRef,
     staticComputedKey,
     staticMemberKey,
+    objectPatternEntries,
     isGlobalObjectRef,
+    isGlobalObjectPathRef,
     patternDeclares,
     scopeDeclares
 };

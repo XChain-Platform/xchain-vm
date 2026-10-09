@@ -327,6 +327,8 @@ class ProcessExecutor {
     }
 
     execute(opts) {
+        // No worker is spawned or dispatched after shutdown(), so a queued entry would never settle.
+        if (this._shuttingDown) return Promise.reject(new HostFaultError('executor shutting down'));
         if (this._broken) {
             // The worker could not be started (host fault: fork EAGAIN or
             // isolated-vm load failure). This is NOT a contract outcome and must

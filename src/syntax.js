@@ -134,6 +134,7 @@ function validateSyntax(code, opts) {
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
     const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
     const enforceLintNestingDepth = !opts || opts.enforceLintNestingDepth !== false;
+    const enforceLintDestructure = !opts || opts.enforceLintDestructure !== false;
 
     if (enforceLintNestingDepth) {
         const nesting = nestingDepthFinding(code);
@@ -168,7 +169,8 @@ function validateSyntax(code, opts) {
         hardened: enforceLintHardening,
         globalAlias: enforceLintGlobalAlias,
         optionalChain: enforceLintOptionalChain,
-        enforceLintNestingDepth: false
+        enforceLintNestingDepth: false,
+        destructure: enforceLintDestructure
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
         enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));
     if (blocking.length > 0)

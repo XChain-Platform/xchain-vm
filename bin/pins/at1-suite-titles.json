@@ -502,6 +502,14 @@
       "execute-time consensus source-lint enforcement @regression @tier1 verdict cache keyed by the metering sha256 key partitions on the five consensus flag bits, not just the source",
       "execute-time consensus source-lint enforcement @regression @tier1 verdict cache keyed by the metering sha256 key returns the verdict a fresh validateSyntax call produces"
     ],
+    "39e57d4b7dbf2f07": [
+      "BigInt surface strip activation exports a frozen map with six unarmed entries",
+      "BigInt surface strip activation is active on regtest at genesis",
+      "BigInt surface strip activation is exported by the VM entry point",
+      "BigInt surface strip activation keeps every mainnet and testnet chain unarmed",
+      "BigInt surface strip activation rejects an unknown network, null coin and non-finite height",
+      "BigInt surface strip activation resolves local armed thresholds and absent keys"
+    ],
     "4187b661120eb61e": [
       "consensus wall-clock budget: the enforcing path a gated execution runs against the protocol budget, whatever the node configured",
       "consensus wall-clock budget: the enforcing path an ungated execution still runs against the node knob (replay parity + non-consensus callers)",
@@ -726,6 +734,19 @@
       "constructor limits back-fill (bac14514) leaves the no-limits default object unchanged",
       "constructor limits back-fill (bac14514) preserves caller-supplied values (no clobbering)"
     ],
+    "13e7d3f1f37cb555": [
+      "BigInt native surface strip: gated sets accepts the independently injected BigInt flag without enabling WebAssembly",
+      "BigInt native surface strip: gated sets adds the two globals when the host-injected Pkg 3 flag is true",
+      "BigInt native surface strip: gated sets freezes the exact gated surface sets",
+      "BigInt native surface strip: gated sets keeps the BigInt prototype neuters out of the pre-activation script",
+      "BigInt native surface strip: gated sets leaves the gated globals out of the deletion list by default and when false",
+      "BigInt native surface strip: prototype constructor and isolation locks every neutered property against recreation",
+      "BigInt native surface strip: prototype constructor and isolation neuters BigInt.prototype.constructor at activation",
+      "BigInt native surface strip: prototype constructor and isolation uses the WebAssembly host flag without coupling to the Promise gate",
+      "BigInt native surface strip: typed arrays and DataView keeps all three surfaces reachable below activation",
+      "BigInt native surface strip: typed arrays and DataView neuters every DataView BigInt64 method at activation",
+      "BigInt native surface strip: typed arrays and DataView removes both typed-array globals at activation"
+    ],
     "8515568eab568709": [
       "Gateway controller-guard mode (isGuard) guard mode (isGuard=true) disables async frameworks a synchronous emission (emit.send) still works in guard mode",
       "Gateway controller-guard mode (isGuard) guard mode (isGuard=true) disables async frameworks attestation.request throws and charges no gas",
@@ -840,6 +861,39 @@
       "CONTRACT_WRAPPER control-binding closure move (5bff4687) post-gate manifest introspection still works (readManifest threads through the closure)",
       "CONTRACT_WRAPPER control-binding closure move (5bff4687) post-gate, exec-lint off (an unplaceable chain at the flag-day): bindings are starved there too",
       "CONTRACT_WRAPPER control-binding closure move (5bff4687) pre-gate (mainnet below the flag-day): legacy visibility preserved for replay parity"
+    ],
+    "9737d66ce32e0ced": [
+      "LINT_DESTRUCTURE ObjectPattern flag composition composes aliases and optional chains only under their own flags",
+      "LINT_DESTRUCTURE ObjectPattern flag composition does not treat safe, dynamic, or unrelated properties as banned reads",
+      "LINT_DESTRUCTURE ObjectPattern flag composition keeps each scanner byte-for-byte legacy when destructure is false",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: ({ Promise: localPromise } = globalThis);",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: ({ log: deterministicLog } = globalThis.Math);",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const key = 'pow'; const { [key]: localPow } = Math;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { Math: { pow: { call } } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { Math: { sqrt: deterministicSqrt } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { Promise: LocalPromise } = (globalThis?.globalThis);",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { Promise: LocalPromise } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { Promise: LocalPromise, Math: { pow: localPow } } = other;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { Promise: LocalPromise, WebAssembly: Wasm, Math: { pow: deterministicPow } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { Promise: { resolve } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { WebAssembly: Wasm } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { WebAssembly: { compile } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { ['WebAssembly']: Wasm } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { floor: deterministicFloor } = Math;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { globalThis: { WebAssembly: Wasm } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { pow: deterministicPow } = Math;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { pow: { call } } = Math;",
+      "LINT_DESTRUCTURE ObjectPattern refinement applies active and legacy verdicts for: const { random: deterministicRandom } = Math;",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in ({ Promise: localPromise } = globalThis);",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in ({ WebAssembly: wasm } = globalThis);",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in ({ log: deterministicLog } = globalThis.Math);",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in const { Math: { pow: { call } } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in const { Promise: LocalPromise } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in const { Promise: { resolve } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in const { WebAssembly: Wasm } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in const { WebAssembly: { compile } } = globalThis;",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in const { pow: deterministicPow } = Math;",
+      "LINT_DESTRUCTURE ObjectPattern scanner hits reports the static property read in const { pow: { call } } = Math;"
     ],
     "9a6638760ddfe268": [
       "sandbox: frozen consensus lists NEUTERED_PROTO_CONSTRUCTORS carries exactly the expected entries",
@@ -1325,12 +1379,33 @@
     "fb6efc086e3c1f29": [
       "Preflight: sandbox engine must load executes a trivial contract end-to-end inside the isolate",
       "Preflight: sandbox engine must load loads the XChainVM engine (isolated-vm native binding)"
+    ],
+    "03e5be0396e94f65": [
+      "destructure lint activation exports a frozen map with six unarmed entries",
+      "destructure lint activation is active on regtest at genesis",
+      "destructure lint activation is exported by the VM entry point",
+      "destructure lint activation keeps every mainnet and testnet chain unarmed",
+      "destructure lint activation rejects an unknown network, null coin and non-finite height",
+      "destructure lint activation resolves local armed thresholds and absent keys"
+    ],
+    "5ce9047e4e761aad": [
+      "destructure lint threading execute lint resolves the contract coin and restores the private carrier",
+      "destructure lint threading partitions the verdict cache independently from banned-with and forwards the exact boolean",
+      "destructure lint threading simulator deploy lint resolves the configured network and coin",
+      "destructure lint threading validateSyntax defaults the lint-core destructure option on and forwards explicit values"
+    ],
+    "c715f5204c8902d3": [
+      "BigInt surface strip execute threading isolates armed and unarmed decisions across parallel executions",
+      "BigInt surface strip execute threading matches the pinned companion SDK commit byte for byte",
+      "BigInt surface strip execute threading passes the unarmed map decision beside Package 3 compatibility",
+      "BigInt surface strip execute threading strips the surface on regtest from genesis",
+      "BigInt surface strip execute threading uses the deploy context for manifest execution"
     ]
   },
   "scripts": {
     "test": {
-      "fileCount": 59,
-      "titleCount": 1208,
+      "fileCount": 65,
+      "titleCount": 1271,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1374,6 +1449,7 @@
         "test/unit/lint-shared-rules.test.js": "c77bd66dbb559a2d",
         "test/unit/lint/lint_banned_with_heights.test.js": "444fba1ae77dbf07",
         "test/unit/lint/banned_with/lint_banned_with_threading.test.js": "b88631b2878d99d7",
+        "test/unit/lint/destructure/destructure_rules.test.js": "9737d66ce32e0ced",
         "test/unit/math.test.js": "1ec905aa9509bdfe",
         "test/unit/metered-cache.test.js": "085cea6786ecc21c",
         "test/unit/metering.test.js": "645189e9f67b5f3f",
@@ -1382,6 +1458,9 @@
         "test/unit/read-manifest.test.js": "6fd03d7e8ef88554",
         "test/unit/readonly-accessors.test.js": "040ba6bc59c4375f",
         "test/unit/sandbox.test.js": "9a6638760ddfe268",
+        "test/unit/sandbox/bigint_surface_strip.test.js": "13e7d3f1f37cb555",
+        "test/unit/sandbox/bigint_surface_strip_heights.test.js": "39e57d4b7dbf2f07",
+        "test/unit/sandbox/bigint_surface_strip_threading.test.js": "c715f5204c8902d3",
         "test/unit/scripts-mutation-report.test.js": "b3d7c9ed4f762088",
         "test/unit/security/configuration/dependency-advisories.test.js": "0f2abe37f99c5a17",
         "test/unit/sibling-coverage.test.js": "d8d1e52267ea606f",
@@ -1390,7 +1469,9 @@
         "test/unit/validator.test.js": "b6e5dbcaf7af8843",
         "test/unit/vm-worker.test.js": "61da1fba928ff3fb",
         "test/unit/wrapper-control-bindings.test.js": "9580326e21a45485",
-        "test/unit/xcall-bounds-parity.test.js": "d42a00ccb4967c7c"
+        "test/unit/xcall-bounds-parity.test.js": "d42a00ccb4967c7c",
+        "test/unit/lint/destructure/heights.test.js": "03e5be0396e94f65",
+        "test/unit/lint/destructure/threading.test.js": "5ce9047e4e761aad"
       }
     }
   }

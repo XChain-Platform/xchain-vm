@@ -269,6 +269,11 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
 // value would let the VM emit an amount the slash arithmetic cannot represent. Declared in
 // gateway/slash_limits.js, which also builds the gateway's amount regex from it.
 const { MAX_SLASH_AMOUNT_DECIMALS } = require('../../gateway/slash_limits.js');
+const {
+    BIGINT_SURFACE_STRIP_ACTIVATION,
+    resolveBigIntSurfaceStripActive,
+    isBigIntSurfaceStripActive,
+} = require('../bigint_surface_strip_heights.js');
 
 // Activation for widening the contract.slash `amount` precision ceiling from 8 to
 // MAX_SLASH_AMOUNT_DECIMALS. The 8-dp regex contradicted the other side of the same
@@ -344,4 +349,7 @@ module.exports = {
     isSlashTokenDelimGuardActive,
     isSlashAmountPrecisionActive,
     isConsensusWallClockActive,
+    BIGINT_SURFACE_STRIP_ACTIVATION,
+    resolveBigIntSurfaceStripActive,
+    isBigIntSurfaceStripActive,
 };

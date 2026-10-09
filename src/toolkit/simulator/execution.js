@@ -15,6 +15,7 @@
 
 const { toContractJs } = require('../transpile.js');
 const { GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER } = require('./constants.js');
+const { isDeployInitStrictActive } = require('./manifest_gate.js');
 
 module.exports = {
     /** Merge fields into the current block context ({ height, timestamp, hash }). */
@@ -50,14 +51,18 @@ module.exports = {
      * @param {string} [opts.contractAddress] - explicit address (default C:{coin}:{i})
      * @param {object} [opts.state] - initial state k/v
      * @param {string} [opts.filename] - drives TS detection (.ts -> type-strip)
-     * @param {string[]} [opts.constructorParams] - if present, runs `initialize`
+     * @param {string[]} [opts.constructorParams] - the DEPLOY's CONSTRUCTOR_PARAMS.
+     *        `initialize` runs when the chain would run it: under DEPLOY_INIT_STRICT
+     *        whenever the contract exports it or params are non-empty, below that
+     *        flag-day only when params are non-empty (an empty list counts as none).
      * @param {string} [opts.caller]
      * @returns {Promise<{contractIndex, contractAddress, initResult, deployGate}>}
-     *          deployGate is the chain's deploy verdict over all three legs (size
-     *          cap, validateSyntax, manifest + meta), `{ valid: true }` or
-     *          `{ valid: false, error }`, or `valid: null` when a leg could not run
-     *          on this host. Advisory: a reject warns once and the contract is
-     *          still registered (see deployGateVerdict, manifestGateVerdict).
+     *          deployGate is the chain's deploy verdict over the size cap,
+     *          validateSyntax, manifest + meta and, once those pass, the
+     *          constructor: `{ valid: true }` or `{ valid: false, error }`, or
+     *          `valid: null` when a leg could not run on this host. initResult is
+     *          null when no constructor ran. Advisory: a reject warns once and the
+     *          contract is still registered (see deployGateVerdict, manifestGate).
      */
     async deploy(code, opts = {}) {
         const src = toContractJs(code, opts.filename || '');
@@ -65,7 +70,8 @@ module.exports = {
         if (index >= this._nextIndex) this._nextIndex = index + 1;
         const address = opts.contractAddress || ('C:' + this.coin + ':' + index);
         let deployGate = this.deployGateVerdict(src);
-        if (deployGate.valid === true) deployGate = await this.manifestGateVerdict(src, address);
+        let hasInitialize = false;
+        if (deployGate.valid === true) ({ verdict: deployGate, hasInitialize } = await this.manifestGate(src, address));
         if (deployGate.valid !== true) this.warnDeployGate(deployGate);
 
         this.contracts.set(index, {
@@ -74,13 +80,36 @@ module.exports = {
             state: Object.assign({}, opts.state || {})
         });
 
-        let initResult = null;
-        if (opts.constructorParams !== undefined) {
-            initResult = await this.call(index, 'initialize', opts.constructorParams, {
-                caller: opts.caller
-            });
-        }
+        const initResult = await this.runDeployConstructor(index, opts, hasInitialize);
+        deployGate = this.constructorGateVerdict(deployGate, initResult);
         return { contractIndex: index, contractAddress: address, initResult, deployGate };
+    },
+
+    /**
+     * Run `initialize` exactly when the indexer's planConstructor would. The chain's
+     * CONSTRUCTOR_PARAMS is one pipe-joined string tested for truthiness, and a run
+     * with none passes zero args, never a single empty one.
+     * @returns {Promise<?object>} the constructor's execute() result, or null when it does not run
+     */
+    async runDeployConstructor(index, opts, hasInitialize) {
+        const given = opts.constructorParams;
+        const paramStr = (given === undefined || given === null) ? ''
+            : (Array.isArray(given) ? given.join('|') : String(given));
+        const strict = isDeployInitStrictActive(this.network, this.block.timestamp);
+        if (!(strict ? (hasInitialize || paramStr !== '') : paramStr !== '')) return null;
+        return this.call(index, 'initialize', paramStr !== '' ? given : [], { caller: opts.caller });
+    },
+
+    /**
+     * Fold a failed constructor into the deploy verdict with the indexer's exact
+     * status. Only a passing verdict is replaced, because the chain never runs the
+     * constructor once an earlier leg rejected, so that rejection is the one it records.
+     */
+    constructorGateVerdict(deployGate, initResult) {
+        if (deployGate.valid !== true || !initResult || initResult.success === true) return deployGate;
+        const verdict = { valid: false, error: 'invalid: constructor failed: ' + initResult.error };
+        this.warnDeployGate(verdict);
+        return verdict;
     },
 
     /**

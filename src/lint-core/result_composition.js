@@ -80,8 +80,8 @@ function pushReservedErrors(code, hardened, errors) {
 
 // 4. Banned Math.* check (transcendentals always; hardened: the full
 //    complement of the sandbox SAFE_MATH_MEMBERS whitelist).
-function pushMathErrors(code, hardened, globalAlias, optionalChain, errors) {
-    const banned = findBannedMathCalls(code, hardened, globalAlias, optionalChain);
+function pushMathErrors(code, hardened, globalAlias, optionalChain, destructure, errors) {
+    const banned = findBannedMathCalls(code, hardened, globalAlias, optionalChain, destructure);
     for (const hit of banned) {
         errors.push({
             rule: 'banned-math',
@@ -137,8 +137,8 @@ function pushLiteralErrors(code, errors) {
 //    version-dependent microtask-drain timing, which is outside the
 //    consensus_runtime pin: two validators can diverge (success vs timeout,
 //    or differing post-await state). Rejected at deploy like BigInt/RegExp.
-function pushAsyncErrors(code, hardened, globalAlias, optionalChain, errors) {
-    for (const hit of findBannedAsync(code, hardened, globalAlias, optionalChain)) {
+function pushAsyncErrors(code, hardened, globalAlias, optionalChain, destructure, errors) {
+    for (const hit of findBannedAsync(code, hardened, globalAlias, optionalChain, destructure)) {
         const advice = hit.kind === 'promise'
             ? 'Promise schedules microtasks whose drain timing is isolated-vm version-dependent and unpinned'
             : hit.kind === 'import'
@@ -220,8 +220,8 @@ function pushWithErrors(code, errors) {
     }
 }
 
-function pushWasmErrors(code, globalAlias, optionalChain, errors) {
-    for (const hit of findBannedWasm(code, globalAlias, optionalChain)) {
+function pushWasmErrors(code, globalAlias, optionalChain, destructure, errors) {
+    for (const hit of findBannedWasm(code, globalAlias, optionalChain, destructure)) {
         errors.push({
             rule: 'banned-wasm',
             message: 'banned global: WebAssembly at line ' + hit.line +
@@ -320,12 +320,17 @@ function pushStrippedGlobalWarnings(code, globalAlias, optionalChain, warnings) 
  *        (xchain-vm LINT_OPTIONAL_CHAIN_ACTIVATION / the xchain-indexer registry
  *        row vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION).
  *        Defaults to true for author-facing callers (SDK linter, CLI, unit tests).
+ * @param {boolean} [opts.destructure=true] - apply the LINT_DESTRUCTURE
+ *        refinement: statically named ObjectPattern reads from the global object
+ *        and Math count as the corresponding direct property reads. Defaults to
+ *        true for author-facing callers (SDK linter, CLI, unit tests).
  * @returns {{ errors: Array<{rule,message,line,severity}>, warnings: Array<{rule,message,line,severity}> }}
  */
 function lintSource(code, opts) {
     const hardened = !opts || opts.hardened !== false;
     const globalAlias = !opts || opts.globalAlias !== false;
     const optionalChain = !opts || opts.optionalChain !== false;
+    const destructure = !opts || opts.destructure !== false;
     if (typeof code !== 'string') {
         return {
             errors: [{ rule: 'invalid-type', message: 'Contract source must be a string', line: null, severity: 'error' }],
@@ -339,12 +344,12 @@ function lintSource(code, opts) {
     if (!pushParseError(code, errors)) return { errors, warnings: [] };
 
     pushReservedErrors(code, hardened, errors);
-    pushMathErrors(code, hardened, globalAlias, optionalChain, errors);
+    pushMathErrors(code, hardened, globalAlias, optionalChain, destructure, errors);
     pushLiteralErrors(code, errors);
-    pushAsyncErrors(code, hardened, globalAlias, optionalChain, errors);
+    pushAsyncErrors(code, hardened, globalAlias, optionalChain, destructure, errors);
     pushGeneratorErrors(code, errors);
     pushRestErrors(code, errors);
-    pushWasmErrors(code, globalAlias, optionalChain, errors);
+    pushWasmErrors(code, globalAlias, optionalChain, destructure, errors);
     pushWithErrors(code, errors);
 
     const warnings = findFloatWarnings(code);

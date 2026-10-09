@@ -26,14 +26,14 @@ const { effectiveCeiling } = require('../../gas.js');
 const StateManager      = require('../../state.js');
 const EmissionCollector = require('../../collector.js');
 const { buildGateway } = require('../../gateway.js');
-const { stripGlobals } = require('../../sandbox.js');
+const sandbox = require('../../sandbox.js');
 const { HostFaultError } = require('../../errors.js');
 const { resolveAccessors, isAccessorOwnKeyActive } = require('../../readonly-accessors.js');
 const {
     BINARY_ALLOC_GATE_BLOCK_TIME, isAsyncSurfaceActive,
     isLintHardeningActive, isStateKeyNulRejectActive, isStateKeyTypeNormalizeActive,
     isMeteringEvalOrderActive, isCallSpreadMeterActive, isRestPatternMeterActive,
-    pkg3CoinFromAddress, isPkg3SandboxActive,
+    pkg3CoinFromAddress, isPkg3SandboxActive, isBigIntSurfaceStripActive,
 } = require('./activations.js');
 const { checkExecLint } = require('./exec_lint.js');
 const { buildGatewayOptions } = require('./gateway_options.js');
@@ -187,7 +187,13 @@ module.exports = {
             const __pkg3Coin   = __execLintCoin;
             const __pkg3Height = __execLintHeight;
             const __pkg3SandboxOn = isPkg3SandboxActive(opts.network, __pkg3Coin, __pkg3Height);
-            stripGlobals(isolate, context, { stripPromise, stripWasm: __pkg3SandboxOn });
+            const __stripBigIntSurface = isBigIntSurfaceStripActive(
+                opts.network, __pkg3Coin, __pkg3Height);
+            sandbox.stripGlobals(isolate, context, {
+                stripPromise,
+                stripWasm: __pkg3SandboxOn,
+                stripBigIntSurface: __stripBigIntSurface,
+            });
 
             // Resolve read-only data into synchronous accessor objects. Accepts
             // either plain serializable snapshots (the canonical form, required by

@@ -37,7 +37,7 @@ function createVM() {
     });
 }
 
-function executeCode(vm, code) {
+function executeCode(vm, code, execution = {}) {
     return vm.execute({
         code: code,
         state: {},
@@ -45,7 +45,8 @@ function executeCode(vm, code) {
         params: [],
         caller: 'test_address',
         contractAddress: 'C:BTC:1',
-        blockContext: { height: 100, timestamp: 1700000000, hash: 'abc123' }
+        blockContext: { height: 100, timestamp: 1700000000, hash: 'abc123' },
+        ...execution
     });
 }
 
@@ -75,6 +76,14 @@ function executeCode(vm, code) {
                 try {
                     return this.constructor.constructor('return typeof process')();
                 } catch(e) { return 'blocked'; }
+            };`,
+            'bigint-surface-pre-activation': `module.exports = function(xchain) {
+                return [typeof BigInt64Array, typeof BigUint64Array,
+                    typeof DataView.prototype.getBigInt64,
+                    typeof DataView.prototype.getBigUint64,
+                    typeof DataView.prototype.setBigInt64,
+                    typeof DataView.prototype.setBigUint64,
+                    typeof (new BigInt64Array(1)[0]).constructor].join(',');
             };`
         };
 
@@ -97,5 +106,35 @@ function executeCode(vm, code) {
                     name + ': fresh-VM run must return identical bytes');
             });
         }
+
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Sandbox: Pkg 3 BigInt strip activation', function() {
+    let vm;
+    before(function() { vm = createVM(); });
+
+    it('host-injected Pkg 3 flag strips the BigInt native surface', async function() {
+        const code = `module.exports = function(xchain) {
+            return [typeof BigInt64Array, typeof BigUint64Array,
+                typeof DataView.prototype.getBigInt64,
+                typeof DataView.prototype.getBigUint64,
+                typeof DataView.prototype.setBigInt64,
+                typeof DataView.prototype.setBigUint64].join(',');
+        };`;
+        const before = await executeCode(vm, code, {
+            network: 'mainnet',
+            blockContext: { height: 960999, timestamp: 1700000000, hash: 'before' }
+        });
+        const after = await executeCode(vm, code, {
+            network: 'mainnet',
+            blockContext: { height: 961000, timestamp: 1700000000, hash: 'after' }
+        });
+        assert.strictEqual(before.success, true, before.error);
+        assert.strictEqual(after.success, true, after.error);
+        assert.strictEqual(JSON.parse(before.returnValue),
+            'function,function,function,function,function,function');
+        assert.strictEqual(JSON.parse(after.returnValue),
+            'undefined,undefined,undefined,undefined,undefined,undefined');
     });
 });

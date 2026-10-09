@@ -45,27 +45,40 @@ const classifyErrorMethods = require('./index/runtime/classify_error.js');
 const { resolveLimits } = require('./index/runtime/limits_defaults.js');
 const { initCaches } = require('./index/runtime/vm_caches.js');
 const { assertExecutionMode } = require('./index/runtime/execution_mode.js');
-const { isConsensusWallClockActive } = require('./index/runtime/activations.js');
+const {
+    isConsensusWallClockActive,
+    BIGINT_SURFACE_STRIP_ACTIVATION,
+    isBigIntSurfaceStripActive,
+} = require('./index/runtime/activations.js');
 const { attachStatics } = require('./index/runtime/public_exports.js');
 const { setTimeoutLog } = require('./index/runtime/timeout_log.js');
 const {
     LINT_BANNED_WITH_ACTIVATION,
     isLintBannedWithActive,
 } = require('./index/lint_banned_with_heights.js');
-
+const {
+    LINT_DESTRUCTURE_ACTIVATION,
+    isLintDestructureActive,
+} = require('./index/lint_destructure_heights.js');
 const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
-const executeWithBannedWithGate = executeMethods.execute;
+const EXECUTE_LINT_DESTRUCTURE = '_executeLintDestructure';
+const executeWithHeightLintGates = executeMethods.execute;
 executeMethods.execute = function execute(opts) {
-    const hadValue = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_BANNED_WITH);
-    const previous = this[EXECUTE_LINT_BANNED_WITH];
+    const hadBannedWith = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_BANNED_WITH);
+    const previousBannedWith = this[EXECUTE_LINT_BANNED_WITH];
+    const hadDestructure = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_DESTRUCTURE);
+    const previousDestructure = this[EXECUTE_LINT_DESTRUCTURE];
     const coin = XChainVM.pkg3CoinFromAddress(opts && opts.contractAddress);
     const height = opts && opts.blockContext && Number(opts.blockContext.height);
     this[EXECUTE_LINT_BANNED_WITH] = isLintBannedWithActive(opts && opts.network, coin, height);
+    this[EXECUTE_LINT_DESTRUCTURE] = isLintDestructureActive(opts && opts.network, coin, height);
     try {
-        return executeWithBannedWithGate.call(this, opts);
+        return executeWithHeightLintGates.call(this, opts);
     } finally {
-        if (hadValue) this[EXECUTE_LINT_BANNED_WITH] = previous;
+        if (hadBannedWith) this[EXECUTE_LINT_BANNED_WITH] = previousBannedWith;
         else delete this[EXECUTE_LINT_BANNED_WITH];
+        if (hadDestructure) this[EXECUTE_LINT_DESTRUCTURE] = previousDestructure;
+        else delete this[EXECUTE_LINT_DESTRUCTURE];
     }
 };
 
@@ -153,10 +166,14 @@ installMethods(
 module.exports = XChainVM;
 setTimeoutLog((message) => console.error(message));
 attachStatics(XChainVM);
-const bannedWithExports = Object.create(Object.getPrototypeOf(XChainVM), {
+const heightGateExports = Object.create(Object.getPrototypeOf(XChainVM), {
     LINT_BANNED_WITH_ACTIVATION: { value: LINT_BANNED_WITH_ACTIVATION, enumerable: true },
     isLintBannedWithActive: { value: isLintBannedWithActive, enumerable: true },
+    LINT_DESTRUCTURE_ACTIVATION: { value: LINT_DESTRUCTURE_ACTIVATION, enumerable: true },
+    isLintDestructureActive: { value: isLintDestructureActive, enumerable: true },
+    BIGINT_SURFACE_STRIP_ACTIVATION: { value: BIGINT_SURFACE_STRIP_ACTIVATION, enumerable: true },
+    isBigIntSurfaceStripActive: { value: isBigIntSurfaceStripActive, enumerable: true },
 });
-Object.setPrototypeOf(XChainVM, bannedWithExports);
+Object.setPrototypeOf(XChainVM, heightGateExports);
 module.exports.GAS_CEILING_SUCCESS_ACTIVATION = GasTracker.GAS_CEILING_SUCCESS_ACTIVATION;
 module.exports.isGasCeilingSuccessActive = GasTracker.isGasCeilingSuccessActive;
