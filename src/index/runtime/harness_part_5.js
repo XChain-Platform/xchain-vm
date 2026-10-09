@@ -113,6 +113,28 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
         });
     }
     if (__applyLengthMeterOn) {
+        // Callback bodies meter present elements, but these methods skip holes in
+        // native code. A sparse or generic array-like receiver can therefore scan
+        // an arbitrarily large length without running any metered callback code.
+        // Charge the snapshotted receiver length after the native call, including
+        // a callback throw that contract code could otherwise catch and repeat.
+        // This shares the apply-length flag because both close length-driven native
+        // work that was previously billed only at the flat call-site rate.
+        var __meterSparseCallback = function(name) {
+            var orig = Array.prototype[name];
+            if (typeof orig !== 'function') return;
+            __lockMethod(Array.prototype, name, function() {
+                var n = (this == null ? 0 : this.length);
+                try {
+                    return orig.apply(this, arguments);
+                } finally {
+                    __allocGas(n);
+                }
+            });
+        };
+        ['every', 'filter', 'flatMap', 'forEach', 'map', 'reduce',
+         'reduceRight', 'some'].forEach(__meterSparseCallback);
+
         var __fnProto = Object.getPrototypeOf(function() {});
         var __applyNative = __fnProto.call.bind(__fnProto.apply);
         __lockMethod(__fnProto, 'apply', function(thisArg, args) {
