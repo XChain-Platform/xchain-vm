@@ -75,35 +75,30 @@ describe('BigInt native surface strip: gated sets', function () {
     });
 
     it('leaves the gated globals out of the deletion list by default and when false', function () {
-        for (const opts of [undefined, {}, { stripBigIntSurface: false }]) {
+        for (const opts of [undefined, {}, { stripWasm: false }]) {
             const names = deletionList(opts);
             assert.ok(!names.includes('BigInt64Array'));
             assert.ok(!names.includes('BigUint64Array'));
         }
     });
 
-    it('embeds the two globals when the host-injected BigInt flag is true', function () {
-        const before = deletionList({ stripBigIntSurface: false });
-        const after = deletionList({ stripBigIntSurface: true });
-        assert.deepStrictEqual(after, before);
-        assert.deepStrictEqual(bigintDeletionList({ stripBigIntSurface: true }),
-            ['BigInt64Array', 'BigUint64Array']);
-    });
-
-    it('keeps the BigInt and WebAssembly strip flags independent', function () {
+    it('adds the two globals when the host-injected Pkg 3 flag is true', function () {
         const before = deletionList({ stripWasm: false });
         const after = deletionList({ stripWasm: true });
         assert.deepStrictEqual(after.filter((name) => !before.includes(name)),
             ['WebAssembly']);
-        assert.ok(!captureScript({ stripWasm: true })
-            .includes('BIGINT_SURFACE_STRIPPED_PROTO_METHODS'));
+        assert.deepStrictEqual(bigintDeletionList({ stripWasm: true }),
+            ['BigInt64Array', 'BigUint64Array']);
+    });
+
+    it('accepts the independently injected BigInt flag without enabling WebAssembly', function () {
         assert.deepStrictEqual(bigintDeletionList({ stripBigIntSurface: true }),
             ['BigInt64Array', 'BigUint64Array']);
         assert.ok(!deletionList({ stripBigIntSurface: true }).includes('WebAssembly'));
     });
 
     it('keeps the BigInt prototype neuters out of the pre-activation script', function () {
-        const source = captureScript({ stripBigIntSurface: false });
+        const source = captureScript({ stripWasm: false });
         assert.ok(!source.includes('BIGINT_SURFACE_STRIPPED_PROTO_METHODS'));
         assert.ok(!source.includes('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS'));
     });
@@ -122,7 +117,7 @@ describe('BigInt native surface strip: typed arrays and DataView', function () {
             typeof DataView.prototype.setBigInt64,
             typeof DataView.prototype.setBigUint64,
             typeof (0n).constructor
-        ])`, { stripBigIntSurface: false });
+        ])`, { stripWasm: false });
         assert.strictEqual(result,
             '["function","function","function","function","function","function","function"]');
     });
@@ -130,7 +125,7 @@ describe('BigInt native surface strip: typed arrays and DataView', function () {
     it('removes both typed-array globals at activation', function () {
         const result = evaluateAfterStrip(
             'typeof BigInt64Array + "," + typeof BigUint64Array',
-            { stripBigIntSurface: true });
+            { stripWasm: true });
         assert.strictEqual(result, 'undefined,undefined');
     });
 
@@ -141,7 +136,7 @@ describe('BigInt native surface strip: typed arrays and DataView', function () {
             DataView.prototype.setBigInt64,
             DataView.prototype.setBigUint64
         ].every(function(value) { return value === undefined; })`,
-        { stripBigIntSurface: true });
+        { stripWasm: true });
         assert.strictEqual(result, true);
     });
 
@@ -152,7 +147,7 @@ describe('BigInt native surface strip: prototype constructor and isolation', fun
 
     it('neuters BigInt.prototype.constructor at activation', function () {
         assert.strictEqual(evaluateAfterStrip(
-            '(0n).constructor === undefined', { stripBigIntSurface: true }), true);
+            '(0n).constructor === undefined', { stripWasm: true }), true);
     });
 
     it('locks every neutered property against recreation', function () {
@@ -179,20 +174,18 @@ describe('BigInt native surface strip: prototype constructor and isolation', fun
                 descriptor.configurable === false && assignmentBlocked &&
                 deletionBlocked === false && afterMutation.value === undefined &&
                 afterMutation.writable === false && afterMutation.configurable === false;
-        })()`, { stripBigIntSurface: true });
+        })()`, { stripWasm: true });
         assert.strictEqual(result, true);
     });
 
-    it('uses the BigInt host flag without coupling to the Promise gate', function () {
-        const bigint = deletionList({ stripBigIntSurface: true });
-        assert.ok(!bigint.includes('WebAssembly'));
-        assert.deepStrictEqual(bigintDeletionList({ stripBigIntSurface: true }),
+    it('uses the WebAssembly host flag without coupling to the Promise gate', function () {
+        const pkg3 = deletionList({ stripWasm: true });
+        assert.ok(pkg3.includes('WebAssembly'));
+        assert.deepStrictEqual(bigintDeletionList({ stripWasm: true }),
             ['BigInt64Array', 'BigUint64Array']);
-        assert.ok(!bigint.includes('Promise'));
+        assert.ok(!pkg3.includes('Promise'));
         const promiseOnly = deletionList({ stripPromise: true });
         assert.ok(!promiseOnly.includes('BigInt64Array'));
         assert.ok(!promiseOnly.includes('BigUint64Array'));
-        assert.ok(!captureScript({ stripPromise: true })
-            .includes('BIGINT_SURFACE_STRIPPED_PROTO_METHODS'));
     });
 });

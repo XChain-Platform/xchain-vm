@@ -19,7 +19,7 @@
     },
     "src/stripped-globals.js": {
       "canonical": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
-      "vendoredInSdk": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
+      "vendoredInSdk": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
       "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/stripped_globals.js"
     }

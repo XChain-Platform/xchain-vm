@@ -32,6 +32,7 @@ function newVm() {
 }
 
 const CONTEXT = { height: 10000000, timestamp: 1786060800, hash: 'b'.repeat(64) };
+const PRE_PKG3_CONTEXT = { height: 960999, timestamp: 1700000000, hash: 'c'.repeat(64) };
 const ADDRESS = 'C:BTC:1';
 
 async function executeWithStripOptions(opts) {
@@ -59,7 +60,7 @@ async function assertParallelIsolation() {
             ...base, network: 'regtest',
             blockContext: { height: 0, timestamp: 0, hash: 'b'.repeat(64) }
         }),
-        newVm().execute({ ...base, network: 'mainnet', blockContext: CONTEXT })
+        newVm().execute({ ...base, network: 'mainnet', blockContext: PRE_PKG3_CONTEXT })
     ]);
 
     assert.strictEqual(armed.success, true, armed.error);
@@ -69,7 +70,7 @@ async function assertParallelIsolation() {
 }
 
 describe('BigInt surface strip execute threading', function () {
-    it('keeps the unarmed public-network surface independent from Package 3', async function () {
+    it('passes the unarmed map decision beside Package 3 compatibility', async function () {
         const { result, observed } = await executeWithStripOptions({
             code: "module.exports = function(){ return [typeof BigInt64Array, typeof BigUint64Array, typeof DataView.prototype.getBigInt64, typeof globalThis['Web' + 'Assembly']]; };",
             state: {}, method: 'default', params: [], caller: 'bc1qcaller',
@@ -78,7 +79,7 @@ describe('BigInt surface strip execute threading', function () {
         });
 
         assert.strictEqual(result.success, true, result.error);
-        assert.strictEqual(result.returnValue, '["function","function","function","undefined"]');
+        assert.strictEqual(result.returnValue, '["undefined","undefined","undefined","undefined"]');
         assert.strictEqual(observed.length, 1);
         assert.strictEqual(observed[0].stripWasm, true);
         assert.strictEqual(observed[0].stripBigIntSurface, false);
@@ -103,7 +104,7 @@ describe('BigInt surface strip execute threading', function () {
     it('uses the deploy context for manifest execution', async function () {
         const code = "module.exports = { permissions: typeof BigInt64Array === 'undefined' ? ['SEND'] : [] };";
         const publicResult = await newVm().readManifest(code, {
-            network: 'mainnet', contractAddress: ADDRESS, blockContext: CONTEXT
+            network: 'mainnet', contractAddress: ADDRESS, blockContext: PRE_PKG3_CONTEXT
         });
         const regtestResult = await newVm().readManifest(code, {
             network: 'regtest', contractAddress: ADDRESS,

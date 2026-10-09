@@ -380,7 +380,8 @@ function stripGlobals(isolate, context, opts) {
     // is stripped unconditionally from genesis.
     const names = STRIPPED_GLOBAL_NAMES.filter((n) =>
         (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm));
-    const script = isolate.compileScriptSync(buildStripScript(names, stripBigIntSurface));
+    const script = isolate.compileScriptSync(
+        buildStripScript(names, stripWasm || stripBigIntSurface));
     script.runSync(context);
 }
 

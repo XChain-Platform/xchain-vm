@@ -110,11 +110,11 @@ function executeCode(vm, code, execution = {}) {
     });
 });
 
-(XChainVM ? describe : describe.skip)('Sandbox: independent BigInt strip activation', function() {
+(XChainVM ? describe : describe.skip)('Sandbox: Pkg 3 BigInt strip activation', function() {
     let vm;
     before(function() { vm = createVM(); });
 
-    it('Package 3 does not arm the unarmed BigInt native surface', async function() {
+    it('host-injected Pkg 3 flag strips the BigInt native surface', async function() {
         const code = `module.exports = function(xchain) {
             return [typeof BigInt64Array, typeof BigUint64Array,
                 typeof DataView.prototype.getBigInt64,
@@ -135,6 +135,6 @@ function executeCode(vm, code, execution = {}) {
         assert.strictEqual(JSON.parse(before.returnValue),
             'function,function,function,function,function,function');
         assert.strictEqual(JSON.parse(after.returnValue),
-            'function,function,function,function,function,function');
+            'undefined,undefined,undefined,undefined,undefined,undefined');
     });
 });
