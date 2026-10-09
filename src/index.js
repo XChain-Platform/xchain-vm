@@ -40,7 +40,50 @@ const lintAndMeteringMethods = require('./index/lint_and_metering.js');
 const gatewayInjectionMethods = require('./index/gateway_injection.js');
 const errorResultMethods = require('./index/error_results.js');
 const manifestMethods = require('./index/manifest.js');
+const sandbox = require('./sandbox.js');
+const stripGlobals = sandbox.stripGlobals;
+let executeBigIntSurfaceStrip = false;
+sandbox.stripGlobals = function stripGlobalsWithHeightGate(isolate, context, opts) {
+    const stripWasm = !!(opts && opts.stripWasm);
+    const gateScripts = [];
+    if (stripWasm) gateScripts.push(`
+        try { delete globalThis.WebAssembly; } catch(e) {}
+        try { globalThis.WebAssembly = undefined; } catch(e) {}
+    `);
+    if (executeBigIntSurfaceStrip) gateScripts.push(`
+        var globalNames = ${JSON.stringify(sandbox.BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES)};
+        for (var g = 0; g < globalNames.length; g++) {
+            try { delete globalThis[globalNames[g]]; } catch(e) {}
+            try { globalThis[globalNames[g]] = undefined; } catch(e) {}
+        }
+        var protoMethods = ${JSON.stringify(sandbox.BIGINT_SURFACE_STRIPPED_PROTO_METHODS)};
+        var protos = { DataView: DataView.prototype, BigInt: BigInt.prototype };
+        for (var i = 0; i < protoMethods.length; i++) {
+            var proto = protos[protoMethods[i].proto];
+            if (!proto) throw new Error('BIGINT_SURFACE_STRIPPED_PROTO_METHODS: unmapped proto ' + protoMethods[i].proto);
+            Object.defineProperty(proto, protoMethods[i].method,
+                { value: undefined, writable: false, configurable: false });
+        }
+        var ctorTargets = ${JSON.stringify(sandbox.BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS)};
+        for (var j = 0; j < ctorTargets.length; j++) {
+            var ctorProto = protos[ctorTargets[j]];
+            if (!ctorProto) throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: unmapped proto ' + ctorTargets[j]);
+            Object.defineProperty(ctorProto, 'constructor',
+                { value: undefined, writable: false, configurable: false });
+        }
+    `);
+    if (gateScripts.length) {
+        const script = isolate.compileScriptSync('(function() {' + gateScripts.join('') + '})();');
+        script.runSync(context);
+    }
+    return stripGlobals(isolate, context, {
+        ...opts,
+        stripWasm: false,
+        stripBigIntSurface: executeBigIntSurfaceStrip,
+    });
+};
 const executeMethods = require('./index/runtime/execute.js');
+sandbox.stripGlobals = stripGlobals;
 const classifyErrorMethods = require('./index/runtime/classify_error.js');
 const { resolveLimits } = require('./index/runtime/limits_defaults.js');
 const { initCaches } = require('./index/runtime/vm_caches.js');
@@ -69,10 +112,12 @@ executeMethods.execute = function execute(opts) {
     const previousBannedWith = this[EXECUTE_LINT_BANNED_WITH];
     const hadDestructure = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_DESTRUCTURE);
     const previousDestructure = this[EXECUTE_LINT_DESTRUCTURE];
+    const previousBigIntSurfaceStrip = executeBigIntSurfaceStrip;
     const coin = XChainVM.pkg3CoinFromAddress(opts && opts.contractAddress);
     const height = opts && opts.blockContext && Number(opts.blockContext.height);
     this[EXECUTE_LINT_BANNED_WITH] = isLintBannedWithActive(opts && opts.network, coin, height);
     this[EXECUTE_LINT_DESTRUCTURE] = isLintDestructureActive(opts && opts.network, coin, height);
+    executeBigIntSurfaceStrip = isBigIntSurfaceStripActive(opts && opts.network, coin, height);
     try {
         return executeWithHeightLintGates.call(this, opts);
     } finally {
@@ -80,6 +125,7 @@ executeMethods.execute = function execute(opts) {
         else delete this[EXECUTE_LINT_BANNED_WITH];
         if (hadDestructure) this[EXECUTE_LINT_DESTRUCTURE] = previousDestructure;
         else delete this[EXECUTE_LINT_DESTRUCTURE];
+        executeBigIntSurfaceStrip = previousBigIntSurfaceStrip;
     }
 };
 
