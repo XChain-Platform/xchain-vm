@@ -11,7 +11,9 @@ const {
     STRIPPED_PROTO_METHOD_NAMES,
     REGEX_COERCING_METHODS
 } = require('./constants.js');
-const { isMathObjectRef, staticComputedKey } = require('./scope_analysis.js');
+const {
+    isMathObjectRef, isMathObjectPathRef, staticComputedKey, objectPatternEntries
+} = require('./scope_analysis.js');
 
 /**
  * Scan contract code for references to banned transcendental Math members
@@ -34,12 +36,14 @@ const { isMathObjectRef, staticComputedKey } = require('./scope_analysis.js');
  *        and banned-wasm already do. Defaults to true for author-facing callers
  *        (SDK linter, CLI, unit tests), as the sibling scanners do.
  * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
+ * @param {boolean} [destructure=true] - LINT_DESTRUCTURE consensus flag
  * @returns {Array<{name: string, line: (number|string), transcendental: boolean}>}
  */
-function findBannedMathCalls(code, hardened, aliased, optionalChain) {
+function findBannedMathCalls(code, hardened, aliased, optionalChain, destructure) {
     if (hardened === undefined) hardened = true;
     if (aliased === undefined) aliased = true;
     if (optionalChain === undefined) optionalChain = true;
+    if (destructure === undefined) destructure = true;
     const hits = [];
     let ast;
     try {
@@ -52,7 +56,25 @@ function findBannedMathCalls(code, hardened, aliased, optionalChain) {
         // Parse failure; validateSyntax's earlier checks would have caught this.
         return hits;
     }
+    const markMember = (member, node) => {
+        if (!member) return;
+        if (BANNED_MATH_MEMBERS.has(member)) {
+            hits.push({ name: member, line: node.loc ? node.loc.start.line : '?', transcendental: true });
+        } else if (hardened && !SAFE_MATH_MEMBERS.has(member)) {
+            hits.push({ name: member, line: node.loc ? node.loc.start.line : '?', transcendental: false });
+        }
+    };
+    const markDestructuredMath = (node) => {
+        if (!destructure) return;
+        for (const entry of objectPatternEntries(node)) {
+            const path = entry.path;
+            if (!isMathObjectPathRef(entry.source, path.slice(0, -1), aliased, optionalChain)) continue;
+            markMember(path[path.length - 1], entry.property);
+        }
+    };
     walk.simple(ast, {
+        VariableDeclarator: markDestructuredMath,
+        AssignmentExpression: markDestructuredMath,
         MemberExpression(node) {
             if (!isMathObjectRef(node.object, aliased, optionalChain)) return;
             let member = null;
@@ -61,12 +83,7 @@ function findBannedMathCalls(code, hardened, aliased, optionalChain) {
             } else if (node.computed) {
                 member = staticComputedKey(node);             // Math['pow'] / Math[`pow`]
             }
-            if (!member) return;
-            if (BANNED_MATH_MEMBERS.has(member)) {
-                hits.push({ name: member, line: node.loc ? node.loc.start.line : '?', transcendental: true });
-            } else if (hardened && !SAFE_MATH_MEMBERS.has(member)) {
-                hits.push({ name: member, line: node.loc ? node.loc.start.line : '?', transcendental: false });
-            }
+            markMember(member, node);
         }
     });
     return hits;
