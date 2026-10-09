@@ -26,6 +26,7 @@
 const IsolateManager    = require('./isolate.js');
 const ActionValidator   = require('./validator.js');
 const GasTracker         = require('./gas.js');
+const { AsyncLocalStorage } = require('async_hooks');
 // Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
 const { resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
@@ -42,15 +43,16 @@ const errorResultMethods = require('./index/error_results.js');
 const manifestMethods = require('./index/manifest.js');
 const sandbox = require('./sandbox.js');
 const stripGlobals = sandbox.stripGlobals;
-let executeBigIntSurfaceStrip = false;
+const executeBigIntSurfaceStrip = new AsyncLocalStorage();
 sandbox.stripGlobals = function stripGlobalsWithHeightGate(isolate, context, opts) {
     const stripWasm = !!(opts && opts.stripWasm);
+    const stripBigIntSurface = executeBigIntSurfaceStrip.getStore() === true;
     const gateScripts = [];
     if (stripWasm) gateScripts.push(`
         try { delete globalThis.WebAssembly; } catch(e) {}
         try { globalThis.WebAssembly = undefined; } catch(e) {}
     `);
-    if (executeBigIntSurfaceStrip) gateScripts.push(`
+    if (stripBigIntSurface) gateScripts.push(`
         var globalNames = ${JSON.stringify(sandbox.BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES)};
         for (var g = 0; g < globalNames.length; g++) {
             try { delete globalThis[globalNames[g]]; } catch(e) {}
@@ -79,7 +81,7 @@ sandbox.stripGlobals = function stripGlobalsWithHeightGate(isolate, context, opt
     return stripGlobals(isolate, context, {
         ...opts,
         stripWasm: false,
-        stripBigIntSurface: executeBigIntSurfaceStrip,
+        stripBigIntSurface,
     });
 };
 const executeMethods = require('./index/runtime/execute.js');
@@ -112,20 +114,20 @@ executeMethods.execute = function execute(opts) {
     const previousBannedWith = this[EXECUTE_LINT_BANNED_WITH];
     const hadDestructure = Object.prototype.hasOwnProperty.call(this, EXECUTE_LINT_DESTRUCTURE);
     const previousDestructure = this[EXECUTE_LINT_DESTRUCTURE];
-    const previousBigIntSurfaceStrip = executeBigIntSurfaceStrip;
     const coin = XChainVM.pkg3CoinFromAddress(opts && opts.contractAddress);
     const height = opts && opts.blockContext && Number(opts.blockContext.height);
     this[EXECUTE_LINT_BANNED_WITH] = isLintBannedWithActive(opts && opts.network, coin, height);
     this[EXECUTE_LINT_DESTRUCTURE] = isLintDestructureActive(opts && opts.network, coin, height);
-    executeBigIntSurfaceStrip = isBigIntSurfaceStripActive(opts && opts.network, coin, height);
     try {
-        return executeWithHeightLintGates.call(this, opts);
+        const stripBigIntSurface = isBigIntSurfaceStripActive(
+            opts && opts.network, coin, height);
+        return executeBigIntSurfaceStrip.run(stripBigIntSurface,
+            () => executeWithHeightLintGates.call(this, opts));
     } finally {
         if (hadBannedWith) this[EXECUTE_LINT_BANNED_WITH] = previousBannedWith;
         else delete this[EXECUTE_LINT_BANNED_WITH];
         if (hadDestructure) this[EXECUTE_LINT_DESTRUCTURE] = previousDestructure;
         else delete this[EXECUTE_LINT_DESTRUCTURE];
-        executeBigIntSurfaceStrip = previousBigIntSurfaceStrip;
     }
 };
 

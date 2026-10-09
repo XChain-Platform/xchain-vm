@@ -1360,7 +1360,8 @@
       "destructure lint threading simulator deploy lint resolves the configured network and coin",
       "destructure lint threading validateSyntax defaults the lint-core destructure option on and forwards explicit values"
     ],
-    "5e851dc14ed7d743": [
+    "cf3799dd072fb35c": [
+      "BigInt surface strip execute threading isolates armed and unarmed decisions across parallel executions",
       "BigInt surface strip execute threading keeps the unarmed public-network surface independent from Package 3",
       "BigInt surface strip execute threading strips the surface on regtest from genesis",
       "BigInt surface strip execute threading uses the deploy context for manifest execution"
@@ -1369,7 +1370,7 @@
   "scripts": {
     "test": {
       "fileCount": 64,
-      "titleCount": 1237,
+      "titleCount": 1238,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1423,7 +1424,7 @@
         "test/unit/sandbox.test.js": "9a6638760ddfe268",
         "test/unit/sandbox/bigint_surface_strip.test.js": "1e210466e6f01f69",
         "test/unit/sandbox/bigint_surface_strip_heights.test.js": "39e57d4b7dbf2f07",
-        "test/unit/sandbox/bigint_surface_strip_threading.test.js": "5e851dc14ed7d743",
+        "test/unit/sandbox/bigint_surface_strip_threading.test.js": "cf3799dd072fb35c",
         "test/unit/scripts-mutation-report.test.js": "b3d7c9ed4f762088",
         "test/unit/security/configuration/dependency-advisories.test.js": "0f2abe37f99c5a17",
         "test/unit/sibling-coverage.test.js": "d8d1e52267ea606f",
