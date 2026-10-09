@@ -14,7 +14,7 @@
 'use strict';
 
 const assert = require('assert');
-const { AsyncLocalStorage } = require('async_hooks');
+const sandbox = require('../../../src/sandbox.js');
 const XChainVM = require('../../../src/index.js');
 
 const GAS_SCHEDULE = {
@@ -34,40 +34,34 @@ function newVm() {
 const CONTEXT = { height: 10000000, timestamp: 1786060800, hash: 'b'.repeat(64) };
 const ADDRESS = 'C:BTC:1';
 
+async function executeWithStripOptions(opts) {
+    const original = sandbox.stripGlobals;
+    const observed = [];
+    sandbox.stripGlobals = function captureStripOptions(isolate, context, stripOptions) {
+        observed.push({ ...stripOptions });
+        return original(isolate, context, stripOptions);
+    };
+    try {
+        return { result: await newVm().execute(opts), observed };
+    } finally {
+        sandbox.stripGlobals = original;
+    }
+}
+
 async function assertParallelIsolation() {
     const code = "module.exports = function(){ return typeof BigInt64Array; };";
     const base = {
         code, state: {}, method: 'default', params: [], caller: 'bc1qcaller',
         contractAddress: ADDRESS, contractIndex: 1, txHash: 'a'.repeat(64)
     };
-    const run = AsyncLocalStorage.prototype.run;
-    let arrivals = 0;
-    let release;
-    const barrier = new Promise((resolve) => { release = resolve; });
-    AsyncLocalStorage.prototype.run = function runAfterBarrier(store, callback, ...args) {
-        return run.call(this, store, async () => {
-            arrivals += 1;
-            if (arrivals === 2) release();
-            await barrier;
-            return callback(...args);
-        });
-    };
+    const [armed, unarmed] = await Promise.all([
+        newVm().execute({
+            ...base, network: 'regtest',
+            blockContext: { height: 0, timestamp: 0, hash: 'b'.repeat(64) }
+        }),
+        newVm().execute({ ...base, network: 'mainnet', blockContext: CONTEXT })
+    ]);
 
-    let armed;
-    let unarmed;
-    try {
-        [armed, unarmed] = await Promise.all([
-            newVm().execute({
-                ...base, network: 'regtest',
-                blockContext: { height: 0, timestamp: 0, hash: 'b'.repeat(64) }
-            }),
-            newVm().execute({ ...base, network: 'mainnet', blockContext: CONTEXT })
-        ]);
-    } finally {
-        AsyncLocalStorage.prototype.run = run;
-    }
-
-    assert.strictEqual(arrivals, 2);
     assert.strictEqual(armed.success, true, armed.error);
     assert.strictEqual(unarmed.success, true, unarmed.error);
     assert.strictEqual(armed.returnValue, '"undefined"');
@@ -76,7 +70,7 @@ async function assertParallelIsolation() {
 
 describe('BigInt surface strip execute threading', function () {
     it('keeps the unarmed public-network surface independent from Package 3', async function () {
-        const result = await newVm().execute({
+        const { result, observed } = await executeWithStripOptions({
             code: "module.exports = function(){ return [typeof BigInt64Array, typeof BigUint64Array, typeof DataView.prototype.getBigInt64, typeof globalThis['Web' + 'Assembly']]; };",
             state: {}, method: 'default', params: [], caller: 'bc1qcaller',
             contractAddress: ADDRESS, contractIndex: 1, txHash: 'a'.repeat(64),
@@ -85,10 +79,13 @@ describe('BigInt surface strip execute threading', function () {
 
         assert.strictEqual(result.success, true, result.error);
         assert.strictEqual(result.returnValue, '["function","function","function","undefined"]');
+        assert.strictEqual(observed.length, 1);
+        assert.strictEqual(observed[0].stripWasm, true);
+        assert.strictEqual(observed[0].stripBigIntSurface, false);
     });
 
     it('strips the surface on regtest from genesis', async function () {
-        const result = await newVm().execute({
+        const { result, observed } = await executeWithStripOptions({
             code: "module.exports = function(){ return [typeof BigInt64Array, typeof BigUint64Array, typeof DataView.prototype.getBigInt64, typeof globalThis['Web' + 'Assembly']]; };",
             state: {}, method: 'default', params: [], caller: 'bc1qcaller',
             contractAddress: ADDRESS, contractIndex: 1, txHash: 'a'.repeat(64),
@@ -97,6 +94,8 @@ describe('BigInt surface strip execute threading', function () {
 
         assert.strictEqual(result.success, true, result.error);
         assert.strictEqual(result.returnValue, '["undefined","undefined","undefined","undefined"]');
+        assert.strictEqual(observed.length, 1);
+        assert.strictEqual(observed[0].stripBigIntSurface, true);
     });
 
     it('isolates armed and unarmed decisions across parallel executions', assertParallelIsolation);

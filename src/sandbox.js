@@ -27,7 +27,10 @@ const ivm = require('isolated-vm');
 // the three consumers cannot drift. That module is dependency-free on purpose:
 // this file requires isolated-vm at the top level, and the other two consumers
 // must load where no isolate exists.
-const { STRIPPED_GLOBAL_NAMES } = require('./stripped-globals.js');
+const {
+    STRIPPED_GLOBAL_NAMES,
+    BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES,
+} = require('./stripped-globals.js');
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
@@ -71,8 +74,6 @@ const STRIPPED_PROTO_METHODS = Object.freeze([
 const NEUTERED_PROTO_CONSTRUCTORS = Object.freeze([
     'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp'
 ]);
-
-const BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES = Object.freeze(['BigInt64Array', 'BigUint64Array']);
 
 const BIGINT_SURFACE_STRIPPED_PROTO_METHODS = Object.freeze([
     { proto: 'DataView', method: 'getBigInt64' }, { proto: 'DataView', method: 'getBigUint64' },
@@ -343,13 +344,13 @@ const stripScriptSafeMath = () => `
 // is simply absent from `names` and never deleted (exactly how a pre-activation
 // node behaves). Everything after the toDelete loop is fixed neutering logic that
 // does not depend on the list.
-const buildStripScript = (names, stripPkg3Surface) => [
+const buildStripScript = (names, stripBigIntSurface) => [
     stripScriptProtoCapture(),
     stripScriptDeleteGlobals(names),
     stripScriptFunctionCtors(),
     stripScriptProtoCtors(),
     stripScriptRegExpAndProtoMethods(),
-    stripScriptBigIntSurface(stripPkg3Surface),
+    stripScriptBigIntSurface(stripBigIntSurface),
     stripScriptErrorStacks(),
     stripScriptDefineProperty(),
     stripScriptHostGlobals(),
@@ -371,20 +372,21 @@ const buildStripScript = (names, stripPkg3Surface) => [
  * @param {boolean} [opts.stripWasm=false] - delete the global `WebAssembly`.
  *        CONSENSUS-GATED on the per-coin Pkg 3 bundle HEIGHT flag-day (index.js
  *        isPkg3SandboxActive): below it WebAssembly is LEFT IN PLACE (historical
- *        replay), at/after it WebAssembly and the BigInt native surface are absent
- *        fleet-wide. The host injects this single flag for the whole Pkg 3 sandbox
- *        bundle so its strip legs cannot activate independently.
+ *        replay), at/after it WebAssembly is absent fleet-wide.
+ * @param {boolean} [opts.stripBigIntSurface=false] - remove BigInt typed-array
+ *        globals and neuter the related DataView and prototype constructor surface.
  */
 function stripGlobals(isolate, context, opts) {
     const stripPromise = !!(opts && opts.stripPromise);
     const stripWasm    = !!(opts && opts.stripWasm);
+    const stripBigIntSurface = !!(opts && opts.stripBigIntSurface);
     // Gated entries stay in the applied list only once their own flag-day is active,
     // exactly as a pre-activation node leaves them in place. Promise: block-time
     // async-surface gate. WebAssembly: per-coin Pkg 3 height gate. Every other entry
     // is stripped unconditionally from genesis.
     const names = STRIPPED_GLOBAL_NAMES.filter((n) =>
         (n !== 'Promise' || stripPromise) && (n !== 'WebAssembly' || stripWasm));
-    const script = isolate.compileScriptSync(buildStripScript(names, stripWasm));
+    const script = isolate.compileScriptSync(buildStripScript(names, stripBigIntSurface));
     script.runSync(context);
 }
 

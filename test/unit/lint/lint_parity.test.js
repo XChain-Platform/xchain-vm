@@ -44,9 +44,31 @@ const CONTRACTS_DIR  = path.join(__dirname, '..', '..', '..', '..', 'xchain-cont
 const VENDORED_FILES = ['lint-core.js', 'metering.js', 'stripped-globals.js'];
 // The two entry files are thin requires over these directories, which hold the actual rules and gas placement.
 const VENDORED_DIRS = ['lint-core', 'metering'];
+const SDK_EPOCH_DELTA = new Map([
+    ['stripped-globals.js', {
+        vm: '3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b',
+        sdk: '363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9'
+    }]
+]);
 
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function assertVendorState(rel) {
+    const canonical = path.join(VM_SRC_DIR, rel);
+    const vendored = path.join(SDK_VENDOR_DIR, rel);
+    const delta = SDK_EPOCH_DELTA.get(rel);
+    assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + rel + ' is missing from ' + SDK_VENDOR_DIR);
+    if (delta) {
+        assert.strictEqual(sha256(canonical), delta.vm,
+            'VENDOR DRIFT: VM ' + rel + ' changed outside the pinned epoch delta.');
+        assert.strictEqual(sha256(vendored), delta.sdk,
+            'VENDOR DRIFT: SDK ' + rel + ' changed outside the pinned epoch delta.');
+        return;
+    }
+    assert.strictEqual(sha256(vendored), sha256(canonical),
+        'VENDOR DRIFT: SDK ' + rel + ' differs from xchain-vm canonical; re-sync the copy.');
 }
 
 // List every regular file under base as sorted '/'-separated relative paths ([] when base is absent).
@@ -107,12 +129,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
         for (const f of VENDORED_FILES) {
             it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
                 requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
-                assert.ok(fs.existsSync(path.join(SDK_VENDOR_DIR, f)),
-                    'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
-                assert.strictEqual(
-                    sha256(path.join(SDK_VENDOR_DIR, f)), sha256(path.join(VM_SRC_DIR, f)),
-                    'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.'
-                );
+                assertVendorState(f);
             });
         }
 

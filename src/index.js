@@ -26,7 +26,6 @@
 const IsolateManager    = require('./isolate.js');
 const ActionValidator   = require('./validator.js');
 const GasTracker         = require('./gas.js');
-const { AsyncLocalStorage } = require('async_hooks');
 // Consensus wall-clock budget per execution (see consensus-wall-clock.js). The
 // per-node limits.maxCpuTimeMs binds ungated executions only.
 const { resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
@@ -41,56 +40,16 @@ const lintAndMeteringMethods = require('./index/lint_and_metering.js');
 const gatewayInjectionMethods = require('./index/gateway_injection.js');
 const errorResultMethods = require('./index/error_results.js');
 const manifestMethods = require('./index/manifest.js');
-const sandbox = require('./sandbox.js');
-const stripGlobals = sandbox.stripGlobals;
-const executeBigIntSurfaceStrip = new AsyncLocalStorage();
-sandbox.stripGlobals = function stripGlobalsWithHeightGate(isolate, context, opts) {
-    const stripWasm = !!(opts && opts.stripWasm);
-    const stripBigIntSurface = executeBigIntSurfaceStrip.getStore() === true;
-    const gateScripts = [];
-    if (stripWasm) gateScripts.push(`
-        try { delete globalThis.WebAssembly; } catch(e) {}
-        try { globalThis.WebAssembly = undefined; } catch(e) {}
-    `);
-    if (stripBigIntSurface) gateScripts.push(`
-        var globalNames = ${JSON.stringify(sandbox.BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES)};
-        for (var g = 0; g < globalNames.length; g++) {
-            try { delete globalThis[globalNames[g]]; } catch(e) {}
-            try { globalThis[globalNames[g]] = undefined; } catch(e) {}
-        }
-        var protoMethods = ${JSON.stringify(sandbox.BIGINT_SURFACE_STRIPPED_PROTO_METHODS)};
-        var protos = { DataView: DataView.prototype, BigInt: BigInt.prototype };
-        for (var i = 0; i < protoMethods.length; i++) {
-            var proto = protos[protoMethods[i].proto];
-            if (!proto) throw new Error('BIGINT_SURFACE_STRIPPED_PROTO_METHODS: unmapped proto ' + protoMethods[i].proto);
-            Object.defineProperty(proto, protoMethods[i].method,
-                { value: undefined, writable: false, configurable: false });
-        }
-        var ctorTargets = ${JSON.stringify(sandbox.BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS)};
-        for (var j = 0; j < ctorTargets.length; j++) {
-            var ctorProto = protos[ctorTargets[j]];
-            if (!ctorProto) throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: unmapped proto ' + ctorTargets[j]);
-            Object.defineProperty(ctorProto, 'constructor',
-                { value: undefined, writable: false, configurable: false });
-        }
-    `);
-    if (gateScripts.length) {
-        const script = isolate.compileScriptSync('(function() {' + gateScripts.join('') + '})();');
-        script.runSync(context);
-    }
-    return stripGlobals(isolate, context, {
-        ...opts,
-        stripWasm: false,
-        stripBigIntSurface,
-    });
-};
 const executeMethods = require('./index/runtime/execute.js');
-sandbox.stripGlobals = stripGlobals;
 const classifyErrorMethods = require('./index/runtime/classify_error.js');
 const { resolveLimits } = require('./index/runtime/limits_defaults.js');
 const { initCaches } = require('./index/runtime/vm_caches.js');
 const { assertExecutionMode } = require('./index/runtime/execution_mode.js');
-const { isConsensusWallClockActive } = require('./index/runtime/activations.js');
+const {
+    isConsensusWallClockActive,
+    BIGINT_SURFACE_STRIP_ACTIVATION,
+    isBigIntSurfaceStripActive,
+} = require('./index/runtime/activations.js');
 const { attachStatics } = require('./index/runtime/public_exports.js');
 const { setTimeoutLog } = require('./index/runtime/timeout_log.js');
 const {
@@ -101,11 +60,6 @@ const {
     LINT_DESTRUCTURE_ACTIVATION,
     isLintDestructureActive,
 } = require('./index/lint_destructure_heights.js');
-const {
-    BIGINT_SURFACE_STRIP_ACTIVATION,
-    isBigIntSurfaceStripActive,
-} = require('./index/bigint_surface_strip_heights.js');
-
 const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
 const EXECUTE_LINT_DESTRUCTURE = '_executeLintDestructure';
 const executeWithHeightLintGates = executeMethods.execute;
@@ -119,10 +73,7 @@ executeMethods.execute = function execute(opts) {
     this[EXECUTE_LINT_BANNED_WITH] = isLintBannedWithActive(opts && opts.network, coin, height);
     this[EXECUTE_LINT_DESTRUCTURE] = isLintDestructureActive(opts && opts.network, coin, height);
     try {
-        const stripBigIntSurface = isBigIntSurfaceStripActive(
-            opts && opts.network, coin, height);
-        return executeBigIntSurfaceStrip.run(stripBigIntSurface,
-            () => executeWithHeightLintGates.call(this, opts));
+        return executeWithHeightLintGates.call(this, opts);
     } finally {
         if (hadBannedWith) this[EXECUTE_LINT_BANNED_WITH] = previousBannedWith;
         else delete this[EXECUTE_LINT_BANNED_WITH];
