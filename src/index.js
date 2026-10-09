@@ -45,7 +45,11 @@ const classifyErrorMethods = require('./index/runtime/classify_error.js');
 const { resolveLimits } = require('./index/runtime/limits_defaults.js');
 const { initCaches } = require('./index/runtime/vm_caches.js');
 const { assertExecutionMode } = require('./index/runtime/execution_mode.js');
-const { isConsensusWallClockActive } = require('./index/runtime/activations.js');
+const {
+    isConsensusWallClockActive,
+    BIGINT_SURFACE_STRIP_ACTIVATION,
+    isBigIntSurfaceStripActive,
+} = require('./index/runtime/activations.js');
 const { attachStatics } = require('./index/runtime/public_exports.js');
 const { setTimeoutLog } = require('./index/runtime/timeout_log.js');
 const {
@@ -56,11 +60,6 @@ const {
     LINT_DESTRUCTURE_ACTIVATION,
     isLintDestructureActive,
 } = require('./index/lint_destructure_heights.js');
-const {
-    BIGINT_SURFACE_STRIP_ACTIVATION,
-    isBigIntSurfaceStripActive,
-} = require('./index/bigint_surface_strip_heights.js');
-
 const EXECUTE_LINT_BANNED_WITH = '_executeLintBannedWith';
 const EXECUTE_LINT_DESTRUCTURE = '_executeLintDestructure';
 const executeWithHeightLintGates = executeMethods.execute;

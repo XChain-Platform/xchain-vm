@@ -734,7 +734,8 @@
       "constructor limits back-fill (bac14514) leaves the no-limits default object unchanged",
       "constructor limits back-fill (bac14514) preserves caller-supplied values (no clobbering)"
     ],
-    "1e210466e6f01f69": [
+    "13e7d3f1f37cb555": [
+      "BigInt native surface strip: gated sets accepts the independently injected BigInt flag without enabling WebAssembly",
       "BigInt native surface strip: gated sets adds the two globals when the host-injected Pkg 3 flag is true",
       "BigInt native surface strip: gated sets freezes the exact gated surface sets",
       "BigInt native surface strip: gated sets keeps the BigInt prototype neuters out of the pre-activation script",
@@ -1392,12 +1393,19 @@
       "destructure lint threading partitions the verdict cache independently from banned-with and forwards the exact boolean",
       "destructure lint threading simulator deploy lint resolves the configured network and coin",
       "destructure lint threading validateSyntax defaults the lint-core destructure option on and forwards explicit values"
+    ],
+    "c715f5204c8902d3": [
+      "BigInt surface strip execute threading isolates armed and unarmed decisions across parallel executions",
+      "BigInt surface strip execute threading matches the pinned companion SDK commit byte for byte",
+      "BigInt surface strip execute threading passes the unarmed map decision beside Package 3 compatibility",
+      "BigInt surface strip execute threading strips the surface on regtest from genesis",
+      "BigInt surface strip execute threading uses the deploy context for manifest execution"
     ]
   },
   "scripts": {
     "test": {
-      "fileCount": 64,
-      "titleCount": 1265,
+      "fileCount": 65,
+      "titleCount": 1271,
       "files": {
         "test/preflight.test.js": "fb6efc086e3c1f29",
         "test/toolkit/authoring.test.js": "9c8fdc73580226fe",
@@ -1450,8 +1458,9 @@
         "test/unit/read-manifest.test.js": "6fd03d7e8ef88554",
         "test/unit/readonly-accessors.test.js": "040ba6bc59c4375f",
         "test/unit/sandbox.test.js": "9a6638760ddfe268",
-        "test/unit/sandbox/bigint_surface_strip.test.js": "1e210466e6f01f69",
+        "test/unit/sandbox/bigint_surface_strip.test.js": "13e7d3f1f37cb555",
         "test/unit/sandbox/bigint_surface_strip_heights.test.js": "39e57d4b7dbf2f07",
+        "test/unit/sandbox/bigint_surface_strip_threading.test.js": "c715f5204c8902d3",
         "test/unit/scripts-mutation-report.test.js": "b3d7c9ed4f762088",
         "test/unit/security/configuration/dependency-advisories.test.js": "0f2abe37f99c5a17",
         "test/unit/sibling-coverage.test.js": "d8d1e52267ea606f",

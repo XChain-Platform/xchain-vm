@@ -91,6 +91,12 @@ describe('BigInt native surface strip: gated sets', function () {
             ['BigInt64Array', 'BigUint64Array']);
     });
 
+    it('accepts the independently injected BigInt flag without enabling WebAssembly', function () {
+        assert.deepStrictEqual(bigintDeletionList({ stripBigIntSurface: true }),
+            ['BigInt64Array', 'BigUint64Array']);
+        assert.ok(!deletionList({ stripBigIntSurface: true }).includes('WebAssembly'));
+    });
+
     it('keeps the BigInt prototype neuters out of the pre-activation script', function () {
         const source = captureScript({ stripWasm: false });
         assert.ok(!source.includes('BIGINT_SURFACE_STRIPPED_PROTO_METHODS'));
