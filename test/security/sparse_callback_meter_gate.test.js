@@ -35,6 +35,20 @@ const METHODS = [
     ['reduceRight', 'function(a,v){return a+v;},0'],
     ['some', 'function(){return false;}'],
 ];
+const FAILED_PROBE_RECEIVERS = [
+    ['non-configurable accessor',
+        `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
+        a=Object.freeze({get length(){reads++;return size;}});`,
+        [1, 1]],
+    ['non-extensible inherited accessor',
+        `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
+        p={get length(){reads++;return size;}},a=Object.preventExtensions(Object.create(p));`,
+        [1, 1]],
+    ['non-configurable object value',
+        `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
+        a=Object.freeze({length:size});`,
+        [0, 1]],
+];
 
 // eslint-disable-next-line camelcase
 async function sparse_callback_methods_are_charged_after_the_call(run, receiver) {
@@ -99,35 +113,25 @@ function registerNetworkCases(run) {
     });
 }
 
+async function verifyFailedProbeCases(run) {
+    for (const [receiver, setup, expected] of FAILED_PROBE_RECEIVERS) {
+        for (const [method, args] of METHODS) {
+            const body = `${setup}var result=Array.prototype.${method}.call(a,${args});
+                return [reads,coercions,Array.isArray(result)?result.length:result];`;
+            const armed = await run(body, 'regtest');
+            const unarmed = await run(body, 'mainnet');
+            assert.strictEqual(armed.success, false, `${receiver} ${method}`);
+            assert.match(armed.error, /^out_of_gas:/, `${receiver} ${method}: ${armed.error}`);
+            assert.strictEqual(unarmed.success, true, `${receiver} ${method}: ${unarmed.error}`);
+            assert.deepStrictEqual(JSON.parse(unarmed.returnValue).slice(0, 2), expected,
+                `${receiver} ${method}`);
+        }
+    }
+}
+
 function registerFailedProbeCases(run) {
     it('fails closed when the temporary length probe cannot be installed', async function () {
-        const receivers = [
-            ['non-configurable accessor',
-                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
-                a=Object.freeze({get length(){reads++;return size;}});`,
-                [1, 1]],
-            ['non-extensible inherited accessor',
-                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
-                p={get length(){reads++;return size;}},a=Object.preventExtensions(Object.create(p));`,
-                [1, 1]],
-            ['non-configurable object value',
-                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
-                a=Object.freeze({length:size});`,
-                [0, 1]],
-        ];
-        for (const [receiver, setup, expected] of receivers) {
-            for (const [method, args] of METHODS) {
-                const body = `${setup}var result=Array.prototype.${method}.call(a,${args});
-                    return [reads,coercions,Array.isArray(result)?result.length:result];`;
-                const armed = await run(body, 'regtest');
-                const unarmed = await run(body, 'mainnet');
-                assert.strictEqual(armed.success, false, `${receiver} ${method}`);
-                assert.match(armed.error, /^out_of_gas:/, `${receiver} ${method}: ${armed.error}`);
-                assert.strictEqual(unarmed.success, true, `${receiver} ${method}: ${unarmed.error}`);
-                assert.deepStrictEqual(JSON.parse(unarmed.returnValue).slice(0, 2), expected,
-                    `${receiver} ${method}`);
-            }
-        }
+        await verifyFailedProbeCases(run);
     });
 
     it('charges a failed accessor probe without an extra read or coercion', function () {
