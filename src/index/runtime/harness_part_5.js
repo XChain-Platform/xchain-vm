@@ -161,7 +161,7 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
                 });
                 installed = true;
             } catch (e) {
-                n = 9007199254740991;
+                return { length: function() { return 0; }, restore: function() {} };
             }
             return { length: function() { return n; }, restore: restore };
         };

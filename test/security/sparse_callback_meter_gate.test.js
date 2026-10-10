@@ -96,6 +96,39 @@ function registerNetworkCases(run) {
     });
 }
 
+function registerFailedProbeCases(run) {
+    it('preserves native results when the temporary length probe cannot be installed', async function () {
+        const receivers = [
+            ['non-configurable accessor',
+                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return 3;}},
+                a=Object.freeze({get length(){reads++;return size;}});`,
+                [1, 1]],
+            ['non-extensible inherited accessor',
+                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return 3;}},
+                p={get length(){reads++;return size;}},a=Object.preventExtensions(Object.create(p));`,
+                [1, 1]],
+            ['non-configurable object value',
+                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return 3;}},
+                a=Object.freeze({length:size});`,
+                [0, 1]],
+        ];
+        for (const [receiver, setup, expected] of receivers) {
+            for (const [method, args] of METHODS) {
+                const body = `${setup}var result=Array.prototype.${method}.call(a,${args});
+                    return [reads,coercions,result];`;
+                const armed = await run(body, 'regtest');
+                const unarmed = await run(body, 'mainnet');
+                assert.strictEqual(armed.success, true, `${receiver} ${method}: ${armed.error}`);
+                assert.strictEqual(unarmed.success, true, `${receiver} ${method}: ${unarmed.error}`);
+                assert.deepStrictEqual(JSON.parse(armed.returnValue).slice(0, 2), expected,
+                    `${receiver} ${method}`);
+                assert.strictEqual(armed.returnValue, unarmed.returnValue,
+                    `${receiver} ${method}`);
+            }
+        }
+    });
+}
+
 function registerActivationCase(run) {
     it('reads and coerces an accessor-backed length only once', async function () {
         for (const [method, args] of METHODS) {
@@ -166,6 +199,7 @@ function sparseCallbackMeteringSuite() {
     });
     registerSparseScanCases(run);
     registerNetworkCases(run);
+    registerFailedProbeCases(run);
     registerActivationCase(run);
 }
 
