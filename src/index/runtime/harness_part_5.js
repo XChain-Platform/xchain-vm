@@ -119,7 +119,7 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
             return n < 9007199254740991 ? Math.floor(n) : 9007199254740991;
         };
         var __sparseLengthProbe = function(receiver) {
-            var n = 0, current = receiver, desc, ownsLength = true, installed = false;
+            var n = 0, current = receiver, desc, ownsLength = true, installed = false, simpleValue;
             if (receiver == null) return { length: function() { return 0; }, restore: function() {} };
             try {
                 while (current != null) {
@@ -132,9 +132,11 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
                 return { length: function() { return 9007199254740991; }, restore: function() {} };
             }
             if (!desc) return { length: function() { return 0; }, restore: function() {} };
-            if (__hasOwn.call(desc, 'value') &&
-                (desc.value == null || (typeof desc.value !== 'object' && typeof desc.value !== 'function'))) {
-                n = __toSparseLength(desc.value);
+            simpleValue = __hasOwn.call(desc, 'value') &&
+                (desc.value == null || (typeof desc.value !== 'object' && typeof desc.value !== 'function'));
+            if (simpleValue && ownsLength && desc.configurable === false) {
+                try { n = __toSparseLength(receiver.length); }
+                catch (e) { n = 9007199254740991; }
                 return { length: function() { return n; }, restore: function() {} };
             }
             if (!__hasOwn.call(desc, 'value') && typeof desc.get !== 'function') {
@@ -161,9 +163,17 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
                 });
                 installed = true;
             } catch (e) {
+                if (simpleValue) {
+                    try { n = __toSparseLength(receiver.length); }
+                    catch (e) { n = 9007199254740991; }
+                    return { length: function() { return n; }, restore: function() {} };
+                }
                 return { length: function() { return 0; }, restore: function() {} };
             }
-            return { length: function() { return n; }, restore: restore };
+            return {
+                length: function() { return installed ? 9007199254740991 : n; },
+                restore: restore
+            };
         };
         var __meterSparseCallback = function(name) {
             var orig = Array.prototype[name];
@@ -173,8 +183,9 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
                 try {
                     return orig.apply(this, arguments);
                 } finally {
+                    var n = probe.length();
                     probe.restore();
-                    __allocGas(probe.length());
+                    __allocGas(n);
                 }
             });
         };

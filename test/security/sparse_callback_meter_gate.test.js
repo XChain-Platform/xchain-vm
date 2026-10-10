@@ -16,8 +16,10 @@
 // @ts-nocheck
 
 const assert = require('assert');
+const nodeVM = require('vm');
 const runtime = require('../../src/index.js');
 const { createVM, execute, XChainVM } = require('../fuzz/helpers/harness.js');
+const harnessPart5 = require('../../src/index/runtime/harness_part_5.js');
 
 const K = 100000;
 const WALL_MS = 30000;
@@ -34,6 +36,7 @@ const METHODS = [
     ['some', 'function(){return false;}'],
 ];
 
+// eslint-disable-next-line camelcase
 async function sparse_callback_methods_are_charged_after_the_call(run, receiver) {
     for (const [method, args] of METHODS) {
         const body = `${receiver}Array.prototype.${method}.call(a,${args});return 1;`;
@@ -129,6 +132,57 @@ function registerFailedProbeCases(run) {
     });
 }
 
+function sparseCallbackHarnessFragment() {
+    const start = harnessPart5.indexOf('    if (__applyLengthMeterOn) {');
+    const end = harnessPart5.indexOf('        var __fnProto', start);
+    assert.ok(start >= 0 && end > start, 'sparse callback harness fragment');
+    return harnessPart5.slice(start, end) + '    }\n';
+}
+
+function registerProxyProbeCase() {
+    it('charges the native scan when a Proxy reports a smaller length descriptor', function () {
+        const context = nodeVM.createContext({});
+        const source = `
+            var charged = 0;
+            var __applyLengthMeterOn = true;
+            var __hasOwn = Object.prototype.hasOwnProperty;
+            var __getOwnDesc = Object.getOwnPropertyDescriptor;
+            var __getProto = Object.getPrototypeOf;
+            var __defProp = Object.defineProperty;
+            var __allocGas = function(n) { charged += n; };
+            var __lockMethod = function(o, k, fn) {
+                Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
+            };
+            ${sparseCallbackHarnessFragment()}
+            var K = ${K};
+            var results = [];
+            [true,false].forEach(function(configurable) {
+                charged = 0;
+                var target = {};
+                Object.defineProperty(target,'length',{
+                    value:1,writable:true,enumerable:true,configurable:configurable
+                });
+                var receiver = new Proxy(target, {
+                    getOwnPropertyDescriptor:function(t,k) {
+                        if (k === 'length') return {
+                            value:1,writable:true,enumerable:true,configurable:configurable
+                        };
+                        return Object.getOwnPropertyDescriptor(t,k);
+                    },
+                    get:function(t,k,r) { return k === 'length' ? K : Reflect.get(t,k,r); },
+                    has:function() { return false; }
+                });
+                Array.prototype.some.call(receiver,function(){return false;});
+                results.push([charged,Object.getOwnPropertyDescriptor(target,'length').value]);
+            });`;
+        nodeVM.runInContext(source, context);
+        assert.ok(context.results[0][0] >= Number.MAX_SAFE_INTEGER);
+        assert.ok(context.results[1][0] >= K);
+        assert.deepStrictEqual(Array.from(context.results, (row) => Array.from(row)),
+            [[context.results[0][0], 1], [K, 1]]);
+    });
+}
+
 function registerActivationCase(run) {
     it('reads and coerces an accessor-backed length only once', async function () {
         for (const [method, args] of METHODS) {
@@ -200,6 +254,7 @@ function sparseCallbackMeteringSuite() {
     registerSparseScanCases(run);
     registerNetworkCases(run);
     registerFailedProbeCases(run);
+    registerProxyProbeCase();
     registerActivationCase(run);
 }
 
