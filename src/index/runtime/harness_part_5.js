@@ -154,10 +154,17 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
                 n = __toSparseLength(value);
                 return n;
             };
+            var write = function(value) {
+                n = 9007199254740991;
+                restore();
+                if (!desc || __hasOwn.call(desc, 'value')) receiver.length = value;
+                else desc.set.call(receiver, value);
+            };
             try {
                 __defProp(receiver, 'length', {
                     get: read,
-                    set: !desc || __hasOwn.call(desc, 'value') ? undefined : desc.set,
+                    set: !desc || (__hasOwn.call(desc, 'value') && desc.writable) ||
+                        (!__hasOwn.call(desc, 'value') && typeof desc.set === 'function') ? write : undefined,
                     enumerable: ownsLength && desc.enumerable,
                     configurable: true
                 });

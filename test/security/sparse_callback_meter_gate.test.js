@@ -220,6 +220,45 @@ function registerDescriptorlessProxyProbeCase() {
     });
 }
 
+function registerBypassedProbeWriteCases() {
+    it('preserves callback writes when a Proxy bypasses the temporary length getter', function () {
+        const context = nodeVM.createContext({});
+        const source = `
+            var charged = 0;
+            var __applyLengthMeterOn = true;
+            var __hasOwn = Object.prototype.hasOwnProperty;
+            var __getOwnDesc = Object.getOwnPropertyDescriptor;
+            var __getProto = Object.getPrototypeOf;
+            var __defProp = Object.defineProperty;
+            var __allocGas = function(n) { charged += n; };
+            var __lockMethod = function(o, k, fn) {
+                Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
+            };
+            ${sparseCallbackHarnessFragment()}
+            var run = function(inherited) {
+                charged = 0;
+                var proto = inherited ? {length:1} : Object.prototype;
+                var target = Object.create(proto);
+                if (!inherited) Object.defineProperty(target,'length',{
+                    value:1,writable:true,configurable:true
+                });
+                target[0] = 3;
+                var receiver = new Proxy(target, {
+                    get:function(t,k,r) { return k === 'length' ? 1 : Reflect.get(t,k,r); }
+                });
+                Array.prototype.forEach.call(receiver,function() { receiver.length = 7; });
+                return [charged,target.length,
+                    Object.prototype.hasOwnProperty.call(target,'length')];
+            };
+            var ownResult = run(false);
+            var inheritedResult = run(true);`;
+        nodeVM.runInContext(source, context);
+        assert.deepStrictEqual(Array.from(context.ownResult), [Number.MAX_SAFE_INTEGER, 7, true]);
+        assert.deepStrictEqual(Array.from(context.inheritedResult),
+            [Number.MAX_SAFE_INTEGER, 7, true]);
+    });
+}
+
 function registerActivationCase(run) {
     it('reads and coerces an accessor-backed length only once', async function () {
         for (const [method, args] of METHODS) {
@@ -293,6 +332,7 @@ function sparseCallbackMeteringSuite() {
     registerFailedProbeCases(run);
     registerProxyProbeCase();
     registerDescriptorlessProxyProbeCase();
+    registerBypassedProbeWriteCases();
     registerActivationCase(run);
 }
 
