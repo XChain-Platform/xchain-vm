@@ -113,6 +113,92 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
         });
     }
     if (__applyLengthMeterOn) {
+        var __toSparseLength = function(v) {
+            var n = +v;
+            if (!(n > 0)) return 0;
+            return n < 9007199254740991 ? Math.floor(n) : 9007199254740991;
+        };
+        var __sparseLengthProbe = function(receiver) {
+            var n = 0, current = receiver, desc, ownsLength = true, installed = false, simpleValue;
+            if (receiver == null) return { length: function() { return 0; }, restore: function() {} };
+            try {
+                while (current != null) {
+                    desc = __getOwnDesc(current, 'length');
+                    if (desc) break;
+                    ownsLength = false;
+                    current = __getProto(current);
+                }
+            } catch (e) {
+                return { length: function() { return 9007199254740991; }, restore: function() {} };
+            }
+            simpleValue = desc && __hasOwn.call(desc, 'value') &&
+                (desc.value == null || (typeof desc.value !== 'object' && typeof desc.value !== 'function'));
+            if (simpleValue && ownsLength && desc.configurable === false) {
+                try { n = __toSparseLength(receiver.length); }
+                catch (e) { n = 9007199254740991; }
+                return { length: function() { return n; }, restore: function() {} };
+            }
+            if (desc && !__hasOwn.call(desc, 'value') && typeof desc.get !== 'function') {
+                return { length: function() { return 0; }, restore: function() {} };
+            }
+            var restore = function() {
+                if (!installed) return;
+                installed = false;
+                if (ownsLength) __defProp(receiver, 'length', desc);
+                else delete receiver.length;
+            };
+            var read = function() {
+                restore();
+                var value = !desc ? undefined :
+                    (__hasOwn.call(desc, 'value') ? desc.value : desc.get.call(receiver));
+                n = __toSparseLength(value);
+                return n;
+            };
+            var write = function(value) {
+                n = 9007199254740991;
+                restore();
+                if (!desc || __hasOwn.call(desc, 'value')) receiver.length = value;
+                else desc.set.call(receiver, value);
+            };
+            try {
+                __defProp(receiver, 'length', {
+                    get: read,
+                    set: !desc || (__hasOwn.call(desc, 'value') && desc.writable) ||
+                        (!__hasOwn.call(desc, 'value') && typeof desc.set === 'function') ? write : undefined,
+                    enumerable: ownsLength && desc.enumerable,
+                    configurable: true
+                });
+                installed = true;
+            } catch (e) {
+                if (simpleValue) {
+                    try { n = __toSparseLength(receiver.length); }
+                    catch (e) { n = 9007199254740991; }
+                    return { length: function() { return n; }, restore: function() {} };
+                }
+                return { length: function() { return 9007199254740991; }, restore: function() {} };
+            }
+            return {
+                length: function() { return installed ? 9007199254740991 : n; },
+                restore: restore
+            };
+        };
+        var __meterSparseCallback = function(name) {
+            var orig = Array.prototype[name];
+            if (typeof orig !== 'function') return;
+            __lockMethod(Array.prototype, name, function() {
+                var probe = __sparseLengthProbe(this);
+                try {
+                    return orig.apply(this, arguments);
+                } finally {
+                    var n = probe.length();
+                    try { probe.restore(); }
+                    finally { __allocGas(n); }
+                }
+            });
+        };
+        ['every', 'filter', 'flatMap', 'forEach', 'map', 'reduce',
+         'reduceRight', 'some'].forEach(__meterSparseCallback);
+
         var __fnProto = Object.getPrototypeOf(function() {});
         var __applyNative = __fnProto.call.bind(__fnProto.apply);
         __lockMethod(__fnProto, 'apply', function(thisArg, args) {

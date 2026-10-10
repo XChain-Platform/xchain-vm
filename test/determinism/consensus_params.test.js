@@ -72,7 +72,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
-    it('APPLY_LENGTH_METER_ACTIVATION is sealed and unarmed outside regtest', function () {
+    it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work and is unarmed outside regtest', function () {
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
             { mainnet: null, testnet: null, regtest: 0 });
         assert.ok(Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
