@@ -131,15 +131,14 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
             } catch (e) {
                 return { length: function() { return 9007199254740991; }, restore: function() {} };
             }
-            if (!desc) return { length: function() { return 0; }, restore: function() {} };
-            simpleValue = __hasOwn.call(desc, 'value') &&
+            simpleValue = desc && __hasOwn.call(desc, 'value') &&
                 (desc.value == null || (typeof desc.value !== 'object' && typeof desc.value !== 'function'));
             if (simpleValue && ownsLength && desc.configurable === false) {
                 try { n = __toSparseLength(receiver.length); }
                 catch (e) { n = 9007199254740991; }
                 return { length: function() { return n; }, restore: function() {} };
             }
-            if (!__hasOwn.call(desc, 'value') && typeof desc.get !== 'function') {
+            if (desc && !__hasOwn.call(desc, 'value') && typeof desc.get !== 'function') {
                 return { length: function() { return 0; }, restore: function() {} };
             }
             var restore = function() {
@@ -150,14 +149,15 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
             };
             var read = function() {
                 restore();
-                var value = __hasOwn.call(desc, 'value') ? desc.value : desc.get.call(receiver);
+                var value = !desc ? undefined :
+                    (__hasOwn.call(desc, 'value') ? desc.value : desc.get.call(receiver));
                 n = __toSparseLength(value);
                 return n;
             };
             try {
                 __defProp(receiver, 'length', {
                     get: read,
-                    set: __hasOwn.call(desc, 'value') ? undefined : desc.set,
+                    set: !desc || __hasOwn.call(desc, 'value') ? undefined : desc.set,
                     enumerable: ownsLength && desc.enumerable,
                     configurable: true
                 });

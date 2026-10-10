@@ -183,6 +183,43 @@ function registerProxyProbeCase() {
     });
 }
 
+function registerDescriptorlessProxyProbeCase() {
+    it('charges a virtual Proxy length with no reported descriptor', function () {
+        const context = nodeVM.createContext({});
+        const source = `
+            var charged = 0;
+            var __applyLengthMeterOn = true;
+            var __hasOwn = Object.prototype.hasOwnProperty;
+            var __getOwnDesc = Object.getOwnPropertyDescriptor;
+            var __getProto = Object.getPrototypeOf;
+            var __defProp = Object.defineProperty;
+            var __allocGas = function(n) { charged += n; };
+            var __lockMethod = function(o, k, fn) {
+                Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
+            };
+            ${sparseCallbackHarnessFragment()}
+            var K = ${K};
+            var plain = {};
+            Array.prototype.some.call(plain,function(){return false;});
+            var plainResult = [charged,Object.prototype.hasOwnProperty.call(plain,'length')];
+            charged = 0;
+            var target = {};
+            var receiver = new Proxy(target, {
+                getOwnPropertyDescriptor:function(t,k) {
+                    if (k === 'length') return undefined;
+                    return Object.getOwnPropertyDescriptor(t,k);
+                },
+                get:function(t,k,r) { return k === 'length' ? K : Reflect.get(t,k,r); },
+                has:function() { return false; }
+            });
+            Array.prototype.some.call(receiver,function(){return false;});
+            var result = [charged,Object.prototype.hasOwnProperty.call(target,'length')];`;
+        nodeVM.runInContext(source, context);
+        assert.deepStrictEqual(Array.from(context.plainResult), [0, false]);
+        assert.deepStrictEqual(Array.from(context.result), [Number.MAX_SAFE_INTEGER, false]);
+    });
+}
+
 function registerActivationCase(run) {
     it('reads and coerces an accessor-backed length only once', async function () {
         for (const [method, args] of METHODS) {
@@ -255,6 +292,7 @@ function sparseCallbackMeteringSuite() {
     registerNetworkCases(run);
     registerFailedProbeCases(run);
     registerProxyProbeCase();
+    registerDescriptorlessProxyProbeCase();
     registerActivationCase(run);
 }
 
