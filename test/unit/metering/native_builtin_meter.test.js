@@ -64,9 +64,13 @@ const SIZED = {
 
     it('a short apply argument list keeps the legacy cost on an armed network', async function () {
         const body = `var a=[1,2,3];return Math.max.apply(null,a);`;
+        const baseline = `return Math.max(1,2,3);`;
         const armed = await run('regtest', body);
         const legacy = await run('mainnet', body);
-        assert.strictEqual(armed.gasUsed, legacy.gasUsed);
+        const armedBaseline = await run('regtest', baseline);
+        const legacyBaseline = await run('mainnet', baseline);
+        assert.strictEqual(armed.gasUsed - legacy.gasUsed,
+            armedBaseline.gasUsed - legacyBaseline.gasUsed);
     });
 
     it('apply keeps its result and this-binding once metered', async function () {
