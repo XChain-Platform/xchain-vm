@@ -100,35 +100,69 @@ function registerNetworkCases(run) {
 }
 
 function registerFailedProbeCases(run) {
-    it('preserves native results when the temporary length probe cannot be installed', async function () {
+    it('fails closed when the temporary length probe cannot be installed', async function () {
         const receivers = [
             ['non-configurable accessor',
-                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return 3;}},
+                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
                 a=Object.freeze({get length(){reads++;return size;}});`,
                 [1, 1]],
             ['non-extensible inherited accessor',
-                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return 3;}},
+                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
                 p={get length(){reads++;return size;}},a=Object.preventExtensions(Object.create(p));`,
                 [1, 1]],
             ['non-configurable object value',
-                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return 3;}},
+                `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
                 a=Object.freeze({length:size});`,
                 [0, 1]],
         ];
         for (const [receiver, setup, expected] of receivers) {
             for (const [method, args] of METHODS) {
                 const body = `${setup}var result=Array.prototype.${method}.call(a,${args});
-                    return [reads,coercions,result];`;
+                    return [reads,coercions,Array.isArray(result)?result.length:result];`;
                 const armed = await run(body, 'regtest');
                 const unarmed = await run(body, 'mainnet');
-                assert.strictEqual(armed.success, true, `${receiver} ${method}: ${armed.error}`);
+                assert.strictEqual(armed.success, false, `${receiver} ${method}`);
+                assert.match(armed.error, /^out_of_gas:/, `${receiver} ${method}: ${armed.error}`);
                 assert.strictEqual(unarmed.success, true, `${receiver} ${method}: ${unarmed.error}`);
-                assert.deepStrictEqual(JSON.parse(armed.returnValue).slice(0, 2), expected,
-                    `${receiver} ${method}`);
-                assert.strictEqual(armed.returnValue, unarmed.returnValue,
+                assert.deepStrictEqual(JSON.parse(unarmed.returnValue).slice(0, 2), expected,
                     `${receiver} ${method}`);
             }
         }
+    });
+
+    it('charges a failed accessor probe without an extra read or coercion', function () {
+        const context = nodeVM.createContext({});
+        const source = `
+            var charged = 0;
+            var __applyLengthMeterOn = true;
+            var __hasOwn = Object.prototype.hasOwnProperty;
+            var __getOwnDesc = Object.getOwnPropertyDescriptor;
+            var __getProto = Object.getPrototypeOf;
+            var __defProp = Object.defineProperty;
+            var __allocGas = function(n) { charged += n; };
+            var __lockMethod = function(o, k, fn) {
+                Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
+            };
+            ${sparseCallbackHarnessFragment()}
+            var K = ${K};
+            var run = function(inherited) {
+                charged = 0;
+                var reads = 0, coercions = 0;
+                var size = {valueOf:function(){coercions++;return K;}};
+                var proto = {get length(){reads++;return size;}};
+                var receiver = inherited ? Object.preventExtensions(Object.create(proto)) : {};
+                if (!inherited) Object.defineProperty(receiver,'length',{
+                    get:function(){reads++;return size;},configurable:false
+                });
+                Array.prototype.forEach.call(receiver,function(){});
+                return [charged,reads,coercions];
+            };
+            var ownResult = run(false);
+            var inheritedResult = run(true);`;
+        nodeVM.runInContext(source, context);
+        assert.deepStrictEqual(Array.from(context.ownResult), [Number.MAX_SAFE_INTEGER, 1, 1]);
+        assert.deepStrictEqual(Array.from(context.inheritedResult),
+            [Number.MAX_SAFE_INTEGER, 1, 1]);
     });
 }
 
