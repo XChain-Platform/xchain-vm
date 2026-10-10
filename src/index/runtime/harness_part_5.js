@@ -113,15 +113,68 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
         });
     }
     if (__applyLengthMeterOn) {
+        var __toSparseLength = function(v) {
+            var n = +v;
+            if (!(n > 0)) return 0;
+            return n < 9007199254740991 ? Math.floor(n) : 9007199254740991;
+        };
+        var __sparseLengthProbe = function(receiver) {
+            var n = 0, current = receiver, desc, ownsLength = true, installed = false;
+            if (receiver == null) return { length: function() { return 0; }, restore: function() {} };
+            try {
+                while (current != null) {
+                    desc = __getOwnDesc(current, 'length');
+                    if (desc) break;
+                    ownsLength = false;
+                    current = __getProto(current);
+                }
+            } catch (e) {
+                return { length: function() { return 9007199254740991; }, restore: function() {} };
+            }
+            if (!desc) return { length: function() { return 0; }, restore: function() {} };
+            if (__hasOwn.call(desc, 'value') &&
+                (desc.value == null || (typeof desc.value !== 'object' && typeof desc.value !== 'function'))) {
+                n = __toSparseLength(desc.value);
+                return { length: function() { return n; }, restore: function() {} };
+            }
+            if (!__hasOwn.call(desc, 'value') && typeof desc.get !== 'function') {
+                return { length: function() { return 0; }, restore: function() {} };
+            }
+            var restore = function() {
+                if (!installed) return;
+                installed = false;
+                if (ownsLength) __defProp(receiver, 'length', desc);
+                else delete receiver.length;
+            };
+            var read = function() {
+                restore();
+                var value = __hasOwn.call(desc, 'value') ? desc.value : desc.get.call(receiver);
+                n = __toSparseLength(value);
+                return n;
+            };
+            try {
+                __defProp(receiver, 'length', {
+                    get: read,
+                    set: __hasOwn.call(desc, 'value') ? undefined : desc.set,
+                    enumerable: ownsLength && desc.enumerable,
+                    configurable: true
+                });
+                installed = true;
+            } catch (e) {
+                n = 9007199254740991;
+            }
+            return { length: function() { return n; }, restore: restore };
+        };
         var __meterSparseCallback = function(name) {
             var orig = Array.prototype[name];
             if (typeof orig !== 'function') return;
             __lockMethod(Array.prototype, name, function() {
-                var n = (this == null ? 0 : this.length);
+                var probe = __sparseLengthProbe(this);
                 try {
                     return orig.apply(this, arguments);
                 } finally {
-                    __allocGas(n);
+                    probe.restore();
+                    __allocGas(probe.length());
                 }
             });
         };

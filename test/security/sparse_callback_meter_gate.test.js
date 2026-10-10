@@ -97,6 +97,33 @@ function registerNetworkCases(run) {
 }
 
 function registerActivationCase(run) {
+    it('reads and coerces an accessor-backed length only once', async function () {
+        for (const [method, args] of METHODS) {
+            const body = `var reads=0,coercions=0,size={valueOf:function(){coercions++;return ${K};}},
+                a={get length(){reads++;return size;}};
+                Array.prototype.${method}.call(a,${args});return [reads,coercions];`;
+            const armed = await run(body, 'regtest');
+            const unarmed = await run(body, 'mainnet');
+            assert.strictEqual(armed.success, true, `${method}: ${armed.error}`);
+            assert.strictEqual(unarmed.success, true, `${method}: ${unarmed.error}`);
+            assert.deepStrictEqual(JSON.parse(armed.returnValue), [1, 1], method);
+            assert.strictEqual(armed.returnValue, unarmed.returnValue, method);
+            assert.ok(armed.gasUsed >= unarmed.gasUsed + K - 10,
+                `${method}: ${armed.gasUsed} vs ${unarmed.gasUsed}`);
+        }
+    });
+
+    it('restores the length accessor before callbacks run', async function () {
+        const body = `var reads=0,a={0:7,get length(){reads++;return 1;}};
+            var value=Array.prototype.map.call(a,function(v){return [v,a.length,reads];})[0];
+            return [reads,value];`;
+        const armed = await run(body, 'regtest');
+        const unarmed = await run(body, 'mainnet');
+        assert.strictEqual(armed.success, true, armed.error);
+        assert.deepStrictEqual(JSON.parse(armed.returnValue), [2, [7, 1, 2]]);
+        assert.strictEqual(armed.returnValue, unarmed.returnValue);
+    });
+
     it('uses the apply-length activation without changing native results', async function () {
         const body = `var a=new Array(4);a[2]=7;return [
             a.map(function(v){return v+1;}).join(','),
