@@ -191,8 +191,8 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
                     return orig.apply(this, arguments);
                 } finally {
                     var n = probe.length();
-                    probe.restore();
-                    __allocGas(n);
+                    try { probe.restore(); }
+                    finally { __allocGas(n); }
                 }
             });
         };

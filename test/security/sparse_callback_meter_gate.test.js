@@ -297,6 +297,27 @@ function registerBypassedProbeWriteCases() {
     });
 }
 
+function registerThrowingRestoreCase() {
+    it('charges when a Proxy throws while restoring the temporary length probe', function () {
+        const context = nodeVM.createContext({}), source = `
+            var charged=0,__applyLengthMeterOn=true,__hasOwn=Object.prototype.hasOwnProperty,
+                __getOwnDesc=Object.getOwnPropertyDescriptor,__getProto=Object.getPrototypeOf,
+                __defProp=Object.defineProperty,__allocGas=function(n){charged+=n;};
+            var __lockMethod=function(o,k,fn){Object.defineProperty(o,k,
+                {value:fn,writable:false,configurable:false});};
+            ${sparseCallbackHarnessFragment()}
+            var definitions=0,target={length:${K}},receiver=new Proxy(target, {
+                get:function(t,k,r) { return k === 'length' ? ${K} : Reflect.get(t,k,r); },
+                has:function(){return false;}, defineProperty:function(t,k,d) {definitions++;
+                    if(definitions>1)throw new Error('restore blocked');return Reflect.defineProperty(t,k,d);}
+            }),error;
+            try{Array.prototype.forEach.call(receiver,function(){});}catch(e){error=e.message;}`;
+        nodeVM.runInContext(source, context);
+        assert.deepStrictEqual([context.error,context.definitions,context.charged],
+            ['restore blocked',2,Number.MAX_SAFE_INTEGER]);
+    });
+}
+
 function registerActivationCase(run) {
     it('reads and coerces an accessor-backed length only once', async function () {
         for (const [method, args] of METHODS) {
@@ -371,6 +392,7 @@ function sparseCallbackMeteringSuite() {
     registerProxyProbeCase();
     registerDescriptorlessProxyProbeCase();
     registerBypassedProbeWriteCases();
+    registerThrowingRestoreCase();
     registerActivationCase(run);
 }
 
