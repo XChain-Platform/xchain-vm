@@ -108,9 +108,7 @@ module.exports = {
 
 });
 
-(ContractSimulator ? describe : describe.skip)('Toolkit ContractSimulator', function() {
-    this.timeout(30000);
-
+function registerEmitAndBlockTests() {
     it('captures emitted actions without applying them to the ledger', async function() {
         const sim = new ContractSimulator({ coin: 'BTC' });
         try {
@@ -137,7 +135,9 @@ module.exports = {
             assert.strictEqual(JSON.parse(r2.returnValue), '2');
         } finally { await sim.close(); }
     });
+}
 
+function registerMainnetDeployVerdictTest() {
     it('reports the mainnet deploy verdict and rejects banned syntax again at call time', async function() {
         // This gate is what surfaces a chain-rejected source at DEPLOY, where the
         // author sees it. The 2026-09-09 ruling armed EXEC_LINT_ACTIVATION on mainnet,
@@ -170,7 +170,12 @@ module.exports = {
             assert.strictEqual(gateWarnings.length, 1, JSON.stringify(warned));
         } finally { console.warn = real; await sim.close(); }
     });
+}
 
+(ContractSimulator ? describe : describe.skip)('Toolkit ContractSimulator', function() {
+    this.timeout(30000);
+    registerEmitAndBlockTests();
+    registerMainnetDeployVerdictTest();
 });
 
 (ContractSimulator ? describe : describe.skip)('Toolkit ContractSimulator', function() {
