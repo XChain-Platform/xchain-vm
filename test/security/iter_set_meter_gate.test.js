@@ -109,17 +109,22 @@ function registerSwallowedExhaustionTest() {
         }
     });
 
-    it('mainnet, testnet and unknown networks are unarmed: a single call costs the legacy flat charge', async function () {
+    it('mainnet, unknown and pre-arm testnet blocks are unarmed: a single call costs the legacy flat charge', async function () {
         const body = `${ARR}a.values().toArray();return 1;`;
         const armed = await on(body);
+        // One second before the armed testnet instant still runs the legacy rule.
+        const early = { ...LATE, timestamp: XChainVM.ITER_SET_METER_ACTIVATION.testnet - 1 };
         const gas = {};
         for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-            const r = await execute(vm, wrap(body), { method: 'default', network, blockContext: LATE });
+            const blockContext = network === 'testnet' ? early : LATE;
+            const r = await execute(vm, wrap(body), { method: 'default', network, blockContext });
             gas[String(network)] = r.gasUsed;
             assert.ok(armed.gasUsed >= r.gasUsed + K - 10, String(network));
         }
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
+        const armedTestnet = await execute(vm, wrap(body), { method: 'default', network: 'testnet', blockContext: LATE });
+        assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed, 'testnet past its armed instant meters like regtest');
     });
 
     it('ArrayBuffer resize, transfer and transferToFixedLength are charged by byte length', async function () {

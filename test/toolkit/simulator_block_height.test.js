@@ -45,9 +45,11 @@ const assert = require('assert');
 
 let ContractSimulator = null;
 let XChainVM = null;
+let HEIGHT_GATES = null;
 try {
     ({ ContractSimulator } = require('../../src/toolkit/simulator.js'));
     XChainVM = require('../../src/index.js');
+    ({ HEIGHT_GATES } = require('../../src/toolkit/simulator/constants.js'));
 } catch (e) {
     console.log('Skipping simulator block-height tests (isolated-vm unavailable):', e.message);
 }
@@ -93,9 +95,13 @@ function heightWarnings(lines) {
         }
     });
 
-    it('leaves regtest and an explicit height alone, and starts testnet at its v0.21.3 optional-chain height', function () {
+    it('leaves regtest and an explicit height alone, and starts testnet at its highest armed gate height', function () {
+        // Read off the exported maps: the newest armed BTC:testnet threshold any height gate carries.
+        const testnetArmed = Math.max(...HEIGHT_GATES.map((g) => XChainVM[g.map]['BTC:testnet'])
+            .filter((t) => Number.isFinite(t)));
+        assert.ok(testnetArmed > 1, 'no height gate is armed on BTC:testnet');
         assert.strictEqual(new ContractSimulator().block.height, 1);
-        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, 155001);
+        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, testnetArmed);
         assert.strictEqual(new ContractSimulator().block.hash, 'sim_block_0000000000000001');
         const pinned = new ContractSimulator({ network: 'mainnet', block: { height: 7 } });
         assert.strictEqual(pinned.block.height, 7);

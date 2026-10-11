@@ -13,7 +13,7 @@
 
 const APPLY_LENGTH_METER_ACTIVATION = Object.seal({
     mainnet: null,
-    testnet: null,
+    testnet: 1791804379,
     regtest: 0,
 });
 

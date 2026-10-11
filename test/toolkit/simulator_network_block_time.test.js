@@ -54,6 +54,17 @@ const isTimeMap = (v) => {
         keys.some((n) => Number.isFinite(v[n]) && v[n] >= 1e9);
 };
 
+// Every export name, own or inherited: the apply-length meter sits on an object under
+// the class rather than as an own static, and Object.keys never sees it.
+function exportedNames() {
+    const names = new Set();
+    for (let o = XChainVM; o && o !== Function.prototype && o !== Object.prototype;
+        o = Object.getPrototypeOf(o)) {
+        Object.getOwnPropertyNames(o).forEach((k) => names.add(k));
+    }
+    return [...names];
+}
+
 // A toJSON hook that hands the serializer a spine one level past the depth guard:
 // with the hook gate ON it faults out_of_stack, with it OFF it serializes.
 const HOOK_SPINE = (depth) => `module.exports = {
@@ -82,9 +93,10 @@ async function runQuiet(opts, src, method) {
 
     it('lists every VM network-keyed block-time map in TIME_NETWORK_GATES', function () {
         // GasTracker statics are scanned too, since the entry deliberately does not re-export them.
-        const timeMaps = Object.keys(XChainVM).filter((k) => isTimeMap(XChainVM[k])).concat(
+        const timeMaps = exportedNames().filter((k) => isTimeMap(XChainVM[k])).concat(
             Object.getOwnPropertyNames(GasTracker).filter((k) => /_ACTIVATION$/.test(k) && isTimeMap(GasTracker[k])));
         assert.ok(timeMaps.includes('JSON_STRINGIFY_HOOK_ACTIVATION'), 'the enumeration found nothing to check');
+        assert.ok(timeMaps.includes('APPLY_LENGTH_METER_ACTIVATION'), 'the inherited apply-length map was not enumerated');
         const named = TIME_NETWORK_GATES.map((g) => g.source);
         for (const k of timeMaps) assert.ok(named.includes(k), k + ' is missing from TIME_NETWORK_GATES');
     });

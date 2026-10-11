@@ -19,9 +19,9 @@ const LINT_BANNED_WITH_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
     'DOGE:mainnet': null,
-    'BTC:testnet':  null,
-    'LTC:testnet':  null,
-    'DOGE:testnet': null,
+    'BTC:testnet':  156230,
+    'LTC:testnet':  4912984,
+    'DOGE:testnet': 67989993,
 });
 
 function resolveBannedWithActive(map, network, coin, blockHeight) {

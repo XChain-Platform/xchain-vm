@@ -32,11 +32,13 @@ describe('BigInt surface strip activation', function () {
         'DOGE:testnet',
     ];
 
-    it('exports a frozen map with six unarmed entries', function () {
+    it('exports a frozen map with mainnet unarmed and every testnet chain armed', function () {
         assert.ok(Object.isFrozen(BIGINT_SURFACE_STRIP_ACTIVATION));
         assert.deepStrictEqual(Object.keys(BIGINT_SURFACE_STRIP_ACTIVATION), expectedKeys);
-        for (const key of expectedKeys) {
-            assert.strictEqual(BIGINT_SURFACE_STRIP_ACTIVATION[key], null);
+        for (const coin of coins) {
+            assert.strictEqual(BIGINT_SURFACE_STRIP_ACTIVATION[`${coin}:mainnet`], null);
+            const armed = BIGINT_SURFACE_STRIP_ACTIVATION[`${coin}:testnet`];
+            assert.ok(Number.isSafeInteger(armed) && armed > 1, `${coin}:testnet armed height`);
         }
     });
 
@@ -51,12 +53,15 @@ describe('BigInt surface strip activation', function () {
             isBigIntSurfaceStripActive);
     });
 
-    it('keeps every mainnet and testnet chain unarmed', function () {
-        for (const network of ['mainnet', 'testnet']) {
-            for (const coin of coins) {
-                assert.strictEqual(isBigIntSurfaceStripActive(network, coin, 0), false);
-                assert.strictEqual(isBigIntSurfaceStripActive(network, coin, 10000000), false);
-            }
+    it('keeps every mainnet chain unarmed and activates each testnet chain at its armed height', function () {
+        for (const coin of coins) {
+            assert.strictEqual(isBigIntSurfaceStripActive('mainnet', coin, 0), false);
+            assert.strictEqual(isBigIntSurfaceStripActive('mainnet', coin, 10000000), false);
+            const armed = BIGINT_SURFACE_STRIP_ACTIVATION[`${coin}:testnet`];
+            assert.strictEqual(isBigIntSurfaceStripActive('testnet', coin, 1), false, coin);
+            assert.strictEqual(isBigIntSurfaceStripActive('testnet', coin, armed - 1), false, coin);
+            assert.strictEqual(isBigIntSurfaceStripActive('testnet', coin, armed), true, coin);
+            assert.strictEqual(isBigIntSurfaceStripActive('testnet', coin, armed + 1), true, coin);
         }
     });
 
