@@ -20,6 +20,7 @@ const path = require('path');
 const sandbox = require('../../../src/sandbox.js');
 const XChainVM = require('../../../src/index.js');
 const identityPin = require('../../../bin/pins/identity.json');
+const { readPinnedSdkFile } = require('../../helpers/pinned_sdk_file.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 
@@ -73,28 +74,6 @@ async function assertParallelIsolation() {
     assert.strictEqual(unarmed.success, true, unarmed.error);
     assert.strictEqual(armed.returnValue, '"undefined"');
     assert.strictEqual(unarmed.returnValue, '"function"');
-}
-
-function readPinnedSdkFile(sdkRoot, commit, sdkPath) {
-    const spec = commit + ':' + sdkPath;
-    const roots = [sdkRoot];
-    try {
-        const origin = childProcess.execFileSync(
-            'git', ['-C', sdkRoot, 'remote', 'get-url', 'origin'], { encoding: 'utf8' }
-        ).trim().replace(/^file:\/\//, '');
-        if (path.isAbsolute(origin)) roots.push(origin);
-    } catch (_) {
-        // no origin remote: the sibling checkout is the only candidate
-    }
-    for (const root of roots) {
-        try {
-            childProcess.execFileSync('git', ['-C', root, 'cat-file', '-e', commit + '^{commit}'], { stdio: 'ignore' });
-        } catch (_) {
-            continue;
-        }
-        return childProcess.execFileSync('git', ['-C', root, 'show', spec]);
-    }
-    return childProcess.execFileSync('git', ['-C', sdkRoot, 'show', spec]);
 }
 
 function assertPinnedSdkVendorParity() {
