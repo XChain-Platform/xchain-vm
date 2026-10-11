@@ -55,12 +55,12 @@ function indexerFlagDayLiterals(sources, name) {
     return found;
 }
 describe('consensus parameters are frozen (track 8 guard)', function () {
-    it('APPLY_LENGTH_METER_ACTIVATION is sealed and unarmed outside regtest', function () {
-        assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION, { mainnet: null, testnet: null, regtest: 0 });
-        assert.ok(Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
-        assert.strictEqual(vm.isApplyLengthMeterActive('regtest', 0), true);
-        for (const network of ['mainnet', 'testnet', 'unknown', undefined])
-            assert.strictEqual(vm.isApplyLengthMeterActive(network, 4102444800), false);
+    it('APPLY_LENGTH_METER_ACTIVATION is sealed, unarmed on mainnet and armed on testnet', function () {
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, late = 4102444800;
+        assert.ok(Number.isSafeInteger(armed) && armed > 1 && Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
+        assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION, { mainnet: null, testnet: armed, regtest: 0 });
+        for (const [network, t, on] of [['regtest', 0, true], ['mainnet', late, false], ['unknown', late, false], [undefined, late, false], ['testnet', 1, false], ['testnet', armed, true]])
+            assert.strictEqual(vm.isApplyLengthMeterActive(network, t), on, `${network}@${t}`);
     });
 });
 describe('consensus parameters are frozen (track 8 guard)', function () {

@@ -86,16 +86,20 @@ function registerGateIsolationTest(run) {
             `${armed.gasUsed} vs ${unarmed.gasUsed}`);
     });
 
-    it('mainnet, testnet and unknown networks retain the legacy flat charge', async function () {
+    it('mainnet, unknown and pre-arm testnet blocks retain the legacy flat charge; armed testnet meters', async function () {
         const body = `${ARR}Math.max.apply(null,a);return 1;`;
+        // One second before the armed testnet instant still runs the legacy rule.
+        const early = { blockContext: { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 } };
         const gas = {};
-        for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-            const r = await run(body, network);
+        for (const [network, extra] of [['mainnet'], ['testnet', early], [undefined], ['unknown']]) {
+            const r = await run(body, network, extra);
             assert.strictEqual(r.success, true, `${network}: ${r.error}`);
             gas[String(network)] = r.gasUsed;
         }
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
+        const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined });
+        assert.ok(armedTestnet.gasUsed >= gas.mainnet + K - 10, `${armedTestnet.gasUsed} vs ${gas.mainnet}`);
     });
 
     registerGateIsolationTest(run);

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-11
+
+### Added
+- Added the iterator, Set and apply metering gate behind an unarmed activation.
+- Added the gas ceiling success gate map and predicate to the module surface.
+- Added the blocking banned-with lint rule, the pre-parse nesting depth lint and the BigInt surface strip, each behind an activation height.
+- Returned contract stake reads as decimal strings across the isolate bridge.
+
+### Changed
+- Raised the VM consensus version from 5 to 7 with refreshed goldens.
+- Published the oracle snapshot age in consensus seconds and gated readonly accessor lookups to own keys.
+
+### Fixed
+- Settled in-flight executions by exit signal and kept the BigInt strip compatible with gas exhaustion.
+- Charged ArrayBuffer resize and transfer by byte length under the apply meter gate.
+
 ## [0.21.3] - 2026-10-03
 
 ### Changed

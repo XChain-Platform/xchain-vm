@@ -128,11 +128,15 @@ describe('destructure lint threading', function () {
 
 describe('destructure lint threading', function () {
     it('simulator deploy lint resolves the configured network and coin', function () {
-        for (const [network, expected] of [['regtest', true], ['mainnet', false], ['testnet', false]]) {
+        // BTC:testnet is armed, so the testnet cases straddle its armed height.
+        const armed = XChainVM.LINT_DESTRUCTURE_ACTIVATION['BTC:testnet'];
+        const cases = [['regtest', 10000000, true], ['mainnet', 10000000, false],
+            ['testnet', 1, false], ['testnet', armed, true]];
+        for (const [network, height, expected] of cases) {
             let options;
             const verdict = gateWarnings.deployGateVerdict.call({
                 limits: { maxCodeSize: 65536 },
-                block: { height: 10000000, timestamp: 1786060800 },
+                block: { height, timestamp: 1786060800 },
                 network,
                 coin: 'BTC',
                 vm: {
@@ -143,7 +147,7 @@ describe('destructure lint threading', function () {
                 }
             }, 'module.exports = function(){};');
             assert.deepStrictEqual(verdict, { valid: true });
-            assert.strictEqual(options.enforceLintDestructure, expected, network);
+            assert.strictEqual(options.enforceLintDestructure, expected, `${network}@${height}`);
         }
     });
 

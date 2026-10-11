@@ -25,61 +25,55 @@ const vm = require('../../src/index.js');
 const lintCore = require('../../src/lint-core.js');
 const metering = require('../../src/metering.js');
 
-describe('consensus parameters are frozen (track 8 guard)', function () {
-
-    it('LINT_DESTRUCTURE_ACTIVATION is frozen and unarmed outside regtest', function () {
-        assert.deepStrictEqual(vm.LINT_DESTRUCTURE_ACTIVATION, {
-            'BTC:mainnet': null,
-            'LTC:mainnet': null,
-            'DOGE:mainnet': null,
-            'BTC:testnet': null,
-            'LTC:testnet': null,
-            'DOGE:testnet': null,
-        });
-        assert.ok(Object.isFrozen(vm.LINT_DESTRUCTURE_ACTIVATION));
-        assert.strictEqual(vm.isLintDestructureActive('regtest', 'BTC', 0), true);
-    });
-
-    it('BIGINT_SURFACE_STRIP_ACTIVATION is frozen and unarmed outside regtest', function () {
-        assert.deepStrictEqual(vm.BIGINT_SURFACE_STRIP_ACTIVATION, {
-            'BTC:mainnet': null,
-            'LTC:mainnet': null,
-            'DOGE:mainnet': null,
-            'BTC:testnet': null,
-            'LTC:testnet': null,
-            'DOGE:testnet': null,
-        });
-        assert.ok(Object.isFrozen(vm.BIGINT_SURFACE_STRIP_ACTIVATION));
-        assert.strictEqual(vm.isBigIntSurfaceStripActive('regtest', 'BTC', 0), true);
-    });
-});
+// A per-coin height map a release cut armed on testnet: the six keys in order, every
+// mainnet chain unarmed (null), every testnet chain at an armed height read off the map,
+// off at height 1 and on from that height, and regtest on from genesis.
+function assertCoinMapArmedOnTestnetOnly(map, isActive) {
+    assert.deepStrictEqual(Object.keys(map), ['BTC:mainnet', 'LTC:mainnet', 'DOGE:mainnet',
+        'BTC:testnet', 'LTC:testnet', 'DOGE:testnet']);
+    assert.ok(Object.isFrozen(map));
+    for (const coin of ['BTC', 'LTC', 'DOGE']) {
+        assert.strictEqual(map[`${coin}:mainnet`], null, `${coin}:mainnet`);
+        const armed = map[`${coin}:testnet`];
+        assert.ok(Number.isSafeInteger(armed) && armed > 1, `${coin}:testnet armed height`);
+        assert.strictEqual(isActive('testnet', coin, 1), false, `${coin}:testnet at 1`);
+        assert.strictEqual(isActive('testnet', coin, armed), true, `${coin}:testnet at ${armed}`);
+    }
+    assert.strictEqual(isActive('regtest', 'BTC', 0), true);
+}
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
-    it('LINT_BANNED_WITH_ACTIVATION is frozen and unarmed outside regtest', function () {
-        assert.deepStrictEqual(vm.LINT_BANNED_WITH_ACTIVATION, {
-            'BTC:mainnet': null,
-            'LTC:mainnet': null,
-            'DOGE:mainnet': null,
-            'BTC:testnet': null,
-            'LTC:testnet': null,
-            'DOGE:testnet': null,
-        });
-        assert.ok(Object.isFrozen(vm.LINT_BANNED_WITH_ACTIVATION));
-        assert.strictEqual(vm.isLintBannedWithActive('regtest', 'BTC', 0), true);
+    it('LINT_DESTRUCTURE_ACTIVATION is frozen, unarmed on mainnet and armed on testnet', function () {
+        assertCoinMapArmedOnTestnetOnly(vm.LINT_DESTRUCTURE_ACTIVATION, vm.isLintDestructureActive);
+    });
+
+    it('BIGINT_SURFACE_STRIP_ACTIVATION is frozen, unarmed on mainnet and armed on testnet', function () {
+        assertCoinMapArmedOnTestnetOnly(vm.BIGINT_SURFACE_STRIP_ACTIVATION, vm.isBigIntSurfaceStripActive);
     });
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
-    it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work and is unarmed outside regtest', function () {
+    it('LINT_BANNED_WITH_ACTIVATION is frozen, unarmed on mainnet and armed on testnet', function () {
+        assertCoinMapArmedOnTestnetOnly(vm.LINT_BANNED_WITH_ACTIVATION, vm.isLintBannedWithActive);
+    });
+});
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
+    it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work, unarmed on mainnet and armed on testnet', function () {
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet;
+        assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
-            { mainnet: null, testnet: null, regtest: 0 });
+            { mainnet: null, testnet: armed, regtest: 0 });
         assert.ok(Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
         assert.strictEqual(vm.isApplyLengthMeterActive('regtest', 0), true);
-        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
+        for (const network of ['mainnet', 'unknown', undefined]) {
             assert.strictEqual(vm.isApplyLengthMeterActive(network, 4102444800), false);
         }
+        assert.strictEqual(vm.isApplyLengthMeterActive('testnet', 1), false);
+        assert.strictEqual(vm.isApplyLengthMeterActive('testnet', armed), true);
     });
 });
 

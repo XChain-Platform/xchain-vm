@@ -34,11 +34,13 @@ describe('destructure lint activation', function () {
         'DOGE:testnet',
     ];
 
-    it('exports a frozen map with six unarmed entries', function () {
+    it('exports a frozen map with mainnet unarmed and every testnet chain armed', function () {
         assert.ok(Object.isFrozen(LINT_DESTRUCTURE_ACTIVATION));
         assert.deepStrictEqual(Object.keys(LINT_DESTRUCTURE_ACTIVATION), expectedKeys);
-        for (const key of expectedKeys) {
-            assert.strictEqual(LINT_DESTRUCTURE_ACTIVATION[key], null);
+        for (const coin of coins) {
+            assert.strictEqual(LINT_DESTRUCTURE_ACTIVATION[`${coin}:mainnet`], null);
+            const armed = LINT_DESTRUCTURE_ACTIVATION[`${coin}:testnet`];
+            assert.ok(Number.isSafeInteger(armed) && armed > 1, `${coin}:testnet armed height`);
         }
     });
 
@@ -51,12 +53,15 @@ describe('destructure lint activation', function () {
         assert.strictEqual(XChainVM.isLintDestructureActive, isLintDestructureActive);
     });
 
-    it('keeps every mainnet and testnet chain unarmed', function () {
-        for (const network of ['mainnet', 'testnet']) {
-            for (const coin of coins) {
-                assert.strictEqual(isLintDestructureActive(network, coin, 0), false);
-                assert.strictEqual(isLintDestructureActive(network, coin, 10000000), false);
-            }
+    it('keeps every mainnet chain unarmed and activates each testnet chain at its armed height', function () {
+        for (const coin of coins) {
+            assert.strictEqual(isLintDestructureActive('mainnet', coin, 0), false);
+            assert.strictEqual(isLintDestructureActive('mainnet', coin, 10000000), false);
+            const armed = LINT_DESTRUCTURE_ACTIVATION[`${coin}:testnet`];
+            assert.strictEqual(isLintDestructureActive('testnet', coin, 1), false, coin);
+            assert.strictEqual(isLintDestructureActive('testnet', coin, armed - 1), false, coin);
+            assert.strictEqual(isLintDestructureActive('testnet', coin, armed), true, coin);
+            assert.strictEqual(isLintDestructureActive('testnet', coin, armed + 1), true, coin);
         }
     });
 

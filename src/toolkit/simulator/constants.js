@@ -151,7 +151,15 @@ const TIME_NETWORK_GATES = Object.freeze([
     // Resolve exactly as isGasCeilingSuccessActive does: a network the map does not name is unarmed.
     { label: 'gas-ceiling success', source: 'GAS_CEILING_SUCCESS_ACTIVATION',
         resolve: (network) => (Object.hasOwn(GasTracker.GAS_CEILING_SUCCESS_ACTIVATION, network)
-            ? GasTracker.GAS_CEILING_SUCCESS_ACTIVATION[network] : null) }
+            ? GasTracker.GAS_CEILING_SUCCESS_ACTIVATION[network] : null) },
+    // The iter/Set and apply-length meters switch on block time per network inside the
+    // isolate; a network their map does not name is unarmed, as in their predicates.
+    { label: 'iter/Set meter', source: 'ITER_SET_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.ITER_SET_METER_ACTIVATION, network)
+            ? XChainVM.ITER_SET_METER_ACTIVATION[network] : null) },
+    { label: 'apply-length meter', source: 'APPLY_LENGTH_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.APPLY_LENGTH_METER_ACTIVATION, network)
+            ? XChainVM.APPLY_LENGTH_METER_ACTIVATION[network] : null) }
 ]);
 
 module.exports = {
