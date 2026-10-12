@@ -89,6 +89,8 @@ function checkV8Syntax(code) {
  *        LINT_OPTIONAL_CHAIN_ACTIVATION refinement applies. The indexer passes
  *        vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION.
  *        Defaults to true.
+ * @param {boolean} [opts.enforceLintDestructure=true] - whether the
+ *        lint-destructure refinement applies. Defaults to true.
  * @param {boolean} [opts.enforceBannedGenerator=true] - whether the
  *        'banned-generator' rule (function*, generator methods, yield) is
  *        deploy-blocking. CONSENSUS-GATED identically to enforceBannedAsync, but
