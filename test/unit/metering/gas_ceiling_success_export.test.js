@@ -11,10 +11,16 @@ describe('gas-ceiling success gate on the module surface', function () {
     });
 
     it('resolves per network from the exported predicate', function () {
-        assert.deepStrictEqual({ ...vmModule.GAS_CEILING_SUCCESS_ACTIVATION }, { mainnet: null, testnet: null, regtest: 0 });
+        const armed = vmModule.GAS_CEILING_SUCCESS_ACTIVATION.testnet;
+        assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
+        assert.deepStrictEqual({ ...vmModule.GAS_CEILING_SUCCESS_ACTIVATION }, { mainnet: null, testnet: armed, regtest: 0 });
         assert.strictEqual(vmModule.isGasCeilingSuccessActive('regtest', 0), true);
-        for (const net of ['mainnet', 'testnet', 'nosuchnet', undefined]) {
+        for (const net of ['mainnet', 'nosuchnet', undefined]) {
             assert.strictEqual(vmModule.isGasCeilingSuccessActive(net, 4000000000), false, String(net));
         }
+        assert.strictEqual(vmModule.isGasCeilingSuccessActive('testnet', 1), false);
+        assert.strictEqual(vmModule.isGasCeilingSuccessActive('testnet', armed - 1), false);
+        assert.strictEqual(vmModule.isGasCeilingSuccessActive('testnet', armed), true);
+        assert.strictEqual(vmModule.isGasCeilingSuccessActive('testnet', 4000000000), true);
     });
 });

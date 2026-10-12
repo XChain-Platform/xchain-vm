@@ -73,7 +73,7 @@ function effectiveCeiling(requested, configCeiling) {
 // mainnet.
 const GAS_CEILING_SUCCESS_ACTIVATION = Object.freeze({
     mainnet: null,
-    testnet: null,
+    testnet: 1791804379,
     regtest: 0,
 });
 function isGasCeilingSuccessActive(network, blockTime) {

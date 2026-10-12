@@ -239,7 +239,7 @@ function isRestPatternMeterActive(network, blockTime) {
 // the rule from genesis. Unknown or missing networks resolve like mainnet.
 const ITER_SET_METER_ACTIVATION = Object.seal({
     mainnet: null,
-    testnet: null,
+    testnet: 1791804379,
     regtest: 0,
 });
 function isIterSetMeterActive(network, blockTime) {

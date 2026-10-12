@@ -298,11 +298,15 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
         }
     });
 
-    it('keeps regtest at height 1, starts testnet at its v0.21.3 optional-chain height, and lets an explicit height win', function () {
+    it('keeps regtest at height 1, starts testnet at its highest armed gate height, and lets an explicit height win', function () {
         // regtest activates every height gate from genesis, so the historical default stands;
-        // testnet arms the optional-chain lint at BTC 155001 in v0.21.3.
+        // testnet sits on the newest BTC:testnet threshold any exported height map arms.
+        const { HEIGHT_GATES } = require('../../src/toolkit/simulator/constants.js');
+        const testnetArmed = Math.max(...HEIGHT_GATES.map((g) => XChainVM[g.map]['BTC:testnet'])
+            .filter((t) => Number.isFinite(t)));
+        assert.ok(testnetArmed > 1, 'no height gate is armed on BTC:testnet');
         assert.strictEqual(new ContractSimulator().block.height, 1);
-        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, 155001);
+        assert.strictEqual(new ContractSimulator({ network: 'testnet' }).block.height, testnetArmed);
         // A deliberate below-gate run stays possible: the author's height wins.
         assert.strictEqual(
             new ContractSimulator({ network: 'mainnet', block: { height: 5 } }).block.height, 5);

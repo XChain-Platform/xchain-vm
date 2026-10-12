@@ -34,11 +34,13 @@ describe('banned-with lint activation', function () {
         'DOGE:testnet',
     ];
 
-    it('exports a frozen map with six unarmed entries', function () {
+    it('exports a frozen map with mainnet unarmed and every testnet chain armed', function () {
         assert.ok(Object.isFrozen(LINT_BANNED_WITH_ACTIVATION));
         assert.deepStrictEqual(Object.keys(LINT_BANNED_WITH_ACTIVATION), expectedKeys);
-        for (const key of expectedKeys) {
-            assert.strictEqual(LINT_BANNED_WITH_ACTIVATION[key], null);
+        for (const coin of coins) {
+            assert.strictEqual(LINT_BANNED_WITH_ACTIVATION[`${coin}:mainnet`], null);
+            const armed = LINT_BANNED_WITH_ACTIVATION[`${coin}:testnet`];
+            assert.ok(Number.isSafeInteger(armed) && armed > 1, `${coin}:testnet armed height`);
         }
     });
 
@@ -51,12 +53,15 @@ describe('banned-with lint activation', function () {
         assert.strictEqual(XChainVM.isLintBannedWithActive, isLintBannedWithActive);
     });
 
-    it('keeps every mainnet and testnet chain unarmed', function () {
-        for (const network of ['mainnet', 'testnet']) {
-            for (const coin of coins) {
-                assert.strictEqual(isLintBannedWithActive(network, coin, 0), false);
-                assert.strictEqual(isLintBannedWithActive(network, coin, 10000000), false);
-            }
+    it('keeps every mainnet chain unarmed and activates each testnet chain at its armed height', function () {
+        for (const coin of coins) {
+            assert.strictEqual(isLintBannedWithActive('mainnet', coin, 0), false);
+            assert.strictEqual(isLintBannedWithActive('mainnet', coin, 10000000), false);
+            const armed = LINT_BANNED_WITH_ACTIVATION[`${coin}:testnet`];
+            assert.strictEqual(isLintBannedWithActive('testnet', coin, 1), false, coin);
+            assert.strictEqual(isLintBannedWithActive('testnet', coin, armed - 1), false, coin);
+            assert.strictEqual(isLintBannedWithActive('testnet', coin, armed), true, coin);
+            assert.strictEqual(isLintBannedWithActive('testnet', coin, armed + 1), true, coin);
         }
     });
 

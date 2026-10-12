@@ -29,16 +29,24 @@ const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 const { isGasCeilingSuccessActive, GAS_CEILING_SUCCESS_ACTIVATION } = GasTracker;
 
 describe('gas-ceiling success gate resolver', function () {
-    it('is armed from genesis on regtest only', function () {
+    it('is armed from genesis on regtest and from the armed block time on testnet', function () {
         assert.strictEqual(isGasCeilingSuccessActive('regtest', 0), true);
         assert.strictEqual(isGasCeilingSuccessActive('regtest', undefined), true);
-        for (const net of ['mainnet', 'testnet', undefined, null, 'unknown', '__proto__', 'toString']) {
+        for (const net of ['mainnet', undefined, null, 'unknown', '__proto__', 'toString']) {
             assert.strictEqual(isGasCeilingSuccessActive(net, 4000000000), false, String(net));
         }
+        const armed = GAS_CEILING_SUCCESS_ACTIVATION.testnet;
+        assert.strictEqual(isGasCeilingSuccessActive('testnet', 1), false);
+        assert.strictEqual(isGasCeilingSuccessActive('testnet', undefined), false);
+        assert.strictEqual(isGasCeilingSuccessActive('testnet', armed - 1), false);
+        assert.strictEqual(isGasCeilingSuccessActive('testnet', armed), true);
+        assert.strictEqual(isGasCeilingSuccessActive('testnet', 4000000000), true);
     });
 
-    it('is frozen: regtest from genesis, mainnet and testnet unarmed until a release cut', function () {
-        assert.deepStrictEqual({ ...GAS_CEILING_SUCCESS_ACTIVATION }, { mainnet: null, testnet: null, regtest: 0 });
+    it('is frozen: regtest from genesis, testnet armed at a release-cut block time, mainnet unarmed', function () {
+        const armed = GAS_CEILING_SUCCESS_ACTIVATION.testnet;
+        assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
+        assert.deepStrictEqual({ ...GAS_CEILING_SUCCESS_ACTIVATION }, { mainnet: null, testnet: armed, regtest: 0 });
         assert.ok(Object.isFrozen(GAS_CEILING_SUCCESS_ACTIVATION));
     });
 
@@ -66,19 +74,24 @@ describe('gas-ceiling success gate execution', function () {
     beforeEach(function () { vm = createVM({ gasCeiling: 5000, maxCpuTimeMs: 30000 }); vm.beginBlock(); });
     afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
 
-    const run = (body, network) => execute(vm, wrap(body), { method: 'default', network, blockContext: LATE });
+    const run = (body, network, blockContext = LATE) =>
+        execute(vm, wrap(body), { method: 'default', network, blockContext });
     const SWALLOWED = `var a=new Array(3000).fill(1);Object.keys(a);return 5;`;
+    // A testnet block one second before the armed instant still runs the legacy rule.
+    const testnetEarly = () => ({ ...LATE, timestamp: GAS_CEILING_SUCCESS_ACTIVATION.testnet - 1 });
 
     it('fails a swallowed Object.keys exhaustion out_of_gas at the ceiling once armed', async function () {
-        const r = await run(SWALLOWED, 'regtest');
-        assert.strictEqual(r.success, false);
-        assert.match(r.error, /^out_of_gas:/, r.error);
-        assert.strictEqual(r.gasUsed, 5000);
+        for (const net of ['regtest', 'testnet']) {
+            const r = await run(SWALLOWED, net);
+            assert.strictEqual(r.success, false, net);
+            assert.match(r.error, /^out_of_gas:/, r.error);
+            assert.strictEqual(r.gasUsed, 5000, net);
+        }
     });
 
     it('replays the legacy success while unarmed', async function () {
-        for (const net of ['mainnet', 'testnet', undefined]) {
-            const r = await run(SWALLOWED, net);
+        for (const [net, ctx] of [['mainnet', LATE], [undefined, LATE], ['testnet', testnetEarly()]]) {
+            const r = await run(SWALLOWED, net, ctx);
             assert.strictEqual(r.success, true, String(net));
             assert.ok(r.gasUsed > 5000, String(net));
         }

@@ -100,11 +100,11 @@ function registerSparseScanCases(run) {
 }
 
 function registerNetworkCases(run) {
-    it('leaves the legacy flat charge on unarmed and unknown networks', async function () {
+    it('leaves the legacy flat charge on unarmed, unknown and pre-arm testnet blocks', async function () {
         const body = `var a=new Array(${K});a.some(function(){return false;});return 1;`;
-        const gas = {};
+        const gas = {}, early = { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 };
         for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-            const r = await run(body, network, { gasCeiling: undefined });
+            const r = await run(body, network, { gasCeiling: undefined, ...(network === 'testnet' && { blockContext: early }) });
             assert.strictEqual(r.success, true, `${network}: ${r.error}`);
             gas[String(network)] = r.gasUsed;
         }
