@@ -97,6 +97,8 @@ const BASE_STATIC_ROWS = [
     ["STATUS_ERROR_PREFIXES", true, true, true, "object", null],
     ["checkConsensusRuntime", true, true, true, "function", 1],
     ["describeRuntimeMismatch", true, true, true, "function", 1],
+    ["checkConsensusDependencies", true, true, true, "function", 1],
+    ["describeDependencyMismatch", true, true, true, "function", 1],
     ["HostFaultError", true, true, true, "function", 1],
     ["STRIPPED_GLOBAL_NAMES", true, true, true, "object", null],
     ["CONSENSUS_RULES", true, true, true, "object", null],

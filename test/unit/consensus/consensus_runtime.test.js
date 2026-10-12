@@ -15,10 +15,21 @@
 
 const assert = require('assert');
 const {
-    PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
+    PINNED, MATH_PINNED, AST_TOOLCHAIN_PINNED, RUNTIME_ADDON_PINNED,
+    REFERENCE_NODE, CONSENSUS_VERSION,
     CONSENSUS_STATUS_TOKENS, STATUS_ERROR_PREFIXES,
     checkConsensusRuntime, describeMismatch,
+    checkConsensusDependencies, describeDependencyMismatch,
 } = require('../../../src/consensus-runtime.js');
+
+const MATCHING_DEPENDENCIES = {
+    'isolated-vm': RUNTIME_ADDON_PINNED.isolatedVm,
+    mathjs: MATH_PINNED.mathjs,
+    'decimal.js': MATH_PINNED.decimaljs,
+    acorn: AST_TOOLCHAIN_PINNED.acorn,
+    'acorn-walk': AST_TOOLCHAIN_PINNED.acornWalk,
+    astring: AST_TOOLCHAIN_PINNED.astring,
+};
 
 describe('Consensus runtime pin', function () {
 
@@ -68,6 +79,45 @@ describe('Consensus runtime pin', function () {
             assert.match(msg, /CONSENSUS RUNTIME MISMATCH/);
             assert.match(msg, /v8: running "9.9.9" != pinned/);
             assert.ok(msg.includes(REFERENCE_NODE));
+        });
+    });
+
+    describe('checkConsensusDependencies', function () {
+        it('reports ok for an exact match of every dependency pin', function () {
+            assert.deepStrictEqual(checkConsensusDependencies(MATCHING_DEPENDENCIES), {
+                ok: true,
+                mismatches: [],
+            });
+        });
+
+        it('reports drift and missing packages without throwing', function () {
+            const installed = { ...MATCHING_DEPENDENCIES, mathjs: '0.0.0' };
+            delete installed['decimal.js'];
+            const result = checkConsensusDependencies(installed);
+            assert.strictEqual(result.ok, false);
+            assert.deepStrictEqual(result.mismatches, [
+                { key: 'mathjs', expected: MATH_PINNED.mathjs, actual: '0.0.0' },
+                { key: 'decimal.js', expected: MATH_PINNED.decimaljs, actual: undefined },
+            ]);
+        });
+
+        it('checks the real installed dependency tree by default', function () {
+            assert.deepStrictEqual(checkConsensusDependencies(), { ok: true, mismatches: [] });
+        });
+    });
+
+    describe('describeDependencyMismatch', function () {
+        it('returns the match message for ok / null results', function () {
+            assert.match(describeDependencyMismatch({ ok: true }), /match the pins/);
+            assert.match(describeDependencyMismatch(null), /match the pins/);
+        });
+
+        it('renders every mismatch and remediation', function () {
+            const result = checkConsensusDependencies({ ...MATCHING_DEPENDENCIES, astring: '2.0.0' });
+            const message = describeDependencyMismatch(result);
+            assert.match(message, /CONSENSUS DEPENDENCY MISMATCH/);
+            assert.match(message, /astring: installed "2.0.0" != pinned "1.9.0"/);
+            assert.match(message, /package-lock\.json/);
         });
     });
 });

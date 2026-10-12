@@ -179,6 +179,8 @@ function attachFrozenSurface(target) {
     target.STATUS_ERROR_PREFIXES = consensusRuntime.STATUS_ERROR_PREFIXES;
     target.checkConsensusRuntime = consensusRuntime.checkConsensusRuntime;
     target.describeRuntimeMismatch = consensusRuntime.describeMismatch;
+    target.checkConsensusDependencies = consensusRuntime.checkConsensusDependencies;
+    target.describeDependencyMismatch = consensusRuntime.describeDependencyMismatch;
     // Expose HostFaultError so a host that cannot run contracts (permanently broken
     // subprocess executor) is recognisable by callers. They must HALT, not commit
     // a fabricated result that would fork the chain.
