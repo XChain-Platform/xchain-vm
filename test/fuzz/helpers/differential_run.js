@@ -17,15 +17,22 @@
  *
  * Usage:
  *   node test/fuzz/helpers/differential_run.js record  [--seed N] [--cases M] \
- *        [--execution in-process|subprocess] --out FILE
- *   node test/fuzz/helpers/differential_run.js verify  [--seed N] [--cases M] --against FILE
+ *        [--execution in-process|subprocess] [--profile legacy|post-gate] \
+ *        [--require-pinned-runtime] --out FILE
+ *   node test/fuzz/helpers/differential_run.js verify  [--seed N] [--cases M] \
+ *        [--profile legacy|post-gate] --against FILE
  *   node test/fuzz/helpers/differential_run.js compare A.json B.json
+ *   node test/fuzz/helpers/differential_run.js check-legs DIR [--seed N] [--cases M] \
+ *        [--profile legacy|post-gate]
  *
  * `record` writes this platform's manifest. Run it in each matrix leg
  * (different arch / Node ABI / libc) and upload the manifests as artifacts.
  * `compare` (or `verify`) then asserts every case's consensus hash matches
  * across every pair; a non-empty divergence set exits non-zero and IS the
- * differential failure. See .github/workflows/vm-differential-fuzz.yml.
+ * differential failure. `check-legs` asserts every expected matrix leg left a
+ * manifest of the platform it claims, on the pinned consensus engine, so a
+ * dropped or mislabelled leg cannot shrink the comparison silently. See
+ * .github/workflows/vm-differential-fuzz.yml.
  ********************************************************************/
 
 const fs = require('fs');
@@ -37,6 +44,11 @@ const {
     diffManifests,
     platformTag
 } = require('./differential.js');
+const { buildPostGateManifest } = require('./differential_postgate.js');
+const { checkLegSet } = require('./differential_legs.js');
+const { checkConsensusRuntime, describeMismatch } = require('../../../src/consensus-runtime.js');
+
+const PROFILES = ['legacy', 'post-gate'];
 
 function parseFlags(argv) {
     const flags = {};
@@ -69,15 +81,40 @@ function reportDivergences(divs) {
     }
 }
 
+function flagProfile(flags) {
+    const profile = flags.profile && flags.profile !== true ? flags.profile : 'legacy';
+    if (!PROFILES.includes(profile)) throw new Error(`--profile must be one of ${PROFILES.join(', ')}`);
+    return profile;
+}
+
+function buildFor(profile, opts) {
+    return profile === 'post-gate' ? buildPostGateManifest(opts) : buildManifest(opts);
+}
+
 async function cmdRecord(flags) {
     const seed = flags.seed != null && flags.seed !== true ? parseInt(flags.seed, 10) : DEFAULT_SEED;
     const cases = flags.cases != null && flags.cases !== true ? parseInt(flags.cases, 10) : DEFAULT_CASES;
     const execution = flags.execution && flags.execution !== true ? flags.execution : 'in-process';
+    const profile = flagProfile(flags);
+
+    // Fail closed before the corpus runs: a leg on an off-pin engine compares an
+    // engine no validator may run.
+    const runtime = checkConsensusRuntime();
+    if (flags['require-pinned-runtime'] && !runtime.ok) {
+        process.stderr.write(describeMismatch(runtime) + '\n');
+        return 4;
+    }
 
     process.stdout.write(`[differential] recording on ${platformTag()} ` +
-        `(seed=${seed}, cases=${cases}, execution=${execution})\n`);
+        `(seed=${seed}, cases=${cases}, execution=${execution}, profile=${profile})\n`);
 
-    const manifest = await buildManifest({ seed, cases, execution });
+    const manifest = await buildFor(profile, { seed, cases, execution });
+    manifest.consensusRuntime = { ok: runtime.ok, mismatches: runtime.mismatches };
+    if (Array.isArray(manifest.regime) && manifest.regime.length) {
+        process.stderr.write('post-gate profile is not in the post-gate regime:\n  - ' +
+            manifest.regime.join('\n  - ') + '\n');
+        return 5;
+    }
 
     const out = flags.out && flags.out !== true
         ? flags.out
@@ -97,10 +134,12 @@ async function cmdVerify(flags) {
     const seed = flags.seed != null && flags.seed !== true ? parseInt(flags.seed, 10) : ref.seed;
     const cases = flags.cases != null && flags.cases !== true ? parseInt(flags.cases, 10) : ref.cases;
 
-    process.stdout.write(`[differential] verifying ${platformTag()} against ` +
-        `${ref.platform} (seed=${seed}, cases=${cases})\n`);
+    const profile = flags.profile ? flagProfile(flags) : (ref.profile || 'legacy');
 
-    const live = await buildManifest({ seed, cases, execution: ref.execution || 'in-process' });
+    process.stdout.write(`[differential] verifying ${platformTag()} against ` +
+        `${ref.platform} (seed=${seed}, cases=${cases}, profile=${profile})\n`);
+
+    const live = await buildFor(profile, { seed, cases, execution: ref.execution || 'in-process' });
     const divs = diffManifests(ref, live);
     if (divs.length) { reportDivergences(divs); return 1; }
     process.stdout.write(`[differential] OK: ${live.entries.length} cases match ${ref.platform}\n`);
@@ -121,6 +160,25 @@ function cmdCompare(positional) {
     return 0;
 }
 
+function cmdCheckLegs(flags, positional) {
+    const dir = positional[0];
+    if (!dir) {
+        process.stderr.write('check-legs requires a manifest directory: check-legs DIR\n');
+        return 2;
+    }
+    const want = { profile: flagProfile(flags) };
+    if (flags.seed != null && flags.seed !== true) want.seed = parseInt(flags.seed, 10);
+    if (flags.cases != null && flags.cases !== true) want.cases = parseInt(flags.cases, 10);
+    const problems = checkLegSet(dir, want);
+    if (problems.length) {
+        process.stderr.write(`DIFFERENTIAL LEG CHECK FAILED (${want.profile}): ${problems.length} problem(s)\n`);
+        for (const p of problems) process.stderr.write('  - ' + p + '\n');
+        return 1;
+    }
+    process.stdout.write(`[differential] every expected ${want.profile} leg is present, distinct and on the pinned engine\n`);
+    return 0;
+}
+
 async function main() {
     const { flags, positional } = parseFlags(process.argv.slice(2));
     const cmd = positional.shift();
@@ -130,12 +188,14 @@ async function main() {
         case 'record':  code = await cmdRecord(flags); break;
         case 'verify':  code = await cmdVerify(flags); break;
         case 'compare': code = cmdCompare(positional); break;
+        case 'check-legs': code = cmdCheckLegs(flags, positional); break;
         default:
             process.stderr.write(
-                'usage: differential_run.js <record|verify|compare> [options]\n' +
-                '  record  [--seed N] [--cases M] [--execution MODE] [--out FILE]\n' +
-                '  verify  [--seed N] [--cases M] --against FILE\n' +
-                '  compare A.json B.json\n');
+                'usage: differential_run.js <record|verify|compare|check-legs> [options]\n' +
+                '  record  [--seed N] [--cases M] [--execution MODE] [--profile P] [--require-pinned-runtime] [--out FILE]\n' +
+                '  verify  [--seed N] [--cases M] [--profile P] --against FILE\n' +
+                '  compare A.json B.json\n' +
+                '  check-legs DIR [--seed N] [--cases M] [--profile P]\n');
             code = 2;
     }
     process.exit(code);

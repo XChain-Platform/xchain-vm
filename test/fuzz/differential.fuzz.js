@@ -49,6 +49,13 @@ const {
     buildManifest,
     diffManifests
 } = require('./helpers/differential.js');
+const {
+    POST_GATE_BLOCK,
+    SINK_MAX,
+    targetedCases,
+    buildPostGateCorpus,
+    checkPostGateRegime
+} = require('./helpers/differential_postgate.js');
 
 // Keep the in-suite corpus modest so the fuzz job stays fast; CI can widen it
 // via DIFF_CASES, and the standalone runner defaults higher (200).
@@ -139,5 +146,53 @@ function logCorpusParams() {
             `this platform (${live.platform}) diverged from the reference ` +
             `manifest (${ref.platform}) on ${divs.length} case(s); a validator on ` +
             `this build would fork:\n` + firstDivergences(divs, 10));
+    });
+});
+
+(XChainVM ? describe : describe.skip)('Fuzz: Differential execution, post-gate profile', function () {
+    this.timeout(180000);
+
+    it('the post-gate corpus is seed-stable, past both gates, and carries the targeted depth cases', function () {
+        const a = buildPostGateCorpus({ seed: SEED, cases: 5 });
+        const b = buildPostGateCorpus({ seed: SEED, cases: 5 });
+        assert.deepStrictEqual(a.map(c => [c.index, c.code]), b.map(c => [c.index, c.code]));
+        assert.ok(a.slice(0, 5).every(c => c.network === 'mainnet' && c.blockContext === POST_GATE_BLOCK));
+        const targeted = a.slice(5);
+        assert.deepStrictEqual(targeted.map(c => c.index), targetedCases().map(c => c.index),
+            'targeted indices must not depend on the random case count');
+        assert.ok(targeted.some(c => c.label === 'mainnet:parseReviver@256' && c.role === 'at'));
+        assert.ok(targeted.some(c => c.label === 'regtest:parseReviver@257' && c.role === 'over'));
+    });
+
+    it('a legacy manifest and a post-gate manifest never compare as one corpus', function () {
+        const legacy = { seed: 1, cases: 1, platform: 'a', entries: [{ index: 0, resultHash: 'x' }] };
+        const postGate = Object.assign({}, legacy, { profile: 'post-gate', platform: 'b' });
+        const divs = diffManifests(legacy, postGate);
+        assert.strictEqual(divs.length, 1);
+        assert.strictEqual(divs[0].kind, 'corpus-mismatch');
+        assert.strictEqual(diffManifests(legacy, Object.assign({}, legacy, { profile: 'legacy' })).length, 0);
+    });
+
+    it('on this host every sink accepts its maximum and faults one past it, past both gates', async function () {
+        const corpus = targetedCases();
+        const entries = await runCorpus(corpus, { execution: 'in-process' });
+        const byIndex = new Map(entries.map(e => [e.index, e]));
+        for (const c of corpus) {
+            const e = byIndex.get(c.index);
+            if (c.role === 'at' || c.role === 'below') assert.strictEqual(e.success, true, `${c.label}: ${e.error}`);
+            else assert.match(String(e.error), /^out_of_stack/, `${c.label} must fault`);
+        }
+        assert.deepStrictEqual(checkPostGateRegime(corpus, entries), []);
+        for (const [sink, max] of Object.entries(SINK_MAX)) {
+            assert.ok(corpus.some(c => c.label === `mainnet:${sink}@${max}`), `${sink} has no case at its maximum`);
+        }
+    });
+
+    it('the regime check refuses the targeted cases run in the pre-gate context', async function () {
+        const preGate = targetedCases().filter(c => c.role === 'over')
+            .map(c => Object.assign({}, c, { network: undefined, blockContext: undefined }));
+        const entries = await runCorpus(preGate, { execution: 'in-process' });
+        const problems = checkPostGateRegime(preGate, entries);
+        assert.ok(problems.length > 0, 'a pre-gate run must not pass the regime check');
     });
 });

@@ -181,6 +181,8 @@ xchain-foundry lint contracts/my-token.js
 
 # Deploy + run a method in the in-memory simulator (Node 22)
 xchain-foundry simulate contracts/my-token.js --constructor 5 --method increment --params 3
+# The default network is regtest, which runs gates no live chain runs yet; match mainnet gas
+xchain-foundry simulate contracts/my-token.js --constructor 5 --method increment --params 3 --network mainnet
 
 # AI-assisted authoring (Tier 3): print a ready-to-use prompt, no network call or key
 xchain-foundry describe "an escrow that releases on a signed delivery attestation"

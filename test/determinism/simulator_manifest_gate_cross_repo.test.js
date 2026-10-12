@@ -14,9 +14,10 @@
  *
  **********************************************************************
  * Parity gate for the simulator's third DEPLOY leg against the indexer that
- * owns the rule. The toolkit carries second copies of three consensus facts:
- * the CONTRACT_MANIFEST verdict strings, the policy-row strings, and the
- * CONTRACT_META_REQUIRED flag times. Each is compared here against the
+ * owns the rule. The toolkit carries second copies of four consensus facts:
+ * the CONTRACT_MANIFEST verdict strings, the policy-row strings, the
+ * CONTRACT_META_REQUIRED flag times and the DEPLOY_INIT_STRICT instants that
+ * decide when a DEPLOY runs its constructor. Each is compared here against the
  * sibling xchain-indexer, so a change on that side reddens this repo instead
  * of leaving the simulator quoting a status the chain no longer writes.
  *
@@ -93,5 +94,19 @@ describe('simulator deploy-gate manifest leg agrees with the indexer', function 
             testnet: flags.CONTRACT_META_REQUIRED_TESTNET_TIME,
             regtest: Number(row[1])
         }, 'the simulator arms the meta rule at a different instant than the chain');
+    });
+
+    it('arms DEPLOY_INIT_STRICT at the indexer registry instants', function () {
+        if (!simConstants) this.skip();
+        const rowFile = siblingOrSkip(this, path.join('xchain-indexer', 'src', 'protocol_changes', 'changes_3.js'));
+        if (!rowFile) return;
+        const row = fs.readFileSync(rowFile, 'utf8').match(
+            /\['DEPLOY_INIT_STRICT',\s*'[^']*',\s*(\d+),\s*(\d+),\s*(\d+)/);
+        assert.ok(row, 'DEPLOY_INIT_STRICT row not found in ' + rowFile + '; re-point this scrape');
+        assert.deepStrictEqual(Object.assign({}, simConstants.DEPLOY_INIT_STRICT_TIMES), {
+            mainnet: Number(row[1]),
+            testnet: Number(row[2]),
+            regtest: Number(row[3])
+        }, 'the simulator runs the constructor under a different trigger instant than the chain');
     });
 });

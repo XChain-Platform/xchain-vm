@@ -14,12 +14,14 @@
  * Contract-lint PARITY (deploy path ⇆ shared rules) + DRIFT guard.
  *
  * The deploy-time validator (validateSyntax, including the isolated-vm V8
- * step-1 compile) and the dependency-light shared rules (lint_core.lintSource,
+ * step-1 compile) and the dependency-light shared rules (lint-core.lintSource,
  * which the SDK/CLI consume) MUST agree on every acorn-coverable verdict: same
  * valid flag AND byte-identical first-error message, or contract authors get
  * false greens / false reds. This is the authoritative cross-engine check;
- * because the SDK vendors lint_core/metering byte-identically (asserted below),
- * proving validateSyntax ⇆ lintSource here transitively covers the SDK linter.
+ * because the SDK vendors lint-core/metering byte-identically (asserted below
+ * for the three entry files AND every file under src/lint-core/ and
+ * src/metering/, which hold the rules), proving validateSyntax ⇆ lintSource here
+ * transitively covers the SDK linter.
  *
  * Requires isolated-vm → Node 22 (see .nvmrc).
  ********************************************************************/
@@ -31,18 +33,34 @@ const path   = require('path');
 
 const { validateSyntax, checkFloatWarnings } = require('../../../src/syntax.js');
 const { lintSource, CONSENSUS_RULES, findBannedStrippedGlobals,
-        findBannedProtoMethods } = require('../../../src/lint_core.js');
+        findBannedProtoMethods } = require('../../../src/lint-core.js');
 
 const VM_SRC_DIR     = path.join(__dirname, '..', '..', '..', 'src');
 const SDK_VENDOR_DIR = path.join(__dirname, '..', '..', '..', '..', 'xchain-sdk', 'src', 'contract');
 const CONTRACTS_DIR  = path.join(__dirname, '..', '..', '..', '..', 'xchain-contracts');
-// stripped_globals.js is in the vendor set because lint_core.js requires it by a
+// stripped-globals.js is in the vendor set because lint-core.js requires it by a
 // path that must resolve at BOTH vendored depths, so the copy has to travel with
-// lint_core.js in the same change or the SDK linter cannot load.
-const VENDORED_FILES = ['lint_core.js', 'metering.js', 'stripped_globals.js'];
+// lint-core.js in the same change or the SDK linter cannot load.
+const VENDORED_FILES = ['lint-core.js', 'metering.js', 'stripped-globals.js'];
+// The two entry files are thin requires over these directories, which hold the actual rules and gas placement.
+const VENDORED_DIRS = ['lint-core', 'metering'];
 
 function sha256(file) {
     return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+// List every regular file under base as sorted '/'-separated relative paths ([] when base is absent).
+function listFiles(base, rel = '') {
+    let entries;
+    try { entries = fs.readdirSync(path.join(base, rel), { withFileTypes: true }); }
+    catch (e) { if (e.code === 'ENOENT') return []; throw e; }
+    let out = [];
+    for (const entry of entries) {
+        const child = rel ? rel + '/' + entry.name : entry.name;
+        if (entry.isDirectory()) out = out.concat(listFiles(base, child));
+        else if (entry.isFile()) out.push(child);
+    }
+    return out.sort();
 }
 
 // Required-sibling gate. By default a missing sibling checkout skips its parity
@@ -60,15 +78,26 @@ function requireSiblingOrSkip(ctx, present, what) {
 }
 
 // All bad fixtures use syntax V8 accepts, so validateSyntax clears step 1 and the
-// failure must come from a shared (lint_core) rule, making the messages comparable.
+// failure must come from a shared (lint-core) rule, making the messages comparable.
+// Each names the consensus rule it trips, and every CONSENSUS_RULES member needs one.
+// The flag-day rules run at default options, where every gate is on (lintSource's epoch).
 const BAD_FIXTURES = [
-    { name: 'banned-math',           code: 'function f(){ return Math.sqrt(4); }' },
-    { name: 'banned-literal-bigint', code: 'function f(){ return 2n; }' },
-    { name: 'banned-literal-regex',  code: 'function f(){ return /a+/.test("x"); }' },
-    { name: 'reserved-gas',          code: 'function f(){ var __gas = 1; return __gas; }' },
-    { name: 'reserved-alloc',        code: 'function f(){ return __concat([1],[2]); }' },
-    { name: 'unsupported-syntax',    code: 'var x = 1_000; function f(){ return x; }' }
+    { name: 'banned-math',           rule: 'banned-math',         code: 'function f(){ return Math.sqrt(4); }' },
+    { name: 'banned-literal-bigint', rule: 'banned-literal',      code: 'function f(){ return 2n; }' },
+    { name: 'banned-literal-regex',  rule: 'banned-literal',      code: 'function f(){ return /a+/.test("x"); }' },
+    { name: 'reserved-gas',          rule: 'reserved-identifier', code: 'function f(){ var __gas = 1; return __gas; }' },
+    { name: 'reserved-alloc',        rule: 'reserved-identifier', code: 'function f(){ return __concat([1],[2]); }' },
+    { name: 'unsupported-syntax',    rule: 'unsupported-syntax',  code: 'var x = 1_000; function f(){ return x; }' },
+    { name: 'banned-async',          rule: 'banned-async',        code: 'function f(){ return 1; } async function g(){ return 1; }' },
+    { name: 'banned-generator',      rule: 'banned-generator',    code: 'module.exports = function(x){ return 1; }; function* g(){ yield 1; }' },
+    { name: 'banned-wasm',           rule: 'banned-wasm',         code: 'module.exports = function(x){ return typeof WebAssembly; };' },
+    { name: 'banned-rest',           rule: 'banned-rest',         code: 'module.exports = function(){ function s(...n){ return n.length; } return s(1,2); };' },
+    { name: 'banned-with',           rule: 'banned-with',         code: 'module.exports = function(o){ with (o) { return a; } };' }
+    ,{ name: 'nesting-depth',        rule: 'nesting-depth',       code: 'module.exports = ' + '('.repeat(65) + '1' + ')'.repeat(65) + ';' }
 ];
+// Consensus rules whose deploy message cannot equal lintSource's, so only the verdict compares.
+// invalid-type: validateSyntax's V8 compile rejects a non-string first ("syntax error: ...").
+const VERDICT_ONLY_RULES = new Set(['invalid-type']);
 const FLOAT_FIXTURE = 'var x = 3.14; function f(){ return x; }';
 const GOOD_FIXTURE  = 'function init(){ return 1; } function add(a,b){ return a + b; }';
 
@@ -79,14 +108,47 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
         for (const f of VENDORED_FILES) {
             it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
                 requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                assert.ok(fs.existsSync(path.join(SDK_VENDOR_DIR, f)),
+                    'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
                 assert.strictEqual(
                     sha256(path.join(SDK_VENDOR_DIR, f)), sha256(path.join(VM_SRC_DIR, f)),
                     'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.'
                 );
             });
         }
-    });
 
+        for (const dir of VENDORED_DIRS) {
+            const canonical = listFiles(path.join(VM_SRC_DIR, dir));
+            // Fail closed on a vacuous pass: a renamed or emptied directory must go red, never generate zero checks
+            it('src/' + dir + '/ is present and non-empty, so its drift checks cannot pass vacuously', function () {
+                assert.ok(canonical.length > 0, 'NO CANONICAL FILES: src/' + dir +
+                    '/ is missing or empty, so the per-file drift guard below would check nothing.');
+            });
+            // Refuse a file added, removed or renamed on one side only, which a per-file hash of one side cannot see
+            it('xchain-sdk/src/contract/' + dir + '/ file set matches src/' + dir + '/', function () {
+                requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                const vendored = listFiles(path.join(SDK_VENDOR_DIR, dir));
+                const missingInSdk = canonical.filter((f) => !vendored.includes(f));
+                const onlyInSdk = vendored.filter((f) => !canonical.includes(f));
+                assert.ok(missingInSdk.length === 0 && onlyInSdk.length === 0,
+                    'VENDOR DRIFT: ' + dir + '/ file sets differ. Missing from the SDK copy: [' + missingInSdk.join(', ') +
+                    ']. Present only in the SDK copy: [' + onlyInSdk.join(', ') + '].');
+            });
+            for (const rel of canonical) {
+                const f = dir + '/' + rel;
+                it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
+                    requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                    const vendored = path.join(SDK_VENDOR_DIR, f);
+                    assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
+                    assert.strictEqual(sha256(vendored), sha256(path.join(VM_SRC_DIR, f)),
+                        'VENDOR DRIFT: SDK ' + f + ' differs from xchain-vm canonical; re-sync the copy.');
+                });
+            }
+        }
+    });
+});
+
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     describe('good fixture', function () {
         it('valid under both validateSyntax and lintSource', function () {
             assert.strictEqual(validateSyntax(GOOD_FIXTURE).valid, true);
@@ -106,14 +168,39 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
                 assert.strictEqual(v.valid, l.errors.length === 0);
                 assert.strictEqual(v.error, l.errors[0].message,
                     fx.name + ' message drift:\n  deploy: ' + v.error + '\n  lint  : ' + l.errors[0].message);
+                // Confirm the fixture trips the rule it claims, at error severity.
+                assert.strictEqual(l.errors[0].rule, fx.rule, fx.name + ' trips ' + l.errors[0].rule + ', not ' + fx.rule);
+                assert.strictEqual(l.errors[0].severity, 'error');
             });
         }
     });
 });
 
 describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
+    describe('every consensus rule is covered', function () {
+        it('invalid-type: both engines reject a non-string (verdict only)', function () {
+            assert.strictEqual(validateSyntax(null).valid, false, 'deploy validator must reject a non-string source');
+            assert.strictEqual(lintSource(null).errors[0].rule, 'invalid-type');
+        });
+
+        it('the fixtures plus the verdict-only set are exactly CONSENSUS_RULES', function () {
+            // A stale or renamed exclusion fails here, and no rule is counted twice.
+            for (const rule of VERDICT_ONLY_RULES)
+                assert.ok(CONSENSUS_RULES.has(rule), 'VERDICT_ONLY_RULES names ' + rule + ', which is not a consensus rule');
+            const fixtureRules = new Set(BAD_FIXTURES.map((fx) => fx.rule));
+            for (const rule of fixtureRules)
+                assert.ok(!VERDICT_ONLY_RULES.has(rule), rule + ' is in both BAD_FIXTURES and VERDICT_ONLY_RULES');
+            // Require a parity fixture for every new consensus rule, so none ships unchecked.
+            assert.deepStrictEqual([...fixtureRules, ...VERDICT_ONLY_RULES].sort(), [...CONSENSUS_RULES].sort(),
+                'adding a rule to CONSENSUS_RULES requires a BAD_FIXTURES entry in this file ' +
+                '(or a commented VERDICT_ONLY_RULES entry when message parity is structurally impossible)');
+        });
+    });
+});
+
+describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     describe('Move 2 rules NEVER change the deploy verdict (parity invariant)', function () {
-        // The critical guarantee: lint_core gained a new ERROR rule
+        // The critical guarantee: lint-core gained a new ERROR rule
         // (crossCallable-not-array) and several warnings, but validateSyntax (the
         // on-chain deploy gate) must block on CONSENSUS_RULES ONLY. A contract that
         // only trips a Move-2 rule still deploys.

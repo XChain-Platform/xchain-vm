@@ -180,7 +180,10 @@ async function executeHealthyContractAfterExhaustion(h) {
         it('should terminate on timeout', async function() {
             const hShort = new E2EHarness(XChainVM, {
                 gasCeiling: 100000000, // Very high gas so it won't gas-out first
-                limits: { maxCpuTimeMs: 500 }
+                limits: { maxCpuTimeMs: 500 },
+                // The per-node maxCpuTimeMs binds only below the consensus wall-clock
+                // gate (wallClockBudgetMs), so this case pins a pre-gate block time.
+                blockTimestamp: 1700000000
             });
             hShort.seedBalance('deployer', 'XCHAIN', '1000000');
 

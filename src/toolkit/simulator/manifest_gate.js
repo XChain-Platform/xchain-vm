@@ -28,7 +28,7 @@ const {
     META_VERSION_MAX_BYTES,
     isValidMetaText
 } = require('../gate/meta_validation.js');
-const { CONTRACT_META_REQUIRED_TIMES } = require('./constants.js');
+const { CONTRACT_META_REQUIRED_TIMES, DEPLOY_INIT_STRICT_TIMES } = require('./constants.js');
 
 // Policy-row rejections, written verbatim into the DEPLOY status by applyManifestPolicy.
 const MANIFEST_POLICY_VERDICTS = Object.freeze({
@@ -48,6 +48,18 @@ function isContractMetaRequiredActive(network, blockTime) {
     const known = Object.prototype.hasOwnProperty.call(CONTRACT_META_REQUIRED_TIMES, network);
     const at = CONTRACT_META_REQUIRED_TIMES[known ? network : 'mainnet'];
     return Number(blockTime) >= at;
+}
+
+/**
+ * Whether DEPLOY_INIT_STRICT is armed at this block time, so a DEPLOY runs an
+ * exported `initialize` even with no constructor params.
+ * @param {string} network
+ * @param {number} blockTime - seconds
+ * @returns {boolean}
+ */
+function isDeployInitStrictActive(network, blockTime) {
+    const known = Object.prototype.hasOwnProperty.call(DEPLOY_INIT_STRICT_TIMES, network);
+    return Number(blockTime) >= DEPLOY_INIT_STRICT_TIMES[known ? network : 'mainnet'];
 }
 
 /**
@@ -109,6 +121,7 @@ function metaFieldsError(parsed) {
 module.exports = {
     MANIFEST_POLICY_VERDICTS,
     isContractMetaRequiredActive,
+    isDeployInitStrictActive,
     manifestPolicyError,
     contractMetaError
 };

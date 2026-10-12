@@ -27,12 +27,16 @@ let XChainVM;
 try { XChainVM = require('../../src/index.js'); }
 catch (e) { console.log('Skipping E2E tests (isolated-vm not available)'); }
 
-function createHarness() {
-    const h = new E2EHarness(XChainVM);
+function createHarness(overrides) {
+    const h = new E2EHarness(XChainVM, overrides);
     h.seedBalance('deployer', 'XCHAIN', '1000000');
     h.seedBalance('user1', 'XCHAIN', '1000000');
     return h;
 }
+
+// Cases that store unlinted source run on the no-network path, where the
+// execute-time re-lint is off and the runtime sandbox is the only line left.
+const NO_RELINT = { network: null };
 
 async function deployPreHardening(h, opts) {
     const validateSyntax = h.vm.validateSyntax;
@@ -88,6 +92,7 @@ async function executeHostStateProbe(h) {
     // --- E2E-030: Sandbox escape attempts ---
     describe('E2E-030: Sandbox escape battery', function() {
         it('should block all escape vectors through the full pipeline', async function() {
+            h = createHarness(NO_RELINT);
             const code = h.loadContract('sandbox_escape.js');
             const deployed = await deployPreHardening(h, {
                 code, deployer: 'deployer', contractAddress: 'C:BTC:30'
@@ -153,6 +158,7 @@ async function executeHostStateProbe(h) {
         });
 
         it('should block Math.random()', async function() {
+            h = createHarness(NO_RELINT);
             const deployed = await deployPreHardening(h, {
                 code: `module.exports = {
                     initialize: function(xchain) {},
@@ -183,6 +189,27 @@ async function executeHostStateProbe(h) {
             });
             assertSuccess(r);
             assert.strictEqual(JSON.parse(r.returnValue), 'undefined');
+        });
+    });
+});
+
+(XChainVM ? describe : describe.skip)('E2E: Security Enforcement', function() {
+    let h;
+
+    beforeEach(function() { h = createHarness(); });
+
+    describe('E2E-031: Non-deterministic APIs blocked', function() {
+        it('re-lints stored Math.random source at execute time on the default harness', async function() {
+            // Store the source straight onto the ledger, as a pre-hardening deploy left it.
+            h.ledger.deployContract('C:BTC:31d', `module.exports = {
+                    tryRandom: function(xchain) { return typeof Math.random; }
+                };`, 'deployer', h.ledger.blockHeight);
+            const r = await h.execute({
+                contractAddress: 'C:BTC:31d', method: 'tryRandom',
+                params: [], caller: 'user1'
+            });
+            assert.strictEqual(r.success, false, 'unlinted source must not execute on mainnet rules');
+            assert(/Math\.random/.test(r.error), 'expected an execute-time lint rejection, got: ' + r.error);
         });
     });
 });

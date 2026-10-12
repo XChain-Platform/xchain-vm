@@ -76,3 +76,48 @@ const GAS_SCHEDULE = {
         }
     });
 });
+
+(XChainVM ? describe : describe.skip)('constructor emission cap back-fill', function () {
+
+    // Run a contract that emits `count` SENDs under a partial limits object.
+    async function emitMany(count) {
+        const vm = new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000, execution: 'in-process',
+                                  limits: { maxCpuTimeMs: 5000, maxMemory: 8 } });
+        const lines = [];
+        for (let i = 0; i < count; i++)
+            lines.push('xchain.emit.send({ destination: "addr' + i + '", tick: "T", quantity: "1" });');
+        vm.beginBlock();
+        try {
+            return await vm.execute({
+                code: 'module.exports = function(xchain) {\n' + lines.join('\n') + '\n};',
+                state: {}, method: 'default', params: [],
+                caller: 'addr', contractAddress: 'C:BTC:TEST',
+                blockContext: { height: 1, timestamp: 1700000000, hash: 'h' }
+            });
+        } finally {
+            vm.endBlock();
+        }
+    }
+
+    it('a partial limits object no longer disables the emission cap', async function () {
+        const over = await emitMany(51);
+        assert.strictEqual(over.success, false);
+        assert.ok(/emission limit exceeded \(50\)/.test(over.error), over.error);
+        const atCap = await emitMany(50);
+        assert.strictEqual(atCap.success, true, atCap.error);
+        assert.strictEqual(atCap.emittedActions.length, 50);
+    });
+});
+
+describe('resolveLimits back-fills the emission cap', function () {
+    const { resolveLimits } = require('../../../src/index/runtime/limits_defaults.js');
+
+    it('defaults maxEmissions to 50 on a partial limits object', function () {
+        assert.strictEqual(resolveLimits({ maxCpuTimeMs: 5000, maxMemory: 8 }).maxEmissions, 50);
+    });
+
+    it('keeps a caller-supplied maxEmissions and the no-limits default', function () {
+        assert.strictEqual(resolveLimits({ maxEmissions: 7 }).maxEmissions, 7);
+        assert.strictEqual(resolveLimits(undefined).maxEmissions, 50);
+    });
+});

@@ -87,11 +87,9 @@ function buildCallIdPreimage(fields) {
            fields.emissionIndex + ':' + fields.targetChain;
 }
 
-// Cross-CHAIN call (XCALL) protocol constants. Vendored single source of truth:
-// ./protocol/constants.js (byte-identical to xchain-documentation/protocol/
-// constants.js); mirrored in src/index.js exports and re-validated host-side by
-// the indexer. Deriving from the vendored module makes a bare-literal drift
-// impossible by construction.
+// Read the cross-CHAIN call (XCALL) bounds from the vendored ./protocol/constants.js, never
+// as bare literals. Only the ones test/determinism/xcall-constants-cross-repo.test.js gates
+// are checked against the sibling and documentation copies; the indexer re-validates host-side.
 const PROTO = require('./protocol/constants.js');
 const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;
 const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;
@@ -99,6 +97,9 @@ const XCALL_MAX_HOPS            = PROTO.XCALL_MAX_HOPS;
 const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
 const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;
 const XCALL_DEFAULT_DEADLINE    = 400;   // caller default only; not a protocol bound (absent from canonical)
+// Same-chain call limits, the emit-context fallback when a caller passes none (never literals).
+const VM_MAX_CALL_DEPTH         = PROTO.VM_MAX_CALL_DEPTH;
+const VM_MIN_CALL_GAS           = PROTO.VM_MIN_CALL_GAS;
 
 // VM_XCALL_REQUEST / VM_XCALL_CALLBACK are charged directly from the schedule
 // (like VM_EMISSION). Both are CANONICAL_GAS_KEYS, so GasTracker construction
@@ -114,8 +115,8 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     // emit API directly) -> depth 0 with the protocol defaults.
     const ctx = callContext || {};
     const callDepth    = Number.isInteger(ctx.callDepth)    ? ctx.callDepth    : 0;
-    const maxCallDepth = Number.isInteger(ctx.maxCallDepth) ? ctx.maxCallDepth : 4;
-    const minCallGas   = Number.isInteger(ctx.minCallGas)   ? ctx.minCallGas   : 5000;
+    const maxCallDepth = Number.isInteger(ctx.maxCallDepth) ? ctx.maxCallDepth : VM_MAX_CALL_DEPTH;
+    const minCallGas   = Number.isInteger(ctx.minCallGas)   ? ctx.minCallGas   : VM_MIN_CALL_GAS;
     const crossHops    = Number.isInteger(ctx.crossHops)    ? ctx.crossHops    : 0;
     // ctx.callPath (the deterministic '>'-joined call-path, root = '') and
     // ctx.rootActionIndex (the per-root discriminator, pinned at the root) enter

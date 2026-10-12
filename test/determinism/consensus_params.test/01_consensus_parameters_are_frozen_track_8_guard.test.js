@@ -22,7 +22,7 @@
 const assert = require('assert');
 const cr = require('../../../src/consensus-runtime.js');
 const vm = require('../../../src/index.js');
-const lintCore = require('../../../src/lint_core.js');
+const lintCore = require('../../../src/lint-core.js');
 const metering = require('../../../src/metering.js');
 
 // The indexer's protocol-change sources as [file, text] pairs: src/protocol_changes.js plus
@@ -54,9 +54,16 @@ function indexerFlagDayLiterals(sources, name) {
     }
     return found;
 }
-
 describe('consensus parameters are frozen (track 8 guard)', function () {
-
+    it('APPLY_LENGTH_METER_ACTIVATION is sealed, unarmed on mainnet and armed on testnet', function () {
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, late = 4102444800;
+        assert.ok(Number.isSafeInteger(armed) && armed > 1 && Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
+        assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION, { mainnet: null, testnet: armed, regtest: 0 });
+        for (const [network, t, on] of [['regtest', 0, true], ['mainnet', late, false], ['unknown', late, false], [undefined, late, false], ['testnet', 1, false], ['testnet', armed, true]])
+            assert.strictEqual(vm.isApplyLengthMeterActive(network, t), on, `${network}@${t}`);
+    });
+});
+describe('consensus parameters are frozen (track 8 guard)', function () {
     it('BINARY_ALLOC_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // The F3-binary ArrayBuffer/TypedArray byte-length gas charge activates
         // fleet-wide at this block time. It is hashed (gasUsed → contract_hash) and
@@ -68,7 +75,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.BINARY_ALLOC_GATE_BLOCK_TIME, 1786060800);
     });
 });
-
 describe('consensus parameters are frozen (track 8 guard)', function () {
     it('CONSENSUS_MAX_WALL_MS is the frozen per-execution wall-clock budget', function () {
         // Gas does not bound wall time: shapes exist whose wall-time-per-gas is far
@@ -91,7 +97,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isConsensusWallClockActive('mainnet', vm.BINARY_ALLOC_GATE_BLOCK_TIME - 1), false);
     });
 });
-
 describe('consensus parameters are frozen (track 8 guard)', function () {
     it('CALL_SPREAD_METER_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // Size-metering of call/new/method argument spread (the __arrspread-wrapped
@@ -138,9 +143,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
             'REST_PATTERN_METER must keep its own FUTURE flag-day; the contract-era instant is in the past');
     });
 });
-
 describe('consensus parameters are frozen (track 8 guard)', function () {
-
     it('REST_PATTERN_METER_GATE_BLOCK_TIME matches the indexer REST_PATTERN_METER literal (cross-repo repin guard)', function () {
         // The VM constant and the indexer protocol_changes entry are the two halves of one
         // flag day: the VM gates the metering rewrite on it, the indexer gates the deploy
@@ -160,7 +163,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
-
     it('Package 3 VM-sandbox bundle gate: per-coin activation heights + depth bounds are frozen', function () {
         // The whole flag-day Package 3 VM-sandbox bundle flips on ONE per-coin
         // block-HEIGHT gate (the musl-safe recursion bound folded in, the
@@ -210,7 +212,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
-
     it('execute-time source-lint gate: per-coin map is ARMED AT GENESIS on mainnet and the gas divisor is frozen', function () {
         // Re-linting stored contract code at EXECUTE time flips executions that pass the
         // deploy-time check into failures and adds a source-length-derived gas charge, so both
@@ -250,7 +251,6 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 });
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
-
     it('lint global-alias gate: per-coin map is ARMED AT GENESIS on mainnet and cannot ride an open gate', function () {
         // Widening banned-async / banned-wasm to the aliased global reads (sloppy-mode
         // `this`, the globalThis self-reference chain) changes which contracts the chain

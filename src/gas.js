@@ -65,11 +65,31 @@ function effectiveCeiling(requested, configCeiling) {
     return configCeiling;
 }
 
+// Activation for failing a run that reached the host as a success although a charge
+// crossed the ceiling inside the isolate (a contract-side catch, or an Object.* statics
+// wrapper, swallowed the exhaustion fault). It moves a run's status and gasUsed, so it
+// is gated. Mainnet and testnet are unarmed (null) until a release cut schedules an
+// instant; regtest runs the rule from genesis. Unknown or missing networks resolve like
+// mainnet.
+const GAS_CEILING_SUCCESS_ACTIVATION = Object.freeze({
+    mainnet: null,
+    testnet: 1791804379,
+    regtest: 0,
+});
+function isGasCeilingSuccessActive(network, blockTime) {
+    const gate = Object.hasOwn(GAS_CEILING_SUCCESS_ACTIVATION, network)
+        ? GAS_CEILING_SUCCESS_ACTIVATION[network] : null;
+    if (!Number.isFinite(gate)) return false;
+    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
+}
+
 class GasTracker {
     // The key list and the ceiling resolver ride on the class itself, so the module
     // has one export shape and `require('./gas.js').effectiveCeiling` still reads them.
     static CANONICAL_GAS_KEYS = CANONICAL_GAS_KEYS;
     static effectiveCeiling = effectiveCeiling;
+    static GAS_CEILING_SUCCESS_ACTIVATION = GAS_CEILING_SUCCESS_ACTIVATION;
+    static isGasCeilingSuccessActive = isGasCeilingSuccessActive;
 
     constructor(gasSchedule, gasCeiling) {
         // Validate schedule: all values must be non-negative integers
@@ -92,6 +112,9 @@ class GasTracker {
         this.schedule = gasSchedule;
         this.ceiling  = gasCeiling;
         this.used     = 0;
+        // Set when a charge crossed the ceiling, so the host can fail a run whose
+        // exhaustion fault was caught inside the isolate before it reached the host.
+        this.exhausted = false;
     }
 
     charge(amount) {
@@ -106,8 +129,10 @@ class GasTracker {
         if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)
             throw new Error('gas charge amount must be a non-negative finite number, got: ' + amount);
         this.used += amount;
-        if (this.used > this.ceiling)
+        if (this.used > this.ceiling) {
+            this.exhausted = true;
             throw new GasExhaustedError(this.used, this.ceiling);
+        }
     }
 
     chargeComputation() {

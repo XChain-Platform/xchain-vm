@@ -29,8 +29,8 @@
  *      stripped-global list. Note the last of those is NOT deploy-blocking: the
  *      globals are deleted from the isolate at runtime, so a contract using one
  *      passes the gate and throws on its first execution. The taught list is not
- *      a copy: it is required from src/stripped_globals.js, the one definition
- *      sandbox.js and lint_core.js consume too, which is dependency-free so this
+ *      a copy: it is required from src/stripped-globals.js, the one definition
+ *      sandbox.js and lint-core.js consume too, which is dependency-free so this
  *      module stays isolated-vm-free while sandbox.js is not.
  *   2. buildAuthoringPrompt() turns an English brief or a Solidity source into a
  *      well-formed system+user message pair embedding that knowledge.
@@ -58,7 +58,7 @@ const {
     HARD_RULES,
     CONTRACT_SHAPE
 } = require('./authoring/authoring_knowledge.js');
-const { STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT } = require('../stripped_globals.js');
+const { STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT } = require('../stripped-globals.js');
 const {
     buildSystemPrompt,
     buildUserPrompt,
@@ -71,12 +71,12 @@ const KNOWLEDGE = {
     nativePrimitives: NATIVE_PRIMITIVES,
     conceptMap: CONCEPT_MAP,
     hardRules: HARD_RULES,
-    // The sandbox's stripped-global list, straight from src/stripped_globals.js.
+    // The sandbox's stripped-global list, straight from src/stripped-globals.js.
     // Exported so a test can compare it to the enforced list by value rather
     // than by grepping rendered prose.
     strippedGlobals: STRIPPED_GLOBALS_TAUGHT,
     // The deploy gate's reserved identifiers, derived from metering.js and
-    // lint_core.js. Exported for the same reason strippedGlobals is: a test
+    // lint-core.js. Exported for the same reason strippedGlobals is: a test
     // compares it to the enforced lists by value instead of grepping prose.
     reservedIdentifiers: RESERVED_NAMES_TAUGHT,
     contractShape: CONTRACT_SHAPE

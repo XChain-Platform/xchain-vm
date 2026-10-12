@@ -17,8 +17,20 @@ const XChainVM = require('../../index.js');
 const {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
-    HEIGHT_GATES
+    isArmedGateTime,
+    HEIGHT_GATES,
+    TIME_NETWORK_GATES
 } = require('./constants.js');
+
+/**
+ * Armed, non-genesis instants of the per-network time gates for one network. A 0
+ * entry is on from genesis and needs no anchor; an unarmed placeholder never counts.
+ * With no network there are none, which keeps the network-agnostic anchors as they were.
+ */
+function networkGateTimes(network) {
+    if (network === undefined) return [];
+    return TIME_NETWORK_GATES.map((g) => g.resolve(network)).filter((t) => isArmedGateTime(t) && t > 0);
+}
 
 /**
  * The newest gate that has elapsed at `nowSeconds`: the rule set a live chain runs.
@@ -28,12 +40,44 @@ const {
  * to a ratified gate constant, so the only clock dependence is which side of a
  * flag day the host sits on, which is exactly the question being asked.
  *
+ * Given a network, that network's elapsed per-network time gates count too, so a
+ * testnet simulation sits on testnet's own already-armed instants.
+ *
  * @param {number} [nowSeconds] - unix seconds; defaults to the host clock
+ * @param {string} [network] - fold in this network's TIME_NETWORK_GATES entries
  * @returns {number} unix seconds
  */
-function liveBlockTime(nowSeconds = Math.floor(Date.now() / 1000)) {
-    const elapsed = GATE_BLOCK_TIMES.filter((t) => t <= nowSeconds);
+function liveBlockTime(nowSeconds = Math.floor(Date.now() / 1000), network) {
+    const elapsed = GATE_BLOCK_TIMES.concat(networkGateTimes(network)).filter((t) => t <= nowSeconds);
     return elapsed.length ? Math.max(...elapsed) : GATE_FALLBACK_BLOCK_TIME;
+}
+
+/**
+ * The preview anchor: the newest ARMED gate, elapsed or not, scalar or (given a
+ * network) per-network. The fallback is the same ratified literal liveBlockTime uses.
+ *
+ * @param {string} [network]
+ * @returns {number} unix seconds
+ */
+function scheduledBlockTime(network) {
+    const armed = GATE_BLOCK_TIMES.concat(networkGateTimes(network));
+    return armed.length ? Math.max(...armed) : GATE_FALLBACK_BLOCK_TIME;
+}
+
+/**
+ * Every armed gate dated after `live` (scalar, plus the network's own), named with
+ * its epoch and UTC date, for the scheduled-mode preview warning.
+ */
+function gatesAheadOf(live, network) {
+    const at = (t) => ' (' + t + ', ' + new Date(t * 1000).toISOString() + ')';
+    const scalar = Object.keys(XChainVM)
+        .filter((k) => /_GATE_BLOCK_TIME$/.test(k) && isArmedGateTime(XChainVM[k]) && XChainVM[k] > live)
+        .map((k) => k + at(XChainVM[k]));
+    const perNetwork = network === undefined ? [] : TIME_NETWORK_GATES
+        .map((g) => ({ label: g.label, t: g.resolve(network) }))
+        .filter(({ t }) => isArmedGateTime(t) && t > live)
+        .map(({ label, t }) => label + ' on ' + network + at(t));
+    return scalar.concat(perNetwork);
 }
 
 /**
@@ -74,4 +118,7 @@ function defaultBlockHeight(coin, network) {
     return needs.length ? Math.max(...needs) : 1;
 }
 
-module.exports = { liveBlockTime, heightGateThreshold, heightGateNeed, defaultBlockHeight };
+module.exports = {
+    liveBlockTime, scheduledBlockTime, networkGateTimes, gatesAheadOf,
+    heightGateThreshold, heightGateNeed, defaultBlockHeight
+};
