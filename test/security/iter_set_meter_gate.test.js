@@ -15,9 +15,9 @@
  *
  * Iterator helpers (toArray, drop), String isWellFormed/toWellFormed, the Set
  * algebra family do O(n) native work that the AST meter bills at a flat unit per
- * call. The metering is gated: regtest runs it
- * from genesis, mainnet and testnet are unarmed (null). The same gate fails a run
- * whose gas-exhaustion fault was swallowed by an Object.* statics wrapper.
+ * call. The metering is gated per network by ITER_SET_METER_ACTIVATION: regtest runs
+ * it from genesis, mainnet and testnet at the instants that table holds. The same
+ * gate fails a run whose gas-exhaustion fault was swallowed by an Object.* statics wrapper.
  ********************************************************************/
 // @ts-nocheck
 

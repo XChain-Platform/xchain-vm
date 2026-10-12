@@ -37,6 +37,7 @@
 
 const { lintSource, findFloatWarnings, CONSENSUS_RULES } = require('../lint-core.js');
 const { checkContractMeta, getExportedMeta, isValidMetaText } = require('./gate/meta_validation.js');
+const { gatedStripWarnings } = require('./gate/gated_strip_warnings.js');
 
 // Heuristic gas-budget estimate. Ported from xchain-sdk ContractUtils
 // .suggestGasLimit (src/contract/utils.js): a coarse author-time budget, NOT a
@@ -118,6 +119,9 @@ function runGate(code) {
             for (const w of (findFloatWarnings(code) || [])) warnings.push(w);
         } catch (e) { /* unparseable; errors already captured it */ }
     }
+    // The height-gated BigInt surface strip is outside lint-core's stripped-global
+    // advisory, so the gate adds its own non-blocking warning for it.
+    for (const w of gatedStripWarnings(code)) warnings.push(w);
 
     return {
         ok: errors.length === 0,

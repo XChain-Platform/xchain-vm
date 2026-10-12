@@ -23,12 +23,13 @@
  * loop, no recursion), feed it to one of these sinks, CATCH the RangeError, and
  * branch on caught-vs-not -> divergent hashed state on a heterogeneous-OS fleet.
  *
- * The guard pre-checks nesting depth against the platform-independent
- * __DEPTH_LIMIT and routes an over-depth value into the same un-swallowable
- * __stackPoison the contract-recursion guard uses, so the outcome is a
- * DETERMINISTIC out_of_stack on every host. It is CONSENSUS-GATED on the same
- * block-time flag-day as F3-binary/globals: below the gate the legacy
- * (catchable native overflow) behaviour replays unchanged.
+ * The guard pre-checks nesting depth against __NR_DEPTH_LIMIT, the
+ * platform-independent min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL) injected by
+ * src/index/runtime/isolate_globals.js, and routes an over-depth value into
+ * the same un-swallowable __stackPoison the contract-recursion guard uses, so
+ * the outcome is a DETERMINISTIC out_of_stack on every host. It is
+ * CONSENSUS-GATED on the same block-time flag-day as F3-binary/globals: below
+ * the gate the legacy (catchable native overflow) behaviour replays unchanged.
  ********************************************************************/
 // @ts-nocheck
 

@@ -68,9 +68,9 @@ function effectiveCeiling(requested, configCeiling) {
 // Activation for failing a run that reached the host as a success although a charge
 // crossed the ceiling inside the isolate (a contract-side catch, or an Object.* statics
 // wrapper, swallowed the exhaustion fault). It moves a run's status and gasUsed, so it
-// is gated. Mainnet and testnet are unarmed (null) until a release cut schedules an
-// instant; regtest runs the rule from genesis. Unknown or missing networks resolve like
-// mainnet.
+// is gated. Each entry is the block-time instant the rule arms at on that network (null
+// leaves it unarmed, 0 runs it from genesis); the published Flag-Day Values page carries
+// each network's current status. Unknown or missing networks resolve like mainnet.
 const GAS_CEILING_SUCCESS_ACTIVATION = Object.freeze({
     mainnet: null,
     testnet: 1791804379,

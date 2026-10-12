@@ -70,7 +70,17 @@ const CONCEPT_MAP = [
 // point is that the authoring loop and the acorn gate run on any OS) while
 // making a taught/enforced mismatch impossible to write. sandbox.js and
 // lint-core.js require the same module.
-const { STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT } = require('../../stripped-globals.js');
+const {
+    STRIPPED_GLOBAL_NAMES: STRIPPED_GLOBALS_TAUGHT,
+    BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES: GATED_STRIPPED_GLOBALS_TAUGHT
+} = require('../../stripped-globals.js');
+
+// The DataView BigInt accessors the same height-gated strip neuters. sandbox.js
+// owns BIGINT_SURFACE_STRIPPED_PROTO_METHODS but requires isolated-vm, so the
+// names are restated here and held equal by test/toolkit/gated_strip_parity.test.js.
+const GATED_STRIPPED_PROTO_METHODS_TAUGHT = Object.freeze([
+    'getBigInt64', 'getBigUint64', 'setBigInt64', 'setBigUint64'
+]);
 
 // The identifiers the deploy gate rejects, taught by NAME rather than retyped as
 // a prefix sketch. Two authorities, both acorn-only (so requiring them keeps this
@@ -116,6 +126,11 @@ const HARD_RULES = [
     'No host globals. These are DELETED from the sandbox, so a contract that touches one deploys and then throws at execution: ' +
         STRIPPED_GLOBALS_TAUGHT.join(', ') +
         '. Also no `eval`, no `Function`, no `.constructor` access, no `require`/`import`/filesystem/network.',
+    'No 64-bit BigInt typed arrays: ' + GATED_STRIPPED_GLOBALS_TAUGHT.join(', ') +
+        ' and the DataView methods ' + GATED_STRIPPED_PROTO_METHODS_TAUGHT.join(', ') +
+        '. The sandbox deletes these behind an activation height (always on regtest and in the ' +
+        'simulator default, on testnet past its activation height, on mainnet once activated), ' +
+        'so a contract that uses one deploys and then throws at execution. Use xchain.math.* instead.',
     'ES2020 syntax maximum (no numeric separators, no logical-assignment, no top-level await).',
     'Do not declare or reference these reserved identifiers (the metering pass and the contract wrapper inject them; the deploy gate rejects any reference): ' +
         RESERVED_NAMES_TAUGHT.join(', ') +
@@ -149,6 +164,8 @@ module.exports = {
     NATIVE_PRIMITIVES,
     CONCEPT_MAP,
     STRIPPED_GLOBALS_TAUGHT,
+    GATED_STRIPPED_GLOBALS_TAUGHT,
+    GATED_STRIPPED_PROTO_METHODS_TAUGHT,
     RESERVED_NAMES_TAUGHT,
     HARD_RULES,
     CONTRACT_SHAPE

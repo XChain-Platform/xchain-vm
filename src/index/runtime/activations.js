@@ -232,11 +232,11 @@ function isRestPatternMeterActive(network, blockTime) {
 }
 
 // Activation for metering the native work the other size charges miss: iterator
-// helpers (toArray, drop), String isWellFormed/toWellFormed, the Set algebra family
-// and Function.prototype.apply with a long argument list. Every one moves gasUsed,
-// so it is gated. Mainnet and
-// testnet are unarmed (null) until a release cut schedules an instant; regtest runs
-// the rule from genesis. Unknown or missing networks resolve like mainnet.
+// helpers (toArray, drop), String isWellFormed/toWellFormed and the Set algebra family
+// (Function.prototype.apply is gated in ../apply_length_meter.js). Every one moves gasUsed,
+// so it is gated. Each entry is the block-time instant the rule arms at on that network
+// (null leaves it unarmed, 0 runs it from genesis); the published Flag-Day Values page
+// carries each network's current status. Unknown or missing networks resolve like mainnet.
 const ITER_SET_METER_ACTIVATION = Object.seal({
     mainnet: null,
     testnet: 1791804379,
@@ -291,7 +291,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 }
 
 // Activation for the CONSENSUS wall-clock budget per execution
-// (CONSENSUS_MAX_WALL_MS, ./consensus-wall-clock.js). Below this gate the
+// (CONSENSUS_MAX_WALL_MS, src/consensus-wall-clock.js). Below this gate the
 // wall-clock net is the per-NODE limits.maxCpuTimeMs, which is not a consensus
 // value: two validators configured differently return DIFFERENT statuses and
 // DIFFERENT gasUsed for the same execution (timeout + gasUsed clamped to the
