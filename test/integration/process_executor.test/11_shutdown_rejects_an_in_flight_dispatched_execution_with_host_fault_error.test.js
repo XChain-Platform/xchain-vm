@@ -24,14 +24,14 @@
 
 const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAVE_IVM } = require('./support/executor_setup.js');
 
-    // The in-flight half of the same fix must be unchanged: an execution
-    // already DISPATCHED to the worker when shutdown() runs still RESOLVES
-    // with the deterministic host-terminated result (every validator sees
-    // the same poisoned-contract outcome for work that actually started).
+    // A shutdown is local to this node, so an execution already DISPATCHED when
+    // shutdown() runs REJECTS with HostFaultError like the queued ones: every
+    // other validator finishes that contract normally, so a fabricated
+    // out_of_resource here would be a result no peer commits.
 (HAVE_IVM ? describe : describe.skip)('process_executor: out-of-process execution', function () {
     this.timeout(60000);
 
-    it('shutdown() still RESOLVES an in-flight (dispatched) execution with the host-terminated result', async function () {
+    it('shutdown() REJECTS an in-flight (dispatched) execution with HostFaultError', async function () {
         const ProcessExecutor = require('../../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
@@ -43,10 +43,8 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
 
             await exec.shutdown();
 
-            const r = await inFlight;
-            assert.strictEqual(r.success, false, 'in-flight execution interrupted by shutdown resolves a failure');
-            assert.match(r.error, /out_of_resource/, 'must be the deterministic host-terminated result');
-            assert.strictEqual(r.gasUsed, GAS_CEILING, 'fabricated result clamps gasUsed to the ceiling');
+            await assert.rejects(inFlight, (e) => e.name === 'HostFaultError' && e.code === 'EXECUTOR_UNAVAILABLE',
+                'an in-flight execution interrupted by shutdown must reject as a host fault, never resolve');
         } finally {
             // shutdown() already ran above; calling again is a harmless no-op.
         }

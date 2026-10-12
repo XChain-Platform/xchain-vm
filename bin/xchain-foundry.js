@@ -29,9 +29,12 @@
  *   xchain-foundry simulate <file> [--method M] [--params a,b]
  *                                   [--constructor a,b] [--caller ADDR]
  *                                   [--execution in-process|subprocess]
+ *                                   [--network mainnet|testnet|regtest] [--coin TICKER]
  *       Deploy the contract in the in-memory simulator and run one method,
  *       printing the result (success, returnValue, gasUsed, emitted actions,
  *       state changes). Requires the isolated-vm binding (Node 22 / Linux).
+ *       The default network is regtest, which runs gates no live chain runs yet,
+ *       so its gasUsed and status can differ; --network mainnet reproduces mainnet.
  *       --execution subprocess runs the mode the indexer runs: slower (one
  *       forked worker) but it reports the chain's out_of_resource result for a
  *       contract that aborts the JS engine, instead of taking this process down.
@@ -75,6 +78,7 @@ function usage(msg) {
         '  xchain-foundry gas <file...>\n' +
         '  xchain-foundry simulate <file> [--method M] [--params a,b] [--constructor a,b] [--caller ADDR]\n' +
         '                                 [--execution in-process|subprocess]\n' +
+        '                                 [--network mainnet|testnet|regtest] [--coin TICKER]\n' +
         '  xchain-foundry describe "<what it should do>" [--ts] [--json]\n' +
         '  xchain-foundry from-solidity <file.sol> [--ts] [--json]\n' +
         '  xchain-foundry validate <response-file|-> [--ts] [--json]\n'
@@ -212,10 +216,23 @@ async function cmdSimulate(args) {
         if (execution !== 'in-process' && execution !== 'subprocess')
             usage('--execution must be in-process or subprocess, got ' + JSON.stringify(execution));
     }
+    // Default left to the simulator (regtest), which runs gates no live chain runs
+    // yet; --network mainnet is how an author reproduces mainnet gasUsed and status.
+    const simOpts = {};
+    if (execution) simOpts.execution = execution;
+    if (args.flags.network !== undefined) {
+        simOpts.network = String(args.flags.network);
+        if (!['mainnet', 'testnet', 'regtest'].includes(simOpts.network))
+            usage('--network must be mainnet, testnet or regtest, got ' + JSON.stringify(args.flags.network));
+    }
+    if (args.flags.coin !== undefined) {
+        if (args.flags.coin === true || String(args.flags.coin) === '') usage('--coin requires a ticker');
+        simOpts.coin = String(args.flags.coin).toUpperCase();
+    }
 
     let sim;
     try {
-        sim = new ContractSimulator(execution ? { execution } : {});
+        sim = new ContractSimulator(simOpts);
     } catch (e) {
         process.stderr.write('error: cannot start the simulator (' + e.message + ')\n' +
             'Run on Node 22 / Linux where isolated-vm loads.\n');
@@ -231,6 +248,8 @@ async function cmdSimulate(args) {
         const res = await sim.call(dep.contractIndex, method, params, { caller });
         process.stdout.write(JSON.stringify({
             method,
+            network: sim.network,
+            coin: sim.coin,
             success: res.success,
             error: res.error,
             returnValue: res.returnValue,

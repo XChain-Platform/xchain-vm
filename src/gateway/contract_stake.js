@@ -24,9 +24,10 @@
 // ceiling MAX_TOKEN_DECIMALS (18, xchain-indexer/src/config/token_limits.js), the precision
 // STAKE v3 already admits and slashContractStake already computes at. Which form
 // applies is decided by readOnlyData.slashAmountPrecisionOn (host-set, see
-// isSlashAmountPrecisionActive in index.js) because ACCEPTING a call the legacy
+// isSlashAmountPrecisionActive in src/index/runtime/activations.js) because ACCEPTING a call the legacy
 // form rejects changes replay for historical blocks exactly as rejecting one does.
-// Both forms are built in ./slash_limits.js from the ceilings index.js also exports.
+// Both forms, and the ceilings they are built from, are defined in ./slash_limits.js; index.js
+// only re-exports MAX_SLASH_AMOUNT_DECIMALS, through src/index/runtime/public_exports.js.
 const { SLASH_AMOUNT_LEGACY_RE, SLASH_AMOUNT_WIDE_RE } = require('./slash_limits.js');
 
 // Shape checks for one contract.slash call, in the order they throw: the
@@ -58,6 +59,15 @@ function validateSlashArgs(pubkey, token, amount, readOnlyData) {
         throw new Error('contract.slash: amount must be a positive decimal string');
 }
 
+// An accessor may hand back a BigNumber; its JSON form is an object, so a contract
+// would read a different type than gateway.d.ts declares. Reads cross the isolate
+// boundary as the plain decimal string.
+function asDecimalString(value) {
+    if (value !== null && typeof value === 'object' && typeof value.toFixed === 'function')
+        return value.toFixed();
+    return typeof value === 'number' ? String(value) : value;
+}
+
 // The contract namespace: stake reads (metered) and the metered slash emission.
 function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasSchedule) {
     return {
@@ -72,7 +82,7 @@ function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasS
                 gasTracker.charge(gasSchedule.VM_STATE_READ);
                 if (!readOnlyData.contractStakeData) return '0';
                 if (typeof pubkey !== 'string' || typeof token !== 'string') return '0';
-                return readOnlyData.contractStakeData.getStake(pubkey, token);
+                return asDecimalString(readOnlyData.contractStakeData.getStake(pubkey, token));
             },
             // Total active staked amount across all stakers for (token) on THIS contract.
             getTotalStaked: (token) => {

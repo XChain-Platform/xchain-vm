@@ -11,9 +11,9 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * lint_core shared-rule coverage (2668 / 2669 / 2670)
+ * lint-core shared-rule coverage (2668 / 2669 / 2670)
  *
- * lint_core.js declares itself the shared source of truth for every
+ * lint-core.js declares itself the shared source of truth for every
  * acorn-coverable contract rule, and the SDK vendors it byte-identically. Two
  * rules were missing from it and enforced (or not) elsewhere:
  *
@@ -43,9 +43,9 @@ const {
     lintSource, CONSENSUS_RULES, codeSizeBytes, MAX_CODE_SIZE,
     findBannedProtoMethods, STRIPPED_PROTO_METHOD_NAMES,
     findBannedStrippedGlobals, STRIPPED_GLOBAL_NAMES_MIRROR, ADVISORY_STRIPPED_GLOBALS
-} = require('../../../src/lint_core.js');
+} = require('../../../src/lint-core.js');
 const { RESERVED_IDENTIFIERS } = require('../../../src/metering.js');
-const SHARED = require('../../../src/stripped_globals.js');
+const SHARED = require('../../../src/stripped-globals.js');
 const PROTO = require('../../../src/protocol/constants.js');
 
 // isolated-vm-dependent modules (Node 22 only); preflight.test.js is the loud guard.
@@ -57,7 +57,7 @@ const VALID = 'function init(){ return 1; }';
 const rules = (findings) => findings.map((f) => f.rule);
 const sized = (bytes) => VALID + '\n//' + 'x'.repeat(Math.max(0, bytes - VALID.length - 3));
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('2668: code-size is enforced by lintSource, not only by the CLI', function () {
         // A body of ASCII filler that parses; padded with a comment so the size
@@ -91,7 +91,7 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
     });
 });
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('2668: code-size is enforced by lintSource, not only by the CLI', function () {
 
@@ -126,7 +126,7 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
     });
 });
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('2669: sandbox-neutered prototype methods are linted', function () {
         it('flags the regex-coercing methods as warnings, not errors', function () {
@@ -178,12 +178,12 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
                 stripGlobalsMod.STRIPPED_PROTO_METHODS.map((e) => e.method)
             )).sort();
             assert.deepStrictEqual(STRIPPED_PROTO_METHOD_NAMES.slice().sort(), fromSandbox,
-                'lint_core mirror drifted from the sandbox neuter list');
+                'lint-core mirror drifted from the sandbox neuter list');
         });
     });
 });
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     // The sandbox deletes 24 globals so every validator computes the same result,
     // and the shipped templates document that strip as their reason to exist
@@ -241,7 +241,7 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
     });
 });
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('sandbox-stripped globals are linted (banned-stripped-global)', function () {
 
@@ -275,19 +275,19 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
     });
 });
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('sandbox-stripped globals are linted (banned-stripped-global)', function () {
 
-        // ONE definition of the strip set lives in src/stripped_globals.js. A
-        // hand-copied literal in sandbox.js, lint_core.js or toolkit/authoring.js
+        // ONE definition of the strip set lives in src/stripped-globals.js. A
+        // hand-copied literal in sandbox.js, lint-core.js or toolkit/authoring.js
         // could only be held equal by parity tests that SKIP wherever isolated-vm
         // will not load, i.e. exactly where the copies are consumed (the SDK, a
         // browser, a non-Linux dev box). These guards run WITHOUT the isolate, so
         // they cannot green-by-skip.
         it('the linter reads the one shared definition, not a copy of it', function () {
             assert.strictEqual(STRIPPED_GLOBAL_NAMES_MIRROR, SHARED.STRIPPED_GLOBAL_NAMES,
-                'lint_core must expose the very array stripped_globals.js froze; a distinct ' +
+                'lint-core must expose the very array stripped-globals.js froze; a distinct ' +
                 'array means a second literal crept back in and can drift again');
             assert.strictEqual(ADVISORY_STRIPPED_GLOBALS, SHARED.ADVISORY_STRIPPED_GLOBAL_NAMES);
             assert.ok(Object.isFrozen(STRIPPED_GLOBAL_NAMES_MIRROR), 'the shared set must be frozen');
@@ -300,7 +300,7 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
             // nowhere else in these files.
             const CONSUMERS = [
                 path.join(__dirname, '../../../src/sandbox.js'),
-                path.join(__dirname, '../../../src/lint_core.js'),
+                path.join(__dirname, '../../../src/lint-core.js'),
                 path.join(__dirname, '../../../src/toolkit/authoring.js')
             ];
             for (const file of CONSUMERS) {
@@ -309,15 +309,15 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
                 const bare = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
                 assert.ok(!/['"]structuredClone['"]/.test(bare),
                     path.basename(file) + ' names a stripped global in its own code; the set has ' +
-                    'ONE home (src/stripped_globals.js) and must be required, never re-listed');
-                assert.ok(/require\((['"])\.{1,2}\/stripped_globals\.js\1\)/.test(bare),
+                    'ONE home (src/stripped-globals.js) and must be required, never re-listed');
+                assert.ok(/require\((['"])\.{1,2}\/stripped-globals\.js\1\)/.test(bare),
                     path.basename(file) + ' must require the shared strip-set module');
             }
         });
     });
 });
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('sandbox-stripped globals are linted (banned-stripped-global)', function () {
 
@@ -343,7 +343,7 @@ describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
     });
 });
 
-describe('lint_core shared rules (2668 / 2669 / 2670)', function () {
+describe('lint-core shared rules (2668 / 2669 / 2670)', function () {
 
     describe('2670: the reserved-identifier rule covers all of RESERVED_IDENTIFIERS', function () {
         it('has twelve names spanning both hazard classes', function () {

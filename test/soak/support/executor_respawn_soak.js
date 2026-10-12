@@ -113,8 +113,9 @@ async function main() {
     for (let i = 1; i <= CYCLES; i++) {
         // Model a REAL worker crash: a contract is in-flight (dispatched, IPC
         // round-trip pending) when the worker dies. We SIGKILL mid-flight, then
-        // await that execution. It resolves via onExit to a deterministic
-        // host-terminated result and triggers the respawn synchronously.
+        // await that execution. An outside kill is a host fault, so it REJECTS
+        // with EXECUTOR_UNAVAILABLE (the expected path, not a transient error)
+        // and onExit triggers the respawn synchronously.
         // A transient host fault (fork EAGAIN under load, a /proc read racing a
         // dying pid) must not abort a multi-day soak; count it and continue.
         // A genuine leak still shows in the flat-line resource counters.
@@ -122,7 +123,10 @@ async function main() {
             const pidBefore = ex._child && ex._child.pid;
             const inFlight = vm.execute(runOpts(CHEAP));   // dispatched, not yet resolved
             if (ex._child) { try { ex._child.kill('SIGKILL'); } catch (e) {} }
-            const crashed = await inFlight;                // expected: success === false
+            const crashed = await inFlight.catch((e) => { // expected: a host-fault rejection
+                if (!e || e.code !== 'EXECUTOR_UNAVAILABLE') throw e;
+                return e;
+            });
             // Recovery: the NEXT contract must queue until the respawned worker is
             // 'ready' and then succeed. This is the determinism-critical recovery path the
             // real indexer relies on (a crash must not poison the following contract).

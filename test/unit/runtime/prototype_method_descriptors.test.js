@@ -35,7 +35,7 @@ const BASE_PROTOTYPE_ROWS = [
     ["endBlock", false, true, true, "function", 0],
     ["errorResult", false, true, true, "function", 4],
     ["execute", false, true, true, "function", 1],
-    ["getLintVerdict", false, true, true, "function", 8],
+    ["getLintVerdict", false, true, true, "function", 10],
     ["getMeteredCode", false, true, true, "function", 5],
     ["injectGateway", false, true, true, "function", 2],
     ["readManifest", false, true, true, "function", 2],
@@ -68,6 +68,8 @@ const BASE_STATIC_ROWS = [
     ["JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME", true, true, true, "number", null],
     ["JSON_STRINGIFY_HOOK_ACTIVATION", true, true, true, "object", null],
     ["jsonStringifyHookGateTime", true, true, true, "function", 1],
+    ["ITER_SET_METER_ACTIVATION", true, true, true, "object", null],
+    ["isIterSetMeterActive", true, true, true, "function", 2],
     ["ASYNC_SURFACE_GATE_BLOCK_TIME", true, true, true, "number", null],
     ["isAsyncSurfaceActive", true, true, true, "function", 2],
     ["STATE_KEY_NUL_GATE_BLOCK_TIME", true, true, true, "number", null],
@@ -101,6 +103,8 @@ const BASE_STATIC_ROWS = [
     ["STRIPPED_PROTO_METHODS", true, true, true, "object", null],
     ["NEUTERED_PROTO_CONSTRUCTORS", true, true, true, "object", null],
     ["SAFE_MATH_MEMBERS", true, true, true, "object", null],
+    ["GAS_CEILING_SUCCESS_ACTIVATION", true, true, true, "object", null],
+    ["isGasCeilingSuccessActive", true, true, true, "function", 2],
 ];
 
 // The constructor sets this flag on itself the first time an embedder omits

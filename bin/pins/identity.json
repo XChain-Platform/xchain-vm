@@ -2,24 +2,26 @@
   "what": "Identity pin for the vendored contract-lint trio, taken before the structure pass moved anything.",
   "why": "lint-parity.test.js is the only gate holding the vm canonical and the sdk copy byte-identical: there is no sync script. A rename that re-vendors the trio must reproduce these digests under the new names, or the two linters have drifted.",
   "takenAt": "AT1, xchain-vm at 8570dea0983a0508aae29761440c5a936b180047",
-  "note": "Declared, not graded: no tool, test or script in this repo reads this file, so a stale path or digest here fails nothing; the live parity gate is test/unit/lint_parity.test.js, which builds the sdk path itself. Every key, digest and sdkPath below is the AT1 record, unchanged; sdkPathAtOrigin records the sdk's spelling of the same file after its snake_case rename.",
+  "note": "Canonical digests are graded by bin/pin_identity.js. SDK metadata records the sibling commits that carry the byte-identical vendor copies; dedicated parity tests resolve those copies from the sibling SDK repository.",
   "algorithm": "sha256",
   "files": {
-    "src/lint_core.js": {
-      "canonical": "8f8a57481b7d3e6c63c142d8574357ab9021582e91fee74e53899c987d9405ea",
-      "vendoredInSdk": "720d64dc3151f4105378ce47e3c6edba61155c46677a0cb02df1c773a17ad65a",
+    "src/lint-core.js": {
+      "canonical": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
+      "vendoredInSdk": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
+      "sdkCommit": "b3cdaa502d4f716821f7d2b24911672f601eb66a",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },
     "src/metering.js": {
-      "canonical": "e2493e09ab11b6328aee767934d7506a8948302cfef666f5e08b9cc5314cd8c1",
+      "canonical": "16a4ddad41c86d77358487a8458f4f2c204636f99e036dd6092fc713d45e5e05",
       "vendoredInSdk": "834552b7f6c1a86084def6b5a0094a0626a1ca078cf87208a94b01e532a3f101",
       "sdkPath": "xchain-sdk/src/contract/metering.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/metering.js"
     },
-    "src/stripped_globals.js": {
-      "canonical": "580f415bcb94f5c98012945ab30c120f13928a0f7390c2ee4fe2a081432255fb",
-      "vendoredInSdk": "363aeedba1afd6e9882d9a21ab01336a3acd05b5b495928ea352084bbd75e7e9",
+    "src/stripped-globals.js": {
+      "canonical": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
+      "vendoredInSdk": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
+      "sdkCommit": "558576f6b11183e52a629df15b37f18db9a5fcef",
       "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/stripped_globals.js"
     }

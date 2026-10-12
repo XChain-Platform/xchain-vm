@@ -14,6 +14,7 @@
 // @ts-nocheck
 
 const XChainVM = require('../../index.js');
+const GasTracker = require('../../gas.js');
 
 // Default simulated block time. Every block-TIME-keyed metering activation in
 // the VM -- F3 binary-constructor and F3-globals metering, the O(n)-copy meter
@@ -23,7 +24,9 @@ const XChainVM = require('../../index.js');
 // hardening, state-key, Pkg-3 sandbox) that regtest activates from genesis. On
 // mainnet the height-keyed gates are keyed on block HEIGHT per coin instead, which is
 // what defaultBlockHeight() below derives (see HEIGHT_GATES). So
-// `network: 'regtest'` does NOT turn the meters on; only the block time does. A
+// `network: 'regtest'` does NOT turn these scalar meters on; only the block time
+// does. (The network-keyed meters, such as the iter/Set/apply meter and gas-ceiling
+// success, are the exception: regtest runs them from genesis, mainnet not yet.) A
 // default below the newest flag-day meters under a rule set no live chain runs:
 // measured on Node 22 / Linux, `new Uint8Array(100000)` costs 225 gas at the old
 // 1700000000 default and 100228 gas at the flag-day.
@@ -60,20 +63,24 @@ const GATE_FALLBACK_BLOCK_TIME = 1786060800;
 
 // The sibling class of activations, keyed on block HEIGHT per coin rather than on
 // block time: the Package-3 sandbox bundle, the execute-time source re-lint, the
-// lint global-alias refinement and the lint optional-chain refinement all resolve
-// `<COIN>:<network>` against a threshold map. Whether a gate is on from genesis is
+// lint global-alias, optional-chain and destructure refinements, the banned-with
+// lint and the BigInt surface strip all resolve `<COIN>:<network>` against a
+// threshold map. Whether a gate is on from genesis is
 // decided per gate by its own predicate, never per network (the optional-chain
 // gate is genesis-on for regtest only and needs a threshold on testnet). A default
 // of 1 below an armed threshold runs the PRE-activation rule set, which BTC:mainnet
 // left behind at 961000 (~2026-08-04). Each entry names the exported map and the
 // exported predicate, so the toolkit reads the consensus decision instead of
 // restating it; test/toolkit/simulator_height_gates.test.js holds the table
-// complete against the VM's exported `*_ACTIVATION` maps.
+// complete against the VM's exported `*_ACTIVATION` maps, own and inherited.
 const HEIGHT_GATES = Object.freeze([
     { label: 'Pkg-3 sandbox',          map: 'PKG3_SANDBOX_ACTIVATION',        isActive: 'isPkg3SandboxActive' },
     { label: 'execute-time re-lint',   map: 'EXEC_LINT_ACTIVATION',           isActive: 'isExecLintActive' },
     { label: 'lint global-alias',      map: 'LINT_GLOBAL_ALIAS_ACTIVATION',   isActive: 'isLintGlobalAliasActive' },
-    { label: 'lint optional-chain',    map: 'LINT_OPTIONAL_CHAIN_ACTIVATION', isActive: 'isLintOptionalChainActive' }
+    { label: 'lint optional-chain',    map: 'LINT_OPTIONAL_CHAIN_ACTIVATION', isActive: 'isLintOptionalChainActive' },
+    { label: 'lint banned-with',       map: 'LINT_BANNED_WITH_ACTIVATION',    isActive: 'isLintBannedWithActive' },
+    { label: 'lint destructure',       map: 'LINT_DESTRUCTURE_ACTIVATION',    isActive: 'isLintDestructureActive' },
+    { label: 'BigInt surface strip',   map: 'BIGINT_SURFACE_STRIP_ACTIVATION', isActive: 'isBigIntSurfaceStripActive' }
 ]);
 
 // Gas ceiling a controller guard runs under. The indexer reads it from
@@ -83,12 +90,17 @@ const HEIGHT_GATES = Object.freeze([
 // canonical value to import; this is a second home for that number and a
 // deliberate one. A guard's real headroom is 5x smaller than the simulator's
 // 1000000 default, which is the whole reason it is pinned here rather than
-// left to the author. test/determinism/simulator-defaults-cross-repo.test.js
+// left to the author. test/determinism/simulator_defaults_cross_repo.test.js
 // compares this constant against GAS_SCHEDULE.VM_GUARD_GAS_CEILING in the
 // sibling coin configs, so a coin-side re-pricing reddens this repo instead of
 // leaving simulate quoting stale headroom; test/toolkit/simulator.test.js keeps
 // a literal pin for a standalone clone with no sibling to read.
 const GUARD_GAS_CEILING = 200000;
+
+// Gas ceiling a top-level EXECUTE runs under on chain, mirrored because the indexer
+// exports no requireable copy (actions/execute/index.js holds it module-private);
+// test/determinism/simulator_gas_ceiling_cross_repo.test.js compares the two.
+const DEFAULT_GAS_CEILING = 1000000;
 
 // Method name the indexer invokes on a token's bound controller contract
 // (xchain-indexer/src/actions/execute/controller_guard.js GUARD_METHOD).
@@ -113,6 +125,43 @@ const CONTRACT_META_REQUIRED_TIMES = Object.freeze({
     regtest: 0
 });
 
+// Mirror DEPLOY_INIT_STRICT, the indexer rule that a DEPLOY runs an exported `initialize` with or
+// without params (constructor_run.js planConstructor). No VM twin exists, so the cross-repo manifest
+// gate test pins these against the changes_3.js row; an unnamed network resolves like mainnet.
+const DEPLOY_INIT_STRICT_TIMES = Object.freeze({
+    mainnet: 1786060800,
+    testnet: 0,
+    regtest: 0
+});
+
+// Block-TIME gates keyed per NETWORK rather than by one scalar, so GATE_BLOCK_TIMES
+// (scalar-only by design) never sees them. Each entry reads its instant off the
+// source that decides it, never a retyped value; the live anchor folds in the
+// configured network's elapsed entries. test/toolkit/simulator_network_block_time.test.js
+// holds this table complete against the VM's exported and GasTracker network-keyed time maps.
+const TIME_NETWORK_GATES = Object.freeze([
+    { label: 'JSON.stringify value hooks', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',
+        resolve: (network) => XChainVM.jsonStringifyHookGateTime(network) },
+    { label: 'CONTRACT_META_REQUIRED', source: 'CONTRACT_META_REQUIRED_TIMES',
+        resolve: (network) => CONTRACT_META_REQUIRED_TIMES[
+            Object.prototype.hasOwnProperty.call(CONTRACT_META_REQUIRED_TIMES, network) ? network : 'mainnet'] },
+    { label: 'DEPLOY_INIT_STRICT', source: 'DEPLOY_INIT_STRICT_TIMES',
+        resolve: (network) => DEPLOY_INIT_STRICT_TIMES[
+            Object.prototype.hasOwnProperty.call(DEPLOY_INIT_STRICT_TIMES, network) ? network : 'mainnet'] },
+    // Resolve exactly as isGasCeilingSuccessActive does: a network the map does not name is unarmed.
+    { label: 'gas-ceiling success', source: 'GAS_CEILING_SUCCESS_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(GasTracker.GAS_CEILING_SUCCESS_ACTIVATION, network)
+            ? GasTracker.GAS_CEILING_SUCCESS_ACTIVATION[network] : null) },
+    // The iter/Set and apply-length meters switch on block time per network inside the
+    // isolate; a network their map does not name is unarmed, as in their predicates.
+    { label: 'iter/Set meter', source: 'ITER_SET_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.ITER_SET_METER_ACTIVATION, network)
+            ? XChainVM.ITER_SET_METER_ACTIVATION[network] : null) },
+    { label: 'apply-length meter', source: 'APPLY_LENGTH_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.APPLY_LENGTH_METER_ACTIVATION, network)
+            ? XChainVM.APPLY_LENGTH_METER_ACTIVATION[network] : null) }
+]);
+
 module.exports = {
     GATE_BLOCK_TIMES,
     GATE_FALLBACK_BLOCK_TIME,
@@ -120,7 +169,10 @@ module.exports = {
     isArmedGateTime,
     HEIGHT_GATES,
     CONTRACT_META_REQUIRED_TIMES,
+    DEPLOY_INIT_STRICT_TIMES,
+    TIME_NETWORK_GATES,
     GUARD_GAS_CEILING,
+    DEFAULT_GAS_CEILING,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 };

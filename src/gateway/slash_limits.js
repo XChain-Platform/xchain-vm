@@ -15,7 +15,8 @@
  *
  * The one home of the slash amount's fractional-digit ceilings and the two
  * amount forms built from them. A zero-dependency leaf, so the gateway
- * (contract_stake.js) and index.js both read it without a require cycle.
+ * (contract_stake.js) and the runtime activations (src/index/runtime/activations.js)
+ * both read it without a require cycle.
  ********************************************************************/
 'use strict';
 

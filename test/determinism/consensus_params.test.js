@@ -22,14 +22,66 @@
 const assert = require('assert');
 const cr = require('../../src/consensus-runtime.js');
 const vm = require('../../src/index.js');
-const lintCore = require('../../src/lint_core.js');
+const lintCore = require('../../src/lint-core.js');
 const metering = require('../../src/metering.js');
+
+// A per-coin height map a release cut armed on testnet: the six keys in order, every
+// mainnet chain unarmed (null), every testnet chain at an armed height read off the map,
+// off at height 1 and on from that height, and regtest on from genesis.
+function assertCoinMapArmedOnTestnetOnly(map, isActive) {
+    assert.deepStrictEqual(Object.keys(map), ['BTC:mainnet', 'LTC:mainnet', 'DOGE:mainnet',
+        'BTC:testnet', 'LTC:testnet', 'DOGE:testnet']);
+    assert.ok(Object.isFrozen(map));
+    for (const coin of ['BTC', 'LTC', 'DOGE']) {
+        assert.strictEqual(map[`${coin}:mainnet`], null, `${coin}:mainnet`);
+        const armed = map[`${coin}:testnet`];
+        assert.ok(Number.isSafeInteger(armed) && armed > 1, `${coin}:testnet armed height`);
+        assert.strictEqual(isActive('testnet', coin, 1), false, `${coin}:testnet at 1`);
+        assert.strictEqual(isActive('testnet', coin, armed), true, `${coin}:testnet at ${armed}`);
+    }
+    assert.strictEqual(isActive('regtest', 'BTC', 0), true);
+}
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
+    it('LINT_DESTRUCTURE_ACTIVATION is frozen, unarmed on mainnet and armed on testnet', function () {
+        assertCoinMapArmedOnTestnetOnly(vm.LINT_DESTRUCTURE_ACTIVATION, vm.isLintDestructureActive);
+    });
+
+    it('BIGINT_SURFACE_STRIP_ACTIVATION is frozen, unarmed on mainnet and armed on testnet', function () {
+        assertCoinMapArmedOnTestnetOnly(vm.BIGINT_SURFACE_STRIP_ACTIVATION, vm.isBigIntSurfaceStripActive);
+    });
+});
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
+    it('LINT_BANNED_WITH_ACTIVATION is frozen, unarmed on mainnet and armed on testnet', function () {
+        assertCoinMapArmedOnTestnetOnly(vm.LINT_BANNED_WITH_ACTIVATION, vm.isLintBannedWithActive);
+    });
+});
+
+describe('consensus parameters are frozen (track 8 guard)', function () {
+
+    it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work, unarmed on mainnet and armed on testnet', function () {
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet;
+        assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
+        assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
+            { mainnet: null, testnet: armed, regtest: 0 });
+        assert.ok(Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
+        assert.strictEqual(vm.isApplyLengthMeterActive('regtest', 0), true);
+        for (const network of ['mainnet', 'unknown', undefined]) {
+            assert.strictEqual(vm.isApplyLengthMeterActive(network, 4102444800), false);
+        }
+        assert.strictEqual(vm.isApplyLengthMeterActive('testnet', 1), false);
+        assert.strictEqual(vm.isApplyLengthMeterActive('testnet', armed), true);
+    });
+});
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '5');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '5', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '7');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '7', 're-export must match');
     });
 });
 
@@ -64,12 +116,11 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // CONSENSUS_RULES is the closed set of lint findings the on-chain deploy
         // validator (validateSyntax) acts on; adding/removing one changes which
         // contracts the chain accepts (a hashed deploy verdict). Freeze it sorted so
-        // a lint_core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
-        // Epoch 4 added 'banned-rest' (the REST_PATTERN_METER deploy half).
+        // a lint-core edit reddens here until CONSENSUS_VERSION is bumped in lockstep.
         const GOLDEN_CONSENSUS_RULES = [
             'banned-async', 'banned-generator', 'banned-literal', 'banned-math',
-            'banned-rest', 'banned-wasm', 'invalid-type', 'reserved-identifier',
-            'unsupported-syntax'
+            'banned-rest', 'banned-wasm', 'banned-with', 'invalid-type', 'nesting-depth',
+            'reserved-identifier', 'unsupported-syntax'
         ];
         assert.deepStrictEqual([...vm.CONSENSUS_RULES].sort(), GOLDEN_CONSENSUS_RULES,
             'deploy CONSENSUS_RULES drifted: a deploy-rule change must bump CONSENSUS_VERSION + regolden in both repos');

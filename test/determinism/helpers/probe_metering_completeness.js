@@ -17,7 +17,9 @@
  * native builtins that do O(n) work without a per-element JS callback, to
  * find any that are STILL charged ~1 gas regardless of input size. Methods
  * that take a callback (map/filter/reduce/forEach/some/every/find/flatMap)
- * are metered by the callback body and are excluded.
+ * are excluded from this sweep. Charging their callback bodies does not meter
+ * native traversal of a sparse or array-like receiver, which needs dedicated
+ * probe vectors.
  *
  * Method: CALL-SWEEP. Build ONE working set of fixed size K (so allocation
  * gas is constant and cancels), then perform C native operations over it.

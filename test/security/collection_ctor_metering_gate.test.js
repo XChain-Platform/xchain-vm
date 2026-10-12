@@ -157,6 +157,9 @@ const runAt = (code, height, network, coin, ceiling) => {
     it('regtest meters the Set ctor from genesis (height 0)', async function () {
         const belowMain = await runAt(oneSet, 960999, 'mainnet', 'BTC');
         const regtest = await runAt(oneSet, 0, 'regtest', 'BTC');
+        const baselineCode = `module.exports = function(xchain){ return 500; };`;
+        const baselineMain = await runAt(baselineCode, 960999, 'mainnet', 'BTC');
+        const baselineRegtest = await runAt(baselineCode, 0, 'regtest', 'BTC');
         // Both venues meter the execute-time source lint (regtest from genesis, mainnet from
         // genesis since the 2026-09-09 arm), so that charge cancels and only the Set ctor
         // charge separates them: the Pkg 3 gate is live on regtest at 0 and not yet on
@@ -171,7 +174,8 @@ const runAt = (code, height, network, coin, ceiling) => {
         const unlinted = await runAt(oneSet, 960999, 'stagenet', 'BTC');
         assert.strictEqual(belowMain.gasUsed - unlinted.gasUsed, lintGas,
             'mainnet below the Pkg 3 gate must still carry the metered execute-time lint');
-        assert.strictEqual(regtest.gasUsed - belowMain.gasUsed, 500,
-            'regtest must charge the Set ctor from genesis; the lint charge sits on both sides');
+        assert.strictEqual(regtest.gasUsed - belowMain.gasUsed -
+            (baselineRegtest.gasUsed - baselineMain.gasUsed), 500,
+            'regtest must charge the Set ctor from genesis after unrelated gated overhead is removed');
     });
 });

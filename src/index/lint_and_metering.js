@@ -84,7 +84,7 @@ module.exports = {
      * validateSyntax() is a pure function of the code plus every flag parameter of this
      * method, all folded into the key, so a hit returns the verdict a fresh call would
      * produce. The two Pkg 3 rules share ONE activation and are therefore threaded as
-     * one bit; the global-alias and banned-rest refinements each ride their own.
+     * one bit; every other refinement rides its own gate and cache bit.
      *
      * This exists because validateSyntax spawns an ivm.Isolate for its V8 syntax check
      * and then acorn-parses the source; paying that on every execute of a hot contract
@@ -101,6 +101,10 @@ module.exports = {
      * @param {boolean} enforceBannedRest - banned-rest (REST_PATTERN_METER, own gate)
      * @param {boolean} enforceLintOptionalChain - LINT_OPTIONAL_CHAIN refinement
      * @param {string} [codeHash] - precomputed sha256(code) hex (see getMeteredCode)
+     * @param {boolean} [enforceBannedWith] - banned-with (own per-coin height gate);
+     *        omitted means off, like the optional-chain bit
+     * @param {boolean} [enforceLintDestructure] - destructure refinement (own per-coin
+     *        height gate); omitted means off
      * @returns {{valid: boolean, error?: string}}
      */
     getLintVerdict(
@@ -111,15 +115,21 @@ module.exports = {
         enforceLintGlobalAlias,
         enforceBannedRest,
         enforceLintOptionalChain,
-        codeHash
+        codeHash,
+        enforceBannedWith,
+        enforceLintDestructure
     ) {
+        const bannedWith = enforceBannedWith === true;
+        const lintDestructure = enforceLintDestructure === true;
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
             (enforcePkg3Bans ? '1' : '0') +
             (enforceLintGlobalAlias ? '1' : '0') +
             (enforceBannedRest ? '1' : '0') +
-            (enforceLintOptionalChain === true ? '1' : '0');
+            (enforceLintOptionalChain === true ? '1' : '0') +
+            (bannedWith ? '1' : '0') +
+            (lintDestructure ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -129,7 +139,9 @@ module.exports = {
             enforceBannedWasm:       enforcePkg3Bans,
             enforceLintGlobalAlias:  enforceLintGlobalAlias,
             enforceBannedRest:       enforceBannedRest,
-            enforceLintOptionalChain: enforceLintOptionalChain === true
+            enforceLintOptionalChain: enforceLintOptionalChain === true,
+            enforceBannedWith:       bannedWith,
+            enforceLintDestructure:  lintDestructure
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;
@@ -145,7 +157,7 @@ module.exports = {
      * @param {object} [opts]
      * @param {boolean} [opts.enforceBannedAsync=true] - block async/await/Promise
      *        (CONSENSUS_RULES 'banned-async'). CONSENSUS-GATED on the indexer:
-     *        deploy/index.js passes the resolved VM_BANNED_ASYNC activation so a
+     *        actions/deploy/lint.js passes the resolved VM_BANNED_ASYNC activation so a
      *        from-genesis replay reproduces the historical accept-below verdict.
      *        Defaults to true for author-facing callers (SDK linter, unit tests).
      * @returns {{ valid: boolean, error?: string }}

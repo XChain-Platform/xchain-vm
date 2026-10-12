@@ -24,7 +24,7 @@
  * WHY THIS FILE EXISTS. Three consumers need these names and only one of them
  * can load the isolate:
  *   - sandbox.js builds the strip script (requires isolated-vm),
- *   - lint_core.js warns on a contract that reads one (must run in the SDK and
+ *   - lint-core.js warns on a contract that reads one (must run in the SDK and
  *     in a browser, where no isolate exists),
  *   - toolkit/authoring.js teaches them to a model (deliberately isolate-free
  *     so the authoring loop runs on any OS).
@@ -34,9 +34,9 @@
  * all three require instead.
  *
  * THIS FILE IS DEPENDENCY-FREE AND VENDORED. xchain-sdk keeps a byte-identical
- * copy at src/contract/stripped_globals.js so lint_core.js can reach it with
- * ONE require line - './stripped_globals.js' - that resolves in both trees
- * (lint_core.js itself is byte-identity-locked across the two repos). It must
+ * copy at src/contract/stripped-globals.js so lint-core.js can reach it with
+ * ONE require line - './stripped-globals.js' - that resolves in both trees
+ * (lint-core.js itself is byte-identity-locked across the two repos). It must
  * therefore require nothing: any dependency would have to resolve at two
  * different relative depths. Edit here, then re-sync the vendored copy in the
  * SAME change; a sha256 parity guard fails the build on drift.
@@ -53,7 +53,7 @@
  *     (.then continuation, post-await write) drains on isolated-vm-version-
  *     dependent timing that is outside the consensus pin, forking validators on
  *     success-vs-timeout or post-await state. async/await/Promise are also
- *     rejected at deploy time (lint_core findBannedAsync); stripping the Promise
+ *     rejected at deploy time (lint-core findBannedAsync); stripping the Promise
  *     global is defense in depth. The host still derives AsyncFunction from
  *     async-function syntax, which does not depend on the Promise global binding.
  *     NOTE: the Promise strip is GATED on a block-time flag-day (sandbox.js
@@ -66,6 +66,10 @@
  *     Removed to close the unmetered-CPU DoS surface; contracts use the metered
  *     xchain.math bignumber API. BigInt literals (10n) are rejected at deploy
  *     time (syntax.js) since a global delete cannot disable literal syntax.
+ *   - BigInt64Array / BigUint64Array: their constructors and bulk operations
+ *     retain the native BigInt surface after the BigInt global is gone. They
+ *     are held in a separate flag-day-gated set so historical execution keeps
+ *     the pre-activation globals while new execution removes them.
  *   - WebAssembly (flag-day Pkg 3, 75190596): a core V8 global reachable from
  *     contract code. A wasm body carries NO __gas instrumentation (the AST meter
  *     only touches the JS source), so WebAssembly.instantiate/compile/Module/
@@ -101,6 +105,10 @@ const STRIPPED_GLOBAL_NAMES = Object.freeze([
     'Intl', 'Temporal', 'structuredClone', 'performance'
 ]);
 
+const BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES = Object.freeze([
+    'BigInt64Array', 'BigUint64Array'
+]);
+
 // The entries whose strip is CONSENSUS-GATED on a flag day (see the Promise and
 // WebAssembly notes above): below their activation the sandbox leaves the global
 // in place so a from-genesis replay reproduces the historical execution.
@@ -122,6 +130,7 @@ const ADVISORY_STRIPPED_GLOBAL_NAMES = Object.freeze(
 
 module.exports = {
     STRIPPED_GLOBAL_NAMES,
+    BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES,
     CONSENSUS_GATED_STRIPPED_GLOBALS,
     ADVISORY_STRIPPED_GLOBAL_NAMES
 };

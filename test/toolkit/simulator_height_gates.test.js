@@ -31,6 +31,14 @@ const gateWarnings = require('../../src/toolkit/simulator/gate_warnings.js');
 
 const COIN_NETWORK_KEY = /^[A-Z]+:[a-z]+$/;
 
+// Highest armed threshold the given height gates carry at (coin, network), read off the
+// exported maps; 1 when none is armed, the floor defaultBlockHeight keeps.
+function armedMax(coin, network, gates = HEIGHT_GATES) {
+    const ts = gates.map((g) => XChainVM[g.map][coin + ':' + network]).filter((t) => Number.isFinite(t));
+    return ts.length ? Math.max(...ts) : 1;
+}
+const nonOptionalChainGates = () => HEIGHT_GATES.filter((g) => g.map !== 'LINT_OPTIONAL_CHAIN_ACTIVATION');
+
 // Swap an armed optional-chain map and a predicate with the real resolver's shape
 // onto the export object for the duration of fn, then restore both.
 function withArmedOptionalChain(map, fn) {
@@ -58,13 +66,44 @@ function heightWarningsFor(network, height, contractAddress) {
     return lines;
 }
 
+// Name every per-coin *_ACTIVATION export, own or inherited: some gates sit on an
+// object under the class rather than as own statics, and Object.keys never sees them.
+function exportedHeightGateMaps() {
+    const names = new Set();
+    for (let o = XChainVM; o && o !== Function.prototype && o !== Object.prototype;
+        o = Object.getPrototypeOf(o)) {
+        Object.getOwnPropertyNames(o).forEach((k) => names.add(k));
+    }
+    return [...names].filter((k) => /_ACTIVATION$/.test(k) &&
+        XChainVM[k] && typeof XChainVM[k] === 'object' &&
+        Object.keys(XChainVM[k]).some((key) => COIN_NETWORK_KEY.test(key)));
+}
+
+// Shadow the inherited, non-writable banned-with exports with an armed BTC:mainnet
+// map and a predicate of the real resolver's shape, then delete the shadows.
+function withArmedBannedWith(height, fn) {
+    const shadow = (name, value) => Object.defineProperty(XChainVM, name,
+        { value, writable: true, configurable: true, enumerable: true });
+    try {
+        shadow('LINT_BANNED_WITH_ACTIVATION', Object.freeze({ 'BTC:mainnet': height }));
+        shadow('isLintBannedWithActive', (network, coin, h) => network === 'regtest' ||
+            (coin === 'BTC' && network === 'mainnet' && Number(h) >= height));
+        return fn();
+    } finally {
+        delete XChainVM.LINT_BANNED_WITH_ACTIVATION;
+        delete XChainVM.isLintBannedWithActive;
+    }
+}
+
 describe('toolkit: simulator HEIGHT_GATES covers every VM height gate', function () {
 
     it('lists every exported per-coin activation map with an exported predicate', function () {
-        const exported = Object.keys(XChainVM).filter((k) => /_ACTIVATION$/.test(k) &&
-            XChainVM[k] && typeof XChainVM[k] === 'object' &&
-            Object.keys(XChainVM[k]).some((key) => COIN_NETWORK_KEY.test(key)));
-        assert.ok(exported.length >= 4, 'expected the VM to export its height-gate maps: ' + exported);
+        const exported = exportedHeightGateMaps();
+        for (const name of ['LINT_BANNED_WITH_ACTIVATION', 'LINT_DESTRUCTURE_ACTIVATION',
+            'BIGINT_SURFACE_STRIP_ACTIVATION']) {
+            assert.ok(exported.includes(name), name + ' was not enumerated: ' + exported);
+        }
+        assert.ok(exported.length >= 7, 'expected the VM to export its height-gate maps: ' + exported);
         const listed = HEIGHT_GATES.map((g) => g.map);
         for (const name of exported) {
             assert.ok(listed.includes(name), name + ' is a VM height gate missing from HEIGHT_GATES');
@@ -73,13 +112,20 @@ describe('toolkit: simulator HEIGHT_GATES covers every VM height gate', function
             assert.strictEqual(typeof XChainVM[g.isActive], 'function', g.isActive + ' is not exported');
             assert.ok(XChainVM[g.map] && typeof XChainVM[g.map] === 'object', g.map + ' is not exported');
         }
+        // An armed inherited gate must move the default height.
+        withArmedBannedWith(99999999, () =>
+            assert.strictEqual(defaultBlockHeight('BTC', 'mainnet'), 99999999));
+        assert.strictEqual(defaultBlockHeight('BTC', 'mainnet'),
+            XChainVM.PKG3_SANDBOX_ACTIVATION['BTC:mainnet']);
+        assert.ok(Object.isFrozen(XChainVM.LINT_BANNED_WITH_ACTIVATION));
     });
 
-    it('keeps the default heights the shipped optional-chain map implies', function () {
-        const armed = { 'BTC:testnet': 155001, 'LTC:testnet': 4906040, 'DOGE:testnet': 67962387 };
+    it('keeps the default heights the shipped testnet maps imply', function () {
         for (const coin of ['BTC', 'LTC', 'DOGE']) {
+            const testnetArmed = armedMax(coin, 'testnet');
+            assert.ok(testnetArmed >= XChainVM.LINT_OPTIONAL_CHAIN_ACTIVATION[coin + ':testnet'], coin);
             assert.strictEqual(defaultBlockHeight(coin, 'regtest'), 1);
-            assert.strictEqual(defaultBlockHeight(coin, 'testnet'), armed[coin + ':testnet']);
+            assert.strictEqual(defaultBlockHeight(coin, 'testnet'), testnetArmed);
             assert.strictEqual(defaultBlockHeight(coin, 'mainnet'),
                 XChainVM.PKG3_SANDBOX_ACTIVATION[coin + ':mainnet']);
         }
@@ -87,22 +133,29 @@ describe('toolkit: simulator HEIGHT_GATES covers every VM height gate', function
     });
 
     it('decides genesis activation per gate, so an armed testnet threshold moves the default', function () {
-        withArmedOptionalChain({ 'BTC:testnet': 500, 'BTC:mainnet': 99999999 }, function () {
-            assert.strictEqual(defaultBlockHeight('BTC', 'testnet'), 500);
+        // The synthetic threshold sits above every other armed BTC:testnet gate, so only
+        // the optional-chain gate can be what moves the default there.
+        const above = armedMax('BTC', 'testnet', nonOptionalChainGates()) + 1;
+        withArmedOptionalChain({ 'BTC:testnet': above, 'BTC:mainnet': 99999999 }, function () {
+            assert.strictEqual(defaultBlockHeight('BTC', 'testnet'), above);
             assert.strictEqual(defaultBlockHeight('BTC', 'mainnet'), 99999999);
             assert.strictEqual(defaultBlockHeight('BTC', 'regtest'), 1);
-            assert.strictEqual(defaultBlockHeight('LTC', 'testnet'), 1);
+            assert.strictEqual(defaultBlockHeight('LTC', 'testnet'), armedMax('LTC', 'testnet', nonOptionalChainGates()));
         });
     });
+});
 
-    it('warns on testnet below an armed optional-chain threshold and stays quiet otherwise', function () {
-        assert.deepStrictEqual(heightWarningsFor('testnet', 155001, 'C:BTC:5'), []);
+describe('toolkit: simulator HEIGHT_GATES pre-activation warning', function () {
+    it('warns on testnet below an armed optional-chain threshold and stays quiet at the default', function () {
+        assert.deepStrictEqual(heightWarningsFor('testnet', defaultBlockHeight('BTC', 'testnet'), 'C:BTC:5'), []);
         assert.deepStrictEqual(heightWarningsFor('regtest', 1, 'C:BTC:5'), []);
         withArmedOptionalChain({ 'BTC:testnet': 500 }, function () {
             const below = heightWarningsFor('testnet', 1, 'C:BTC:5');
             assert.strictEqual(below.length, 1, JSON.stringify(below));
             assert.ok(/lint optional-chain \(500\)/.test(below[0]), below[0]);
-            assert.deepStrictEqual(heightWarningsFor('testnet', 500, 'C:BTC:5'), []);
+            const at = heightWarningsFor('testnet', 500, 'C:BTC:5');
+            assert.ok(at.every((l) => !/lint optional-chain/.test(l)), JSON.stringify(at));
+            assert.deepStrictEqual(heightWarningsFor('testnet', defaultBlockHeight('BTC', 'testnet'), 'C:BTC:5'), []);
             assert.deepStrictEqual(heightWarningsFor('regtest', 1, 'C:BTC:5'), []);
         });
     });

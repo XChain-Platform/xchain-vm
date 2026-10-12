@@ -13,15 +13,15 @@
  **********************************************************************
  * Musl-safe recursion-bound HEIGHT gate
  *
- * The injected __DEPTH_LIMIT (read by BOTH the intra-contract recursion guard
- * and the F-NR native-recursion guard) drops from MAX_STACK_DEPTH (512) to
- * MAX_STACK_DEPTH_MUSL (256) at/after the coordinated ~961000 block-HEIGHT
- * window. Below the window a musl/Alpine 128KB-stack validator's native
- * JSON.parse reviver walk (~292) and Array.prototype.join (~379) overflow BELOW
- * the 512 bound, so the guard's 512 pre-check never trips and a musl validator
- * forks from a glibc/macOS one. Lowering the bound to 256 makes the guard poison
- * (deterministic out_of_stack) before any host's native overflow, closing the
- * fork on musl too.
+ * The injected __DEPTH_LIMIT, which bounds the intra-contract recursion guard,
+ * drops from MAX_STACK_DEPTH (512) to MAX_STACK_DEPTH_MUSL (256) at/after the
+ * coordinated ~961000 block-HEIGHT window. The F-NR native-recursion guard reads
+ * __NR_DEPTH_LIMIT instead, which is clamped to MAX_STACK_DEPTH_MUSL even below
+ * the window (the clamp cases are pinned further down). A musl/Alpine validator
+ * runs on a 128KB thread stack, so its native sinks overflow shallower than a
+ * glibc/macOS one; the bound makes the guard poison (deterministic out_of_stack)
+ * first. MAX_STACK_DEPTH_MUSL's comment says which musl onsets are measured
+ * (join, stringify, flat) and which are not (the JSON.parse reviver walk).
  *
  * This suite pins the gate BEHAVIOUR on both sides:
  *   - below the height: byte-identical to today (bound stays 512; a 300-deep
@@ -84,8 +84,8 @@ const RECURSE = `function r(n){ if(n<=0){ return 0; } return 1+r(n-1); }`;
     // Below the height gate the intra-contract bound is still 512 (proven by the last
     // case in this block), but the F-NR sinks read the clamped
     // min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL). Without the clamp, a coin reaching the
-    // block-TIME gate before its per-coin block-HEIGHT gate would hand a 293..512-deep
-    // value to the native parser, which overflows on musl (~292) and succeeds on glibc.
+    // block-TIME gate before its per-coin block-HEIGHT gate would hand a 257..512-deep
+    // value to the native sinks, whose musl onset is not measured for every sink.
     it('below the height gate, an active native guard still poisons a 300-deep JSON.stringify (clamped to 256)', async function () {
         const r = await run(SPINE_300 + `try{JSON.stringify(a);return 'no-throw';}catch(e){return 'SWALLOWED';}`,
             { height: H_BELOW, timestamp: T_FNR_ON, hash: 'h' });
