@@ -114,6 +114,7 @@ const VECTORS = [
     { group: 'unmetered-suspect', id: 'Iterator drop loop', body: `${ARR}var t=0;for(;;){t+=a.values().drop(${K}-1).next().value;}` },
     { group: 'unmetered-suspect', id: 'String isWellFormed loop', body: `${TWO_BYTE}var t=0;for(;;){if(s.isWellFormed())t++;}` },
     { group: 'unmetered-suspect', id: 'String toWellFormed loop', body: `var s=String.fromCharCode(0xD800).repeat(${K});var t=0;for(;;){t+=s.toWellFormed().length;}` },
+    { group: 'unmetered-suspect', id: 'String anchor loop', body: `var x=('x').repeat(${K});var t=0;for(;;){t+='a'.anchor(x).length;}` },
     { group: 'unmetered-suspect', id: 'Function apply loop', body: `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f.apply(null,a);}` },
     { group: 'unmetered-suspect', id: 'Math.max.apply loop', body: `${ARR}var t=0;for(;;){t+=Math.max.apply(null,a);}` },
     { group: 'unmetered-suspect', id: 'ArrayBuffer resize loop', body: `var b=new ArrayBuffer(8,{maxByteLength:${K}});var t=0;for(;;){b.resize(${K});b.resize(0);t++;}` },
