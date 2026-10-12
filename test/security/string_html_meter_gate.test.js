@@ -77,20 +77,7 @@ describe('Annex B String HTML result-length wrapper', function () {
     });
 });
 
-(XChainVM ? describe : describe.skip)('Annex B String HTML metering gate', function () {
-    this.timeout(120000);
-
-    let vm;
-    beforeEach(function () {
-        vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: WALL_MS });
-        vm.beginBlock();
-    });
-    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
-
-    const run = (body, network, extra) => execute(vm, wrap(body), {
-        method: 'default', network, blockContext: LATE, ...extra,
-    });
-
+function defineMethodCases(run) {
     for (const [method, arg = ''] of METHODS) {
         it(`${method} is charged by its returned string length`, async function () {
             const body = `return 'a'.${method}(${arg}).length;`;
@@ -104,7 +91,9 @@ describe('Annex B String HTML result-length wrapper', function () {
                 `${method}: ${armed.gasUsed} vs ${unarmed.gasUsed}`);
         });
     }
+}
 
+function defineWallCase(run) {
     it('a reused large attribute ends in out_of_gas under the wall', async function () {
         const body = `var x='x'.repeat(${K});var t=0;for(;;){t+='a'.anchor(x).length;}`;
         const t0 = Date.now();
@@ -113,7 +102,9 @@ describe('Annex B String HTML result-length wrapper', function () {
         assert.match(result.error, /^out_of_gas:/, result.error);
         assert.ok(Date.now() - t0 < WALL_MS);
     });
+}
 
+function defineCoercionCase(run) {
     it('preserves native receiver and attribute coercion', async function () {
         const body = `var receiverCalls=0,attributeCalls=0;
             var receiver={toString:function(){receiverCalls++;return 'a';}};
@@ -127,7 +118,9 @@ describe('Annex B String HTML result-length wrapper', function () {
         assert.strictEqual(armed.returnValue, unarmed.returnValue);
         assert.deepStrictEqual(JSON.parse(armed.returnValue).slice(1), [1, 1]);
     });
+}
 
+function defineLegacyGasCase(run) {
     it('leaves legacy gas on unarmed, unknown and pre-arm testnet blocks', async function () {
         const body = `return 'a'.anchor('x'.repeat(${K})).length;`;
         const gas = {};
@@ -146,4 +139,24 @@ describe('Annex B String HTML result-length wrapper', function () {
         assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed);
         assert.ok(armed.gasUsed >= gas.mainnet + K);
     });
+}
+
+(XChainVM ? describe : describe.skip)('Annex B String HTML metering gate', function () {
+    this.timeout(120000);
+
+    let vm;
+    beforeEach(function () {
+        vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: WALL_MS });
+        vm.beginBlock();
+    });
+    afterEach(function () { if (vm && vm.endBlock) vm.endBlock(); });
+
+    const run = (body, network, extra) => execute(vm, wrap(body), {
+        method: 'default', network, blockContext: LATE, ...extra,
+    });
+
+    defineMethodCases(run);
+    defineWallCase(run);
+    defineCoercionCase(run);
+    defineLegacyGasCase(run);
 });
