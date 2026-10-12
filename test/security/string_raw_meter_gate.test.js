@@ -73,7 +73,6 @@ describe('direct String.raw result-length wrapper', function () {
 
 (XChainVM ? describe : describe.skip)('direct String.raw metering gate', function () {
     this.timeout(120000);
-
     let vm;
     beforeEach(function () {
         vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: WALL_MS });
@@ -84,7 +83,6 @@ describe('direct String.raw result-length wrapper', function () {
     const run = (body, network, extra) => execute(vm, wrap(body), {
         method: 'default', network, blockContext: LATE, ...extra,
     });
-
     it('charges result length beyond the identical repeat and concat control', async function () {
         const setup = `var s='x'.repeat(${K});`;
         const rawBody = `${setup}return String.raw({raw:['a','b']},s).length;`;
