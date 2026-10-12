@@ -87,6 +87,8 @@ const VECTORS = [
     { id: 'spread [...string]', mk: C => `${STR}var t=0;for(var i=0;i<${C};i++)t+=([...s]).length;return t;` },
     { id: 'String.anchor', network: 'regtest', gateBlock: APPLY_GATE_BLOCK,
         mk: C => `${HTML_ARG}var t=0;for(var i=0;i<${C};i++)t+='a'.anchor(x).length;return t;` },
+    { id: 'String.raw direct', network: 'regtest', gateBlock: APPLY_GATE_BLOCK,
+        mk: C => `${HTML_ARG}var q={raw:['a','b']},t=0;for(var i=0;i<${C};i++)t+=String.raw(q,x).length;return t;` },
     // --- Destructuring REST (a PATTERN carrying a RestElement, not an expression
     // carrying a SpreadElement). The sweep had spread-EXPRESSION vectors only, so it
     // was structurally unable to see this class; these two are what make it visible.

@@ -219,6 +219,12 @@ module.exports = `    // Array spread  [a, ...x, b]  ->  __arrspread([['e',a], [
         for (var __shi = 0; __shi < __stringHtmlMethods.length; __shi++) {
             __meterStringResult(__stringHtmlMethods[__shi]);
         }
+        var __stringRaw = String.raw;
+        if (typeof __stringRaw === 'function') __lockMethod(String, 'raw', function() {
+            var r = __stringRaw.apply(this, arguments);
+            __allocGas(r.length);
+            return r;
+        });
         // resize/transfer allocate (and zero or copy) a new backing store sized by
         // their argument, so charge that byte length the way the constructor does.
         // The argument is coerced once here and the number handed to the native, so
