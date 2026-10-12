@@ -64,6 +64,10 @@
  ********************************************************************/
 // @ts-nocheck
 
+const fs = require('fs');
+const path = require('path');
+const { createRequire } = require('module');
+
 // The pinned set. KEYS are process.versions keys; VALUES are the exact
 // strings the fleet runs. Only engine-level, consensus-affecting versions
 // belong here (V8 + the ICU/Unicode/CLDR data that governs locale-sensitive
@@ -112,6 +116,15 @@ const AST_TOOLCHAIN_PINNED = Object.freeze({
 // to pick the status and clamp gasUsed, so a bump is a CONSENSUS_VERSION event.
 const RUNTIME_ADDON_PINNED = Object.freeze({
     isolatedVm: '6.2.0'
+});
+
+const DEPENDENCY_PINNED = Object.freeze({
+    'isolated-vm': RUNTIME_ADDON_PINNED.isolatedVm,
+    mathjs:       MATH_PINNED.mathjs,
+    'decimal.js': MATH_PINNED.decimaljs,
+    acorn:        AST_TOOLCHAIN_PINNED.acorn,
+    'acorn-walk': AST_TOOLCHAIN_PINNED.acornWalk,
+    astring:      AST_TOOLCHAIN_PINNED.astring
 });
 
 // The reference Node release the pin was taken from. Informational only:
@@ -240,8 +253,81 @@ function describeMismatch(result) {
     );
 }
 
+function installedPackageVersion(name, packageRequire = require) {
+    try {
+        return packageRequire(`${name}/package.json`).version;
+    } catch (_) {
+        try {
+            let dir = path.dirname(packageRequire.resolve(name));
+            while (true) {
+                const manifest = path.join(dir, 'package.json');
+                if (fs.existsSync(manifest)) {
+                    const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+                    if (pkg.name === name) return pkg.version;
+                }
+                const parent = path.dirname(dir);
+                if (parent === dir) return undefined;
+                dir = parent;
+            }
+        } catch (_) {
+            return undefined;
+        }
+    }
+}
+
+function installedConsensusDependencies() {
+    const versions = {};
+    for (const name of Object.keys(DEPENDENCY_PINNED)) {
+        if (name !== 'decimal.js') versions[name] = installedPackageVersion(name);
+    }
+    try {
+        const mathjsRequire = createRequire(require.resolve('mathjs'));
+        versions['decimal.js'] = installedPackageVersion('decimal.js', mathjsRequire);
+    } catch (_) {
+        versions['decimal.js'] = undefined;
+    }
+    return versions;
+}
+
+/**
+ * Compare the installed consensus-affecting packages against their pins.
+ * An explicit versions object keeps mismatch handling independently testable.
+ *
+ * @param {object} [versions]
+ * @returns {{ ok: boolean, mismatches: Array<{key:string, expected:string, actual:(string|undefined)}> }}
+ */
+function checkConsensusDependencies(versions) {
+    const installed = versions || installedConsensusDependencies();
+    const mismatches = [];
+    for (const key of Object.keys(DEPENDENCY_PINNED)) {
+        const actual = installed[key];
+        if (actual !== DEPENDENCY_PINNED[key]) {
+            mismatches.push({ key, expected: DEPENDENCY_PINNED[key], actual });
+        }
+    }
+    return { ok: mismatches.length === 0, mismatches };
+}
+
+/**
+ * Explain a failed dependency check for a validator startup gate.
+ *
+ * @param {{mismatches: Array<{key:string, expected:string, actual:(string|undefined)}>}} result
+ * @returns {string}
+ */
+function describeDependencyMismatch(result) {
+    if (!result || result.ok) return 'consensus dependencies match the pins';
+    const lines = result.mismatches.map(m =>
+        `  ${m.key}: installed ${JSON.stringify(m.actual)} != pinned ${JSON.stringify(m.expected)}`);
+    return (
+        'CONSENSUS DEPENDENCY MISMATCH: installed package versions can change ' +
+        'contract execution or error classification and would FORK the chain:\n' +
+        lines.join('\n') +
+        '\nInstall the exact dependencies from package-lock.json before starting the validator.'
+    );
+}
+
 module.exports = {
     PINNED, MATH_PINNED, AST_TOOLCHAIN_PINNED, RUNTIME_ADDON_PINNED, REFERENCE_NODE, CONSENSUS_VERSION,
     CONSENSUS_STATUS_TOKENS, STATUS_ERROR_PREFIXES,
-    checkConsensusRuntime, describeMismatch
+    checkConsensusRuntime, describeMismatch, checkConsensusDependencies, describeDependencyMismatch
 };
