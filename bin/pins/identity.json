@@ -8,7 +8,7 @@
     "src/lint-core.js": {
       "canonical": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
       "vendoredInSdk": "3a6564e5500d5c71e9f35a086499a6615149c22e953533701307f53fc8fd7132",
-      "sdkCommit": "b3cdaa502d4f716821f7d2b24911672f601eb66a",
+      "sdkCommit": "111740025ea848fb5d7c3dfd476ad56b9cfa23d0",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },
@@ -20,8 +20,8 @@
     },
     "src/stripped-globals.js": {
       "canonical": "fabab00e59faa381fb52ff7da7ed614df0519d21281fffe0b92bc4008dff1a53",
-      "vendoredInSdk": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
-      "sdkCommit": "558576f6b11183e52a629df15b37f18db9a5fcef",
+      "vendoredInSdk": "fabab00e59faa381fb52ff7da7ed614df0519d21281fffe0b92bc4008dff1a53",
+      "sdkCommit": "111740025ea848fb5d7c3dfd476ad56b9cfa23d0",
       "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/stripped_globals.js"
     }
