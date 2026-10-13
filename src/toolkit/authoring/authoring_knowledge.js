@@ -64,8 +64,8 @@ const CONCEPT_MAP = [
     { solidity: 'gas limit', xchain: 'GAS_LIMIT on deploy/execute; sdk.suggestGasLimit(...)', note: 'metered per the gas schedule' }
 ];
 
-// The names the sandbox deletes, taught verbatim. From this nested module, the
-// authority is ../../stripped-globals.js rather than a re-copied list. It is
+// The names the sandbox deletes, taught verbatim. Required from the one module
+// that defines them rather than re-copied: ../../stripped-globals.js is
 // dependency-free, so requiring it keeps this module isolated-vm-free (its whole
 // point is that the authoring loop and the acorn gate run on any OS) while
 // making a taught/enforced mismatch impossible to write. sandbox.js and
