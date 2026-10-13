@@ -56,7 +56,7 @@ const STRIPPED_PROTO_METHOD_NAMES = [
 const REGEX_COERCING_METHODS = new Set(['match', 'matchAll', 'search']);
 
 // The sandbox's deleted GLOBALS. NOT mirrored: required from the one module
-// that defines them, ./stripped-globals.js, which sandbox.js and the AI-authoring
+// that defines them, ../stripped-globals.js, which sandbox.js and the AI-authoring
 // knowledge base require too. That module is dependency-free precisely so this
 // single require line resolves in BOTH trees at the two depths this file is
 // vendored to (xchain-vm/src/ and xchain-sdk/src/contract/), which is the reason
