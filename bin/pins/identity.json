@@ -19,7 +19,7 @@
       "sdkPathAtOrigin": "xchain-sdk/src/contract/metering.js"
     },
     "src/stripped-globals.js": {
-      "canonical": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
+      "canonical": "fabab00e59faa381fb52ff7da7ed614df0519d21281fffe0b92bc4008dff1a53",
       "vendoredInSdk": "3fafd789239ab58e01e9fb47bdc6a810297fd14b5c4e5ee1c1f6df150a8a3c0b",
       "sdkCommit": "558576f6b11183e52a629df15b37f18db9a5fcef",
       "sdkPath": "xchain-sdk/src/contract/stripped-globals.js",

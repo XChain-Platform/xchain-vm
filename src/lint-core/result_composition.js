@@ -59,7 +59,7 @@ function pushParseError(code, errors) {
 
 // 3. Reserved identifier check. The authoritative ban list is
 //    metering.RESERVED_IDENTIFIERS (frozen against narrowing by
-//    test/determinism/consensus-params.test.js); do not re-enumerate it
+//    test/determinism/consensus_params.test.js); do not re-enumerate it
 //    here, it has grown and any inline copy drifts. It covers TWO hazard
 //    classes: the allocator metering helpers (ALLOC_HELPERS), where a
 //    reference could bypass or forge SIZE metering, and the call-depth

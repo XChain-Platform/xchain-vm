@@ -18,7 +18,7 @@
  * of the tree needs. Consensus-critical surface: a contract that reaches one of
  * these can route a non-deterministic value into hashed state and fork the
  * fleet, so the set is frozen with CONSENSUS_VERSION and digested by the
- * determinism guard (test/determinism/consensus-params.test.js). Any add or
+ * determinism guard (test/determinism/consensus_params.test.js). Any add or
  * remove must bump CONSENSUS_VERSION and re-golden in lockstep.
  *
  * WHY THIS FILE EXISTS. Three consumers need these names and only one of them
