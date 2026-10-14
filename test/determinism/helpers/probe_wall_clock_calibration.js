@@ -25,14 +25,16 @@
  * armed *_GATE_BLOCK_TIME export), the per-coin block-HEIGHT gates listed in
  * HEIGHT_GATES for the probe contract's coin (Pkg 3 sandbox, execute-time lint,
  * lint global-alias, lint optional-chain, lint banned-with, lint destructure,
- * BigInt surface strip), and the per-network activation tables
- * listed in NETWORK_GATES (iterator/Set meter, apply-length meter, gas-ceiling
- * success, JSON.stringify hook; null is off, 0 is on from genesis), whose latest
- * armed time is folded into the probe block. The height gates only resolve on a
- * named network, so the probe passes NETWORK explicitly, and it refuses to run
- * when an armed gate is not active at the probe block or when a per-network
- * activation table is not listed. Unarmed gates stay off, as they do on a real
- * mainnet node.
+ * lint syntax depth, BigInt surface strip, resource fault signal, native stack
+ * terminal, gas-ceiling exhaustion, JSON.stringify re-entry, host error stack
+ * strip), and the per-network activation tables listed in NETWORK_GATES
+ * (iterator/Set meter, apply-length meter, host-call bounds, per-element meter,
+ * gas-ceiling success, JSON.stringify hook; null is off, 0 is on from genesis),
+ * whose latest armed time is folded into the probe block. The height gates only
+ * resolve on a named network, so the probe passes NETWORK explicitly, and it
+ * refuses to run when an armed gate is not active at the probe block or when a
+ * per-coin height table or a per-network activation table is not listed.
+ * Unarmed gates stay off, as they do on a real mainnet node.
  *
  * Two vector groups:
  *   - metered: shapes the schedule is meant to price. The worst of these is the
@@ -48,8 +50,8 @@
  *
  * Exit: 0 clean, 2 on a metered headroom breach or advisory (< 10x), 1 on a
  * runtime mismatch without --allow-unpinned, on an armed gate that is not
- * active at the probe block, or on a per-network activation table the probe
- * does not list.
+ * active at the probe block, or on a per-coin height table or per-network
+ * activation table the probe does not list.
  ********************************************************************/
 // @ts-nocheck
 const os = require('os');
@@ -69,19 +71,24 @@ const NETWORK = 'mainnet';
 const CONTRACT = 'C:BTC:1';
 // Floor for the probe height; raised to any armed height gate that sits above it.
 const MIN_HEIGHT = 10000000;
-// Per-coin height gates, read from the exports (a null entry is unarmed, an absent one is refused).
+// Per-coin height gates, read from the exports by name (a null entry is unarmed, an absent one is refused).
 const HEIGHT_GATES = [
-    { name: 'pkg3-sandbox', table: XChainVM.PKG3_SANDBOX_ACTIVATION, active: XChainVM.isPkg3SandboxActive },
-    { name: 'exec-lint', table: XChainVM.EXEC_LINT_ACTIVATION, active: XChainVM.isExecLintActive },
-    { name: 'lint-global-alias', table: XChainVM.LINT_GLOBAL_ALIAS_ACTIVATION, active: XChainVM.isLintGlobalAliasActive },
-    { name: 'lint-optional-chain', table: XChainVM.LINT_OPTIONAL_CHAIN_ACTIVATION, active: XChainVM.isLintOptionalChainActive },
-    { name: 'lint-banned-with', table: XChainVM.LINT_BANNED_WITH_ACTIVATION, active: XChainVM.isLintBannedWithActive },
-    { name: 'lint-destructure', table: XChainVM.LINT_DESTRUCTURE_ACTIVATION, active: XChainVM.isLintDestructureActive },
-    { name: 'lint-syntax-depth', table: XChainVM.LINT_SYNTAX_DEPTH_ACTIVATION, active: XChainVM.isLintSyntaxDepthActive },
-    { name: 'bigint-surface-strip', table: XChainVM.BIGINT_SURFACE_STRIP_ACTIVATION, active: XChainVM.isBigIntSurfaceStripActive },
-    { name: 'resource-fault-signal', table: XChainVM.RESOURCE_FAULT_SIGNAL_ACTIVATION, active: XChainVM.isResourceFaultSignalActive },
-    { name: 'native-stack-terminal', table: XChainVM.NATIVE_STACK_TERMINAL_ACTIVATION, active: XChainVM.isNativeStackTerminalActive },
-];
+    { name: 'pkg3-sandbox', source: 'PKG3_SANDBOX_ACTIVATION', active: XChainVM.isPkg3SandboxActive },
+    { name: 'exec-lint', source: 'EXEC_LINT_ACTIVATION', active: XChainVM.isExecLintActive },
+    { name: 'lint-global-alias', source: 'LINT_GLOBAL_ALIAS_ACTIVATION', active: XChainVM.isLintGlobalAliasActive },
+    { name: 'lint-optional-chain', source: 'LINT_OPTIONAL_CHAIN_ACTIVATION', active: XChainVM.isLintOptionalChainActive },
+    { name: 'lint-banned-with', source: 'LINT_BANNED_WITH_ACTIVATION', active: XChainVM.isLintBannedWithActive },
+    { name: 'lint-destructure', source: 'LINT_DESTRUCTURE_ACTIVATION', active: XChainVM.isLintDestructureActive },
+    { name: 'lint-syntax-depth', source: 'LINT_SYNTAX_DEPTH_ACTIVATION', active: XChainVM.isLintSyntaxDepthActive },
+    { name: 'bigint-surface-strip', source: 'BIGINT_SURFACE_STRIP_ACTIVATION', active: XChainVM.isBigIntSurfaceStripActive },
+    { name: 'resource-fault-signal', source: 'RESOURCE_FAULT_SIGNAL_ACTIVATION', active: XChainVM.isResourceFaultSignalActive },
+    { name: 'native-stack-terminal', source: 'NATIVE_STACK_TERMINAL_ACTIVATION', active: XChainVM.isNativeStackTerminalActive },
+    { name: 'gas-ceiling-exhausted', source: 'GAS_CEILING_EXHAUSTED_ACTIVATION', active: XChainVM.isGasCeilingExhaustedActive },
+    { name: 'json-stringify-reentry', source: 'JSON_STRINGIFY_REENTRY_ACTIVATION', active: XChainVM.isJsonStringifyReentryActive },
+    { name: 'host-error-stack-strip', source: 'HOST_ERROR_STACK_STRIP_ACTIVATION', active: XChainVM.isHostErrorStackStripActive },
+].map((g) => ({ ...g, table: XChainVM[g.source] }));
+// A per-coin height table keys on '<COIN>:<network>'; a per-network table keys on the bare network.
+const COIN_NETWORK_KEY = /^[A-Z]+:[a-z]+$/;
 // Per-network time tables, read from the exports by name (a null entry is unarmed, an absent one is refused).
 const NETWORK_GATES = [
     { name: 'iter-set-meter', source: 'ITER_SET_METER_ACTIVATION', active: XChainVM.isIterSetMeterActive },
@@ -147,15 +154,26 @@ function armedTime(gate) {
     return Number.isFinite(t) && t < UNARMED_SENTINEL ? t : null;
 }
 
-// Name every bare-network-keyed *_ACTIVATION export, own or inherited, that `gates` does not list.
-function unlistedNetworkTables(gates = NETWORK_GATES) {
+// Name every *_ACTIVATION export, own or inherited (some sit on an object under the class).
+function activationExportNames() {
     const names = new Set();
     for (let o = XChainVM; o && o !== Function.prototype && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
         Object.getOwnPropertyNames(o).filter((k) => /_ACTIVATION$/.test(k)).forEach((k) => names.add(k));
     }
+    return [...names];
+}
+
+// Name every bare-network-keyed *_ACTIVATION export, own or inherited, that `gates` does not list.
+function unlistedNetworkTables(gates = NETWORK_GATES) {
     const isNetworkTable = (v) => !!v && typeof v === 'object' && Object.keys(v).length > 0 &&
         Object.keys(v).every((k) => NETWORK_KEYS.includes(k));
-    return [...names].filter((k) => isNetworkTable(XChainVM[k]) && !gates.some((g) => g.source === k));
+    return activationExportNames().filter((k) => isNetworkTable(XChainVM[k]) && !gates.some((g) => g.source === k));
+}
+
+// Name every '<COIN>:<network>'-keyed *_ACTIVATION export, own or inherited, that `gates` does not list.
+function unlistedHeightTables(gates = HEIGHT_GATES) {
+    const isHeightTable = (v) => !!v && typeof v === 'object' && Object.keys(v).some((k) => COIN_NETWORK_KEY.test(k));
+    return activationExportNames().filter((k) => isHeightTable(XChainVM[k]) && !gates.some((g) => g.source === k));
 }
 
 // Build the post-gate block: the latest ARMED flag-day time and every armed height, from the exports.
@@ -182,12 +200,14 @@ function checkNetworkGates(block, gates = NETWORK_GATES) {
     return on;
 }
 
-// Refuse a probe block where an armed gate is off; return the height gates that are on.
-function checkGates(block, coin) {
+// Refuse an unlisted per-coin table or a probe block where an armed gate is off; return the height gates that are on.
+function checkGates(block, coin, gates = HEIGHT_GATES) {
+    const unlisted = unlistedHeightTables(gates);
+    if (unlisted.length) throw new Error(`per-coin height table not listed in HEIGHT_GATES: ${unlisted.join(', ')}`);
     // The enforced budget must be the consensus bound, not the harness's 500 ms default.
     if (!XChainVM.isConsensusWallClockActive(NETWORK, block.timestamp)) throw new Error('consensus wall clock not active at the probe block');
     const on = [];
-    for (const g of HEIGHT_GATES) {
+    for (const g of gates) {
         const isOn = g.active(NETWORK, coin, block.height);
         if (armedHeight(g, coin) !== null && !isOn) throw new Error(`armed height gate ${g.name} not active at the probe block`);
         if (isOn) on.push(g.name);
@@ -279,4 +299,4 @@ async function main() {
 // Measure only when run directly, so a test can load the gate logic without the slow vectors.
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
 
-module.exports = { VECTORS, NETWORK_GATES, HEIGHT_GATES, armedTime, unlistedNetworkTables, postGateBlock, checkGates, checkNetworkGates };
+module.exports = { VECTORS, NETWORK_GATES, HEIGHT_GATES, armedTime, unlistedNetworkTables, unlistedHeightTables, postGateBlock, checkGates, checkNetworkGates };

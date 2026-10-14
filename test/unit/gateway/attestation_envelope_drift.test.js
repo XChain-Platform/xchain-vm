@@ -39,6 +39,7 @@ const path   = require('path');
 
 const { buildGateway }  = require('../../../src/gateway.js');
 const EmissionCollector = require('../../../src/collector.js');
+const { siblingCheckout, skipOrFail } = require('../../helpers/sibling_checkout.js');
 
 // The indexer renamed its registry to snake_case; the camelCase name is what an
 // indexer origin from before that rename carries, so the first of the two that
@@ -54,20 +55,12 @@ const VM_REDUNDANCY_SET  = [1, 3, 5];
 const VM_DEADLINE_MIN    = 1;
 const VM_DEADLINE_MAX    = 100;
 
-// Required-sibling gate, same contract as lint-parity.test.js: a missing
-// xchain-indexer checkout skips (local dev, standalone-repo CI), but the job
-// that PROVIDES the siblings sets XCHAIN_REQUIRE_SIBLINGS=1 and a miss is a
-// hard failure there, so this seam cannot pass green by being skipped.
-const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
-function requireSiblingOrSkip(ctx, present, what) {
-    if (present) return;
-    if (REQUIRE_SIBLINGS)
-        assert.fail('required sibling missing under XCHAIN_REQUIRE_SIBLINGS=1: ' + what);
-    ctx.skip();
-}
-
-const haveRegistry = fs.existsSync(REGISTRY_FILE);
-const PROVIDERS = haveRegistry ? require(REGISTRY_FILE).PROVIDERS : null;
+// Required-sibling gate through the shared helper: a missing xchain-indexer checkout, or a
+// lane symlink into a live main checkout, skips locally, but the job that PROVIDES the
+// siblings sets XCHAIN_REQUIRE_SIBLINGS=1 and a refusal is a hard failure there.
+const registryVerdict = siblingCheckout(__dirname, REGISTRY_FILE);
+const PROVIDERS = registryVerdict.usable ? require(REGISTRY_FILE).PROVIDERS : null;
+const REGISTRY_GUARD = 'attestation envelope drift guard (' + REGISTRY_FILE + ')';
 
 const SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
@@ -96,7 +89,7 @@ function vmRequest(payload) {
 describe('attestation provider envelope (VM literals vs the indexer registry)', function () {
 
     it('caps payloads at the LARGEST registered max_request_bytes, so no provider is under-served', function () {
-        requireSiblingOrSkip(this, haveRegistry, REGISTRY_FILE);
+        skipOrFail(this, registryVerdict, REGISTRY_GUARD);
         const largest = Math.max(...Object.values(PROVIDERS).map(p => p.max_request_bytes));
         assert.strictEqual(largest, VM_PAYLOAD_CAP,
             'ENVELOPE DRIFT: the VM payload cap (' + VM_PAYLOAD_CAP + ') no longer equals the largest '
@@ -105,7 +98,7 @@ describe('attestation provider envelope (VM literals vs the indexer registry)', 
     });
 
     it('admits exactly the redundancy values every registered provider allows', function () {
-        requireSiblingOrSkip(this, haveRegistry, REGISTRY_FILE);
+        skipOrFail(this, registryVerdict, REGISTRY_GUARD);
         for (const p of Object.values(PROVIDERS)) {
             assert.deepStrictEqual(p.allowed_redundancy, VM_REDUNDANCY_SET,
                 'ENVELOPE DRIFT: provider ' + p.provider_id + ' allows '
@@ -116,7 +109,7 @@ describe('attestation provider envelope (VM literals vs the indexer registry)', 
     });
 
     it('keeps every registered deadline window inside the VM [1, 100] safety net', function () {
-        requireSiblingOrSkip(this, haveRegistry, REGISTRY_FILE);
+        skipOrFail(this, registryVerdict, REGISTRY_GUARD);
         for (const p of Object.values(PROVIDERS)) {
             assert.ok(p.deadline_window_blocks >= VM_DEADLINE_MIN && p.deadline_window_blocks <= VM_DEADLINE_MAX,
                 'ENVELOPE DRIFT: provider ' + p.provider_id + ' window is ' + p.deadline_window_blocks
@@ -129,7 +122,7 @@ describe('attestation provider envelope (VM literals vs the indexer registry)', 
     // lands behind its activation pair, this call starts throwing and this test
     // must be inverted in the same change: that is the point of pinning it.
     it('still accepts an over-provider http_get payload (the live, documented stranding gap)', function () {
-        requireSiblingOrSkip(this, haveRegistry, REGISTRY_FILE);
+        skipOrFail(this, registryVerdict, REGISTRY_GUARD);
         const providerCap = PROVIDERS.http_get.max_request_bytes;
         assert.ok(providerCap < VM_PAYLOAD_CAP, 'gap closed at the registry: re-derive this pin');
         const payload = requestPayloadOfSize(providerCap + 2048);

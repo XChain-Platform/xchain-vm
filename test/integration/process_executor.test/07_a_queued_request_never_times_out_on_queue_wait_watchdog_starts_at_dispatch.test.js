@@ -50,6 +50,7 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
             exec._sawReady = false;
 
             const queued = exec.execute({ ...BASE, code: `module.exports = function(){ return 'queued'; };` });
+            assert.strictEqual(exec._queue.length, 1, 'request must be queued while dispatch is held, before the window opens');
 
             // Observation window, not a synchronization point: do not convert to
             // a poll. The claim is that the queue does NOT drain while 3+ shrunk

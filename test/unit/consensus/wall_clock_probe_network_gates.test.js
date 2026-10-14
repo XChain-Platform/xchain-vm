@@ -83,6 +83,35 @@ describe('wall-clock calibration probe: per-network activation tables', function
     });
 });
 
+describe('wall-clock calibration probe: per-coin height tables', function () {
+    it('lists every per-coin height table the VM exports', function () {
+        assert.deepStrictEqual(probe.unlistedHeightTables(), []);
+        const sources = probe.HEIGHT_GATES.map((g) => g.source);
+        for (const s of ['GAS_CEILING_EXHAUSTED_ACTIVATION', 'JSON_STRINGIFY_REENTRY_ACTIVATION', 'HOST_ERROR_STACK_STRIP_ACTIVATION']) {
+            assert.ok(sources.includes(s), `${s} must be a probe height gate`);
+        }
+        for (const g of probe.HEIGHT_GATES) {
+            assert.ok(g.table && typeof g.table === 'object', `${g.source} must be exported`);
+            assert.strictEqual(typeof g.active, 'function', `${g.name} must have an exported predicate`);
+        }
+    });
+
+    it('never counts a per-network table as a per-coin height table', function () {
+        const networkSources = probe.NETWORK_GATES.map((g) => g.source);
+        assert.deepStrictEqual(probe.unlistedHeightTables([]).filter((k) => networkSources.includes(k)), []);
+    });
+
+    it('refuses when a per-coin height table is missing from the list', function () {
+        const without = probe.HEIGHT_GATES.filter((g) => g.source !== 'GAS_CEILING_EXHAUSTED_ACTIVATION');
+        assert.deepStrictEqual(probe.unlistedHeightTables(without), ['GAS_CEILING_EXHAUSTED_ACTIVATION']);
+        assert.throws(() => probe.checkGates(probe.postGateBlock(COIN), COIN, without), /GAS_CEILING_EXHAUSTED_ACTIVATION/);
+    });
+
+    it('passes the height gates on the default probe block with the shipped tables', function () {
+        assert.ok(Array.isArray(probe.checkGates(probe.postGateBlock(COIN), COIN)));
+    });
+});
+
 describe('wall-clock calibration probe: callback Array methods', function () {
     const vectorsById = new Map(probe.VECTORS.map((vector) => [vector.id, vector]));
 

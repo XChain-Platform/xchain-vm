@@ -16,8 +16,8 @@
 // Four guards across test/unit and test/determinism are byte-identity or
 // value-parity checks against a SIBLING checkout (the XCALL constants against
 // xchain-indexer, xchain-sdk and xchain-documentation, lint parity against the
-// shipped contract templates). Every one of them resolves its sibling with
-// existsSync and calls this.skip() when it is absent. That is the right
+// shipped contract templates). Every one of them judges its sibling with
+// siblingCheckout() and calls this.skip() when it is refused. That is the right
 // behaviour for a single-repo checkout, and it is invisible: mocha reports a
 // skipped test as `pending`, the suite still exits 0, and the push gate prints
 // PASS. A sibling the CI venue was never told to ship (.ci-siblings) is
@@ -47,6 +47,8 @@
 const assert = require('assert');
 const fs     = require('fs');
 const path   = require('path');
+
+const { siblingCheckout } = require('../../helpers/sibling_checkout.js');
 
 const REPO_ROOT    = path.join(__dirname, '..', '..', '..');
 const SIBLING_ROOT = process.env.XCHAIN_SIBLING_ROOT || path.join(REPO_ROOT, '..');
@@ -87,11 +89,13 @@ function resolve(entry) {
 
 // Present means "a real checkout", not merely "a directory exists": an empty
 // placeholder would resolve and then every guard inside it would still skip,
-// which is the exact silence this file exists to break.
+// which is the exact silence this file exists to break. The shared helper also
+// refuses a lane symlink into a live main checkout, which the guards themselves refuse.
 function inspect(entry) {
     const { dir, via } = resolve(entry);
-    let present = fs.existsSync(dir) && fs.existsSync(path.join(dir, entry.marker));
-    let source  = via;
+    const verdict = siblingCheckout(__dirname, dir);
+    let present = verdict.usable && fs.existsSync(path.join(dir, entry.marker));
+    let source  = verdict.usable ? via : via + '; ' + verdict.reason;
     if (!present) {
         for (const key of entry.altEnvs || []) {
             if (process.env[key] && fs.existsSync(process.env[key])) {

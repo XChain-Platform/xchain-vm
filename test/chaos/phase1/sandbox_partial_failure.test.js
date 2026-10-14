@@ -13,9 +13,10 @@
  **********************************************************************
  * Chaos Experiment 4: Sandbox Partial Failure
  *
- * Tests that exceptions during the isolate setup phase (before
- * contract code runs) are caught by the outer try/catch in execute()
- * and return a clean error result with atomicity guarantees.
+ * Tests that contract-input failures before contract code runs (metering,
+ * code size, compilation) are caught by the outer try/catch in execute()
+ * and return a clean error result with atomicity guarantees. A host fault in
+ * isolate setup itself rejects with HostFaultError instead (host_setup_fault.test.js).
  *
  * TECHNICAL NOTE: src/index.js destructures stripGlobals at require
  * time via `const { stripGlobals } = require('./sandbox.js')`, so
@@ -27,8 +28,8 @@
  * 2. Verifying the result shape, atomicity, and VM recovery.
  * 3. Testing with malformed code that fails during metering.
  *
- * These tests verify the BEHAVIOR (clean failure on setup error)
- * rather than the specific injection point (stripGlobals).
+ * These tests verify the BEHAVIOR (clean failure on a pre-run contract error)
+ * rather than a specific injection point.
  ********************************************************************/
 // @ts-nocheck
 

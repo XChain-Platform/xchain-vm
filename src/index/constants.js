@@ -57,13 +57,19 @@ const MAX_STACK_DEPTH = 512;
 // What is measured: drills on real aarch64 musl put the guard-off native onset near
 // 2000 for join, 4000 for JSON.stringify and 6000 for flat, with every depth up to
 // 512 clean under the guard, so for those three sinks 256 is a conservative margin.
-// What is not: the reviver walk has never been run on musl, and neither has x86-64
-// musl. Node 22 probes on reduced thread stacks (not musl) put the reviver onset near
-// 200 at 100KB and near 290 at 128KB, and isolated-vm leaves a musl pool thread about
-// 104KB usable, so whether 256 clears it on musl is unmeasured. The ~290 figure in
-// runtime/harness_part_2.js is that probe, not a musl run; it stays byte-identical
-// because the harness text is compiled ahead of contract code. Do not raise this
-// bound without a real-musl reviver-walk drill.
+// The reviver walk was drilled on real musl on both arches in October 2026, with the
+// same reading at every depth: guard off, no catchable RangeError from 200 to 1000;
+// guard on, clean to 256 and out_of_stack from 257. Limits of that evidence: the
+// x86-64 leg ran under Rosetta translation on an aarch64 host (musl still sets the
+// 128KB thread stack), each depth ran once, and that leg used a floating
+// node:22-alpine build (V8 12.4.254.21-node.57), not the pinned engine.
+// Earlier Node 22 probes on reduced thread stacks (not musl) put the reviver onset
+// near 200 at 100KB and near 290 at 128KB, with isolated-vm leaving a musl pool
+// thread about 104KB usable; the musl drills came out well above that. The ~290
+// figure in runtime/harness_part_2.js is that probe, not a musl run; it stays
+// byte-identical because the harness text is compiled ahead of contract code. Do not
+// raise this bound without re-running the reviver drill on real musl on the pinned
+// engine, preferably on native x86-64 with repeated runs.
 //
 // The Package 3 bundle gate (isPkg3SandboxActive, runtime/activation_heights.js)
 // swaps the injected __DEPTH_LIMIT from MAX_STACK_DEPTH to this bound at/after the

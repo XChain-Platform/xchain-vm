@@ -171,7 +171,7 @@ function memberKeyExpr(member) {
 }
 
 module.exports = {
-    gasCallStatement, gasCallExpr, wrapWithGas, callStatement, wrapDepthGuard,
+    gasCallStatement, gasCallExpr, wrapWithGas, wrapDepthGuard,
     directivePrologueLength, insertGasAfterDirectives, ensureBlock, binaryDepth, armedDepthPair,
     astIdent, astLiteral, astArray, astCall, cloneNode, astVoid0, arrowThunk, memberKeyExpr
 };

@@ -42,7 +42,9 @@
 // supply network + a resolvable C:<COIN>:<idx> contract address, so the fallback
 // only ever affects malformed/test contexts.
 //
-// !! PROPOSED LTC/DOGE heights below AWAIT OPERATOR RATIFICATION at train sign-off.
+// !! The LTC/DOGE heights below were RATIFIED 2026-07-22 at train sign-off and are
+// FROZEN consensus parameters: changing any value moves replay across the gate and
+// forks. The derivation is kept for history.
 // Arithmetic (tips measured 2026-07-22; BTC target 961000 = tip 959175 + 1825 blocks
 // x 10 min = 18250 min ~= 12.67 days ~= 2026-08-04):
 //   LTC:  tip 3146964 + (18250 min / 2.5 min-per-block = 7300 blocks)  = 3154264 -> 3154250

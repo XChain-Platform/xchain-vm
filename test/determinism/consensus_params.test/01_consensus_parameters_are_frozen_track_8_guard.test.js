@@ -24,17 +24,15 @@ const cr = require('../../../src/consensus-runtime.js');
 const vm = require('../../../src/index.js');
 const lintCore = require('../../../src/lint-core.js');
 const metering = require('../../../src/metering.js');
+const { siblingCheckout, skipOrFail } = require('../../helpers/sibling_checkout.js');
 
 // The indexer's protocol-change sources as [file, text] pairs: src/protocol_changes.js plus
-// every part file under src/protocol_changes/. Skips the test when the sibling is absent
-// (standalone clone); fails it instead when XCHAIN_REQUIRE_SIBLINGS=1 declares siblings supplied.
+// every part file under src/protocol_changes/. Skips the test when the sibling is absent or a lane
+// symlink into a live main checkout; fails it instead when XCHAIN_REQUIRE_SIBLINGS=1 declares siblings supplied.
 function indexerProtocolChangeSources(ctx, what) {
     const path = require('path'), fs = require('fs');
     const entry = path.resolve(__dirname, '../../../../xchain-indexer/src/protocol_changes.js');
-    if (!fs.existsSync(entry)) {
-        assert.notStrictEqual(process.env.XCHAIN_REQUIRE_SIBLINGS, '1', `${what} cannot run: ${entry} is missing; XCHAIN_REQUIRE_SIBLINGS=1 forbids the green-by-skip`);
-        ctx.skip();
-    }
+    if (!skipOrFail(ctx, siblingCheckout(__dirname, entry), what)) return [];
     const dir = entry.replace(/\.js$/, '');
     const parts = fs.existsSync(dir)
         ? fs.readdirSync(dir).filter((f) => f.endsWith('.js')).sort().map((f) => path.join(dir, f))

@@ -45,6 +45,7 @@ const { buildGatewayOptions } = require('./gateway_options.js');
 const { makeGasReference } = require('./gas_reference.js');
 const { injectExecutionGlobals } = require('./isolate_globals.js');
 const { buildContractSource, extractReturnValue } = require('./contract_io.js');
+const { hostSetupStep } = require('./host_setup/host_setup_step.js');
 
 module.exports = {
     /**
@@ -206,11 +207,11 @@ module.exports = {
             const __pkg3SandboxOn = isPkg3SandboxActive(opts.network, __pkg3Coin, __pkg3Height);
             const __stripBigIntSurface = isBigIntSurfaceStripActive(
                 opts.network, __pkg3Coin, __pkg3Height);
-            sandbox.stripGlobals(isolate, context, {
+            hostSetupStep('stripGlobals', () => sandbox.stripGlobals(isolate, context, {
                 stripPromise,
                 stripWasm: __pkg3SandboxOn,
                 stripBigIntSurface: __stripBigIntSurface,
-            });
+            }));
 
             // Resolve read-only data into synchronous accessor objects. Accepts
             // either plain serializable snapshots (the canonical form, required by
@@ -227,23 +228,23 @@ module.exports = {
             );
 
             // Inject gateway methods as ivm.Reference objects
-            this.injectGateway(context, gateway);
+            hostSetupStep('injectGateway', () => this.injectGateway(context, gateway));
 
-            context.global.setSync('__gas', makeGasReference(gasTracker, opts));
+            hostSetupStep('setGas', () => context.global.setSync('__gas', makeGasReference(gasTracker, opts)));
 
             // Native stack activation (per-coin height), resolved once so the harness
             // hooks and the metering transform can never disagree within one execution.
             const __nativeStackTerminal = isNativeStackTerminalActive(opts.network, __pkg3Coin, __pkg3Height);
-            const __iterSetMeterOn = injectExecutionGlobals(context, opts, __pkg3SandboxOn, this.limits,
-                hostSignals, __nativeStackTerminal);
+            const __iterSetMeterOn = hostSetupStep('injectExecutionGlobals', () => injectExecutionGlobals(
+                context, opts, __pkg3SandboxOn, this.limits, hostSignals, __nativeStackTerminal));
 
             // Run harness script to assemble xchain object inside isolate.
             // Reuse cached V8 bytecode when available: each harness source is a
             // fixed constant, so the compiled form is identical for every call.
             // HARNESS_SOURCE itself unless a harness activation is on (../armed_harness/select.js).
-            const harnessScript = compileHarness(this, isolate, executionHarnessMask(
-                opts, __pkg3Coin, __pkg3Height, hostSignals.stackFaultGateOn, __nativeStackTerminal));
-            harnessScript.runSync(context);
+            const harnessScript = hostSetupStep('compileHarness', () => compileHarness(this, isolate, executionHarnessMask(
+                opts, __pkg3Coin, __pkg3Height, hostSignals.stackFaultGateOn, __nativeStackTerminal)));
+            hostSetupStep('runHarness', () => harnessScript.runSync(context));
 
             // Meter the contract code. L-3 gate: resolve spec-correct `obj[k] += rhs`
             // evaluation order from this execution's block time (isMeteringEvalOrderActive),
