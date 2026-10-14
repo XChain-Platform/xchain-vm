@@ -77,12 +77,17 @@ const HEIGHT_GATES = [
     { name: 'lint-optional-chain', table: XChainVM.LINT_OPTIONAL_CHAIN_ACTIVATION, active: XChainVM.isLintOptionalChainActive },
     { name: 'lint-banned-with', table: XChainVM.LINT_BANNED_WITH_ACTIVATION, active: XChainVM.isLintBannedWithActive },
     { name: 'lint-destructure', table: XChainVM.LINT_DESTRUCTURE_ACTIVATION, active: XChainVM.isLintDestructureActive },
+    { name: 'lint-syntax-depth', table: XChainVM.LINT_SYNTAX_DEPTH_ACTIVATION, active: XChainVM.isLintSyntaxDepthActive },
     { name: 'bigint-surface-strip', table: XChainVM.BIGINT_SURFACE_STRIP_ACTIVATION, active: XChainVM.isBigIntSurfaceStripActive },
+    { name: 'resource-fault-signal', table: XChainVM.RESOURCE_FAULT_SIGNAL_ACTIVATION, active: XChainVM.isResourceFaultSignalActive },
+    { name: 'native-stack-terminal', table: XChainVM.NATIVE_STACK_TERMINAL_ACTIVATION, active: XChainVM.isNativeStackTerminalActive },
 ];
 // Per-network time tables, read from the exports by name (a null entry is unarmed, an absent one is refused).
 const NETWORK_GATES = [
     { name: 'iter-set-meter', source: 'ITER_SET_METER_ACTIVATION', active: XChainVM.isIterSetMeterActive },
     { name: 'apply-length-meter', source: 'APPLY_LENGTH_METER_ACTIVATION', active: XChainVM.isApplyLengthMeterActive },
+    { name: 'host-call-bounds', source: 'HOST_CALL_BOUNDS_ACTIVATION', active: XChainVM.isHostCallBoundsActive },
+    { name: 'per-element-meter', source: 'PER_ELEMENT_METER_ACTIVATION', active: XChainVM.isPerElementMeterActive },
     { name: 'gas-ceiling-success', source: 'GAS_CEILING_SUCCESS_ACTIVATION', active: XChainVM.isGasCeilingSuccessActive },
     // No is-active export exists for this one; the in-isolate check compares against the gate time.
     { name: 'json-stringify-hook', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',

@@ -41,13 +41,23 @@ const banned_syntax = require('./lint-core/banned_syntax.js');
 const banned_globals = require('./lint-core/banned_globals.js');
 const banned_with = require('./lint-core/banned_with.js');
 const nesting_depth = require('./lint-core/nesting_depth.js');
+const syntax_depth = require('./lint-core/syntax_depth.js');
 const { analyzeContract } = require('./lint-core/contract_analysis.js');
-const { lintSource: composeLintSource } = require('./lint-core/result_composition.js');
+const { lintSource: composeLintSource, isHostStackOverflow } = require('./lint-core/result_composition.js');
 
+// opts.enforceLintSyntaxDepth (default true) refuses a source over MAX_SYNTAX_DEPTH
+// before any recursive pass and makes a host stack overflow in the passes below a
+// thrown error rather than a finding. A caller that already ran the scan passes false
+// and sets opts.overflowIsHostFault on its own.
 function lintSource(code, opts) {
+    const enforceLintSyntaxDepth = !opts || opts.enforceLintSyntaxDepth !== false;
     const enforceLintNestingDepth = !opts || opts.enforceLintNestingDepth !== false;
     if (enforceLintNestingDepth) {
         const finding = nesting_depth.nestingDepthFinding(code);
+        if (finding) return { errors: [finding], warnings: [] };
+    }
+    if (enforceLintSyntaxDepth) {
+        const finding = syntax_depth.syntaxDepthFinding(code);
         if (finding) return { errors: [finding], warnings: [] };
     }
     return composeLintSource(code, opts);
@@ -64,6 +74,10 @@ module.exports = {
     findBannedWith: banned_with.findBannedWith,
     findNestingDepth: nesting_depth.findNestingDepth,
     nestingDepthFinding: nesting_depth.nestingDepthFinding,
+    findSyntaxDepth: syntax_depth.findSyntaxDepth,
+    measureSyntaxDepth: syntax_depth.measureSyntaxDepth,
+    syntaxDepthFinding: syntax_depth.syntaxDepthFinding,
+    isHostStackOverflow,
     findBannedRest: banned_syntax.findBannedRest,
     findBannedExponentiation: banned_syntax.findBannedExponentiation,
     findBannedProtoMethods: banned_syntax.findBannedProtoMethods,
@@ -72,6 +86,7 @@ module.exports = {
     codeSizeBytes: banned_syntax.codeSizeBytes,
     MAX_CODE_SIZE: constants.MAX_CODE_SIZE,
     MAX_NESTING_DEPTH: constants.MAX_NESTING_DEPTH,
+    MAX_SYNTAX_DEPTH: constants.MAX_SYNTAX_DEPTH,
     STRIPPED_PROTO_METHOD_NAMES: constants.STRIPPED_PROTO_METHOD_NAMES,
     STRIPPED_GLOBAL_NAMES,
     STRIPPED_GLOBAL_NAMES_MIRROR: STRIPPED_GLOBAL_NAMES,

@@ -128,7 +128,8 @@ function buildEmitAPI(gasTracker, emissionCollector, gasSchedule, callContext) {
     const isGuard      = Boolean(ctx.isGuard);
 
     return {
-        ...buildExecuteEmit(gasTracker, emissionCollector, gasSchedule, callDepth, maxCallDepth, minCallGas),
+        ...buildExecuteEmit(gasTracker, emissionCollector, gasSchedule, callDepth, maxCallDepth, minCallGas,
+            Boolean(ctx.capFirst)),
         ...buildCrossExecuteEmit(gasTracker, emissionCollector, gasSchedule, ctx, crossHops, isGuard),
         ...buildTokenEmits(charge, emissionCollector),
         ...buildAccountEmits(charge, emissionCollector),
@@ -179,6 +180,8 @@ function buildCrossExecuteEmit(gasTracker, emissionCollector, gasSchedule, ctx, 
             const { deadlineBlocks, gasLimit, totalCharge } = validateXcallBudget(params, gasTracker, gasSchedule);
             const callId = deriveXcallCallId(ctx, sourceChain, targetChain, emissionCollector);
 
+            // Host-call bounds gate: refuse at the cap before the prepay is charged.
+            if (ctx.capFirst) emissionCollector.ensureRoom();
             gasTracker.charge(totalCharge);
             emissionCollector.add('XCALL', {
                 callId:         callId,

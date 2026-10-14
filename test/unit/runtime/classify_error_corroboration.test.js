@@ -16,6 +16,12 @@
 // gasUsed to the ceiling; an attacker-authored message substring alone routes
 // to the generic sanitized 'error:' classification with the real gasUsed.
 // Pre-gate the legacy message-only classification is preserved (replay parity).
+//
+// The out_of_stack corroboration by RangeError class, name or the guard's exact
+// text holds only below the resource fault signal activation. Contract code can
+// build every one of those, so once that activation is on (hostSignals.
+// stackFaultGateOn) out_of_stack needs the guard's own host report
+// (hostSignals.stackFault), and a real memory-limit disposal is out_of_memory.
 
 'use strict';
 
@@ -97,12 +103,16 @@ function classify(err, opts, hostSignals, used) {
             assert.strictEqual(r.gasUsed, 777);
         });
         it('accepts a real native overflow (RangeError) -> out_of_stack, clamped', function () {
-            const r = classify(new RangeError('Maximum call stack size exceeded'), HARDENED, signals());
+            // Below the resource fault signal activation the class alone corroborates.
+            const r = classify(new RangeError('Maximum call stack size exceeded'), HARDENED,
+                signals({ stackFaultGateOn: false }));
             assert.ok(r.error.startsWith('out_of_stack:'), r.error);
             assert.strictEqual(r.gasUsed, CEILING);
         });
         it("accepts the recursion guard's exact deterministic fault -> out_of_stack, clamped", function () {
-            const r = classify(new Error('maximum call stack depth exceeded'), HARDENED, signals());
+            // Below the resource fault signal activation the exact text alone corroborates.
+            const r = classify(new Error('maximum call stack depth exceeded'), HARDENED,
+                signals({ stackFaultGateOn: false }));
             assert.ok(r.error.startsWith('out_of_stack:'), r.error);
         });
         it('activates on mainnet at/after the flag-day block time', function () {
@@ -134,5 +144,49 @@ function classify(err, opts, hostSignals, used) {
             const r = classify(new Error('Script execution timed out.'), HARDENED, undefined);
             assert.ok(r.error.startsWith('timeout:'), r.error);
         });
+    });
+});
+
+(XChainVM ? describe : describe.skip)('classifyError resource fault signal corroboration', function () {
+    before(initializeVM);
+
+    const ARMED = (over) => signals(Object.assign({ stackFaultGateOn: true, stackFault: false }, over));
+    const SPOOFED_STACK_ERRORS = [
+        ['a contract-built RangeError', () => new RangeError('Maximum call stack size exceeded')],
+        ["the recursion guard's exact text on a plain Error", () => new Error('maximum call stack depth exceeded')],
+        ['a plain object named RangeError', () => ({ name: 'RangeError', message: 'call stack' })],
+    ];
+
+    for (const [label, make] of SPOOFED_STACK_ERRORS) {
+        it(`rejects ${label} without the guard's host report -> generic error, real gasUsed`, function () {
+            const r = classify(make(), HARDENED, ARMED());
+            assert.ok(r.error.startsWith('error: '), r.error);
+            assert.strictEqual(r.gasUsed, 777);
+        });
+    }
+    it("accepts the guard's exact fault with its host report -> out_of_stack, clamped", function () {
+        const r = classify(new Error('maximum call stack depth exceeded'), HARDENED, ARMED({ stackFault: true }));
+        assert.ok(r.error.startsWith('out_of_stack:'), r.error);
+        assert.strictEqual(r.gasUsed, CEILING);
+    });
+    it('names a real memory-limit disposal out_of_memory, clamped', function () {
+        const r = classify(new Error('Isolate was disposed during execution due to memory limit'), HARDENED,
+            ARMED({ getIsolate: () => ({ isDisposed: true }) }));
+        assert.ok(r.error.startsWith('out_of_memory:'), r.error);
+        assert.strictEqual(r.gasUsed, CEILING);
+    });
+    it('keeps a memory-limit message with the isolate alive out of every resource status', function () {
+        const r = classify(new Error('Isolate was disposed during execution due to memory limit'), HARDENED, ARMED());
+        assert.ok(r.error.startsWith('error: '), r.error);
+        assert.strictEqual(r.gasUsed, 777);
+    });
+    it('keeps the memory-limit disposal a timeout below the activation', function () {
+        const r = classify(new Error('Isolate was disposed during execution due to memory limit'), HARDENED,
+            signals({ stackFaultGateOn: false, getIsolate: () => ({ isDisposed: true }) }));
+        assert.ok(r.error.startsWith('timeout:'), r.error);
+    });
+    it('ignores the activation flag on a pre-hardening block (legacy message-only replay)', function () {
+        const r = classify(new Error('anything call stack anything'), LEGACY, ARMED());
+        assert.ok(r.error.startsWith('out_of_stack:'), r.error);
     });
 });

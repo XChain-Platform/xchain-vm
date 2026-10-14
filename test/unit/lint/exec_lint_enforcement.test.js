@@ -312,7 +312,7 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             const sentinel = 'f'.repeat(64);
             const vm2 = newVm();
             vm2.getLintVerdict(CLEAN, true, true, true, true, true, true, sentinel);
-            assert.deepStrictEqual([...vm2._lintVerdictCache.keys()], [sentinel + ':11111100']);
+            assert.deepStrictEqual([...vm2._lintVerdictCache.keys()], [sentinel + ':111111000']);
         });
 
         it('evicts FIFO at the bound instead of growing without limit', function () {

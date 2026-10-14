@@ -26,6 +26,7 @@ const {
     XCALL_MIN_DEADLINE_BLOCKS, XCALL_MAX_DEADLINE_BLOCKS, XCALL_MAX_RETURN_BYTES,
 } = require('../constants.js');
 const { LINT_OPTIONAL_CHAIN_ACTIVATION, isLintOptionalChainActive } = require('../lint_optional_chain_heights.js');
+const { GAS_CEILING_EXHAUSTED_ACTIVATION, isGasCeilingExhaustedActive } = require('../gas_ceiling_exhausted_heights.js');
 const {
     MAX_SLASH_AMOUNT_DECIMALS, BINARY_ALLOC_GATE_BLOCK_TIME, JSON_STRINGIFY_HOOK_GATE_BLOCK_TIME,
     JSON_STRINGIFY_HOOK_ACTIVATION, jsonStringifyHookGateTime, ASYNC_SURFACE_GATE_BLOCK_TIME,
@@ -43,6 +44,8 @@ const { HostFaultError } = require('../../errors.js');
 const sandbox = require('../../sandbox.js');
 const lintCore = require('../../lint-core.js');
 const { APPLY_LENGTH_METER_ACTIVATION, isApplyLengthMeterActive } = require('../apply_length_meter.js');
+const { HOST_CALL_BOUNDS_ACTIVATION, isHostCallBoundsActive } = require('../host_call_bounds.js');
+const { PER_ELEMENT_METER_ACTIVATION, isPerElementMeterActive } = require('../per_element_meter.js');
 
 function attachHeightGates(target) {
     // Expose the canonical code-size cap so the cross-service regression suite can
@@ -82,6 +85,10 @@ function attachHeightGates(target) {
     // `vm_lint_optional_chain_heights.VM_LINT_OPTIONAL_CHAIN_ACTIVATION`.
     target.LINT_OPTIONAL_CHAIN_ACTIVATION = LINT_OPTIONAL_CHAIN_ACTIVATION;
     target.isLintOptionalChainActive = isLintOptionalChainActive;
+    // Gas-ceiling exhaustion settlement, twinned with indexer registry row
+    // `gas_ceiling_exhausted_heights.GAS_CEILING_EXHAUSTED_ACTIVATION`.
+    target.GAS_CEILING_EXHAUSTED_ACTIVATION = GAS_CEILING_EXHAUSTED_ACTIVATION;
+    target.isGasCeilingExhaustedActive = isGasCeilingExhaustedActive;
 }
 
 function attachTimeGates(target) {
@@ -223,6 +230,8 @@ function attachStatics(target) {
     attachFrozenSurface(target);
     const applyLengthMeterExports = Object.create(Object.getPrototypeOf(target), {
         APPLY_LENGTH_METER_ACTIVATION: { value: APPLY_LENGTH_METER_ACTIVATION }, isApplyLengthMeterActive: { value: isApplyLengthMeterActive },
+        HOST_CALL_BOUNDS_ACTIVATION: { value: HOST_CALL_BOUNDS_ACTIVATION }, isHostCallBoundsActive: { value: isHostCallBoundsActive },
+        PER_ELEMENT_METER_ACTIVATION: { value: PER_ELEMENT_METER_ACTIVATION }, isPerElementMeterActive: { value: isPerElementMeterActive },
     });
     Object.setPrototypeOf(target, applyLengthMeterExports);
 }

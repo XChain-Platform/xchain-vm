@@ -64,8 +64,10 @@ const GATE_FALLBACK_BLOCK_TIME = 1786060800;
 // The sibling class of activations, keyed on block HEIGHT per coin rather than on
 // block time: the Package-3 sandbox bundle, the execute-time source re-lint, the
 // lint global-alias, optional-chain and destructure refinements, the banned-with
-// lint and the BigInt surface strip all resolve `<COIN>:<network>` against a
-// threshold map. Whether a gate is on from genesis is
+// lint, the syntax-depth bound, the BigInt surface strip, the gas-ceiling exhaustion
+// settlement, the resource fault signal, the host error stack strip, the
+// JSON.stringify re-entry rule and the native stack terminal rule all resolve
+// `<COIN>:<network>` against a threshold map. Whether a gate is on from genesis is
 // decided per gate by its own predicate, never per network (the optional-chain
 // gate is genesis-on for regtest only and needs a threshold on testnet). A default
 // of 1 below an armed threshold runs the PRE-activation rule set, which BTC:mainnet
@@ -80,7 +82,13 @@ const HEIGHT_GATES = Object.freeze([
     { label: 'lint optional-chain',    map: 'LINT_OPTIONAL_CHAIN_ACTIVATION', isActive: 'isLintOptionalChainActive' },
     { label: 'lint banned-with',       map: 'LINT_BANNED_WITH_ACTIVATION',    isActive: 'isLintBannedWithActive' },
     { label: 'lint destructure',       map: 'LINT_DESTRUCTURE_ACTIVATION',    isActive: 'isLintDestructureActive' },
-    { label: 'BigInt surface strip',   map: 'BIGINT_SURFACE_STRIP_ACTIVATION', isActive: 'isBigIntSurfaceStripActive' }
+    { label: 'lint syntax depth',      map: 'LINT_SYNTAX_DEPTH_ACTIVATION',   isActive: 'isLintSyntaxDepthActive' },
+    { label: 'BigInt surface strip',   map: 'BIGINT_SURFACE_STRIP_ACTIVATION', isActive: 'isBigIntSurfaceStripActive' },
+    { label: 'gas-ceiling exhaustion', map: 'GAS_CEILING_EXHAUSTED_ACTIVATION', isActive: 'isGasCeilingExhaustedActive' },
+    { label: 'resource fault signal',  map: 'RESOURCE_FAULT_SIGNAL_ACTIVATION', isActive: 'isResourceFaultSignalActive' },
+    { label: 'host error stack strip', map: 'HOST_ERROR_STACK_STRIP_ACTIVATION', isActive: 'isHostErrorStackStripActive' },
+    { label: 'stringify re-entry',     map: 'JSON_STRINGIFY_REENTRY_ACTIVATION', isActive: 'isJsonStringifyReentryActive' },
+    { label: 'native stack terminal',  map: 'NATIVE_STACK_TERMINAL_ACTIVATION', isActive: 'isNativeStackTerminalActive' }
 ]);
 
 // Gas ceiling a controller guard runs under. The indexer reads it from
@@ -159,7 +167,17 @@ const TIME_NETWORK_GATES = Object.freeze([
             ? XChainVM.ITER_SET_METER_ACTIVATION[network] : null) },
     { label: 'apply-length meter', source: 'APPLY_LENGTH_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.APPLY_LENGTH_METER_ACTIVATION, network)
-            ? XChainVM.APPLY_LENGTH_METER_ACTIVATION[network] : null) }
+            ? XChainVM.APPLY_LENGTH_METER_ACTIVATION[network] : null) },
+    // Host-call bounds (cap before charge, cyclic TypeError, argument depth); resolved
+    // like its predicate, so a network the map does not name is unarmed.
+    { label: 'host-call bounds', source: 'HOST_CALL_BOUNDS_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.HOST_CALL_BOUNDS_ACTIVATION, network)
+            ? XChainVM.HOST_CALL_BOUNDS_ACTIVATION[network] : null) },
+    // Per-element meter (iterator helpers, set-like algebra, String.raw, object
+    // spread and rest); a network the map does not name is unarmed.
+    { label: 'per-element meter', source: 'PER_ELEMENT_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.PER_ELEMENT_METER_ACTIVATION, network)
+            ? XChainVM.PER_ELEMENT_METER_ACTIVATION[network] : null) }
 ]);
 
 module.exports = {

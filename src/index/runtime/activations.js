@@ -274,6 +274,20 @@ const {
     resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
 } = require('../bigint_surface_strip_heights.js');
+const {
+    RESOURCE_FAULT_SIGNAL_ACTIVATION,
+    resolveResourceFaultSignalActive,
+    isResourceFaultSignalActive,
+} = require('../resource_fault_signal_heights.js');
+const {
+    HOST_ERROR_STACK_STRIP_ACTIVATION,
+    isHostErrorStackStripActive,
+} = require('../host_error_stack_strip_heights.js');
+const {
+    NATIVE_STACK_TERMINAL_ACTIVATION,
+    resolveNativeStackTerminalActive,
+    isNativeStackTerminalActive,
+} = require('../native_stack/activation.js');
 
 // Activation for widening the contract.slash `amount` precision ceiling from 8 to
 // MAX_SLASH_AMOUNT_DECIMALS. The 8-dp regex contradicted the other side of the same
@@ -352,4 +366,12 @@ module.exports = {
     BIGINT_SURFACE_STRIP_ACTIVATION,
     resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
+    RESOURCE_FAULT_SIGNAL_ACTIVATION,
+    resolveResourceFaultSignalActive,
+    isResourceFaultSignalActive,
+    HOST_ERROR_STACK_STRIP_ACTIVATION,
+    isHostErrorStackStripActive,
+    NATIVE_STACK_TERMINAL_ACTIVATION,
+    resolveNativeStackTerminalActive,
+    isNativeStackTerminalActive,
 };

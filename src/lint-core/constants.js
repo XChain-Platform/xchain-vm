@@ -34,6 +34,11 @@ const RESERVED_CONTROL_BINDINGS = [
 // to the indexer's deploy.js cap); a parity test asserts it.
 const MAX_CODE_SIZE = 65536;
 const MAX_NESTING_DEPTH = 64;
+// The syntax-depth bound (syntax_depth.js units). Cold, in a fresh process, the lint
+// and metering passes first overflow at about 416 units with a 400 KB V8 stack and at
+// about 990 with the 984 KB default, across every measured shape; 200 keeps 2x headroom
+// at 400 KB and 5x at the default, and sits about 4x above the deepest shipped contract.
+const MAX_SYNTAX_DEPTH = 200;
 
 // The sandbox's hard-neutered prototype METHODS (sandbox.js
 // STRIPPED_PROTO_METHODS). Duplicated here for the dependency-light reason
@@ -130,6 +135,7 @@ module.exports = {
     RESERVED_CONTROL_BINDINGS,
     MAX_CODE_SIZE,
     MAX_NESTING_DEPTH,
+    MAX_SYNTAX_DEPTH,
     STRIPPED_PROTO_METHOD_NAMES,
     REGEX_COERCING_METHODS,
     STRIPPED_GLOBAL_NAMES,

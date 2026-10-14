@@ -58,7 +58,18 @@ function callStatement(name) {
 // Any leading directive-prologue statements (e.g. "use strict") are lifted
 // before the guard so they keep directive-prologue position in the output,
 // matching the same pattern as insertGasAfterDirectives.
-function wrapDepthGuard(node) {
+// Under the native stack activation `armed` carries the frame's depth units and
+// fresh local names: the guard becomes
+//     const D = __depth_enter(w);
+//     try { <body> } catch (X) { __depth_exit(X); throw X; }
+//     finally { __depth_exit(D, 0); }
+// so a native stack overflow leaving any contract frame is turned into the
+// depth fault at that frame (the throw rethrows anything else unchanged), and
+// only the token D, which contract code cannot name, unwinds the frame: the
+// armed hooks are reachable through globalThis, so an argument-free exit must
+// not be able to lower the depth. Neither call charges gas. Omitted, the
+// legacy guard is emitted byte-for-byte.
+function wrapDepthGuard(node, armed) {
     if (!node.body || node.body.type !== 'BlockStatement') return;
     const body = node.body.body;
     const offset = directivePrologueLength(body);
@@ -70,7 +81,27 @@ function wrapDepthGuard(node) {
         handler: null,
         finalizer: { type: 'BlockStatement', body: [callStatement('__depth_exit')] }
     };
-    node.body.body = directives.concat([callStatement('__depth_enter'), tryStmt]);
+    let enter = callStatement('__depth_enter');
+    if (armed) {
+        const pair = armedDepthPair(armed.weight, armed.token);
+        enter = pair.enter;
+        tryStmt.finalizer.body = [pair.exit];
+        const exitCheck = callStatement('__depth_exit');
+        exitCheck.expression.arguments.push(astIdent(armed.caught));
+        tryStmt.handler = { type: 'CatchClause', param: astIdent(armed.caught), body: { type: 'BlockStatement',
+            body: [exitCheck, { type: 'ThrowStatement', argument: astIdent(armed.caught) }] } };
+    }
+    node.body.body = directives.concat([enter, tryStmt]);
+}
+
+// The armed guard's entry and exit:  const D = __depth_enter(w);  /  __depth_exit(D, 0);
+function armedDepthPair(weight, token) {
+    const call = astCall('__depth_enter', [astLiteral(weight)]);
+    const enter = { type: 'VariableDeclaration', kind: 'const',
+        declarations: [{ type: 'VariableDeclarator', id: astIdent(token), init: call }] };
+    const exit = callStatement('__depth_exit');
+    exit.expression.arguments.push(astIdent(token), astLiteral(0));
+    return { enter, exit };
 }
 
 // Count the number of directive prologue statements at the start of a body
@@ -141,6 +172,6 @@ function memberKeyExpr(member) {
 
 module.exports = {
     gasCallStatement, gasCallExpr, wrapWithGas, callStatement, wrapDepthGuard,
-    directivePrologueLength, insertGasAfterDirectives, ensureBlock, binaryDepth,
+    directivePrologueLength, insertGasAfterDirectives, ensureBlock, binaryDepth, armedDepthPair,
     astIdent, astLiteral, astArray, astCall, cloneNode, astVoid0, arrowThunk, memberKeyExpr
 };

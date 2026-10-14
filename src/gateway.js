@@ -71,7 +71,9 @@ function buildGateway(gasTracker, stateManager, emissionCollector, readOnlyData,
             rootActionIndex: readOnlyData.rootActionIndex,
             callPath:        readOnlyData.callPath,
             contractIndex:   readOnlyData.contractIndex,
-            isGuard:         readOnlyData.isGuard
+            isGuard:         readOnlyData.isGuard,
+            // Host-call bounds gate: check the emission cap before a reservation.
+            capFirst:        Boolean(readOnlyData.hostCallBoundsOn)
         }),
 
         // Deterministic math (wraps mathjs bignumber). F-MO: above the flag-day
@@ -102,6 +104,9 @@ function buildAttestationAPI(gasTracker, emissionCollector, readOnlyData, gasSch
                 // wait blocks for an attestation response. Reject before charging.
                 if (readOnlyData.isGuard)
                     throw new Error('attestation.request: not available to a controller guard');
+                // Host-call bounds gate: at the emission cap, refuse before the request
+                // fee is charged, since the ATTEST emission would never be queued.
+                if (readOnlyData.hostCallBoundsOn) emissionCollector.ensureRoom();
                 gasTracker.charge(gasSchedule.VM_ATTEST_REQUEST);
                 gasTracker.charge(gasSchedule.VM_EMISSION);
                 if (typeof providerId !== 'string' || providerId.length === 0 || Buffer.byteLength(providerId, 'utf8') > 32)

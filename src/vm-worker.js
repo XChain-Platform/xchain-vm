@@ -116,6 +116,7 @@ function handleExecuteMessage(msg) {
                 send({
                     type: 'hostfault',
                     id: msg.id,
+                    token: msg.token,
                     reason: String((e && e.message) || 'executor unavailable').slice(0, 200)
                 });
                 // The isolate never came up, so worker state is intact (execute()'s
@@ -127,7 +128,8 @@ function handleExecuteMessage(msg) {
             process.exit(1);
             return;
         }
-        send({ type: 'result', id: msg.id, result });
+        // Echo the dispatch token: the parent accepts a reply only for the dispatch it answers.
+        send({ type: 'result', id: msg.id, token: msg.token, result });
         // Persist this execution's coverage before the parent can SIGKILL the
         // worker (inert unless a coverage harness set NODE_V8_COVERAGE).
         flushCoverage();

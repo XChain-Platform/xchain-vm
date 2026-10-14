@@ -38,7 +38,7 @@ describe('direct String.raw result-length wrapper', function () {
         const large = 'x'.repeat(K);
         const context = nodeVM.createContext({ large });
         const source = `
-            var charged = 0;
+            var charged = 0, __perElemMeterOn = false;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -53,7 +53,7 @@ describe('direct String.raw result-length wrapper', function () {
     it('preserves native coercion counts, return value and thrown errors', function () {
         const context = nodeVM.createContext({});
         const source = `
-            var charged = 0;
+            var charged = 0, __perElemMeterOn = false;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -70,6 +70,29 @@ describe('direct String.raw result-length wrapper', function () {
         assert.deepStrictEqual(Array.from(context.measured), ['axb', 1, 1, 3, 'TypeError']);
     });
 });
+
+// Legacy gas of one body on mainnet, pre-arm testnet, no network and an unknown one.
+async function legacyGas(run, body) {
+    const gas = {};
+    const early = { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 };
+    for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
+        const extra = network === 'testnet' ? { blockContext: early } : undefined;
+        const result = await run(body, network, extra);
+        assert.strictEqual(result.success, true, `${network}: ${result.error}`);
+        gas[String(network)] = result.gasUsed;
+    }
+    return gas;
+}
+
+// Regtest also arms the per-element meter, which adds a per-segment String.raw charge
+// testnet does not apply yet; run regtest with that gate held off.
+async function runRegtestWithoutPerElement(run, body) {
+    const perElement = require('../../src/index/per_element_meter.js').PER_ELEMENT_METER_ACTIVATION;
+    const saved = perElement.regtest;
+    perElement.regtest = null;
+    try { return await run(body, 'regtest', { gasCeiling: undefined }); }
+    finally { perElement.regtest = saved; }
+}
 
 (XChainVM ? describe : describe.skip)('direct String.raw metering gate', function () {
     this.timeout(120000);
@@ -114,18 +137,11 @@ describe('direct String.raw result-length wrapper', function () {
 
     it('leaves legacy gas on unarmed, unknown and pre-arm testnet blocks', async function () {
         const body = `var s='x'.repeat(${K});return String.raw({raw:['a','b']},s).length;`;
-        const gas = {};
-        const early = { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 };
-        for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-            const extra = network === 'testnet' ? { blockContext: early } : undefined;
-            const result = await run(body, network, extra);
-            assert.strictEqual(result.success, true, `${network}: ${result.error}`);
-            gas[String(network)] = result.gasUsed;
-        }
+        const gas = await legacyGas(run, body);
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
 
-        const armed = await run(body, 'regtest', { gasCeiling: undefined });
+        const armed = await runRegtestWithoutPerElement(run, body);
         const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined });
         assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed);
         assert.ok(armed.gasUsed >= gas.mainnet + K);

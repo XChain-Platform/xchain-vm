@@ -34,8 +34,13 @@ const {
     isLintHardeningActive, isStateKeyNulRejectActive, isStateKeyTypeNormalizeActive,
     isMeteringEvalOrderActive, isCallSpreadMeterActive, isRestPatternMeterActive,
     pkg3CoinFromAddress, isPkg3SandboxActive, isBigIntSurfaceStripActive,
+    isResourceFaultSignalActive, isNativeStackTerminalActive,
 } = require('./activations.js');
 const { checkExecLint } = require('./exec_lint.js');
+const { isGasCeilingExhaustedActive } = require('../gas_ceiling_exhausted_heights.js');
+const { isLintSyntaxDepthActive } = require('../lint_syntax_depth_heights.js');
+const { isHostStackOverflow } = require('../../lint-core.js');
+const { executionHarnessMask, compileHarness } = require('../armed_harness/select.js');
 const { buildGatewayOptions } = require('./gateway_options.js');
 const { makeGasReference } = require('./gas_reference.js');
 const { injectExecutionGlobals } = require('./isolate_globals.js');
@@ -122,7 +127,15 @@ module.exports = {
         const hostSignals       = {
             runStartNs: null,
             getIsolate: () => isolate,
-            wallBudgetMs: this.wallClockBudgetMs(opts)
+            wallBudgetMs: this.wallClockBudgetMs(opts),
+            // stackFaultGateOn resolves the per-coin resource fault signal activation
+            // once per execution; while it is on, the harness stack guard sets
+            // stackFault through a host reference before it throws, and the
+            // classifier grants out_of_stack only when that happened.
+            stackFaultGateOn: isResourceFaultSignalActive(opts.network,
+                pkg3CoinFromAddress(opts.contractAddress),
+                opts.blockContext && Number(opts.blockContext.height)),
+            stackFault: false
         };
 
         let isolate = null;
@@ -143,6 +156,10 @@ module.exports = {
         const __lintRefusal = checkExecLint(this, opts, gasTracker, emissionCollector,
             __codeStr, __codeBytes, __codeHash, __execLintCoin, __execLintHeight);
         if (__lintRefusal) return __lintRefusal;
+        // At the syntax-depth activation the re-lint above has bounded the source, so a
+        // host stack overflow while metering or compiling it is a fault of this host:
+        // thrown as HostFaultError (an infra halt), never recorded as an outcome.
+        const __overflowIsHostFault = isLintSyntaxDepthActive(opts.network, __execLintCoin, __execLintHeight);
 
         try {
             // Create isolate and context.
@@ -214,17 +231,18 @@ module.exports = {
 
             context.global.setSync('__gas', makeGasReference(gasTracker, opts));
 
-            const __iterSetMeterOn = injectExecutionGlobals(context, opts, __pkg3SandboxOn, this.limits);
+            // Native stack activation (per-coin height), resolved once so the harness
+            // hooks and the metering transform can never disagree within one execution.
+            const __nativeStackTerminal = isNativeStackTerminalActive(opts.network, __pkg3Coin, __pkg3Height);
+            const __iterSetMeterOn = injectExecutionGlobals(context, opts, __pkg3SandboxOn, this.limits,
+                hostSignals, __nativeStackTerminal);
 
             // Run harness script to assemble xchain object inside isolate.
-            // Reuse cached V8 bytecode when available: the harness source is a
+            // Reuse cached V8 bytecode when available: each harness source is a
             // fixed constant, so the compiled form is identical for every call.
-            const harnessScript = this.isolateManager.compileScript(
-                isolate, this._harnessSource, this._harnessCachedData
-            );
-            if (!this._harnessCachedData) {
-                try { this._harnessCachedData = this.isolateManager.getCachedData(harnessScript); } catch (e) { /* non-fatal */ }
-            }
+            // HARNESS_SOURCE itself unless a harness activation is on (../armed_harness/select.js).
+            const harnessScript = compileHarness(this, isolate, executionHarnessMask(
+                opts, __pkg3Coin, __pkg3Height, hostSignals.stackFaultGateOn, __nativeStackTerminal));
             harnessScript.runSync(context);
 
             // Meter the contract code. L-3 gate: resolve spec-correct `obj[k] += rhs`
@@ -246,8 +264,11 @@ module.exports = {
             let meteredCode;
             try {
                 meteredCode = this.getMeteredCode(
-                    __codeStr, __specEvalOrder, __meterCallSpread, __meterRestPattern, __codeHash);
+                    __codeStr, __specEvalOrder, __meterCallSpread, __meterRestPattern, __codeHash,
+                    __nativeStackTerminal);
             } catch (e) {
+                if (__overflowIsHostFault && isHostStackOverflow(e))
+                    throw new HostFaultError('metering stack overflow: ' + e.message);
                 return this.errorResult(gasTracker, emissionCollector, 'error: metering failed: ' + e.message);
             }
 
@@ -281,6 +302,8 @@ module.exports = {
             try {
                 script = this.isolateManager.compileScript(isolate, fullSource, cachedData);
             } catch (e) {
+                if (__overflowIsHostFault && isHostStackOverflow(e))
+                    throw new HostFaultError('compilation stack overflow: ' + e.message);
                 return this.errorResult(gasTracker, emissionCollector, 'error: compilation failed: ' + e.message);
             }
 
@@ -334,7 +357,10 @@ module.exports = {
             // isolate (the Object.* statics wrappers swallow it) and so reached the host as a
             // success. Post-gate such a run is out_of_gas at the ceiling; pre-gate it replays as
             // the success it settled as. Resolver and map live in gas.js beside the tracker flag.
-            if (gasTracker.exhausted && GasTracker.isGasCeilingSuccessActive(opts.network, __moBlockTime)) {
+            // The exhaustion gate settles the same run the same way on a chain where it is
+            // armed and this one is not, so past it no result carries gasUsed above the ceiling.
+            if (gasTracker.exhausted && (GasTracker.isGasCeilingSuccessActive(opts.network, __moBlockTime) ||
+                isGasCeilingExhaustedActive(opts.network, __execLintCoin, __execLintHeight))) {
                 return this.errorResult(gasTracker, emissionCollector,
                     'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
             }

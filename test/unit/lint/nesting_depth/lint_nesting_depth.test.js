@@ -104,9 +104,9 @@ describe('deploy-lint: nesting-depth enforcement', function () {
     it('is enabled by default and can be disabled for replay', function () {
         const source = parenthesized(65);
         assert.strictEqual(depthErrors(source).length, 1);
-        assert.deepStrictEqual(depthErrors(source, { enforceLintNestingDepth: false }), []);
+        assert.deepStrictEqual(depthErrors(source, { enforceLintNestingDepth: false, enforceLintSyntaxDepth: false }), []);
         assert.strictEqual(validateSyntax(source).valid, false);
-        assert.strictEqual(validateSyntax(source, { enforceLintNestingDepth: false }).valid, true);
+        assert.strictEqual(validateSyntax(source, { enforceLintNestingDepth: false, enforceLintSyntaxDepth: false }).valid, true);
     });
 
     it('keeps validateSyntax and lintSource messages byte-identical', function () {

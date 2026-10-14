@@ -39,14 +39,25 @@ function pushSizeError(code, errors) {
     }
 }
 
+// A host stack overflow: a property of this machine's stack size and JIT state, not
+// of the source. V8 says RangeError, SpiderMonkey InternalError ("too much recursion").
+function isHostStackOverflow(e) {
+    return !!e && (e.name === 'RangeError' || e.name === 'InternalError') &&
+        /call stack|too much recursion/i.test(String(e.message));
+}
+
 // 2. Acorn metering pass. If acorn can't parse it (or it uses post-ES2020
 //    syntax), reject. This also doubles as the blocking parse check.
 // Returns false when the parse failed, so the caller stops scanning.
-function pushParseError(code, errors) {
+// With overflowIsHostFault a host stack overflow is rethrown instead of becoming a
+// finding: once the syntax-depth scan has bounded the source it cannot be reached
+// on a sound host, and if it is, no verdict may depend on it.
+function pushParseError(code, errors, overflowIsHostFault) {
     try {
         meterCode(code);
         return true;
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         errors.push({
             rule: 'unsupported-syntax',
             message: 'unsupported syntax (ES' + CONTRACT_ECMA_VERSION + ' maximum): ' + e.message,
@@ -324,6 +335,9 @@ function pushStrippedGlobalWarnings(code, globalAlias, optionalChain, warnings) 
  *        refinement: statically named ObjectPattern reads from the global object
  *        and Math count as the corresponding direct property reads. Defaults to
  *        true for author-facing callers (SDK linter, CLI, unit tests).
+ * @param {boolean} [opts.overflowIsHostFault] - rethrow a host stack overflow from the
+ *        parse step instead of reporting it as unsupported syntax. Defaults to the
+ *        opts.enforceLintSyntaxDepth flag (itself default true).
  * @returns {{ errors: Array<{rule,message,line,severity}>, warnings: Array<{rule,message,line,severity}> }}
  */
 function lintSource(code, opts) {
@@ -338,10 +352,13 @@ function lintSource(code, opts) {
         };
     }
 
+    const overflowIsHostFault = opts && typeof opts.overflowIsHostFault === 'boolean'
+        ? opts.overflowIsHostFault
+        : !opts || opts.enforceLintSyntaxDepth !== false;
     const errors = [];
     pushSizeError(code, errors);
     // Without a parse there is nothing more to scan deterministically.
-    if (!pushParseError(code, errors)) return { errors, warnings: [] };
+    if (!pushParseError(code, errors, overflowIsHostFault)) return { errors, warnings: [] };
 
     pushReservedErrors(code, hardened, errors);
     pushMathErrors(code, hardened, globalAlias, optionalChain, destructure, errors);
@@ -367,4 +384,4 @@ function lintSource(code, opts) {
     return { errors, warnings };
 }
 
-module.exports = { lintSource };
+module.exports = { lintSource, isHostStackOverflow };

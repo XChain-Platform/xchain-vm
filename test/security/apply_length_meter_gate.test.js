@@ -23,6 +23,10 @@ const K = 100000;
 const WALL_MS = 30000;
 const LATE = { height: 100, timestamp: 4000000000, hash: 'abc123' };
 const ARR = `var a=new Array(${K}).fill(7);`;
+// Argument lists stay under the depth budget the native stack rule holds pushed
+// arguments to (regtest arms it), so these settle on gas, not out_of_stack.
+const APPLY_K = 8000;
+const APPLY_ARR = `var a=new Array(${APPLY_K}).fill(7);`;
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
 function registerGateIsolationTest(run) {
@@ -31,7 +35,7 @@ function registerGateIsolationTest(run) {
         const saved = activation.regtest;
         activation.regtest = null;
         try {
-            const applyBody = `${ARR}Math.max.apply(null,a);return 1;`;
+            const applyBody = `${APPLY_ARR}Math.max.apply(null,a);return 1;`;
             const sparseBody = `var a=new Array(${K});a.some(function(){return false;});return 1;`;
             const iterBody = `${ARR}a.values().toArray();return 1;`;
             const applyRegtest = await run(applyBody, 'regtest');
@@ -68,7 +72,7 @@ function registerGateIsolationTest(run) {
         ['Math.max apply', 'Math.max.apply(null,a)'],
     ]) {
         it(`${id}: a hostile loop ends in out_of_gas well under the wall`, async function () {
-            const setup = id === 'Function apply' ? `${ARR}function f(){return arguments.length;}` : ARR;
+            const setup = id === 'Function apply' ? `${APPLY_ARR}function f(){return arguments.length;}` : APPLY_ARR;
             const t0 = Date.now();
             const r = await run(`${setup}var t=0;for(;;){t+=${call};}`, 'regtest');
             assert.strictEqual(r.success, false, id);
@@ -78,16 +82,16 @@ function registerGateIsolationTest(run) {
     }
 
     it('apply is charged by argument-list length only on an armed network', async function () {
-        const body = `${ARR}Math.max.apply(null,a);return 1;`;
+        const body = `${APPLY_ARR}Math.max.apply(null,a);return 1;`;
         const armed = await run(body, 'regtest', { gasCeiling: undefined });
         const unarmed = await run(body, 'mainnet');
         assert.strictEqual(armed.success, true, armed.error);
-        assert.ok(armed.gasUsed >= unarmed.gasUsed + K - 10,
+        assert.ok(armed.gasUsed >= unarmed.gasUsed + APPLY_K - 10,
             `${armed.gasUsed} vs ${unarmed.gasUsed}`);
     });
 
     it('mainnet, unknown and pre-arm testnet blocks retain the legacy flat charge; armed testnet meters', async function () {
-        const body = `${ARR}Math.max.apply(null,a);return 1;`;
+        const body = `${APPLY_ARR}Math.max.apply(null,a);return 1;`;
         // One second before the armed testnet instant still runs the legacy rule.
         const early = { blockContext: { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 } };
         const gas = {};
@@ -99,7 +103,7 @@ function registerGateIsolationTest(run) {
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
         const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined });
-        assert.ok(armedTestnet.gasUsed >= gas.mainnet + K - 10, `${armedTestnet.gasUsed} vs ${gas.mainnet}`);
+        assert.ok(armedTestnet.gasUsed >= gas.mainnet + APPLY_K - 10, `${armedTestnet.gasUsed} vs ${gas.mainnet}`);
     });
 
     registerGateIsolationTest(run);

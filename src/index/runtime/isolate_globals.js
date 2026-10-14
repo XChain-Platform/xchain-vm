@@ -19,6 +19,7 @@
 
 const { MAX_STACK_DEPTH_MUSL } = require('../constants.js');
 const { BINARY_ALLOC_GATE_BLOCK_TIME, jsonStringifyHookGateTime, isIterSetMeterActive } = require('./activations.js');
+const ivm = require('isolated-vm');
 const { isApplyLengthMeterActive } = require('../apply_length_meter.js');
 
 function injectDepthGlobals(context, pkg3SandboxOn, limits) {
@@ -95,8 +96,26 @@ function injectMeteringGlobals(context, opts) {
         return __iterSetMeterOn;
 }
 
-function injectExecutionGlobals(context, opts, pkg3SandboxOn, limits) {
+// While the resource fault signal activation is armed, hand the harness a host
+// reference its stack guard calls before throwing, so the classifier can tell a
+// real recursion or native-depth trip from a contract that throws the same text.
+// The armed harness captures it before the cleanup pass strips __-prefixed globals;
+// below the activation nothing is injected and the harness is the unarmed one.
+function injectStackFaultSignal(context, hostSignals) {
+    if (!hostSignals || !hostSignals.stackFaultGateOn) return;
+    context.global.setSync('__stackFault', new ivm.Reference(function() {
+        hostSignals.stackFault = true;
+    }));
+}
+
+// The native stack activation flag for the armed harness hooks in
+// ../native_stack/harness_hooks.js, resolved once per execution by the caller and
+// injected only while armed; the cleanup pass strips it with the other __-prefixed
+// globals.
+function injectExecutionGlobals(context, opts, pkg3SandboxOn, limits, hostSignals, nativeStackTerminalOn) {
     injectDepthGlobals(context, pkg3SandboxOn, limits);
+    injectStackFaultSignal(context, hostSignals);
+    if (nativeStackTerminalOn === true) context.global.setSync('__NATIVE_STACK_TERMINAL_ON', true);
     return injectMeteringGlobals(context, opts);
 }
 

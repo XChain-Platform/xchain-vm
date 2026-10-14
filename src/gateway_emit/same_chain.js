@@ -32,7 +32,11 @@ const { validateRequired, validateTypes } = require('./param_validation.js');
 // total work per top-level EXECUTE can never exceed the caller's own
 // ceiling regardless of call-tree shape. Unused reservation is refunded
 // at the top-level fee settlement (indexer-side).
-function buildExecuteEmit(gasTracker, emissionCollector, gasSchedule, callDepth, maxCallDepth, minCallGas) {
+//
+// capFirst (the host-call bounds gate): check the emission cap before the
+// reservation is charged, so a refused call at the cap is not billed for an
+// EXECUTE that is never queued. Off, the cap fires inside add() after the charge.
+function buildExecuteEmit(gasTracker, emissionCollector, gasSchedule, callDepth, maxCallDepth, minCallGas, capFirst) {
     return {
         execute: (params) => {
             validateRequired(params, ['contractIndex', 'method', 'gasLimit']);
@@ -81,6 +85,7 @@ function buildExecuteEmit(gasTracker, emissionCollector, gasSchedule, callDepth,
                 throw new Error('emit.execute: gasLimit ' + gasLimit + ' exceeds remaining gas ' + remaining);
 
             // Reserve: emission cost + the callee's entire budget, charged here.
+            if (capFirst) emissionCollector.ensureRoom();
             gasTracker.charge(gasSchedule.VM_EMISSION + gasLimit);
             emissionCollector.add('EXECUTE', {
                 contractIndex: idx,

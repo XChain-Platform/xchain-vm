@@ -66,9 +66,15 @@ class EmissionCollector {
         this.deepStrip  = !!deepStrip;
     }
 
-    add(actionType, params) {
+    // Throws the emission-cap error when no slot is left. add() runs it first; a gated
+    // caller that charges a reservation also runs it before the charge.
+    ensureRoom() {
         if (this.actions.length >= this.max)
             throw new Error('emission limit exceeded (' + this.max + ')');
+    }
+
+    add(actionType, params) {
+        this.ensureRoom();
         let safe;
         if (this.deepStrip) {
             safe = deepStripParams(params);

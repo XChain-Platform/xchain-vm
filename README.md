@@ -165,6 +165,29 @@ callers such as benches, fuzzing and the toolkit simulator. Tightening the
 constant is a consensus tightening: it needs its own future flag-day,
 re-goldened determinism baselines, and an atomic fleet deploy.
 
+### Per-element charges for native built-ins (`PER_ELEMENT_METER_ACTIVATION`)
+
+Some native built-ins do work per element while the legacy schedule charged
+them a constant per call, so their wall time per gas grew with the input. From
+the `PER_ELEMENT_METER_ACTIVATION` block time on each network (regtest from
+genesis; mainnet and testnet unarmed until a coordinated release arms them),
+the harness charges them per element. One gas unit is one `VM_COMPUTATION`.
+
+| Built-in | Legacy charge | Charge once armed |
+|---|---|---|
+| `Iterator.prototype` `map`, `filter`, `flatMap`, `reduce`, `forEach`, `some`, `every`, `find` | none per element when the callback is native (a contract callback pays its own function-entry gas) | 1 per callback invocation, whatever the callback |
+| Values yielded by an iterator helper (`map`, `filter`, `take`, `drop`, `flatMap`), including inside `for...of` | none | 1 per value yielded, per helper stage |
+| `Set.prototype` `union`, `intersection`, `difference`, `symmetricDifference`, `isSubsetOf`, `isSupersetOf`, `isDisjointFrom` with a plain `Set` argument | size of receiver + size of argument | unchanged |
+| The same methods with any other set-like argument | size of receiver + the argument's self-reported `size` | size of receiver + the larger of the self-reported `size` and the number of keys the argument's `keys()` iterator yields |
+| `String.raw` | result length | number of raw segments + result length |
+| Object spread `{...o}` and object rest `{a, ...r} = o` | number of copied keys, only above 256 keys | number of copied keys from the first key |
+
+The set-like argument is read once, in spec order (`size`, `has`, `keys`), and
+its `has` and `keys` run with the argument as `this`, so results, read order
+and errors match the bare built-in. The one visible difference from the
+earlier testnet charge is that it read a set-like argument's `size` a second
+time; the armed path does not.
+
 ## Developer Toolkit (`xchain-foundry`)
 
 A local on-ramp for authoring XChain contracts: write, lint, gas-profile, and

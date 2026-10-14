@@ -24,7 +24,7 @@
 
 const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
-const { lintSource, nestingDepthFinding, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
+const { lintSource, nestingDepthFinding, syntaxDepthFinding, isHostStackOverflow, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
 
 function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWasm, bannedRest, bannedWith) {
     if (error.rule === 'banned-async' && !bannedAsync) return false;
@@ -35,7 +35,9 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
     return CONSENSUS_RULES.has(error.rule);
 }
 
-function checkV8Syntax(code) {
+// With overflowIsHostFault a V8 stack overflow is a HostFaultError, never a verdict:
+// the syntax-depth scan has already bounded the source, so only a host fault reaches it.
+function checkV8Syntax(code, overflowIsHostFault) {
     let testIsolate;
     try {
         try {
@@ -46,12 +48,32 @@ function checkV8Syntax(code) {
         try {
             testIsolate.compileScriptSync(code);
         } catch (e) {
+            if (overflowIsHostFault && isHostStackOverflow(e))
+                throw new HostFaultError('syntax validation stack overflow: ' + e.message);
             return { valid: false, error: 'syntax error: ' + e.message };
         }
     } finally {
         try { if (testIsolate) testIsolate.dispose(); } catch (e) {}
     }
     return null;
+}
+
+// The non-recursive depth rules, run before any parser: delimiter nesting, then the
+// syntax-depth bound over every construct the parsers and the metering pass recurse on.
+function preParseFinding(code, nesting, syntaxDepth) {
+    return (nesting && nestingDepthFinding(code)) || (syntaxDepth && syntaxDepthFinding(code)) || null;
+}
+
+// The acorn rules, with a host stack overflow surfaced as HostFaultError when
+// opts.overflowIsHostFault is set (lintSource rethrows it from the parse step then).
+function lintAcornRules(code, opts) {
+    try {
+        return lintSource(code, opts);
+    } catch (e) {
+        if (opts.overflowIsHostFault && isHostStackOverflow(e))
+            throw new HostFaultError('syntax validation stack overflow: ' + e.message);
+        throw e;
+    }
 }
 
 /**
@@ -119,6 +141,13 @@ function checkV8Syntax(code) {
  *        activation. Defaults to true for author-facing callers.
  * @param {boolean} [opts.enforceLintNestingDepth=true] - whether the pre-parse
  *        nesting-depth rule is deploy-blocking. Defaults to true.
+ * @param {boolean} [opts.enforceLintSyntaxDepth=true] - the syntax-depth activation
+ *        (index/lint_syntax_depth_heights.js). When set: the delimiter rule applies
+ *        whatever enforceLintNestingDepth says, so deploy is as strict as the
+ *        execute-time lint; a source over MAX_SYNTAX_DEPTH is refused before any
+ *        recursive pass; and a host stack overflow in any later pass throws
+ *        HostFaultError instead of becoming a verdict. CONSENSUS-GATED on its own
+ *        per-coin block-height activation. Defaults to true for author-facing callers.
  * @returns {{ valid: boolean, error?: string }}
  * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
  *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
@@ -135,13 +164,12 @@ function validateSyntax(code, opts) {
     const enforceBannedWasm      = !opts || opts.enforceBannedWasm !== false;
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
     const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
-    const enforceLintNestingDepth = !opts || opts.enforceLintNestingDepth !== false;
+    const enforceLintSyntaxDepth = !opts || opts.enforceLintSyntaxDepth !== false;
+    const enforceLintNestingDepth = enforceLintSyntaxDepth || !opts || opts.enforceLintNestingDepth !== false;
     const enforceLintDestructure = !opts || opts.enforceLintDestructure !== false;
 
-    if (enforceLintNestingDepth) {
-        const nesting = nestingDepthFinding(code);
-        if (nesting) return { valid: false, error: nesting.message };
-    }
+    const preParse = preParseFinding(code, enforceLintNestingDepth, enforceLintSyntaxDepth);
+    if (preParse) return { valid: false, error: preParse.message };
 
     // 1. V8 syntax check (the only step that requires isolated-vm).
     //
@@ -157,7 +185,7 @@ function validateSyntax(code, opts) {
     // failed to load at all. HostFaultError carries that code, which
     // faultGuard.rethrowIfInfraFault treats as an infra halt, so the block
     // rolls back and retries and NO verdict is written.
-    const syntaxError = checkV8Syntax(code);
+    const syntaxError = checkV8Syntax(code, enforceLintSyntaxDepth);
     if (syntaxError) return syntaxError;
 
     // 2-5. Acorn-coverable consensus rules. Block ONLY on consensus rules;
@@ -167,11 +195,13 @@ function validateSyntax(code, opts) {
     // async gate, banned-generator/banned-wasm on the Pkg 3 per-coin height gate,
     // banned-rest on the REST_PATTERN_METER block-time gate, banned-with on its
     // own per-coin height gate.
-    const blocking = lintSource(code, {
+    const blocking = lintAcornRules(code, {
         hardened: enforceLintHardening,
         globalAlias: enforceLintGlobalAlias,
         optionalChain: enforceLintOptionalChain,
         enforceLintNestingDepth: false,
+        enforceLintSyntaxDepth: false,
+        overflowIsHostFault: enforceLintSyntaxDepth,
         destructure: enforceLintDestructure
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
         enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));

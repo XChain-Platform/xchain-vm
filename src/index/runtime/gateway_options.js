@@ -23,6 +23,7 @@ const { normalizeRootDiscriminator } = require('../../gateway-emit.js');
 const {
     BINARY_ALLOC_GATE_BLOCK_TIME, isSlashTokenDelimGuardActive, isSlashAmountPrecisionActive,
 } = require('./activations.js');
+const { isHostCallBoundsActive } = require('../host_call_bounds.js');
 
 function resolveGateFlags(opts) {
     // F-MO gate: math output metering (charge for an oversized pow()/format
@@ -39,7 +40,10 @@ function resolveGateFlags(opts) {
     // digits, matching the token precision the stake side already admits (see
     // isSlashAmountPrecisionActive). Network-aware, same flag-day.
     const slashAmountPrecisionOn = isSlashAmountPrecisionActive(opts.network, mathBlockTime);
-    return { mathOutputMeterOn, slashTokenDelimGuardOn, slashAmountPrecisionOn };
+    // Check the emission cap before charging a reservation, prepay or request fee
+    // (see host_call_bounds.js). Network-aware, on its own flag day.
+    const hostCallBoundsOn = isHostCallBoundsActive(opts.network, mathBlockTime);
+    return { mathOutputMeterOn, slashTokenDelimGuardOn, slashAmountPrecisionOn, hostCallBoundsOn };
 }
 
 function buildGatewayOptions(vm, opts, accessors) {
