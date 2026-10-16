@@ -75,12 +75,35 @@ const {
     isLintSyntaxDepthActive,
 } = require('./index/lint_syntax_depth_heights.js');
 
+const DEFAULT_MAX_LIVE_EXECUTORS = 64;
+let liveExecutors = 0;
+
+function reserveExecutorSlot(configuredCap) {
+    const cap = Number.isInteger(configuredCap) && configuredCap > 0
+        ? configuredCap
+        : DEFAULT_MAX_LIVE_EXECUTORS;
+    if (liveExecutors >= cap) {
+        const error = new Error('ProcessExecutor live worker cap reached (' + cap +
+            ' executors not shut down); call shutdown() on VMs you are done with');
+        error.code = 'EXECUTOR_CAP_REACHED';
+        throw error;
+    }
+    liveExecutors++;
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        liveExecutors--;
+    };
+}
+
 class XChainVM {
     /**
      * @param {object} config
      * @param {object} config.gasSchedule - Gas costs for each operation
      * @param {number} config.gasCeiling  - Maximum gas per execution
      * @param {object} config.limits      - Resource limits
+     * @param {number} config.maxLiveExecutors - Process-wide subprocess cap
      */
     constructor(config) {
         this.gasSchedule = config.gasSchedule;
@@ -116,7 +139,13 @@ class XChainVM {
         if (this.execution === 'subprocess') {
             // Lazy require to avoid loading child_process for in-process callers.
             const ProcessExecutor = require('./process-executor.js');
-            this._executor = new ProcessExecutor(config);
+            const releaseSlot = reserveExecutorSlot(config.maxLiveExecutors);
+            try {
+                this._executor = new ProcessExecutor(config, releaseSlot);
+            } catch (error) {
+                releaseSlot();
+                throw error;
+            }
         }
     }
 
