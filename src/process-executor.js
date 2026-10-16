@@ -65,9 +65,9 @@ const MAX_CONSECUTIVE_SPAWN_FAILURES = 3;
 // the spawn-failure → HostFaultError machinery (halt and retry, a local
 // fault), now that the per-request watchdog no longer covers queue wait.
 const WORKER_READY_TIMEOUT_MS = 30000;
-
 class ProcessExecutor {
-    constructor(config) {
+    constructor(config, releaseSlot = () => {}) {
+        this._releaseSlot = releaseSlot;
         // Keep only the serializable VM config (drop execution mode etc.).
         this._config = {
             gasSchedule: config.gasSchedule,
@@ -374,6 +374,7 @@ class ProcessExecutor {
 
     async shutdown() {
         this._shuttingDown = true;
+        this._releaseSlot();
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
         // A local shutdown is not a contract outcome, even for a dispatched request
         // whose contract had started: every peer finishes it normally, so reject it.
@@ -396,5 +397,4 @@ class ProcessExecutor {
         }
     }
 }
-
 module.exports = ProcessExecutor;
