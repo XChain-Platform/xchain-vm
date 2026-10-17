@@ -25,10 +25,10 @@ const { createVM, execute, XChainVM } = require('../../fuzz/helpers/harness.js')
 describe('armed harness selection: per execution', function () {
     it('selects the unarmed harness on mainnet and testnet and every rule on regtest', function () {
         const far = { blockContext: { height: 1e9, timestamp: 4102444800 } };
-        for (const network of ['mainnet', 'testnet']) {
-            const opts = Object.assign({ network }, far);
-            assert.strictEqual(select.executionHarnessMask(opts, 'BTC', 1e9, false, false), 0, network);
-        }
+        assert.strictEqual(select.executionHarnessMask(Object.assign({ network: 'mainnet' }, far), 'BTC', 1e9, false, false), 0, 'mainnet');
+        // Testnet below its v0.24.0 arms (BTC 156908, change instant 1792303200) still selects the unarmed harness.
+        const preArm = { network: 'testnet', blockContext: { height: 156907, timestamp: 1792303199 } };
+        assert.strictEqual(select.executionHarnessMask(preArm, 'BTC', 156907, false, false), 0, 'testnet');
         const all = (1 << select.RULES.length) - 1;
         assert.strictEqual(select.executionHarnessMask(Object.assign({ network: 'regtest' }, far), 'BTC', 1e9, true, true), all);
     });

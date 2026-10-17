@@ -33,9 +33,9 @@ const HOST_ERROR_STACK_STRIP_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
     'DOGE:mainnet': null,
-    'BTC:testnet':  null,
-    'LTC:testnet':  null,
-    'DOGE:testnet': null,
+    'BTC:testnet':  156908,
+    'LTC:testnet':  4927400,
+    'DOGE:testnet': 68005165,
 });
 
 // Same resolution rule as the BigInt surface strip: regtest on from genesis,

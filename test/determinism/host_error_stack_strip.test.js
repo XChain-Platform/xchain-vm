@@ -44,7 +44,9 @@ const EARLY = { height: 100, timestamp: 1700000000, hash: 'abc123' };
 const TESTNET_THRESHOLD = XChainVM && XChainVM.HOST_ERROR_STACK_STRIP_ACTIVATION
     ? XChainVM.HOST_ERROR_STACK_STRIP_ACTIVATION['BTC:testnet'] : null;
 const TESTNET_LEGACY = Number.isFinite(TESTNET_THRESHOLD)
-    ? { ...LATE, height: Math.min(LATE.height, TESTNET_THRESHOLD - 1) } : LATE;
+    ? { ...LATE, height: Math.min(LATE.height, TESTNET_THRESHOLD - 1), timestamp: 1792303199 } : LATE;
+// The legacy testnet side also sits one second before the v0.24.0 change instant (1792303200),
+// so the host-call bounds and per-element meter armed with it leave the wrapper text and gas alone.
 const fn = (body) => `module.exports = function(xchain) { ${body} };`;
 
 const LEGACY_STACK = (message) =>
@@ -98,12 +100,13 @@ async function assertArmedMatchesLegacy(call, message) {
 }
 
 suite('host-thrown error stack activation: map', function () {
-    it('is frozen, keyed per coin, and unarmed on mainnet and testnet', function () {
+    it('is frozen, keyed per coin, unarmed on mainnet, and armed on testnet at its v0.24.0 heights', function () {
         const map = XChainVM.HOST_ERROR_STACK_STRIP_ACTIVATION;
         assert.ok(Object.isFrozen(map));
         assert.deepStrictEqual(Object.keys(map), ['BTC:mainnet', 'LTC:mainnet', 'DOGE:mainnet',
             'BTC:testnet', 'LTC:testnet', 'DOGE:testnet']);
-        for (const key of Object.keys(map)) assert.strictEqual(map[key], null, key);
+        const TESTNET = { 'BTC:testnet': 156908, 'LTC:testnet': 4927400, 'DOGE:testnet': 68005165 };
+        for (const key of Object.keys(map)) assert.strictEqual(map[key], TESTNET[key] || null, key);
     });
 
     it('resolves on regtest from genesis and off everywhere else', function () {
@@ -112,7 +115,9 @@ suite('host-thrown error stack activation: map', function () {
         assert.strictEqual(isActive('regtest', null, NaN), true);
         for (const coin of ['BTC', 'LTC', 'DOGE']) {
             assert.strictEqual(isActive('mainnet', coin, 1e12), false, `${coin}:mainnet`);
-            assert.strictEqual(isActive('testnet', coin, 1e12), false, `${coin}:testnet`);
+            const at = { BTC: 156908, LTC: 4927400, DOGE: 68005165 }[coin];
+            assert.strictEqual(isActive('testnet', coin, at - 1), false, `${coin}:testnet below`);
+            assert.strictEqual(isActive('testnet', coin, at), true, `${coin}:testnet at`);
         }
         assert.strictEqual(isActive(undefined, 'BTC', 1e12), false);
         assert.strictEqual(isActive('devnet', 'BTC', 1e12), false);

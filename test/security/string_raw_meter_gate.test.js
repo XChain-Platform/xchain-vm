@@ -142,7 +142,8 @@ async function runRegtestWithoutPerElement(run, body) {
         assert.strictEqual(gas.undefined, gas.unknown);
 
         const armed = await runRegtestWithoutPerElement(run, body);
-        const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined });
+        // Before the v0.24.0 per-element instant, so only the String.raw meter separates it from legacy.
+        const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined, blockContext: { ...LATE, timestamp: 1792303199 } });
         assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed);
         assert.ok(armed.gasUsed >= gas.mainnet + K);
     });

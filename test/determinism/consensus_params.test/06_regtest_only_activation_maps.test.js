@@ -27,20 +27,28 @@ const COIN_KEYS = ['BTC:mainnet', 'LTC:mainnet', 'DOGE:mainnet', 'BTC:testnet', 
 function assertCoinMapUnarmed(map, isActive) {
     assert.deepStrictEqual(Object.keys(map), COIN_KEYS);
     assert.ok(Object.isFrozen(map));
-    for (const key of COIN_KEYS) assert.strictEqual(map[key], null, key);
+    // The v0.24.0 cut arms each testnet chain; mainnet stays null.
+    const TESTNET = { BTC: 156908, LTC: 4927400, DOGE: 68005165 };
+    for (const key of COIN_KEYS) {
+        const [coin, network] = key.split(':');
+        assert.strictEqual(map[key], network === 'testnet' ? TESTNET[coin] : null, key);
+    }
     assert.strictEqual(isActive('regtest', 'BTC', 0), true);
     for (const coin of ['BTC', 'LTC', 'DOGE']) {
         assert.strictEqual(isActive('mainnet', coin, 1e9), false, `${coin}:mainnet`);
-        assert.strictEqual(isActive('testnet', coin, 1e9), false, `${coin}:testnet`);
+        assert.strictEqual(isActive('testnet', coin, TESTNET[coin] - 1), false, `${coin}:testnet below`);
+        assert.strictEqual(isActive('testnet', coin, TESTNET[coin]), true, `${coin}:testnet at`);
     }
 }
 
 // A per-network block-time map: sealed, regtest at 0, mainnet and testnet null.
 function assertTimeMapUnarmed(map, isActive) {
-    assert.deepStrictEqual(map, { mainnet: null, testnet: null, regtest: 0 });
+    // The v0.24.0 cut arms testnet at its shared change instant; mainnet stays null.
+    assert.deepStrictEqual(map, { mainnet: null, testnet: 1792303200, regtest: 0 });
     assert.ok(Object.isSealed(map));
     for (const [network, t, on] of [['regtest', 0, true], ['mainnet', 4102444800, false],
-        ['testnet', 4102444800, false], ['unknown', 4102444800, false], [undefined, 4102444800, false]])
+        ['testnet', 1792303199, false], ['testnet', 1792303200, true],
+        ['unknown', 4102444800, false], [undefined, 4102444800, false]])
         assert.strictEqual(isActive(network, t), on, `${network}@${t}`);
 }
 

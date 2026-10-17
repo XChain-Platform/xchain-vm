@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-17
+
+### Added
+- Added activations for lint depth, metering and host-call accounting, each at its own height per chain.
+- Metered Annex B string HTML results and direct raw template string result length behind activations.
+- Added a consensus dependency runtime gate and the toString size meter activation module at its unarmed sentinel.
+
+### Changed
+- Capped live subprocess executors and added an execute throw worker preload.
+- Armed GAS_CEILING_EXHAUSTED_ACTIVATION on testnet at BTC 156908, LTC 4927400 and DOGE 68005165.
+- Armed LINT_SYNTAX_DEPTH_ACTIVATION on testnet at BTC 156908, LTC 4927400 and DOGE 68005165.
+- Armed RESOURCE_FAULT_SIGNAL_ACTIVATION on testnet at BTC 156908, LTC 4927400 and DOGE 68005165.
+- Armed HOST_ERROR_STACK_STRIP_ACTIVATION on testnet at BTC 156908, LTC 4927400 and DOGE 68005165.
+- Armed JSON_STRINGIFY_REENTRY_ACTIVATION on testnet at BTC 156908, LTC 4927400 and DOGE 68005165.
+- Armed NATIVE_STACK_TERMINAL_ACTIVATION on testnet at BTC 156908, LTC 4927400 and DOGE 68005165.
+
 ## [0.23.0] - 2026-10-11
 
 ### Added

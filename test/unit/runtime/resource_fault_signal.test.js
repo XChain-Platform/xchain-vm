@@ -41,7 +41,8 @@ const CEILING = 1000000;
 const BLOCK_TIME = 1800000000;
 const ARMED   = { network: 'regtest', blockContext: { height: 100, timestamp: BLOCK_TIME, hash: 'h' } };
 const MAINNET = { network: 'mainnet', blockContext: { height: 5000000, timestamp: BLOCK_TIME, hash: 'h' } };
-const TESTNET = { network: 'testnet', blockContext: { height: 5000000, timestamp: BLOCK_TIME, hash: 'h' } };
+// Below every v0.24.0 testnet height (BTC 156908 is the lowest), where testnet still settles as before.
+const TESTNET = { network: 'testnet', blockContext: { height: 156907, timestamp: BLOCK_TIME, hash: 'h' } };
 
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 const lit = (s) => JSON.stringify(s);

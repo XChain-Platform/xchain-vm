@@ -23,6 +23,8 @@ const XChainVM = require('../../../src/index.js');
 
 describe('resource fault signal activation', function () {
     const coins = ['BTC', 'LTC', 'DOGE'];
+    // The v0.24.0 cut arms testnet at BTC 156908, LTC 4927400 and DOGE 68005165; mainnet stays unarmed.
+    const V0240_TESTNET = Object.freeze({ BTC: 156908, LTC: 4927400, DOGE: 68005165 });
     const expectedKeys = [
         'BTC:mainnet',
         'LTC:mainnet',
@@ -32,11 +34,12 @@ describe('resource fault signal activation', function () {
         'DOGE:testnet',
     ];
 
-    it('exports a frozen map with every mainnet and testnet chain unarmed', function () {
+    it('exports a frozen map with mainnet unarmed and testnet at its v0.24.0 heights', function () {
         assert.ok(Object.isFrozen(RESOURCE_FAULT_SIGNAL_ACTIVATION));
         assert.deepStrictEqual(Object.keys(RESOURCE_FAULT_SIGNAL_ACTIVATION), expectedKeys);
         for (const key of expectedKeys) {
-            assert.strictEqual(RESOURCE_FAULT_SIGNAL_ACTIVATION[key], null, key);
+            const [coin, network] = key.split(':');
+            assert.strictEqual(RESOURCE_FAULT_SIGNAL_ACTIVATION[key], network === 'testnet' ? V0240_TESTNET[coin] : null, key);
         }
     });
 
@@ -52,12 +55,12 @@ describe('resource fault signal activation', function () {
             isResourceFaultSignalActive);
     });
 
-    it('keeps every mainnet and testnet chain unarmed at any height', function () {
+    it('keeps mainnet unarmed at any height and arms testnet from its v0.24.0 height', function () {
         for (const coin of coins) {
-            for (const network of ['mainnet', 'testnet']) {
-                assert.strictEqual(isResourceFaultSignalActive(network, coin, 0), false, coin + ':' + network);
-                assert.strictEqual(isResourceFaultSignalActive(network, coin, 100000000), false, coin + ':' + network);
-            }
+            assert.strictEqual(isResourceFaultSignalActive('mainnet', coin, 0), false, coin + ':mainnet');
+            assert.strictEqual(isResourceFaultSignalActive('mainnet', coin, 100000000), false, coin + ':mainnet');
+            assert.strictEqual(isResourceFaultSignalActive('testnet', coin, V0240_TESTNET[coin] - 1), false, coin + ':testnet');
+            assert.strictEqual(isResourceFaultSignalActive('testnet', coin, V0240_TESTNET[coin]), true, coin + ':testnet');
         }
     });
 
