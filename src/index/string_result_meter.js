@@ -29,8 +29,9 @@ function isStringResultMeterActive(network, blockTime) {
 }
 
 // Keep released HARNESS_SOURCE intact because wrapper text and positions are visible.
-// Runtime compilation derives the gated form from exact spans, using outer allocator
-// bindings that leave each installed wrapper's String(fn) text unchanged.
+// Runtime compilation derives the gated form from exact spans. Outer allocator
+// bindings preserve the released wrappers' String(fn) text; the separately derived
+// per-element wrapper gates only its result charge.
 const APPLY_LENGTH_LINE =
     '    var __applyLengthMeterOn = globalThis.__APPLY_LENGTH_METER_ON === true;';
 const HTML_WRAPPERS =
@@ -92,7 +93,7 @@ function buildStringResultMeterHarness(source) {
         [HTML_WRAPPERS, GATED_HTML_WRAPPERS],
         [RAW_WRAPPER(rawGuard), GATED_RAW_WRAPPER(rawGuard)],
     ];
-    if (source.includes(PER_ELEMENT_RAW_RESULT))
+    if (rawGuard === perElementGuard)
         edits.push([PER_ELEMENT_RAW_RESULT, GATED_PER_ELEMENT_RAW_RESULT]);
     return deriveHarness(source, [{
         label: 'string result meter',
