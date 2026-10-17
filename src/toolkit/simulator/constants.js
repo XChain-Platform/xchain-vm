@@ -181,7 +181,9 @@ const TIME_NETWORK_GATES = Object.freeze([
             ? XChainVM.PER_ELEMENT_METER_ACTIVATION[network] : null) },
     { label: 'string-result meter', source: 'STRING_RESULT_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.STRING_RESULT_METER_ACTIVATION, network)
-            ? XChainVM.STRING_RESULT_METER_ACTIVATION[network] : null) }
+            ? XChainVM.STRING_RESULT_METER_ACTIVATION[network] : null) },
+    { label: 'toString size meter', source: 'TOSTRING_SIZE_METER_ACTIVATION',
+        resolve: (network) => XChainVM.toStringSizeMeterGateTime(network) }
 ]);
 
 module.exports = {

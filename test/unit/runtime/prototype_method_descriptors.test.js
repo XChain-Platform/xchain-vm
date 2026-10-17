@@ -142,6 +142,21 @@ describe('XChainVM prototype and static descriptors (split surface pin)', functi
         assert.deepStrictEqual(names.map((k) => row(XChainVM, k)), BASE_STATIC_ROWS);
     });
 
+    it('exposes the toString size meter gate through inherited static descriptors', function () {
+        const carrier = Object.getPrototypeOf(Object.getPrototypeOf(XChainVM));
+        assert.deepStrictEqual([
+            'TOSTRING_SIZE_METER_GATE_BLOCK_TIME',
+            'TOSTRING_SIZE_METER_ACTIVATION',
+            'toStringSizeMeterGateTime',
+            'isToStringSizeMeterActive',
+        ].map((k) => row(carrier, k)), [
+            ['TOSTRING_SIZE_METER_GATE_BLOCK_TIME', false, false, false, 'number', null],
+            ['TOSTRING_SIZE_METER_ACTIVATION', false, false, false, 'object', null],
+            ['toStringSizeMeterGateTime', false, false, false, 'function', 1],
+            ['isToStringSizeMeterActive', false, false, false, 'function', 2],
+        ]);
+    });
+
     it('a constructed VM has no enumerable prototype key in its for...in view', function () {
         const GAS = { VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200, VM_STATE_DELETE: 100,
             VM_ORACLE_READ: 100, VM_CROSSCHAIN_READ: 100, VM_ATTEST_REQUEST: 5000, VM_EMISSION: 500,

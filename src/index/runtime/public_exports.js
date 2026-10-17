@@ -48,6 +48,10 @@ const { HOST_CALL_BOUNDS_ACTIVATION, isHostCallBoundsActive } = require('../host
 const { PER_ELEMENT_METER_ACTIVATION, isPerElementMeterActive } = require('../per_element_meter.js');
 const { STRING_RECEIVER_METER_ACTIVATION, isStringReceiverMeterActive } = require('../string_receiver_meter.js');
 const { STRING_RESULT_METER_ACTIVATION, isStringResultMeterActive } = require('../string_result_meter.js');
+const {
+    TOSTRING_SIZE_METER_GATE_BLOCK_TIME, TOSTRING_SIZE_METER_ACTIVATION,
+    toStringSizeMeterGateTime, isToStringSizeMeterActive,
+} = require('../tostring_size_meter.js');
 
 function attachHeightGates(target) {
     // Expose the canonical code-size cap so the cross-service regression suite can
@@ -236,6 +240,10 @@ function attachStatics(target) {
         PER_ELEMENT_METER_ACTIVATION: { value: PER_ELEMENT_METER_ACTIVATION }, isPerElementMeterActive: { value: isPerElementMeterActive },
         STRING_RECEIVER_METER_ACTIVATION: { value: STRING_RECEIVER_METER_ACTIVATION }, isStringReceiverMeterActive: { value: isStringReceiverMeterActive },
         STRING_RESULT_METER_ACTIVATION: { value: STRING_RESULT_METER_ACTIVATION }, isStringResultMeterActive: { value: isStringResultMeterActive },
+        TOSTRING_SIZE_METER_GATE_BLOCK_TIME: { value: TOSTRING_SIZE_METER_GATE_BLOCK_TIME },
+        TOSTRING_SIZE_METER_ACTIVATION: { value: TOSTRING_SIZE_METER_ACTIVATION },
+        toStringSizeMeterGateTime: { value: toStringSizeMeterGateTime },
+        isToStringSizeMeterActive: { value: isToStringSizeMeterActive },
     });
     Object.setPrototypeOf(target, applyLengthMeterExports);
 }

@@ -62,6 +62,20 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     });
 });
 describe('consensus parameters are frozen (track 8 guard)', function () {
+    it('TOSTRING_SIZE_METER_ACTIVATION is sealed and armed only on regtest', function () {
+        const deferred = 9999999999;
+        assert.strictEqual(vm.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, deferred);
+        assert.ok(Object.isSealed(vm.TOSTRING_SIZE_METER_ACTIVATION));
+        assert.deepStrictEqual(vm.TOSTRING_SIZE_METER_ACTIVATION,
+            { mainnet: deferred, testnet: deferred, regtest: 0 });
+        assert.strictEqual(vm.isToStringSizeMeterActive('regtest', 0), true);
+        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
+            assert.strictEqual(vm.toStringSizeMeterGateTime(network), deferred, String(network));
+            assert.strictEqual(vm.isToStringSizeMeterActive(network, 4000000000), false, String(network));
+        }
+    });
+});
+describe('consensus parameters are frozen (track 8 guard)', function () {
     it('BINARY_ALLOC_GATE_BLOCK_TIME is the frozen flag-day (a divergent value forks the fleet)', function () {
         // The F3-binary ArrayBuffer/TypedArray byte-length gas charge activates
         // fleet-wide at this block time. It is hashed (gasUsed → contract_hash) and
