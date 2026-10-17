@@ -11,7 +11,7 @@
 // contact legal@dankest.llc.
 
 const assert = require('assert');
-const lifecycle = require('../../../src/index/block_lifecycle.js');
+const lifecycle = require('../../../src/index/methods/block_lifecycle.js');
 
 function stubExecutor() {
     const calls = [];

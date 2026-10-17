@@ -11,7 +11,7 @@
 // contact legal@dankest.llc.
 
 const assert = require('assert');
-const { sanitizeError, errorResult } = require('../../../src/index/error_results.js');
+const { sanitizeError, errorResult } = require('../../../src/index/methods/error_results.js');
 
 describe('error results', function () {
     describe('sanitizeError', function () {
