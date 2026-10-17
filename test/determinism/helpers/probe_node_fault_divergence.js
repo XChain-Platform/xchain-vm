@@ -59,6 +59,8 @@ const LIMITS = { maxCpuTimeMs: 2000, maxMemory: 8, maxEmissions: 50, maxStateKey
 const CFG = { execution: 'subprocess', gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000, limits: LIMITS };
 
 const CONTRACT = `module.exports = function(xchain){ return 21 * 2; };`;
+const COMPILE_FAULT_MARKER = 'compile-fault-probe-marker';
+const COMPILE_FAULT_CONTRACT = `module.exports = function(){ return '${COMPILE_FAULT_MARKER}'; };`;
 const runOpts = (code) => ({ code, method: 'default', params: [], state: {}, contractAddress: 'C:BTC:1', contractIndex: 1 });
 
 async function onHealthyNode() {
@@ -88,14 +90,44 @@ async function onLocallyFaultedNode() {
     return { result, halted, faultErr };
 }
 
+async function onCompileFaultedNode() {
+    const vm = new XChainVM({ ...CFG, execution: 'in-process' });
+    const compileScript = vm.isolateManager.compileScript.bind(vm.isolateManager);
+    vm.isolateManager.compileScript = (isolate, code, cachedData) => {
+        if (String(code).includes(COMPILE_FAULT_MARKER)) {
+            throw new Error('injected compile throw');
+        }
+        return compileScript(isolate, code, cachedData);
+    };
+
+    let faultErr = null;
+    vm.beginBlock();
+    try {
+        await vm.execute({
+            ...runOpts(COMPILE_FAULT_CONTRACT),
+            network: 'regtest',
+            blockContext: { height: 5 },
+        });
+    } catch (e) {
+        faultErr = e;
+    } finally {
+        vm.endBlock();
+        await vm.shutdown();
+    }
+    return faultErr;
+}
+
 async function main() {
     process.stdout.write(`Node-fault stance probe (HALT vs FABRICATE)\n${'='.repeat(78)}\n`);
     const healthy = await onHealthyNode();
     const faulted = await onLocallyFaultedNode();
+    const compileFault = await onCompileFaultedNode();
 
     const hStatus = consensusStatus(healthy);
     process.stdout.write(`\nHEALTHY node:  success=${healthy.success} return=${JSON.stringify(healthy.returnValue)} ` +
         `gasUsed=${healthy.gasUsed} → STATUS=${hStatus} (committed)\n`);
+    process.stdout.write(`COMPILE-FAULT node: execute() ${compileFault ?
+        `REJECTED with ${compileFault.name} (${compileFault.message})` : 'RESOLVED unexpectedly'}\n`);
 
     if (faulted.halted) {
         process.stdout.write(`FAULTED node:  execute() REJECTED with ${faulted.faultErr.name} ` +
