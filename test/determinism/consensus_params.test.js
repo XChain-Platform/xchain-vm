@@ -24,6 +24,7 @@ const cr = require('../../src/consensus-runtime.js');
 const vm = require('../../src/index.js');
 const lintCore = require('../../src/lint-core.js');
 const metering = require('../../src/metering.js');
+const armedHarness = require('../../src/index/armed_harness/select.js');
 
 // A per-coin height map a release cut armed on testnet: the six keys in order, every
 // mainnet chain unarmed (null), every testnet chain at an armed height read off the map,
@@ -85,6 +86,13 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
         assert.strictEqual(cr.CONSENSUS_VERSION, '7');
         assert.strictEqual(vm.CONSENSUS_VERSION, '7', 're-export must match');
+    });
+
+    it('armed harness rule order is frozen', function () {
+        assert.deepStrictEqual(armedHarness.RULES.map(({ LABEL }) => LABEL), [
+            'resource fault signal', 'host error stack strip', 'host-call bounds', 'stringify re-entry',
+            'per-element meter', 'string receiver meter', 'tostring size meter', 'native stack terminal'
+        ]);
     });
 });
 
