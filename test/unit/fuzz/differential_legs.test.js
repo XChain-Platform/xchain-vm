@@ -37,7 +37,8 @@ const CASES = 2;
 const TAGS = {
     'linux-x64-glibc':   `linux-x64-node22-v8_${PINNED.v8}-glibc2.39`,
     'linux-arm64-glibc': `linux-arm64-node22-v8_${PINNED.v8}-glibc2.39`,
-    'linux-x64-musl':    `linux-x64-node22-v8_${PINNED.v8}-nonglibc`
+    'linux-x64-musl':    `linux-x64-node22-v8_${PINNED.v8}-nonglibc`,
+    'linux-arm64-musl':  `linux-arm64-node22-v8_${PINNED.v8}-nonglibc`
 };
 
 function manifest(leg, over) {
@@ -79,6 +80,12 @@ describe('differential-fuzz leg identity check', function () {
         assert.ok(p.some(x => /linux-x64-musl: manifest missing/.test(x)), p.join('\n'));
     });
 
+    it('fails when the arm64 musl leg left no manifest', function () {
+        writeLegs(dir, { 'linux-arm64-musl': null });
+        const p = checkLegSet(dir, { seed: SEED, cases: CASES });
+        assert.ok(p.some(x => /linux-arm64-musl: manifest missing/.test(x)), p.join('\n'));
+    });
+
     it('fails a musl leg that recorded a glibc platform', function () {
         writeLegs(dir, { 'linux-x64-musl': { platform: `linux-x64-node22-v8_${PINNED.v8}-glibc2.39` } });
         const p = checkLegSet(dir, { seed: SEED, cases: CASES });
@@ -88,6 +95,11 @@ describe('differential-fuzz leg identity check', function () {
     it('fails an arm64 leg that recorded an x64 platform', function () {
         assert.ok(checkLegManifest('linux-arm64-glibc',
             manifest('linux-arm64-glibc', { platform: TAGS['linux-x64-glibc'] })).length > 0);
+    });
+
+    it('fails an arm64 musl leg that recorded the x64 musl platform', function () {
+        assert.ok(checkLegManifest('linux-arm64-musl',
+            manifest('linux-arm64-musl', { platform: TAGS['linux-x64-musl'] })).length > 0);
     });
 
     it('fails two legs reporting one platform tag', function () {
@@ -129,7 +141,12 @@ describe('differential-fuzz leg identity check', function () {
 
     it('checks a post-gate leg set by its own file names and targeted count', function () {
         const pg = { profile: 'post-gate', targeted: 1, entries: [{ index: 0 }, { index: 1 }, { index: 1000000 }] };
-        writeLegs(dir, { 'linux-x64-glibc': pg, 'linux-arm64-glibc': pg, 'linux-x64-musl': pg }, 'post-gate');
+        writeLegs(dir, {
+            'linux-x64-glibc': pg,
+            'linux-arm64-glibc': pg,
+            'linux-x64-musl': pg,
+            'linux-arm64-musl': pg
+        }, 'post-gate');
         assert.deepStrictEqual(checkLegSet(dir, { seed: SEED, cases: CASES, profile: 'post-gate' }), []);
         assert.ok(checkLegSet(dir, { seed: SEED, cases: CASES }).some(x => /manifest missing/.test(x)));
         const regime = Object.assign({}, pg, { regime: ['mainnet:parse@257: expected out_of_stack, got success'] });
