@@ -31,15 +31,16 @@ const GasTracker         = require('./gas.js');
 const { resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
 // The entry keeps the class (constructor and the consensus wall-clock resolver);
 // the prototype methods, the harness prelude, the activation carriers and the
-// public statics live in named parts under ./index/ and ./index/runtime/ and are
-// installed here so the public surface (constructor, prototype, statics) is the
-// one this file always exported.
+// prototype methods live under ./index/methods/, while the harness prelude, the
+// activation carriers and the public statics live in named parts under ./index/
+// and ./index/runtime/. They are installed here so the public surface
+// (constructor, prototype, statics) is the one this file always exported.
 const { installMethods } = require('./index/install_methods.js');
-const blockLifecycleMethods = require('./index/block_lifecycle.js');
-const lintAndMeteringMethods = require('./index/lint_and_metering.js');
+const blockLifecycleMethods = require('./index/methods/block_lifecycle.js');
+const lintAndMeteringMethods = require('./index/methods/lint_and_metering.js');
 const gatewayInjectionMethods = require('./index/gateway_injection.js');
-const errorResultMethods = require('./index/error_results.js');
-const manifestMethods = require('./index/manifest.js');
+const errorResultMethods = require('./index/methods/error_results.js');
+const manifestMethods = require('./index/methods/manifest.js');
 const executeMethods = require('./index/runtime/execute.js');
 const classifyErrorMethods = require('./index/runtime/classify_error.js');
 const { resolveLimits } = require('./index/runtime/limits_defaults.js');
