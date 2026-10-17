@@ -151,14 +151,11 @@ module.exports = {
         // Hash the source ONCE per execution and share the digest with both source-keyed
         // caches (metered code + lint verdict), instead of hashing a 64KB body twice.
         const __codeHash = crypto.createHash('sha256').update(__codeStr).digest('hex');
-
         const __execLintCoin   = pkg3CoinFromAddress(opts.contractAddress);
         const __execLintHeight = opts.blockContext && Number(opts.blockContext.height);
-        const runExecLint = () => checkExecLint(this, opts, gasTracker, emissionCollector,
-            __codeStr, __codeBytes, __codeHash, __execLintCoin, __execLintHeight);
-        const __lintRefusal = isHostFaultHaltActive(
-            opts.network, __execLintCoin, __execLintHeight) ?
-            hostSetupStep('checkExecLint', runExecLint) : runExecLint();
+        const __lintRefusal = hostSetupStep('checkExecLint', () => checkExecLint(this, opts, gasTracker,
+            emissionCollector, __codeStr, __codeBytes, __codeHash, __execLintCoin, __execLintHeight),
+            isHostFaultHaltActive(opts.network, __execLintCoin, __execLintHeight));
         if (__lintRefusal) return __lintRefusal;
         // At the syntax-depth activation the re-lint above has bounded the source, so a
         // host stack overflow while metering or compiling it is a fault of this host:

@@ -20,11 +20,12 @@
 
 const { HostFaultError } = require('../../../errors.js');
 
-// Run one host operation and raise any throw as a HostFaultError, so the caller halts and retries.
-function hostSetupStep(step, fn) {
+// Run one host operation and, when enabled, raise any throw as a HostFaultError.
+function hostSetupStep(step, fn, haltOnFailure = true) {
     try {
         return fn();
     } catch (e) {
+        if (!haltOnFailure) throw e;
         if (e instanceof HostFaultError) throw e;
         throw new HostFaultError('execution setup failed (' + step + '): ' + (e && e.message));
     }
