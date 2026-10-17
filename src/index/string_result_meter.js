@@ -28,10 +28,6 @@ function isStringResultMeterActive(network, blockTime) {
         (gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate));
 }
 
-// Keep released HARNESS_SOURCE intact because wrapper text and positions are visible.
-// Runtime compilation derives the gated form from exact spans. Outer allocator
-// bindings preserve the released wrappers' String(fn) text; the separately derived
-// per-element wrapper gates only its result charge.
 const APPLY_LENGTH_LINE =
     '    var __applyLengthMeterOn = globalThis.__APPLY_LENGTH_METER_ON === true;';
 const HTML_WRAPPERS =
