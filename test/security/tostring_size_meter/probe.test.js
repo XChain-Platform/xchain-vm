@@ -46,6 +46,17 @@ async function acrossGate(code) {
     return { armed, below };
 }
 
+async function assertPadConversion(method) {
+    const code = `module.exports=function(){var calls=0,len={valueOf:function(){calls++;return 5;}};
+        return ['x'[${JSON.stringify(method)}](len,'y'),calls];};`;
+    const armed = await run(code);
+    const below = await runBelowGate(code);
+    assert.strictEqual(armed.success, true, 'armed: ' + armed.error);
+    assert.strictEqual(below.success, true, 'below the gate: ' + below.error);
+    assert.deepStrictEqual(JSON.parse(armed.returnValue), [method === 'padStart' ? 'yyyyx' : 'xyyyy', 1]);
+    assert.deepStrictEqual(JSON.parse(below.returnValue), [method === 'padStart' ? 'yyyyx' : 'xyyyy', 2]);
+}
+
 (XChainVM ? describe : describe.skip)('toString size meter: coercion probe', function () {
     this.timeout(60000);
 
@@ -81,14 +92,7 @@ async function acrossGate(code) {
 
     for (const method of ['padStart', 'padEnd']) {
         it(`${method} converts its target length once above the gate`, async function () {
-            const code = `module.exports=function(){var calls=0,len={valueOf:function(){calls++;return 5;}};
-                return ['x'[${JSON.stringify(method)}](len,'y'),calls];};`;
-            const armed = await run(code);
-            const below = await runBelowGate(code);
-            assert.strictEqual(armed.success, true, 'armed: ' + armed.error);
-            assert.strictEqual(below.success, true, 'below the gate: ' + below.error);
-            assert.deepStrictEqual(JSON.parse(armed.returnValue), [method === 'padStart' ? 'yyyyx' : 'xyyyy', 1]);
-            assert.deepStrictEqual(JSON.parse(below.returnValue), [method === 'padStart' ? 'yyyyx' : 'xyyyy', 2]);
+            await assertPadConversion(method);
         });
     }
 
