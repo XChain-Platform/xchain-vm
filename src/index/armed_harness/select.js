@@ -29,16 +29,18 @@ const hostErrorStackStrip = require('./host_error_stack_strip.js');
 const hostCallBounds = require('./host_call_bounds.js');
 const stringifyReentry = require('./json_stringify_reentry.js');
 const perElementMeter = require('./per_element_meter.js');
+const stringReceiverMeter = require('./string_receiver_meter.js');
 const nativeStackTerminal = require('../native_stack/harness_rule.js');
 const { isHostErrorStackStripActive } = require('../host_error_stack_strip_heights.js');
 const { isHostCallBoundsActive } = require('../host_call_bounds.js');
 const { isJsonStringifyReentryActive } = require('../json_stringify_reentry_heights.js');
 const { isPerElementMeterActive } = require('../per_element_meter.js');
+const { isStringReceiverMeterActive } = require('../string_receiver_meter.js');
 
 // The rules in their fixed order; a rule's bit is 1 << its index. The native stack
 // rule is last so it can be dropped without moving any other bit.
 const RULES = [resourceFaultSignal, hostErrorStackStrip, hostCallBounds, stringifyReentry, perElementMeter,
-    nativeStackTerminal];
+    stringReceiverMeter, nativeStackTerminal];
 const bitOf = (rule) => 1 << RULES.indexOf(rule);
 
 // Replace one exact span of a rule's helper text, refusing a text it no longer matches.
@@ -107,6 +109,7 @@ function harnessMask(gates) {
         (gates.hostCallBounds ? bitOf(hostCallBounds) : 0) |
         (gates.stringifyReentry ? bitOf(stringifyReentry) : 0) |
         (gates.perElementMeter ? bitOf(perElementMeter) : 0) |
+        (gates.stringReceiverMeter ? bitOf(stringReceiverMeter) : 0) |
         (gates.nativeStackTerminal ? bitOf(nativeStackTerminal) : 0);
 }
 
@@ -122,6 +125,7 @@ function executionHarnessMask(opts, coin, height, resourceFaultSignalOn, nativeS
         hostCallBounds: isHostCallBoundsActive(opts.network, blockTime),
         stringifyReentry: isJsonStringifyReentryActive(opts.network, coin, height),
         perElementMeter: isPerElementMeterActive(opts.network, blockTime),
+        stringReceiverMeter: isStringReceiverMeterActive(opts.network, blockTime),
         nativeStackTerminal: nativeStackTerminalOn === true,
     });
 }
