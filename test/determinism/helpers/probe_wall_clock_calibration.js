@@ -98,6 +98,7 @@ const NETWORK_GATES = [
     { name: 'per-element-meter', source: 'PER_ELEMENT_METER_ACTIVATION', active: XChainVM.isPerElementMeterActive },
     { name: 'string-receiver-meter', source: 'STRING_RECEIVER_METER_ACTIVATION', active: XChainVM.isStringReceiverMeterActive },
     { name: 'string-result-meter', source: 'STRING_RESULT_METER_ACTIVATION', active: XChainVM.isStringResultMeterActive },
+    { name: 'tostring-size-meter', source: 'TOSTRING_SIZE_METER_ACTIVATION', active: XChainVM.isToStringSizeMeterActive },
     { name: 'gas-ceiling-success', source: 'GAS_CEILING_SUCCESS_ACTIVATION', active: XChainVM.isGasCeilingSuccessActive },
     // No is-active export exists for this one; the in-isolate check compares against the gate time.
     { name: 'json-stringify-hook', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',
