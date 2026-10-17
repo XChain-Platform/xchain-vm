@@ -203,7 +203,7 @@ const HELPERS = `    // ----- per-element meter (armed harness only) -----
             if (i + 1 === count) break;
             if (i < subs) r += __pemToString(arguments[i + 1]);
         }
-        __allocGas(r.length);
+        if (__stringResultMeterOn) __allocGas(r.length);
         return r;
     });
     // ----- end per-element meter -----

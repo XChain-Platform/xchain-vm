@@ -38,7 +38,7 @@ describe('direct String.raw result-length wrapper', function () {
         const large = 'x'.repeat(K);
         const context = nodeVM.createContext({ large });
         const source = `
-            var charged = 0, __perElemMeterOn = false;
+            var charged = 0, __perElemMeterOn = false, __stringResultMeterOn = true;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -53,7 +53,7 @@ describe('direct String.raw result-length wrapper', function () {
     it('preserves native coercion counts, return value and thrown errors', function () {
         const context = nodeVM.createContext({});
         const source = `
-            var charged = 0, __perElemMeterOn = false;
+            var charged = 0, __perElemMeterOn = false, __stringResultMeterOn = true;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -71,13 +71,14 @@ describe('direct String.raw result-length wrapper', function () {
     });
 });
 
-// Legacy gas of one body on mainnet, pre-arm testnet, no network and an unknown one.
+// Legacy gas of one body on mainnet, testnet, no network and an unknown one.
 async function legacyGas(run, body) {
     const gas = {};
-    const early = { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 };
+    assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.testnet, null);
     for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-        const extra = network === 'testnet' ? { blockContext: early } : undefined;
-        const result = await run(body, network, extra);
+        const result = await run(body, network, {
+            blockContext: { ...LATE, timestamp: 0 },
+        });
         assert.strictEqual(result.success, true, `${network}: ${result.error}`);
         gas[String(network)] = result.gasUsed;
     }
@@ -135,15 +136,13 @@ async function runRegtestWithoutPerElement(run, body) {
             `${armed.gasUsed} vs ${legacy.gasUsed}`);
     });
 
-    it('leaves legacy gas on unarmed, unknown and pre-arm testnet blocks', async function () {
+    it('leaves legacy gas on unarmed and unknown networks', async function () {
         const body = `var s='x'.repeat(${K});return String.raw({raw:['a','b']},s).length;`;
         const gas = await legacyGas(run, body);
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
 
         const armed = await runRegtestWithoutPerElement(run, body);
-        const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined });
-        assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed);
         assert.ok(armed.gasUsed >= gas.mainnet + K);
     });
 });

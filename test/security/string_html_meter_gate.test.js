@@ -52,7 +52,7 @@ describe('Annex B String HTML result-length wrapper', function () {
     it('charges the exact returned string length for all 13 methods', function () {
         const context = nodeVM.createContext({});
         const source = `
-            var charged = 0;
+            var charged = 0, __stringResultMeterOn = true;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -121,13 +121,14 @@ function defineCoercionCase(run) {
 }
 
 function defineLegacyGasCase(run) {
-    it('leaves legacy gas on unarmed, unknown and pre-arm testnet blocks', async function () {
+    it('leaves legacy gas on unarmed and unknown networks', async function () {
         const body = `return 'a'.anchor('x'.repeat(${K})).length;`;
         const gas = {};
-        const early = { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 };
+        assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.testnet, null);
         for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-            const extra = network === 'testnet' ? { blockContext: early } : undefined;
-            const result = await run(body, network, extra);
+            const result = await run(body, network, {
+                blockContext: { ...LATE, timestamp: 0 },
+            });
             assert.strictEqual(result.success, true, `${network}: ${result.error}`);
             gas[String(network)] = result.gasUsed;
         }
@@ -135,8 +136,6 @@ function defineLegacyGasCase(run) {
         assert.strictEqual(gas.undefined, gas.unknown);
 
         const armed = await run(body, 'regtest', { gasCeiling: undefined });
-        const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined });
-        assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed);
         assert.ok(armed.gasUsed >= gas.mainnet + K);
     });
 }

@@ -47,6 +47,7 @@ const { APPLY_LENGTH_METER_ACTIVATION, isApplyLengthMeterActive } = require('../
 const { HOST_CALL_BOUNDS_ACTIVATION, isHostCallBoundsActive } = require('../host_call_bounds.js');
 const { PER_ELEMENT_METER_ACTIVATION, isPerElementMeterActive } = require('../per_element_meter.js');
 const { STRING_RECEIVER_METER_ACTIVATION, isStringReceiverMeterActive } = require('../string_receiver_meter.js');
+const { STRING_RESULT_METER_ACTIVATION, isStringResultMeterActive } = require('../string_result_meter.js');
 
 function attachHeightGates(target) {
     // Expose the canonical code-size cap so the cross-service regression suite can
@@ -234,6 +235,7 @@ function attachStatics(target) {
         HOST_CALL_BOUNDS_ACTIVATION: { value: HOST_CALL_BOUNDS_ACTIVATION }, isHostCallBoundsActive: { value: isHostCallBoundsActive },
         PER_ELEMENT_METER_ACTIVATION: { value: PER_ELEMENT_METER_ACTIVATION }, isPerElementMeterActive: { value: isPerElementMeterActive },
         STRING_RECEIVER_METER_ACTIVATION: { value: STRING_RECEIVER_METER_ACTIVATION }, isStringReceiverMeterActive: { value: isStringReceiverMeterActive },
+        STRING_RESULT_METER_ACTIVATION: { value: STRING_RESULT_METER_ACTIVATION }, isStringResultMeterActive: { value: isStringResultMeterActive },
     });
     Object.setPrototypeOf(target, applyLengthMeterExports);
 }

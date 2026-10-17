@@ -178,7 +178,10 @@ const TIME_NETWORK_GATES = Object.freeze([
     // spread and rest); a network the map does not name is unarmed.
     { label: 'per-element meter', source: 'PER_ELEMENT_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.PER_ELEMENT_METER_ACTIVATION, network)
-            ? XChainVM.PER_ELEMENT_METER_ACTIVATION[network] : null) }
+            ? XChainVM.PER_ELEMENT_METER_ACTIVATION[network] : null) },
+    { label: 'string-result meter', source: 'STRING_RESULT_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.STRING_RESULT_METER_ACTIVATION, network)
+            ? XChainVM.STRING_RESULT_METER_ACTIVATION[network] : null) }
 ]);
 
 module.exports = {

@@ -11,6 +11,8 @@
  ********************************************************************/
 // @ts-nocheck
 
+const { deriveHarness } = require('./armed_harness/derivation.js');
+
 // Block-time activation for string-result metering. Null leaves a network
 // unarmed, while zero activates the rule from genesis. Unknown networks fail
 // closed.
@@ -26,7 +28,107 @@ function isStringResultMeterActive(network, blockTime) {
         (gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate));
 }
 
+// Keep released HARNESS_SOURCE intact because wrapper text and positions are visible.
+// Runtime compilation derives the gated form from exact spans, using outer allocator
+// bindings that leave each installed wrapper's String(fn) text unchanged.
+const APPLY_LENGTH_LINE =
+    '    var __applyLengthMeterOn = globalThis.__APPLY_LENGTH_METER_ON === true;';
+const HTML_WRAPPERS =
+    "        var __meterStringResult = function(name) {\n" +
+    "            var orig = String.prototype[name];\n" +
+    "            if (typeof orig !== 'function') return;\n" +
+    "            __lockMethod(String.prototype, name, function() {\n" +
+    "                var r = orig.apply(this, arguments);\n" +
+    "                __allocGas(r.length);\n" +
+    "                return r;\n" +
+    "            });\n" +
+    "        };\n" +
+    "        var __stringHtmlMethods = ['anchor', 'big', 'blink', 'bold', 'fixed',\n" +
+    "            'fontcolor', 'fontsize', 'italics', 'link', 'small', 'strike', 'sub', 'sup'];\n" +
+    "        for (var __shi = 0; __shi < __stringHtmlMethods.length; __shi++) {\n" +
+    "            __meterStringResult(__stringHtmlMethods[__shi]);\n" +
+    '        }';
+const GATED_HTML_WRAPPERS =
+    HTML_WRAPPERS.replace('        var __meterStringResult = ',
+        '        var __meterStringResult, __stringHtmlAllocGas = __allocGas; ' +
+        '{ let __allocGas = __stringResultMeterOn ? __stringHtmlAllocGas : function() {}; ' +
+        '__meterStringResult = ') + ' }';
+const RAW_WRAPPER = (guard) =>
+    '        var __stringRaw = String.raw;\n' +
+    `        ${guard} __lockMethod(String, 'raw', function() {\n` +
+    '            var r = __stringRaw.apply(this, arguments);\n' +
+    '            __allocGas(r.length);\n' +
+    '            return r;\n' +
+    '        });';
+const GATED_RAW_WRAPPER = (guard) =>
+    '        var __stringRaw = String.raw;\n' +
+    '        var __stringRawAllocGas = __allocGas; { let __allocGas = ' +
+    '__stringResultMeterOn ? __stringRawAllocGas : function() {}; ' +
+    `${guard} __lockMethod(String, 'raw', function() {\n` +
+    '            var r = __stringRaw.apply(this, arguments);\n' +
+    '            __allocGas(r.length);\n' +
+    '            return r;\n' +
+    '        }); }';
+
+function buildStringResultMeterHarness(source) {
+    // The per-element rule suppresses the legacy String.raw wrapper and installs
+    // its own. Accept exactly that derived guard or the released plain guard.
+    const plainGuard = "if (typeof __stringRaw === 'function')";
+    const perElementGuard = "if (typeof __stringRaw === 'function' && !__pemArmed)";
+    const rawGuard = source.includes(RAW_WRAPPER(perElementGuard)) ? perElementGuard : plainGuard;
+    return deriveHarness(source, [{
+        label: 'string result meter',
+        edits: [
+            [APPLY_LENGTH_LINE, APPLY_LENGTH_LINE +
+                ' var __stringResultMeterOn = globalThis.__STRING_RESULT_METER_ON === true;'],
+            [HTML_WRAPPERS, GATED_HTML_WRAPPERS],
+            [RAW_WRAPPER(rawGuard), GATED_RAW_WRAPPER(rawGuard)],
+        ],
+        helpers: '',
+    }]);
+}
+
+function installStringResultMeterCompiler(selector) {
+    if (selector.compileHarness.__stringResultMeterCompiler) return;
+    // Derive after the selector has composed its other rules. This keeps the
+    // selector's zero mask and released source intact while every execution gets
+    // the network flag captured into its compiled wrapper closures.
+    const sources = new Map();
+    const sourceFor = (mask) => {
+        let source = sources.get(mask);
+        if (source === undefined) {
+            source = buildStringResultMeterHarness(selector.harnessSourceFor(mask));
+            sources.set(mask, source);
+        }
+        return source;
+    };
+    // Prove every rule combination at module load, matching the selector's own
+    // refusal to start when an exact edit no longer matches.
+    for (let mask = 0; mask < 1 << selector.RULES.length; mask++)
+        buildStringResultMeterHarness(selector.harnessSourceFor(mask));
+    const compileHarness = function(vm, isolate, mask) {
+        const cache = mask === 0 ? vm._harnessCachedData :
+            (vm._armedHarnessCache && vm._armedHarnessCache.get(mask)) || null;
+        const script = vm.isolateManager.compileScript(isolate, sourceFor(mask), cache);
+        if (!cache) {
+            try {
+                const data = vm.isolateManager.getCachedData(script);
+                if (mask === 0) vm._harnessCachedData = data;
+                else {
+                    if (!vm._armedHarnessCache) vm._armedHarnessCache = new Map();
+                    vm._armedHarnessCache.set(mask, data);
+                }
+            } catch (e) { /* non-fatal */ }
+        }
+        return script;
+    };
+    Object.defineProperty(compileHarness, '__stringResultMeterCompiler', { value: true });
+    selector.compileHarness = compileHarness;
+}
+
 module.exports = {
     STRING_RESULT_METER_ACTIVATION,
     isStringResultMeterActive,
+    buildStringResultMeterHarness,
+    installStringResultMeterCompiler,
 };
