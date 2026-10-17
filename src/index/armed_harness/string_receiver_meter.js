@@ -42,6 +42,14 @@ const EDITS = [
         "    var __sconcat = String.prototype.concat;\n    if (typeof __sconcat === 'function') __lockMethod(String.prototype, 'concat', function() {\n" +
         '        var n = __String(this).length;',
     ],
+    [
+        "     'trimStart', 'trimEnd', 'toLowerCase', 'toUpperCase'].forEach(function(m) { __meterLen(String.prototype, m); });",
+        "     'trimStart', 'trimEnd', 'toLowerCase', 'toUpperCase'].forEach(function(m) { __meterLen(String.prototype, m); }); " +
+        "__lockMethod(String.prototype, 'trimLeft', String.prototype.trimStart); " +
+        "__lockMethod(String.prototype, 'trimRight', String.prototype.trimEnd); " +
+        "__lockMethod(Number, 'parseInt', globalThis.parseInt || Number.parseInt); " +
+        "__lockMethod(Number, 'parseFloat', globalThis.parseFloat || Number.parseFloat);",
+    ],
 ];
 
 const HELPERS = '';
