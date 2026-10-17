@@ -75,6 +75,10 @@ const {
     LINT_SYNTAX_DEPTH_ACTIVATION,
     isLintSyntaxDepthActive,
 } = require('./index/lint_syntax_depth_heights.js');
+const {
+    HOST_FAULT_HALT_ACTIVATION,
+    isHostFaultHaltActive,
+} = require('./index/host_fault_halt_heights.js');
 
 const DEFAULT_MAX_LIVE_EXECUTORS = 64;
 let liveExecutors = 0;
@@ -206,6 +210,8 @@ const heightGateExports = Object.create(Object.getPrototypeOf(XChainVM), {
     isJsonStringifyReentryActive: { value: isJsonStringifyReentryActive, enumerable: true },
     NATIVE_STACK_TERMINAL_ACTIVATION: { value: NATIVE_STACK_TERMINAL_ACTIVATION, enumerable: true },
     isNativeStackTerminalActive: { value: isNativeStackTerminalActive, enumerable: true },
+    HOST_FAULT_HALT_ACTIVATION: { value: HOST_FAULT_HALT_ACTIVATION, enumerable: true },
+    isHostFaultHaltActive: { value: isHostFaultHaltActive, enumerable: true },
 });
 Object.setPrototypeOf(XChainVM, heightGateExports);
 module.exports.GAS_CEILING_SUCCESS_ACTIVATION = GasTracker.GAS_CEILING_SUCCESS_ACTIVATION;

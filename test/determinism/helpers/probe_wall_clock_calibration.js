@@ -27,7 +27,7 @@
  * lint global-alias, lint optional-chain, lint banned-with, lint destructure,
  * lint syntax depth, BigInt surface strip, resource fault signal, native stack
  * terminal, gas-ceiling exhaustion, JSON.stringify re-entry, host error stack
- * strip), and the per-network activation tables listed in NETWORK_GATES
+ * strip, host-fault halt), and the per-network activation tables listed in NETWORK_GATES
  * (iterator/Set meter, apply-length meter, host-call bounds, per-element meter,
  * gas-ceiling success, JSON.stringify hook; null is off, 0 is on from genesis),
  * whose latest armed time is folded into the probe block. The height gates only
@@ -86,6 +86,7 @@ const HEIGHT_GATES = [
     { name: 'gas-ceiling-exhausted', source: 'GAS_CEILING_EXHAUSTED_ACTIVATION', active: XChainVM.isGasCeilingExhaustedActive },
     { name: 'json-stringify-reentry', source: 'JSON_STRINGIFY_REENTRY_ACTIVATION', active: XChainVM.isJsonStringifyReentryActive },
     { name: 'host-error-stack-strip', source: 'HOST_ERROR_STACK_STRIP_ACTIVATION', active: XChainVM.isHostErrorStackStripActive },
+    { name: 'host-fault-halt', source: 'HOST_FAULT_HALT_ACTIVATION', active: XChainVM.isHostFaultHaltActive },
 ].map((g) => ({ ...g, table: XChainVM[g.source] }));
 // A per-coin height table keys on '<COIN>:<network>'; a per-network table keys on the bare network.
 const COIN_NETWORK_KEY = /^[A-Z]+:[a-z]+$/;

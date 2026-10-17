@@ -65,8 +65,8 @@ const GATE_FALLBACK_BLOCK_TIME = 1786060800;
 // block time: the Package-3 sandbox bundle, the execute-time source re-lint, the
 // lint global-alias, optional-chain and destructure refinements, the banned-with
 // lint, the syntax-depth bound, the BigInt surface strip, the gas-ceiling exhaustion
-// settlement, the resource fault signal, the host error stack strip, the
-// JSON.stringify re-entry rule and the native stack terminal rule all resolve
+// settlement, the resource fault signal, the host error stack strip, the host-fault
+// halt, the JSON.stringify re-entry rule and the native stack terminal rule all resolve
 // `<COIN>:<network>` against a threshold map. Whether a gate is on from genesis is
 // decided per gate by its own predicate, never per network (the optional-chain
 // gate is genesis-on for regtest only and needs a threshold on testnet). A default
@@ -87,6 +87,7 @@ const HEIGHT_GATES = Object.freeze([
     { label: 'gas-ceiling exhaustion', map: 'GAS_CEILING_EXHAUSTED_ACTIVATION', isActive: 'isGasCeilingExhaustedActive' },
     { label: 'resource fault signal',  map: 'RESOURCE_FAULT_SIGNAL_ACTIVATION', isActive: 'isResourceFaultSignalActive' },
     { label: 'host error stack strip', map: 'HOST_ERROR_STACK_STRIP_ACTIVATION', isActive: 'isHostErrorStackStripActive' },
+    { label: 'host-fault halt',        map: 'HOST_FAULT_HALT_ACTIVATION',       isActive: 'isHostFaultHaltActive' },
     { label: 'stringify re-entry',     map: 'JSON_STRINGIFY_REENTRY_ACTIVATION', isActive: 'isJsonStringifyReentryActive' },
     { label: 'native stack terminal',  map: 'NATIVE_STACK_TERMINAL_ACTIVATION', isActive: 'isNativeStackTerminalActive' }
 ]);

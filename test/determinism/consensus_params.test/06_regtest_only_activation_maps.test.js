@@ -57,6 +57,10 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assertCoinMapUnarmed(vm.HOST_ERROR_STACK_STRIP_ACTIVATION, vm.isHostErrorStackStripActive);
     });
 
+    it('HOST_FAULT_HALT_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
+        assertCoinMapUnarmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive);
+    });
+
     it('JSON_STRINGIFY_REENTRY_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
         assertCoinMapUnarmed(vm.JSON_STRINGIFY_REENTRY_ACTIVATION, vm.isJsonStringifyReentryActive);
     });
