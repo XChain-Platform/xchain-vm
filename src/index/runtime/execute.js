@@ -20,7 +20,6 @@
 // @ts-nocheck
 
 const crypto = require('crypto');
-
 const GasTracker        = require('../../gas.js');
 const { effectiveCeiling } = require('../../gas.js');
 const StateManager      = require('../../state.js');
@@ -28,6 +27,7 @@ const EmissionCollector = require('../../collector.js');
 const { buildGateway } = require('../../gateway.js');
 const sandbox = require('../../sandbox.js');
 const { HostFaultError } = require('../../errors.js');
+const { isHostFaultHaltActive } = require('../host_fault_halt_heights.js');
 const { resolveAccessors, isAccessorOwnKeyActive } = require('../../readonly-accessors.js');
 const {
     BINARY_ALLOC_GATE_BLOCK_TIME, isAsyncSurfaceActive,
@@ -298,16 +298,16 @@ module.exports = {
             let cachedData = null;
             if (this._blockCache && this._blockCache.has(cacheKey))
                 cachedData = this._blockCache.get(cacheKey);
-
             let script;
             try {
                 script = this.isolateManager.compileScript(isolate, fullSource, cachedData);
             } catch (e) {
                 if (__overflowIsHostFault && isHostStackOverflow(e))
                     throw new HostFaultError('compilation stack overflow: ' + e.message);
+                if (isHostFaultHaltActive(opts.network, __pkg3Coin, __pkg3Height))
+                    throw new HostFaultError('wrapper compilation failed: ' + e.message);
                 return this.errorResult(gasTracker, emissionCollector, 'error: compilation failed: ' + e.message);
             }
-
             // Store in compilation cache
             if (this._blockCache && !this._blockCache.has(cacheKey) &&
                 this._blockCache.size < (this.limits.maxBlockCacheSize || 1000)) {
