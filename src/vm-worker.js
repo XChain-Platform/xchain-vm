@@ -82,7 +82,7 @@ function handleEndBlockMessage() {
 }
 
 // vm.execute() throwing is a HOST fault, not a contract outcome, and
-// the two host-fault shapes need OPPOSITE handling.
+// the pre-activation error shapes need OPPOSITE handling.
 //
 // A HostFaultError says THIS MACHINE cannot run the contract at all:
 // index.js raises it when isolateManager.createIsolate() fails, and
@@ -102,26 +102,29 @@ function handleEndBlockMessage() {
 // contract-controlled text, and a name/code match would let a contract
 // spoof a chain-wide halt (same anti-spoof rule as classifyError).
 //
-// Every OTHER throw still dies into the parent's deterministic
-// host-termination machinery (onExit -> hostTerminatedResult), which
-// clamps the request to its caller-funded ceiling identically on every
-// validator, exactly as an in-isolate resource failure would.
+// After the halt gate, any other throw also rejects through the host-fault
+// reply. Before it, that throw still dies into the parent's deterministic
+// host-termination machinery (onExit -> hostTerminatedResult), which clamps
+// the request to its caller-funded ceiling identically on every validator.
 function handleExecuteMessage(msg) {
     enqueue(async () => {
         let result;
         try {
             result = await vm.execute(msg.opts);
         } catch (e) {
-            if (e instanceof HostFaultError) {
+            const opts = msg.opts || {};
+            const height = opts.blockContext && Number(opts.blockContext.height);
+            const halt = XChainVM.isHostFaultHaltActive(
+                opts.network, XChainVM.pkg3CoinFromAddress(opts.contractAddress), height);
+            if (e instanceof HostFaultError || halt) {
                 send({
                     type: 'hostfault',
                     id: msg.id,
                     token: msg.token,
                     reason: String((e && e.message) || 'executor unavailable').slice(0, 200)
                 });
-                // The isolate never came up, so worker state is intact (execute()'s
-                // finally disposes nothing when createIsolate threw). Staying alive
-                // avoids a respawn for what is usually a transient pressure blip.
+                // The caller halts before using this execution. Keep the worker
+                // available for retry instead of turning the fault into a result.
                 flushCoverage();
                 return;
             }
