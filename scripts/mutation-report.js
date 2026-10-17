@@ -43,14 +43,14 @@ const OUTPUT_MD = path.join(ROOT, 'reports', 'mutation', 'MUTATION_SUMMARY.md');
 // the Unknown/80 default a bare-filename key would give every part file.
 const TIERS = {
     'src/index.js':                       { tier: 'Critical', target: 95 },
-    'src/index/block_lifecycle.js':       { tier: 'Critical', target: 95 },
+    'src/index/methods/block_lifecycle.js': { tier: 'Critical', target: 95 },
     'src/index/constants.js':             { tier: 'Critical', target: 95 },
     'src/index/contract_wrapper.js':      { tier: 'Critical', target: 95 },
-    'src/index/error_results.js':         { tier: 'Critical', target: 95 },
+    'src/index/methods/error_results.js': { tier: 'Critical', target: 95 },
     'src/index/gateway_injection.js':     { tier: 'Critical', target: 95 },
     'src/index/install_methods.js':       { tier: 'Critical', target: 95 },
-    'src/index/lint_and_metering.js':     { tier: 'Critical', target: 95 },
-    'src/index/manifest.js':              { tier: 'Critical', target: 95 },
+    'src/index/methods/lint_and_metering.js': { tier: 'Critical', target: 95 },
+    'src/index/methods/manifest.js':      { tier: 'Critical', target: 95 },
     'src/metering.js':                    { tier: 'Critical', target: 95 },
     'src/sandbox.js':                     { tier: 'Critical', target: 95 },
     'src/gas.js':                         { tier: 'Critical', target: 95 },

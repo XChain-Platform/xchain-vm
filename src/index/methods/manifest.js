@@ -16,7 +16,7 @@
  * The deploy-time permissions-manifest read: one execute() of the module
  * top level under the deploy block's own activation gates, returning the
  * raw typed report the indexer validates. XChainVM prototype method,
- * installed by the entry (../index.js).
+ * installed by the entry (../../index.js).
  ********************************************************************/
 // @ts-nocheck
 

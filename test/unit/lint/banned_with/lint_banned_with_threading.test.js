@@ -33,7 +33,7 @@ function newVm() {
 
 function withSyntaxSpy(fn) {
     const syntaxPath = require.resolve('../../../../src/syntax.js');
-    const lintPath = require.resolve('../../../../src/index/lint_and_metering.js');
+    const lintPath = require.resolve('../../../../src/index/methods/lint_and_metering.js');
     const realSyntax = require.cache[syntaxPath];
     const realLint = require.cache[lintPath];
     const calls = [];

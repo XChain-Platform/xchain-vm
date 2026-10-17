@@ -16,14 +16,14 @@
  * The two source-keyed caches (metered code, execute-time lint verdict)
  * and the deploy-time syntax and float-warning wrappers. Both caches are
  * invisible to consensus: a hit returns exactly what a fresh call would.
- * XChainVM prototype methods, installed by the entry (../index.js).
+ * XChainVM prototype methods, installed by the entry (../../index.js).
  ********************************************************************/
 // @ts-nocheck
 
 const crypto = require('crypto');
 
-const { meterCode }     = require('../metering.js');
-const { validateSyntax, checkFloatWarnings } = require('../syntax.js');
+const { meterCode }     = require('../../metering.js');
+const { validateSyntax, checkFloatWarnings } = require('../../syntax.js');
 
 module.exports = {
     /**

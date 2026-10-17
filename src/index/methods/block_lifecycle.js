@@ -15,7 +15,7 @@
  *
  * The per-block compilation-cache boundaries and the executor teardown,
  * each delegated to the subprocess executor when one is configured.
- * XChainVM prototype methods, installed by the entry (../index.js).
+ * XChainVM prototype methods, installed by the entry (../../index.js).
  ********************************************************************/
 // @ts-nocheck
 
