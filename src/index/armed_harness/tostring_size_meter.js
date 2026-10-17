@@ -16,9 +16,17 @@ const { deriveHarness } = require('./derivation.js');
 
 const EDITS = [
     [
+        "        __allocGas(len); return __padStart.apply(this, arguments);",
+        "      __allocGas(len=+len);return __padStart.apply(this,arguments)",
+    ],
+    [
+        "        __allocGas(len); return __padEnd.apply(this, arguments);",
+        "      __allocGas(len=+len);return __padEnd.apply(this,arguments)",
+    ],
+    [
         "            if (typeof s === 'string') __allocGas(s.length);\n" +
         '            return orig.apply(this, arguments);',
-        "            if (typeof s === 'symbol') return orig.apply(this, arguments);\n" +
+        "            if (new.target) return new orig(...arguments); if (typeof s === 'symbol') return orig.apply(this, arguments);\n" +
         "            s = typeof s === 'string' ? s : __String(s); __allocGas(s.length); arguments[0] = s; return orig.apply(this, arguments);",
     ],
 ];

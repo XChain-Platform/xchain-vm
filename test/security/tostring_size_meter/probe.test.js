@@ -27,19 +27,23 @@ async function run(code) {
     finally { if (vm.endBlock) vm.endBlock(); }
 }
 
-async function acrossGate(code) {
-    const armed = await run(code);
+async function runBelowGate(code) {
     const saved = TOSTRING_SIZE_METER_ACTIVATION.regtest;
     TOSTRING_SIZE_METER_ACTIVATION.regtest = 9999999999;
     try {
-        const below = await run(code);
-        assert.strictEqual(armed.success, true, 'armed: ' + armed.error);
-        assert.strictEqual(below.success, true, 'below the gate: ' + below.error);
-        assert.strictEqual(armed.returnValue, below.returnValue);
-        return { armed, below };
+        return await run(code);
     } finally {
         TOSTRING_SIZE_METER_ACTIVATION.regtest = saved;
     }
+}
+
+async function acrossGate(code) {
+    const armed = await run(code);
+    const below = await runBelowGate(code);
+    assert.strictEqual(armed.success, true, 'armed: ' + armed.error);
+    assert.strictEqual(below.success, true, 'below the gate: ' + below.error);
+    assert.strictEqual(armed.returnValue, below.returnValue);
+    return { armed, below };
 }
 
 (XChainVM ? describe : describe.skip)('toString size meter: coercion probe', function () {
@@ -74,6 +78,28 @@ async function acrossGate(code) {
             }
         });
     }
+
+    for (const method of ['padStart', 'padEnd']) {
+        it(`${method} converts its target length once above the gate`, async function () {
+            const code = `module.exports=function(){var calls=0,len={valueOf:function(){calls++;return 5;}};
+                return ['x'[${JSON.stringify(method)}](len,'y'),calls];};`;
+            const armed = await run(code);
+            const below = await runBelowGate(code);
+            assert.strictEqual(armed.success, true, 'armed: ' + armed.error);
+            assert.strictEqual(below.success, true, 'below the gate: ' + below.error);
+            assert.deepStrictEqual(JSON.parse(armed.returnValue), [method === 'padStart' ? 'yyyyx' : 'xyyyy', 1]);
+            assert.deepStrictEqual(JSON.parse(below.returnValue), [method === 'padStart' ? 'yyyyx' : 'xyyyy', 2]);
+        });
+    }
+
+    it('preserves native constructor rejection above the gate', async function () {
+        const code = `module.exports=function(){return ['decodeURIComponent','parseInt'].map(function(name){
+            try { new globalThis[name]('5'); return 'accepted'; } catch (e) { return e.name; }
+        });};`;
+        const armed = await run(code);
+        assert.strictEqual(armed.success, true, armed.error);
+        assert.deepStrictEqual(JSON.parse(armed.returnValue), ['TypeError', 'TypeError']);
+    });
 
     it('leaves Symbol rejection to each native global function', async function () {
         const code = `module.exports=function(){return ['decodeURIComponent','parseInt'].map(function(name){
