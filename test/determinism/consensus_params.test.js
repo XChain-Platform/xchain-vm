@@ -63,7 +63,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work, unarmed on mainnet and armed on testnet', function () {
-        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet;
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, deferred = 9999999999;
         assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
             { mainnet: null, testnet: armed, regtest: 0 });
@@ -74,22 +74,9 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         }
         assert.strictEqual(vm.isApplyLengthMeterActive('testnet', 1), false);
         assert.strictEqual(vm.isApplyLengthMeterActive('testnet', armed), true);
-    });
-});
-
-describe('consensus parameters are frozen (track 8 guard)', function () {
-
-    it('TOSTRING_SIZE_METER_ACTIVATION is sealed and armed only on regtest', function () {
-        const deferred = 9999999999;
-        assert.strictEqual(vm.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, deferred);
-        assert.ok(Object.isSealed(vm.TOSTRING_SIZE_METER_ACTIVATION));
-        assert.deepStrictEqual(vm.TOSTRING_SIZE_METER_ACTIVATION,
-            { mainnet: deferred, testnet: deferred, regtest: 0 });
-        assert.strictEqual(vm.isToStringSizeMeterActive('regtest', 0), true);
-        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
-            assert.strictEqual(vm.toStringSizeMeterGateTime(network), deferred, String(network));
-            assert.strictEqual(vm.isToStringSizeMeterActive(network, 4000000000), false, String(network));
-        }
+        assert.deepStrictEqual([vm.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, Object.isSealed(vm.TOSTRING_SIZE_METER_ACTIVATION), vm.TOSTRING_SIZE_METER_ACTIVATION,
+            vm.toStringSizeMeterGateTime('unknown'), vm.isToStringSizeMeterActive('regtest', 0), vm.isToStringSizeMeterActive('mainnet', 4000000000)],
+            [deferred, true, { mainnet: deferred, testnet: deferred, regtest: 0 }, deferred, true, false]);
     });
 });
 
