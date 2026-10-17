@@ -128,3 +128,21 @@ describe('wall-clock calibration probe: callback Array methods', function () {
         });
     }
 });
+
+describe('wall-clock calibration probe: rebound aliases', function () {
+    const vectorsById = new Map(probe.VECTORS.map((vector) => [vector.id, vector]));
+
+    for (const [id, shape] of [
+        ['String trimLeft loop', /\.trimLeft\(\)/],
+        ['String trimRight loop', /\.trimRight\(\)/],
+        ['Number.parseInt loop', /Number\.parseInt\(s,10\)/],
+        ['Number.parseFloat loop', /Number\.parseFloat\(s\)/],
+    ]) {
+        it(`includes the ${id} metered vector`, function () {
+            const vector = vectorsById.get(id);
+            assert.ok(vector, `${id} must remain in the calibration probe`);
+            assert.strictEqual(vector.group, 'metered');
+            assert.match(vector.body, shape);
+        });
+    }
+});
