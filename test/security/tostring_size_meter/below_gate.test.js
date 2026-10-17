@@ -27,7 +27,7 @@ const CONTEXT = {
 };
 const OPTIONS = { method: 'default', network: 'mainnet', blockContext: CONTEXT };
 
-(XChainVM ? describe : describe.skip)('toString size metering below the gate', function () {
+describe('toString size metering below the gate', function () {
     this.timeout(60000);
 
     let vm;
