@@ -44,6 +44,7 @@ const { buildEmitAPI, GOLDEN_VECTORS, normalizeRootDiscriminator,
         buildRequestIdPreimage, buildCallIdPreimage } = require('../../../src/gateway-emit.js');
 const GasTracker = require('../../../src/gas.js');
 const EmissionCollector = require('../../../src/collector.js');
+const { siblingCheckout, skipOrFail } = require('../../helpers/sibling_checkout.js');
 
 // Repo root by walking up to the nearest package.json rather than counting '..'
 // hops, so moving this file does not silently point the sibling load at nothing.
@@ -59,7 +60,12 @@ const REPO_ROOT = (function () {
 const PLATFORM_ROOT  = path.dirname(REPO_ROOT);
 const INDEXER_ATTEST = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'attest', 'index.js');
 const INDEXER_XCALL  = path.join(PLATFORM_ROOT, 'xchain-indexer', 'src', 'actions', 'xcall', 'index.js');
-const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
+
+// Judge both indexer files with the shared helper, so a lane symlink into a live main checkout is refused.
+function indexerVerdict() {
+    const attest = siblingCheckout(__dirname, INDEXER_ATTEST);
+    return attest.usable ? siblingCheckout(__dirname, INDEXER_XCALL) : attest;
+}
 
 // The indexer's REAL preimage assembly, not a restatement of it.
 //
@@ -72,7 +78,7 @@ const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
 // have not grown a second inline formula, is pinned separately by
 // bin/check-preimage-golden-parity.js.
 function loadIndexerDerivation() {
-    if (!fs.existsSync(INDEXER_ATTEST) || !fs.existsSync(INDEXER_XCALL)) return null;
+    if (!indexerVerdict().usable) return null;
     const Attest = require(INDEXER_ATTEST);
     const Xcall  = require(INDEXER_XCALL);
     return {
@@ -163,14 +169,8 @@ const COIN_CONFIG = { NETWORK: 'regtest', COIN: 'BTC' };
 let IDX = null;
 
 function loadIndexerBefore() {
+    if (!skipOrFail(this, indexerVerdict(), 'the per-field normalization matrix (real xchain-indexer derivation)')) return;
     IDX = loadIndexerDerivation();
-    if (IDX) return;
-    if (REQUIRE_SIBLINGS) {
-        assert.fail('the per-field normalization matrix needs the real xchain-indexer ' +
-            'derivation at ' + INDEXER_ATTEST + ' and ' + INDEXER_XCALL +
-            '; XCHAIN_REQUIRE_SIBLINGS=1 forbids the green-by-skip');
-    }
-    this.skip();
 }
 
 const vmPreimage = (root, callPath, contractIndex) =>

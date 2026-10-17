@@ -25,11 +25,13 @@
 const acorn = require('acorn');
 const { generate } = require('astring');
 const { CONTRACT_ECMA_VERSION, RESERVED_IDENTIFIERS, findReservedIdentifier, hasGasIdentifier } = require('./metering/reserved_identifiers.js');
-const { insertGasAfterDirectives } = require('./metering/ast_builders.js');
+const { insertGasAfterDirectives, directivePrologueLength, armedDepthPair } = require('./metering/ast_builders.js');
 const { transformAllocators } = require('./metering/allocator_transform.js');
 const {
     injectBlockGas, injectBinaryDepthGas, injectCallGas, injectDepthGuards
 } = require('./metering/visitor_instrumentation.js');
+const { chooseNames } = require('./metering/native_stack_catch.js');
+const { frameWeight } = require('./metering/frame_weight.js');
 
 /**
  * Transform contract source code by injecting gas metering calls.
@@ -51,12 +53,20 @@ const {
  *   __arrspread / __objspreadmeter so the O(n) copy is metered; when false/omitted the
  *   destructure is emitted verbatim (legacy flat __gas(1)). index.js resolves this from
  *   the block time so pre-gate blocks replay identically.
+ * @param {boolean} [opts.nativeStackTerminal] - native stack activation. When true,
+ *   every catch and finally hands its in-flight value to the meter (a native stack
+ *   overflow becomes the un-swallowable depth fault), every function guard charges
+ *   its frame weight, the top-level script charges its own, and call/new argument
+ *   spread holds its pushed count for the call; when false/omitted the output is
+ *   byte-identical to the legacy transform. index.js resolves this from the block
+ *   height so pre-activation blocks replay identically.
  * @returns {string} Transformed source with __gas(1) calls injected
  */
 function meterCode(source, opts) {
     const specEvalOrder = !!(opts && opts.specEvalOrder);
     const meterCallSpread = !!(opts && opts.meterCallSpread);
     const meterRestPattern = !!(opts && opts.meterRestPattern);
+    const nativeStackTerminal = !!(opts && opts.nativeStackTerminal);
     const ast = acorn.parse(source, {
         ecmaVersion: CONTRACT_ECMA_VERSION,
         sourceType: 'script',
@@ -67,7 +77,10 @@ function meterCode(source, opts) {
     // array/object spread, and gated call/new argument spread) into metered helper
     // calls, on the pristine AST before any __gas() insertion. The helper calls are
     // exempted from Phase 3 below.
-    transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern);
+    // Fresh local names for the armed try rewrite, chosen before any helper is
+    // injected so they are tested against the contract's own identifiers only.
+    const armedNames = nativeStackTerminal ? chooseNames(ast) : null;
+    transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern, nativeStackTerminal);
 
     // Track nodes we've already processed to avoid double-injection
     const processed = new WeakSet();
@@ -79,12 +92,23 @@ function meterCode(source, opts) {
     // Inject after any directive prologue, exactly as function bodies are handled.
     insertGasAfterDirectives(ast.body);
 
-    injectBlockGas(ast, processed);
+    injectBlockGas(ast, processed, armedNames);
     injectBinaryDepthGas(ast, processed);
     injectCallGas(ast, processed);
-    injectDepthGuards(ast);
+    injectDepthGuards(ast, armedNames);
+    if (nativeStackTerminal) chargeTopLevelFrame(ast, armedNames.token);
 
     return generate(ast);
+}
+
+// The top-level script runs as one function frame that is live while it calls
+// into contract functions, so under the native stack activation it charges its
+// own weight like any guarded function. A throw ends the execution and a
+// top-level return leaves the units held, both of which are deterministic.
+function chargeTopLevelFrame(ast, token) {
+    const pair = armedDepthPair(frameWeight(ast), token);
+    ast.body.splice(1 + directivePrologueLength(ast.body), 0, pair.enter);
+    ast.body.push(pair.exit);
 }
 
 module.exports = { meterCode, hasGasIdentifier, findReservedIdentifier, RESERVED_IDENTIFIERS, CONTRACT_ECMA_VERSION };

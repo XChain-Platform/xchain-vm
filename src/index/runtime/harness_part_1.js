@@ -15,6 +15,12 @@
  *
  * A contiguous slice of the in-isolate prelude; harness_source.js joins the
  * slices in order.
+ *
+ * One comment inside the template is stale and stays byte-identical, because
+ * editing it would move in-isolate line positions (see the NOTE in
+ * activations.js). __DEPTH_LIMIT is injected by isolate_globals.js, not
+ * index.js, and only the recursion guard reads it; the F-NR sinks read the
+ * clamped __NR_DEPTH_LIMIT.
  ********************************************************************/
 // @ts-nocheck
 

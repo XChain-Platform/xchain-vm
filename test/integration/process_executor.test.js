@@ -22,7 +22,16 @@
 // @ts-nocheck
 
 
-const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAVE_IVM } = require('./process_executor.test/support/executor_setup.js');
+const { assert, XChainVM, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAVE_IVM } = require('./process_executor.test/support/executor_setup.js');
+
+function assertExecutorCapReached(boot) {
+    assert.throws(
+        boot,
+        (error) => error && error.code === 'EXECUTOR_CAP_REACHED' &&
+            /live worker cap reached \(2 executors not shut down\)/.test(error.message),
+        'building past the live executor cap must fail loudly'
+    );
+}
 
 (HAVE_IVM ? describe : describe.skip)('process_executor: out-of-process execution', function () {
     this.timeout(60000);
@@ -55,5 +64,28 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
         // not the in-memory object's prototype.
         assert.strictEqual(hashResult(b), hashResult(a),
             'subprocess output must be consensus-identical to in-process');
+    });
+    it('caps live executors and shutdown frees a slot', async function () {
+        const executors = [];
+        const boot = () => new XChainVM({
+            gasSchedule: GAS_SCHEDULE,
+            gasCeiling: GAS_CEILING,
+            limits: LIMITS,
+            execution: 'subprocess',
+            maxLiveExecutors: 2
+        });
+
+        try {
+            executors.push(boot());
+            executors.push(boot());
+
+            assertExecutorCapReached(boot);
+            await executors[0].shutdown();
+            await executors[0].shutdown();
+            executors.push(boot());
+            assertExecutorCapReached(boot);
+        } finally {
+            await Promise.all(executors.map((executor) => executor.shutdown()));
+        }
     });
 });

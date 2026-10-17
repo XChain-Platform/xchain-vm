@@ -34,6 +34,7 @@ const path   = require('path');
 const { validateSyntax, checkFloatWarnings } = require('../../../src/syntax.js');
 const { lintSource, CONSENSUS_RULES, findBannedStrippedGlobals,
         findBannedProtoMethods } = require('../../../src/lint-core.js');
+const { siblingCheckout, skipOrFail } = require('../../helpers/sibling_checkout.js');
 
 const VM_SRC_DIR     = path.join(__dirname, '..', '..', '..', 'src');
 const SDK_VENDOR_DIR = path.join(__dirname, '..', '..', '..', '..', 'xchain-sdk', 'src', 'contract');
@@ -68,13 +69,10 @@ function listFiles(base, rel = '') {
 // The job that PROVIDES the siblings must export XCHAIN_REQUIRE_SIBLINGS=1:
 // under that flag a missing sibling is a hard FAILURE, never a silent skip, so
 // the deploy-validator template/vendor-drift seams cannot pass green merely
-// because the sibling directory was absent (green-by-skips).
-const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
-function requireSiblingOrSkip(ctx, present, what) {
-    if (present) return;
-    if (REQUIRE_SIBLINGS)
-        assert.fail('required sibling missing under XCHAIN_REQUIRE_SIBLINGS=1: ' + what);
-    ctx.skip();
+// because the sibling directory was absent (green-by-skips). The shared helper
+// also refuses a lane symlink into a live main checkout, which no commit pins.
+function requireSiblingOrSkip(ctx, verdict, what) {
+    skipOrFail(ctx, verdict, what);
 }
 
 // All bad fixtures use syntax V8 accepts, so validateSyntax clears step 1 and the
@@ -94,6 +92,7 @@ const BAD_FIXTURES = [
     { name: 'banned-rest',           rule: 'banned-rest',         code: 'module.exports = function(){ function s(...n){ return n.length; } return s(1,2); };' },
     { name: 'banned-with',           rule: 'banned-with',         code: 'module.exports = function(o){ with (o) { return a; } };' }
     ,{ name: 'nesting-depth',        rule: 'nesting-depth',       code: 'module.exports = ' + '('.repeat(65) + '1' + ')'.repeat(65) + ';' }
+    ,{ name: 'syntax-depth',         rule: 'nesting-depth',       code: 'module.exports = function(){ return ' + '!'.repeat(250) + '1; };' }
 ];
 // Consensus rules whose deploy message cannot equal lintSource's, so only the verdict compares.
 // invalid-type: validateSyntax's V8 compile rejects a non-string first ("syntax error: ...").
@@ -104,10 +103,10 @@ const GOOD_FIXTURE  = 'function init(){ return 1; } function add(a,b){ return a 
 describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
 
     describe('drift guard (SDK vendored copies byte-identical to canonical)', function () {
-        const haveSDK = fs.existsSync(SDK_VENDOR_DIR);
+        const sdkVerdict = siblingCheckout(__dirname, SDK_VENDOR_DIR);
         for (const f of VENDORED_FILES) {
             it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
-                requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                requireSiblingOrSkip(this, sdkVerdict, SDK_VENDOR_DIR);
                 assert.ok(fs.existsSync(path.join(SDK_VENDOR_DIR, f)),
                     'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
                 assert.strictEqual(
@@ -126,7 +125,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
             });
             // Refuse a file added, removed or renamed on one side only, which a per-file hash of one side cannot see
             it('xchain-sdk/src/contract/' + dir + '/ file set matches src/' + dir + '/', function () {
-                requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                requireSiblingOrSkip(this, sdkVerdict, SDK_VENDOR_DIR);
                 const vendored = listFiles(path.join(SDK_VENDOR_DIR, dir));
                 const missingInSdk = canonical.filter((f) => !vendored.includes(f));
                 const onlyInSdk = vendored.filter((f) => !canonical.includes(f));
@@ -137,7 +136,7 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
             for (const rel of canonical) {
                 const f = dir + '/' + rel;
                 it('xchain-sdk/src/contract/' + f + ' matches src/' + f, function () {
-                    requireSiblingOrSkip(this, haveSDK, SDK_VENDOR_DIR);
+                    requireSiblingOrSkip(this, sdkVerdict, SDK_VENDOR_DIR);
                     const vendored = path.join(SDK_VENDOR_DIR, f);
                     assert.ok(fs.existsSync(vendored), 'VENDOR DRIFT: SDK ' + f + ' is missing from ' + SDK_VENDOR_DIR);
                     assert.strictEqual(sha256(vendored), sha256(path.join(VM_SRC_DIR, f)),
@@ -240,7 +239,8 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     });
 });
 
-const haveTemplates = fs.existsSync(CONTRACTS_DIR);
+const templatesVerdict = siblingCheckout(__dirname, CONTRACTS_DIR);
+const haveTemplates = templatesVerdict.usable;
 const dirs = haveTemplates
     ? fs.readdirSync(CONTRACTS_DIR, { withFileTypes: true })
         .filter(d => d.isDirectory() && fs.existsSync(path.join(CONTRACTS_DIR, d.name, d.name + '.js')))
@@ -254,7 +254,7 @@ const dirs = haveTemplates
 // than wait for the next xchain-contracts CI run to notice. Same discovery rule
 // listAvailable() uses, so a sixth pattern is picked up without an allowlist.
 const PATTERNS_DIR = path.join(CONTRACTS_DIR, 'patterns');
-const patterns = fs.existsSync(PATTERNS_DIR)
+const patterns = haveTemplates && fs.existsSync(PATTERNS_DIR)
     ? fs.readdirSync(PATTERNS_DIR).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort()
     : [];
 
@@ -264,7 +264,9 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
             it('xchain-contracts templates present', function () {
                 // Hard-fails under XCHAIN_REQUIRE_SIBLINGS=1 (the sibling-providing
                 // job); skips otherwise. See requireSiblingOrSkip above.
-                requireSiblingOrSkip(this, false, CONTRACTS_DIR + ' (with template dirs)');
+                requireSiblingOrSkip(this, haveTemplates
+                    ? { usable: false, reason: 'no <name>/<name>.js template dirs under ' + CONTRACTS_DIR }
+                    : templatesVerdict, CONTRACTS_DIR + ' (with template dirs)');
             });
         } else {
             for (const name of dirs) {

@@ -77,7 +77,7 @@ class E2EHarness {
         this.indexer = new MockIndexer(this.ledger);
         this.vm = new XChainVM({
             gasSchedule: { ...GAS_SCHEDULE },
-            gasCeiling:  overrides?.gasCeiling || 1000000,
+            gasCeiling:  overrides?.gasCeiling || SIM.DEFAULT_GAS_CEILING,
             limits:      { ...DEFAULT_LIMITS, ...(overrides?.limits || {}) }
         });
         this._executionLog = [];

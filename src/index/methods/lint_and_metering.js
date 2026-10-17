@@ -16,14 +16,14 @@
  * The two source-keyed caches (metered code, execute-time lint verdict)
  * and the deploy-time syntax and float-warning wrappers. Both caches are
  * invisible to consensus: a hit returns exactly what a fresh call would.
- * XChainVM prototype methods, installed by the entry (../index.js).
+ * XChainVM prototype methods, installed by the entry (../../index.js).
  ********************************************************************/
 // @ts-nocheck
 
 const crypto = require('crypto');
 
-const { meterCode }     = require('../metering.js');
-const { validateSyntax, checkFloatWarnings } = require('../syntax.js');
+const { meterCode }     = require('../../metering.js');
+const { validateSyntax, checkFloatWarnings } = require('../../syntax.js');
 
 module.exports = {
     /**
@@ -53,18 +53,21 @@ module.exports = {
      *        computes the digest once and shares it with the lint-verdict cache
      *        so a 64KB body is hashed once per execution, not twice.
      *        Omitting it recomputes the identical digest, so the key is unchanged.
+     * @param {boolean} [nativeStackTerminal] - native stack activation; a fourth key bit,
+     *        so armed and unarmed executions never share a metered source
      * @returns {string} metered source
      */
-    getMeteredCode(code, specEvalOrder, meterCallSpread, meterRestPattern, codeHash) {
+    getMeteredCode(code, specEvalOrder, meterCallSpread, meterRestPattern, codeHash, nativeStackTerminal) {
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (specEvalOrder ? '1' : '0') + (meterCallSpread ? '1' : '0') +
-            (meterRestPattern ? '1' : '0');
+            (meterRestPattern ? '1' : '0') + (nativeStackTerminal ? '1' : '0');
         const hit = this._meteredCache.get(key);
         if (hit !== undefined) return hit;
         const metered = meterCode(code, {
             specEvalOrder: specEvalOrder,
             meterCallSpread: meterCallSpread,
-            meterRestPattern: meterRestPattern
+            meterRestPattern: meterRestPattern,
+            nativeStackTerminal: !!nativeStackTerminal
         });
         // FIFO-evict the oldest entry at capacity (Map preserves insertion order).
         // This cache never feeds consensus, so the eviction policy is a pure
@@ -105,6 +108,9 @@ module.exports = {
      *        omitted means off, like the optional-chain bit
      * @param {boolean} [enforceLintDestructure] - destructure refinement (own per-coin
      *        height gate); omitted means off
+     * @param {boolean} [enforceLintSyntaxDepth] - syntax-depth bound, host-fault overflow
+     *        and deploy-equal nesting (own per-coin height gate); omitted means off.
+     *        The delimiter rule needs no bit: this path has always enforced it.
      * @returns {{valid: boolean, error?: string}}
      */
     getLintVerdict(
@@ -117,10 +123,12 @@ module.exports = {
         enforceLintOptionalChain,
         codeHash,
         enforceBannedWith,
-        enforceLintDestructure
+        enforceLintDestructure,
+        enforceLintSyntaxDepth
     ) {
         const bannedWith = enforceBannedWith === true;
         const lintDestructure = enforceLintDestructure === true;
+        const syntaxDepth = enforceLintSyntaxDepth === true;
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
@@ -129,7 +137,8 @@ module.exports = {
             (enforceBannedRest ? '1' : '0') +
             (enforceLintOptionalChain === true ? '1' : '0') +
             (bannedWith ? '1' : '0') +
-            (lintDestructure ? '1' : '0');
+            (lintDestructure ? '1' : '0') +
+            (syntaxDepth ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -141,7 +150,8 @@ module.exports = {
             enforceBannedRest:       enforceBannedRest,
             enforceLintOptionalChain: enforceLintOptionalChain === true,
             enforceBannedWith:       bannedWith,
-            enforceLintDestructure:  lintDestructure
+            enforceLintDestructure:  lintDestructure,
+            enforceLintSyntaxDepth:  syntaxDepth
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;

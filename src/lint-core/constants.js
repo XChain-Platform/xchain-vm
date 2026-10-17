@@ -34,6 +34,11 @@ const RESERVED_CONTROL_BINDINGS = [
 // to the indexer's deploy.js cap); a parity test asserts it.
 const MAX_CODE_SIZE = 65536;
 const MAX_NESTING_DEPTH = 64;
+// The syntax-depth bound (syntax_depth.js units). Cold, in a fresh process, the lint
+// and metering passes first overflow at about 416 units with a 400 KB V8 stack and at
+// about 990 with the 984 KB default, across every measured shape; 200 keeps 2x headroom
+// at 400 KB and 5x at the default, and sits about 4x above the deepest shipped contract.
+const MAX_SYNTAX_DEPTH = 200;
 
 // The sandbox's hard-neutered prototype METHODS (sandbox.js
 // STRIPPED_PROTO_METHODS). Duplicated here for the dependency-light reason
@@ -56,7 +61,7 @@ const STRIPPED_PROTO_METHOD_NAMES = [
 const REGEX_COERCING_METHODS = new Set(['match', 'matchAll', 'search']);
 
 // The sandbox's deleted GLOBALS. NOT mirrored: required from the one module
-// that defines them, ./stripped-globals.js, which sandbox.js and the AI-authoring
+// that defines them, ../stripped-globals.js, which sandbox.js and the AI-authoring
 // knowledge base require too. That module is dependency-free precisely so this
 // single require line resolves in BOTH trees at the two depths this file is
 // vendored to (xchain-vm/src/ and xchain-sdk/src/contract/), which is the reason
@@ -130,6 +135,7 @@ module.exports = {
     RESERVED_CONTROL_BINDINGS,
     MAX_CODE_SIZE,
     MAX_NESTING_DEPTH,
+    MAX_SYNTAX_DEPTH,
     STRIPPED_PROTO_METHOD_NAMES,
     REGEX_COERCING_METHODS,
     STRIPPED_GLOBAL_NAMES,

@@ -27,6 +27,7 @@
 const assert = require('assert');
 const fs     = require('fs');
 const path   = require('path');
+const { siblingCheckout, skipOrFail } = require('../helpers/sibling_checkout.js');
 
 const { ContractSimulator, DEFAULT_GAS_CEILING } = require('../../src/toolkit/simulator.js');
 const { estimateGas } = require('../../src/toolkit/gate.js');
@@ -45,15 +46,9 @@ const REPO_ROOT = (function () {
 })();
 const PLATFORM_ROOT = path.dirname(REPO_ROOT);
 
-// Skip on a standalone clone, but fail where the sibling repos are required present.
+// Skip on a standalone clone or a lane symlink into a live main checkout, but fail where siblings are required.
 function siblingOrSkip(ctx, absPath, what) {
-    if (fs.existsSync(absPath)) return true;
-    if (process.env.XCHAIN_REQUIRE_SIBLINGS === '1') {
-        assert.fail('simulator gas ceiling parity gate cannot run: ' + what + ' missing at ' +
-            absPath + '; XCHAIN_REQUIRE_SIBLINGS=1 forbids the green-by-skip');
-    }
-    ctx.skip();
-    return false;
+    return skipOrFail(ctx, siblingCheckout(__dirname, absPath), 'simulator gas ceiling parity gate (' + what + ')');
 }
 
 // Read the one literal a source states for a key, failing loud on any other shape.

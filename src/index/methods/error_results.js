@@ -16,7 +16,7 @@
  * The failure-result shape (state and emissions dropped, logs kept, gas
  * optionally clamped to the ceiling) and the message sanitizer that keeps
  * host paths and stack text out of a result a contract outcome is hashed
- * from. XChainVM prototype methods, installed by the entry (../index.js).
+ * from. XChainVM prototype methods, installed by the entry (../../index.js).
  ********************************************************************/
 // @ts-nocheck
 

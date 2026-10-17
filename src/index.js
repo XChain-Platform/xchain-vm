@@ -31,15 +31,16 @@ const GasTracker         = require('./gas.js');
 const { resolveWallClockBudgetMs } = require('./consensus-wall-clock.js');
 // The entry keeps the class (constructor and the consensus wall-clock resolver);
 // the prototype methods, the harness prelude, the activation carriers and the
-// public statics live in named parts under ./index/ and ./index/runtime/ and are
-// installed here so the public surface (constructor, prototype, statics) is the
-// one this file always exported.
+// prototype methods live under ./index/methods/, while the harness prelude, the
+// activation carriers and the public statics live in named parts under ./index/
+// and ./index/runtime/. They are installed here so the public surface
+// (constructor, prototype, statics) is the one this file always exported.
 const { installMethods } = require('./index/install_methods.js');
-const blockLifecycleMethods = require('./index/block_lifecycle.js');
-const lintAndMeteringMethods = require('./index/lint_and_metering.js');
+const blockLifecycleMethods = require('./index/methods/block_lifecycle.js');
+const lintAndMeteringMethods = require('./index/methods/lint_and_metering.js');
 const gatewayInjectionMethods = require('./index/gateway_injection.js');
-const errorResultMethods = require('./index/error_results.js');
-const manifestMethods = require('./index/manifest.js');
+const errorResultMethods = require('./index/methods/error_results.js');
+const manifestMethods = require('./index/methods/manifest.js');
 const executeMethods = require('./index/runtime/execute.js');
 const classifyErrorMethods = require('./index/runtime/classify_error.js');
 const { resolveLimits } = require('./index/runtime/limits_defaults.js');
@@ -49,6 +50,12 @@ const {
     isConsensusWallClockActive,
     BIGINT_SURFACE_STRIP_ACTIVATION,
     isBigIntSurfaceStripActive,
+    RESOURCE_FAULT_SIGNAL_ACTIVATION,
+    isResourceFaultSignalActive,
+    HOST_ERROR_STACK_STRIP_ACTIVATION,
+    isHostErrorStackStripActive,
+    NATIVE_STACK_TERMINAL_ACTIVATION,
+    isNativeStackTerminalActive,
 } = require('./index/runtime/activations.js');
 const { attachStatics } = require('./index/runtime/public_exports.js');
 const { setTimeoutLog } = require('./index/runtime/timeout_log.js');
@@ -60,6 +67,36 @@ const {
     LINT_DESTRUCTURE_ACTIVATION,
     isLintDestructureActive,
 } = require('./index/lint_destructure_heights.js');
+const {
+    JSON_STRINGIFY_REENTRY_ACTIVATION,
+    isJsonStringifyReentryActive,
+} = require('./index/json_stringify_reentry_heights.js');
+const {
+    LINT_SYNTAX_DEPTH_ACTIVATION,
+    isLintSyntaxDepthActive,
+} = require('./index/lint_syntax_depth_heights.js');
+
+const DEFAULT_MAX_LIVE_EXECUTORS = 64;
+let liveExecutors = 0;
+
+function reserveExecutorSlot(configuredCap) {
+    const cap = Number.isInteger(configuredCap) && configuredCap > 0
+        ? configuredCap
+        : DEFAULT_MAX_LIVE_EXECUTORS;
+    if (liveExecutors >= cap) {
+        const error = new Error('ProcessExecutor live worker cap reached (' + cap +
+            ' executors not shut down); call shutdown() on VMs you are done with');
+        error.code = 'EXECUTOR_CAP_REACHED';
+        throw error;
+    }
+    liveExecutors++;
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        liveExecutors--;
+    };
+}
 
 class XChainVM {
     /**
@@ -67,6 +104,7 @@ class XChainVM {
      * @param {object} config.gasSchedule - Gas costs for each operation
      * @param {number} config.gasCeiling  - Maximum gas per execution
      * @param {object} config.limits      - Resource limits
+     * @param {number} config.maxLiveExecutors - Process-wide subprocess cap
      */
     constructor(config) {
         this.gasSchedule = config.gasSchedule;
@@ -102,7 +140,13 @@ class XChainVM {
         if (this.execution === 'subprocess') {
             // Lazy require to avoid loading child_process for in-process callers.
             const ProcessExecutor = require('./process-executor.js');
-            this._executor = new ProcessExecutor(config);
+            const releaseSlot = reserveExecutorSlot(config.maxLiveExecutors);
+            try {
+                this._executor = new ProcessExecutor(config, releaseSlot);
+            } catch (error) {
+                releaseSlot();
+                throw error;
+            }
         }
     }
 
@@ -150,8 +194,18 @@ const heightGateExports = Object.create(Object.getPrototypeOf(XChainVM), {
     isLintBannedWithActive: { value: isLintBannedWithActive, enumerable: true },
     LINT_DESTRUCTURE_ACTIVATION: { value: LINT_DESTRUCTURE_ACTIVATION, enumerable: true },
     isLintDestructureActive: { value: isLintDestructureActive, enumerable: true },
+    LINT_SYNTAX_DEPTH_ACTIVATION: { value: LINT_SYNTAX_DEPTH_ACTIVATION, enumerable: true },
+    isLintSyntaxDepthActive: { value: isLintSyntaxDepthActive, enumerable: true },
     BIGINT_SURFACE_STRIP_ACTIVATION: { value: BIGINT_SURFACE_STRIP_ACTIVATION, enumerable: true },
     isBigIntSurfaceStripActive: { value: isBigIntSurfaceStripActive, enumerable: true },
+    RESOURCE_FAULT_SIGNAL_ACTIVATION: { value: RESOURCE_FAULT_SIGNAL_ACTIVATION, enumerable: true },
+    isResourceFaultSignalActive: { value: isResourceFaultSignalActive, enumerable: true },
+    HOST_ERROR_STACK_STRIP_ACTIVATION: { value: HOST_ERROR_STACK_STRIP_ACTIVATION, enumerable: true },
+    isHostErrorStackStripActive: { value: isHostErrorStackStripActive, enumerable: true },
+    JSON_STRINGIFY_REENTRY_ACTIVATION: { value: JSON_STRINGIFY_REENTRY_ACTIVATION, enumerable: true },
+    isJsonStringifyReentryActive: { value: isJsonStringifyReentryActive, enumerable: true },
+    NATIVE_STACK_TERMINAL_ACTIVATION: { value: NATIVE_STACK_TERMINAL_ACTIVATION, enumerable: true },
+    isNativeStackTerminalActive: { value: isNativeStackTerminalActive, enumerable: true },
 });
 Object.setPrototypeOf(XChainVM, heightGateExports);
 module.exports.GAS_CEILING_SUCCESS_ACTIVATION = GasTracker.GAS_CEILING_SUCCESS_ACTIVATION;

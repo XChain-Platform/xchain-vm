@@ -24,8 +24,9 @@
  * (join, stringify, flat) and which are not (the JSON.parse reviver walk).
  *
  * This suite pins the gate BEHAVIOUR on both sides:
- *   - below the height: byte-identical to today (bound stays 512; a 300-deep
- *     spine serializes / recurses cleanly);
+ *   - below the height: __DEPTH_LIMIT stays 512, so 300-deep recursion runs
+ *     cleanly, while an active native guard still poisons a 300-deep spine
+ *     because __NR_DEPTH_LIMIT is clamped to 256;
  *   - at/after the height: bound is 256 (a 300-deep spine faults out_of_stack, a
  *     200-deep one is untouched);
  *   - testnet/regtest: active from genesis (height 0);

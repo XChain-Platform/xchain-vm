@@ -179,7 +179,16 @@ function convertObjectSpread(node) {
 // active only at/after the flag day (meterCallSpread, resolved from the block
 // time in index.js); pre-gate the call is emitted verbatim so historical blocks
 // replay byte-identically.
-function convertCallSpread(node, meterCallSpread) {
+//
+// Native stack activation (opts.holdCallSpread): the pushed argument count is also
+// held against the depth counter for the length of the call, because the native
+// stack those arguments occupy is otherwise unaccounted:
+//   f(...x)  ->  __arrspread(f(...__arrspread([['s',x]], 1, id)), 2, id)
+// Mode 1 builds the list and holds its units under the call-site id; mode 2
+// releases that hold and returns the call's value unchanged. Inside an optional
+// chain the release is not wrapped (it would break the short-circuit); the hold is
+// then dropped when the site runs again or the enclosing function returns.
+function convertCallSpread(node, meterCallSpread, opts) {
     if (!meterCallSpread ||
         (node.type !== 'CallExpression' && node.type !== 'NewExpression') ||
         !Array.isArray(node.arguments) ||
@@ -189,8 +198,14 @@ function convertCallSpread(node, meterCallSpread) {
             ? astArray([astLiteral('s'), a.argument])
             : astArray([astLiteral('e'), a]);
     });
-    node.arguments = [{ type: 'SpreadElement', argument: astCall('__arrspread', [astArray(segs)]) }];
-    return node;
+    if (!opts || !opts.holdCallSpread) {
+        node.arguments = [{ type: 'SpreadElement', argument: astCall('__arrspread', [astArray(segs)]) }];
+        return node;
+    }
+    const id = astLiteral(opts.spreadSites++);
+    node.arguments = [{ type: 'SpreadElement', argument: astCall('__arrspread', [astArray(segs), astLiteral(1), id]) }];
+    if (opts.chainDepth > 0) return node;
+    return astCall('__arrspread', [node, astLiteral(2), astLiteral(id.value)]);
 }
 
 // destructuring rest, addressable source:  var [x, ...c] = a  /  var {k, ...c} = o
@@ -225,13 +240,15 @@ function convert(node, opts) {
         convertTemplateLiteral(node, opts.taggedQuasis) ||
         convertArraySpread(node) ||
         convertObjectSpread(node) ||
-        convertCallSpread(node, opts.meterCallSpread) ||
+        convertCallSpread(node, opts.meterCallSpread, opts) ||
         convertRestPattern(node, opts.meterRestPattern);
     return converted || node;
 }
 
 function recur(node, opts) {
     if (!node || typeof node.type !== 'string') return node;
+    const chain = node.type === 'ChainExpression';
+    if (chain) opts.chainDepth++;
     const keys = Object.keys(node);
     for (let k = 0; k < keys.length; k++) {
         const key = keys[k];
@@ -245,6 +262,7 @@ function recur(node, opts) {
             node[key] = recur(child, opts);
         }
     }
+    if (chain) opts.chainDepth--;
     return convert(node, opts);
 }
 
@@ -275,7 +293,7 @@ function recur(node, opts) {
  * pattern, catch-clause rest, for-of/for-in heads) cannot be reached by wrapping and
  * are rejected at deploy on the same flag day instead (lint_core findBannedRest).
  */
-function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern) {
+function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPattern, holdCallSpread) {
     // An untagged template literal is rewritten to __tmpl(...). A TAGGED template's
     // quasi must NOT be (the tag receives the raw template strings object); we
     // collect those quasis up front, skip converting them here, and instead rewrite
@@ -283,7 +301,8 @@ function transformAllocators(ast, specEvalOrder, meterCallSpread, meterRestPatte
     // the strings object and invokes the tag with the correct `this`.
     const taggedQuasis = new WeakSet();
     walk.simple(ast, { TaggedTemplateExpression: function (n) { taggedQuasis.add(n.quasi); } });
-    recur(ast, { specEvalOrder, meterCallSpread, meterRestPattern, taggedQuasis });
+    recur(ast, { specEvalOrder, meterCallSpread, meterRestPattern, taggedQuasis,
+        holdCallSpread: !!holdCallSpread, spreadSites: 0, chainDepth: 0 });
 }
 
 module.exports = { transformAllocators };

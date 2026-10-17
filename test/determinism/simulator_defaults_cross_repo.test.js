@@ -65,6 +65,7 @@
 const assert = require('assert');
 const fs     = require('fs');
 const path   = require('path');
+const { siblingCheckout, skipOrFail } = require('../helpers/sibling_checkout.js');
 
 const { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, GUARD_GAS_CEILING } =
     require('../../src/toolkit/simulator.js');
@@ -144,15 +145,9 @@ const REPO_ROOT = (function () {
 })();
 const PLATFORM_ROOT = path.dirname(REPO_ROOT);
 
-const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
+// Refuse an absent sibling or a lane symlink into a live main checkout (skip, or fail when required).
 function siblingOrSkip(ctx, absPath, what) {
-    if (fs.existsSync(absPath)) return true;
-    if (REQUIRE_SIBLINGS) {
-        assert.fail('simulator defaults parity gate cannot run: ' + what + ' missing at ' +
-            absPath + '; XCHAIN_REQUIRE_SIBLINGS=1 forbids the green-by-skip');
-    }
-    ctx.skip();
-    return false;
+    return skipOrFail(ctx, siblingCheckout(__dirname, absPath), 'simulator defaults parity gate (' + what + ')');
 }
 
 // Fresh read per call: the coin configs are dependency-free data tables, but a

@@ -15,9 +15,9 @@
  *
  * Iterator helpers (toArray, drop), String isWellFormed/toWellFormed, the Set
  * algebra family do O(n) native work that the AST meter bills at a flat unit per
- * call. The metering is gated: regtest runs it
- * from genesis, mainnet and testnet are unarmed (null). The same gate fails a run
- * whose gas-exhaustion fault was swallowed by an Object.* statics wrapper.
+ * call. The metering is gated per network by ITER_SET_METER_ACTIVATION: regtest runs
+ * it from genesis, mainnet and testnet at the instants that table holds. The same
+ * gate fails a run whose gas-exhaustion fault was swallowed by an Object.* statics wrapper.
  ********************************************************************/
 // @ts-nocheck
 
@@ -35,7 +35,8 @@ const VECTORS = {
     'Iterator drop': `${ARR}var t=0;for(;;){t+=a.values().drop(${K}-1).next().value;}`,
     'String isWellFormed': `var s=String.fromCharCode(0x100).repeat(${K});var t=0;for(;;){if(s.isWellFormed())t++;}`,
     'String toWellFormed': `var s=String.fromCharCode(0xD800).repeat(${K});var t=0;for(;;){t+=s.toWellFormed().length;}`,
-    'Call spread': `${ARR}function f(){return arguments.length;}var t=0;for(;;){t+=f(...a);}`,
+    // Under the depth budget the native stack rule holds spread arguments to (armed on regtest).
+    'Call spread': `var a=new Array(8000).fill(7);function f(){return arguments.length;}var t=0;for(;;){t+=f(...a);}`,
     'ArrayBuffer resize': `var b=new ArrayBuffer(8,{maxByteLength:${K}});var t=0;for(;;){b.resize(${K});b.resize(0);t++;}`,
     'ArrayBuffer transfer': `var b=new ArrayBuffer(${K});var t=0;for(;;){b=b.transfer();t++;}`,
     'Set union': `var x=new Set(),y=new Set();for(var j=0;j<${K};j++){x.add(j);y.add(j+${K});}var t=0;for(;;){t+=x.union(y).size;}`,

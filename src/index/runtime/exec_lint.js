@@ -22,6 +22,7 @@ const { GasExhaustedError } = require('../../errors.js');
 const { isLintOptionalChainActive } = require('../lint_optional_chain_heights.js');
 const { isLintBannedWithActive } = require('../lint_banned_with_heights.js');
 const { isLintDestructureActive } = require('../lint_destructure_heights.js');
+const { isLintSyntaxDepthActive } = require('../lint_syntax_depth_heights.js');
 const {
     isAsyncSurfaceActive, isLintHardeningActive, isRestPatternMeterActive,
     isPkg3SandboxActive, isLintGlobalAliasActive, EXEC_LINT_GAS_BYTES_PER_UNIT,
@@ -29,7 +30,7 @@ const {
 } = require('./activations.js');
 
 /**
- * The eight flags are resolved by the SAME predicates the rest of the VM already
+ * The nine flags are resolved by the SAME predicates the rest of the VM already
  * uses, which are the execution-side twins of the flags the indexer threads into
  * deploy/index.js validateSyntax, so the execute-time verdict agrees with what a deploy
  * in this block would have produced:
@@ -41,7 +42,8 @@ const {
  *   LINT_OPTIONAL_CHAIN refinement  -> isLintOptionalChainActive (per-coin height)
  *   banned-with                     -> isLintBannedWithActive (per-coin height)
  *   LINT_DESTRUCTURE refinement     -> isLintDestructureActive (per-coin height)
- * The last two travel after codeHash as explicit arguments.
+ *   syntax-depth bound              -> isLintSyntaxDepthActive (per-coin height)
+ * The last three travel after codeHash as explicit arguments.
  *
  * @returns {object|null} an error result when the lint gate refuses the
  *   execution, null when execution may proceed.
@@ -84,7 +86,8 @@ function checkExecLint(vm, opts, gasTracker, emissionCollector, codeStr, codeByt
             isLintOptionalChainActive(opts.network, coin, height),
             codeHash,
             isLintBannedWithActive(opts.network, coin, height),
-            isLintDestructureActive(opts.network, coin, height)
+            isLintDestructureActive(opts.network, coin, height),
+            isLintSyntaxDepthActive(opts.network, coin, height)
         );
         if (!__lintVerdict.valid) {
             // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus-runtime.js);

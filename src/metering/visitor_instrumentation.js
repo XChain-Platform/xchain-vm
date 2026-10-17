@@ -21,6 +21,8 @@ const {
     insertGasAfterDirectives, ensureBlock, binaryDepth
 } = require('./ast_builders.js');
 const { HELPER_SET } = require('./reserved_identifiers.js');
+const { armTryStatement } = require('./native_stack_catch.js');
+const { frameWeight } = require('./frame_weight.js');
 
 const functionEntryVisitors = {
     // Function declarations and expressions: inject at entry
@@ -67,7 +69,7 @@ const loopVisitors = {
     ForOfStatement: chargeLoopBody
 };
 
-function branchVisitors(processed) {
+function branchVisitors(processed, armedNames) {
     return {
         // Conditionals
         IfStatement(node) {
@@ -89,8 +91,10 @@ function branchVisitors(processed) {
                 node.consequent.unshift(gasCallStatement());
         },
 
-        // Try/catch/finally
+        // Try/catch/finally. Under the native stack activation the same charges
+        // also hand the in-flight value to the meter (native_stack_catch.js).
         TryStatement(node) {
+            if (armedNames) { armTryStatement(node, armedNames); return; }
             if (node.block && node.block.body)
                 node.block.body.unshift(gasCallStatement());
             if (node.handler && node.handler.body && node.handler.body.body)
@@ -110,8 +114,10 @@ function branchVisitors(processed) {
 }
 
 // Phase 1: function, loop, branch, try/switch and ternary entry charges.
-function injectBlockGas(ast, processed) {
-    walk.simple(ast, Object.assign({}, functionEntryVisitors, loopVisitors, branchVisitors(processed)));
+// armedNames (native stack activation only) switches the try charges to the
+// armed form that also hands the in-flight value to the meter.
+function injectBlockGas(ast, processed, armedNames) {
+    walk.simple(ast, Object.assign({}, functionEntryVisitors, loopVisitors, branchVisitors(processed, armedNames || null)));
 }
 
 // Phase 2: charge deeply nested BinaryExpression chains.
@@ -192,10 +198,18 @@ function injectCallGas(ast, processed) {
 // try/finally is not itself gas-metered (depth bounding is gas-free, leaving the
 // gas cost of existing contracts unchanged) and the depth hooks are exempt from
 // the call-site wrapping above.
-function injectDepthGuards(ast) {
+//
+// Under the native stack activation (armedNames) each guard charges the frame's
+// depth units, __depth_enter(w) with w from frameWeight(), so a deep chain of
+// large frames reaches the counter before the native stack runs out, and checks
+// whatever leaves the frame by throwing (ast_builders.js wrapDepthGuard).
+function injectDepthGuards(ast, armedNames) {
+    const weightOf = function (node) {
+        return armedNames ? { weight: frameWeight(node), caught: armedNames.caught, token: armedNames.token } : undefined;
+    };
     walk.simple(ast, {
-        FunctionDeclaration(node) { wrapDepthGuard(node); },
-        FunctionExpression(node)  { wrapDepthGuard(node); },
+        FunctionDeclaration(node) { wrapDepthGuard(node, weightOf(node)); },
+        FunctionExpression(node)  { wrapDepthGuard(node, weightOf(node)); },
         ArrowFunctionExpression(node) {
             // Convert an expression-bodied arrow to a block returning the
             // expression, so it can carry the enter/try/finally guard.
@@ -203,7 +217,7 @@ function injectDepthGuards(ast) {
                 node.body = { type: 'BlockStatement',
                     body: [{ type: 'ReturnStatement', argument: node.body }] };
             }
-            wrapDepthGuard(node);
+            wrapDepthGuard(node, weightOf(node));
         }
     });
 }

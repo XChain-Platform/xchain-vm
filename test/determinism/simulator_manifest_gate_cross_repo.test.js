@@ -30,6 +30,7 @@ const assert = require('assert');
 const fs     = require('fs');
 const path   = require('path');
 
+const { siblingCheckout, skipOrFail } = require('../helpers/sibling_checkout.js');
 const { META_VERDICTS } = require('../../src/toolkit/gate/meta_validation.js');
 
 // constants.js loads the VM, so the flag-time and policy checks skip with it.
@@ -43,18 +44,10 @@ try {
 }
 
 const PLATFORM_ROOT = path.resolve(__dirname, '..', '..', '..');
-const REQUIRE_SIBLINGS = process.env.XCHAIN_REQUIRE_SIBLINGS === '1';
-
-// Resolves a sibling path, skipping (or failing under XCHAIN_REQUIRE_SIBLINGS) when absent.
+// Resolves a sibling path, skipping (or failing under XCHAIN_REQUIRE_SIBLINGS) when absent or lane-symlinked.
 function siblingOrSkip(ctx, rel) {
-    const abs = path.join(PLATFORM_ROOT, rel);
-    if (fs.existsSync(abs)) return abs;
-    if (REQUIRE_SIBLINGS) {
-        assert.fail('manifest-gate parity cannot run: ' + rel + ' missing at ' + abs +
-            '; XCHAIN_REQUIRE_SIBLINGS=1 forbids the green-by-skip');
-    }
-    ctx.skip();
-    return null;
+    const verdict = siblingCheckout(__dirname, path.join(PLATFORM_ROOT, rel));
+    return skipOrFail(ctx, verdict, 'manifest-gate parity (' + rel + ')') ? verdict.path : null;
 }
 
 describe('simulator deploy-gate manifest leg agrees with the indexer', function () {

@@ -1,0 +1,877 @@
+{
+  "note": "Harness surface read from the develop xchain-vm the host-call bounds change started from; regenerate only from that base.",
+  "networks": {
+    "mainnet": {
+      "functions": {
+        "xchain.getBlockHeight": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getBlockTimestamp": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getBlockHash": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getSourceAddress": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getContractAddress": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getInputParams": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getInputParam": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getInputParamCount": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getCallDepth": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getCrossHops": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getBalance": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getTokenInfo": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getPollResult": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.get": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.has": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.set": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.delete": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.oracle.getPrice": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.oracle.getPriceAtRound": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.oracle.getSnapshotAge": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.crossChain.getAttestation": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.crossChain.isSettled": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.crossChain.getCallResult": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.attestation.request": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.attestation.getResponse": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.getStake": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.getTotalStaked": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.getStakers": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.slash": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.send": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.destroy": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.issue": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.mint": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.order": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.dispenser": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.dividend": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.airdrop": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.callback": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.file": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.list": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.coinpay": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.sweep": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.link": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.broadcast": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.message": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.vote": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.execute": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.crossExecute": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.add": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.subtract": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.multiply": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.divide": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.mod": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.compare": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.gt": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.gte": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.lt": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.lte": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.eq": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.min": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.max": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.abs": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.isZero": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.sqrt": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.pow": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.log": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.log2": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.log10": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.revert": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.require": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.log": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.isLogFull": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getLogCount": {
+          "success": true,
+          "gasUsed": 461,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "JSON.stringify": {
+          "success": true,
+          "gasUsed": 1118,
+          "sourceSha256": "e0a89bcf028dd4bc09b53b6ba382206ece40a49d5276cbb95b0cf7931e82d031"
+        },
+        "JSON.parse": {
+          "success": true,
+          "gasUsed": 1217,
+          "sourceSha256": "07120d9e738e24852fd9cb5b1728e9588b453adaa647fc3aa8a1a8c49f541bc5"
+        },
+        "Array.prototype.join": {
+          "success": true,
+          "gasUsed": 1038,
+          "sourceSha256": "5dfd7711faa970578af707cb9c2ff3fec520d527eff8ab44df6a002d20e5c6d2"
+        },
+        "Array.prototype.flat": {
+          "success": true,
+          "gasUsed": 843,
+          "sourceSha256": "7db39ce9b271cc623ced1791b65133bed3fb1c953639f18ff64a83c6f4a29edd"
+        }
+      },
+      "throws": {
+        "emitParams": {
+          "success": true,
+          "gasUsed": 655,
+          "returnValue": "[\"Error\",\"emit params must be an object\",\"Error: emit params must be an object\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "stateKey": {
+          "success": true,
+          "gasUsed": 397,
+          "returnValue": "[\"Error\",\"state key must be a string, number, or boolean\",\"Error: state key must be a string, number, or boolean\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capBroadcast": {
+          "success": true,
+          "gasUsed": 26105,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capExecute": {
+          "success": true,
+          "gasUsed": 426156,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capCrossExecute": {
+          "success": true,
+          "gasUsed": 248201,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capAttestation": {
+          "success": true,
+          "gasUsed": 31128,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "attestationProvider": {
+          "success": true,
+          "gasUsed": 5765,
+          "returnValue": "[\"Error\",\"attestation.request: providerId must be a non-empty string (max 32 bytes)\",\"Error: attestation.request: providerId must be a non-empty string (max 32 bytes)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "revert": {
+          "success": true,
+          "gasUsed": 127,
+          "returnValue": "[\"Error\",\"\\u0003REVERT:r\",\"Error: \\u0003REVERT:r\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "inIsolate": {
+          "success": true,
+          "gasUsed": 72,
+          "returnValue": "[\"TypeError\",\"Cannot read properties of null (reading 'x')\",\"\"]"
+        }
+      }
+    },
+    "testnet": {
+      "functions": {
+        "xchain.getBlockHeight": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getBlockTimestamp": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getBlockHash": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getSourceAddress": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getContractAddress": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getInputParams": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getInputParam": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getInputParamCount": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getCallDepth": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getCrossHops": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getBalance": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getTokenInfo": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getPollResult": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.get": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.has": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.set": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.state.delete": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.oracle.getPrice": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.oracle.getPriceAtRound": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.oracle.getSnapshotAge": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.crossChain.getAttestation": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.crossChain.isSettled": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.crossChain.getCallResult": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.attestation.request": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.attestation.getResponse": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.getStake": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.getTotalStaked": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.getStakers": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.contract.slash": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.send": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.destroy": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.issue": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.mint": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.order": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.dispenser": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.dividend": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.airdrop": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.callback": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.file": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.list": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.coinpay": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.sweep": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.link": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.broadcast": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.message": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.vote": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.execute": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.emit.crossExecute": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.add": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.subtract": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.multiply": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.divide": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.mod": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.compare": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.gt": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.gte": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.lt": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.lte": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.eq": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.min": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.max": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.abs": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.isZero": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.sqrt": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.pow": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.log": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.log2": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.math.log10": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.revert": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.require": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.log": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.isLogFull": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "xchain.getLogCount": {
+          "success": true,
+          "gasUsed": 464,
+          "sourceSha256": "6580d606db112cbd44eb1ced8eb2ff3f2f6df4fbdb2cfab00d152091afa571d5"
+        },
+        "JSON.stringify": {
+          "success": true,
+          "gasUsed": 1121,
+          "sourceSha256": "e0a89bcf028dd4bc09b53b6ba382206ece40a49d5276cbb95b0cf7931e82d031"
+        },
+        "JSON.parse": {
+          "success": true,
+          "gasUsed": 1220,
+          "sourceSha256": "07120d9e738e24852fd9cb5b1728e9588b453adaa647fc3aa8a1a8c49f541bc5"
+        },
+        "Array.prototype.join": {
+          "success": true,
+          "gasUsed": 1041,
+          "sourceSha256": "5dfd7711faa970578af707cb9c2ff3fec520d527eff8ab44df6a002d20e5c6d2"
+        },
+        "Array.prototype.flat": {
+          "success": true,
+          "gasUsed": 846,
+          "sourceSha256": "7db39ce9b271cc623ced1791b65133bed3fb1c953639f18ff64a83c6f4a29edd"
+        }
+      },
+      "throws": {
+        "emitParams": {
+          "success": true,
+          "gasUsed": 658,
+          "returnValue": "[\"Error\",\"emit params must be an object\",\"Error: emit params must be an object\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "stateKey": {
+          "success": true,
+          "gasUsed": 400,
+          "returnValue": "[\"Error\",\"state key must be a string, number, or boolean\",\"Error: state key must be a string, number, or boolean\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capBroadcast": {
+          "success": true,
+          "gasUsed": 26108,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capExecute": {
+          "success": true,
+          "gasUsed": 426159,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capCrossExecute": {
+          "success": true,
+          "gasUsed": 248204,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "capAttestation": {
+          "success": true,
+          "gasUsed": 31131,
+          "returnValue": "[\"Error\",\"emission limit exceeded (50)\",\"Error: emission limit exceeded (50)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "attestationProvider": {
+          "success": true,
+          "gasUsed": 5768,
+          "returnValue": "[\"Error\",\"attestation.request: providerId must be a non-empty string (max 32 bytes)\",\"Error: attestation.request: providerId must be a non-empty string (max 32 bytes)\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "revert": {
+          "success": true,
+          "gasUsed": 130,
+          "returnValue": "[\"Error\",\"\\u0003REVERT:r\",\"Error: \\u0003REVERT:r\\n    at (<isolated-vm boundary>)\\n    at <isolated-vm>:10:34\"]"
+        },
+        "inIsolate": {
+          "success": true,
+          "gasUsed": 75,
+          "returnValue": "[\"TypeError\",\"Cannot read properties of null (reading 'x')\",\"\"]"
+        }
+      }
+    }
+  }
+}

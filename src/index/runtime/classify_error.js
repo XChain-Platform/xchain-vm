@@ -19,7 +19,8 @@
 // @ts-nocheck
 
 const { ContractRevertError, GasExhaustedError, HostFaultError } = require('../../errors.js');
-const { isLintHardeningActive } = require('./activations.js');
+const { isLintHardeningActive, pkg3CoinFromAddress } = require('./activations.js');
+const { isGasCeilingExhaustedActive } = require('../gas_ceiling_exhausted_heights.js');
 const { logTimeout } = require('./timeout_log.js');
 
 module.exports = {
@@ -43,6 +44,17 @@ module.exports = {
         // Error built from contract-controlled text and could otherwise be
         // spoofed into a halt.
         if (error instanceof HostFaultError) throw error;
+        // A run whose tracker crossed the ceiling is out of gas, whatever it threw
+        // afterwards. Without this a contract that catches the exhaustion inside an
+        // Object.* wrapper and then throws a plain Error lands in the generic branch
+        // below and reports the tracker's raw total, above the ceiling, as gasUsed.
+        // Height-gated per coin because it moves both the status and the gasUsed.
+        if (gasTracker.exhausted && isGasCeilingExhaustedActive(opts && opts.network,
+            pkg3CoinFromAddress(opts && opts.contractAddress),
+            opts && opts.blockContext && opts.blockContext.height)) {
+            return this.errorResult(gasTracker, emissionCollector,
+                'out_of_gas: used ' + gasTracker.used + ' of ' + gasTracker.ceiling, gasTracker.ceiling);
+        }
         if (error instanceof ContractRevertError) {
             return this.errorResult(gasTracker, emissionCollector, 'revert: ' + error.message);
         }
@@ -105,6 +117,18 @@ module.exports = {
         const __isolate      = (hostSignals && typeof hostSignals.getIsolate === 'function')
             ? hostSignals.getIsolate() : null;
         const __isolateDisposed = !!(__isolate && __isolate.isDisposed);
+        // Resource fault signal activation (per-coin height, resolved once per
+        // execution into hostSignals.stackFaultGateOn). Under it the stack branch
+        // below trusts only the host-observed guard trip, and a real memory-limit
+        // disposal is named out_of_memory here, before the timeout branch, whose
+        // 'disposed' substring would otherwise claim it. The isolate's real
+        // disposed flag is the corroboration, so a thrown message alone cannot
+        // reach this. Below the activation both behave exactly as before.
+        const __faultSignalOn = __corroborate && hostSignals.stackFaultGateOn === true;
+        if (__faultSignalOn && __isolateDisposed && msg.includes('memory limit')) {
+            return this.errorResult(gasTracker, emissionCollector,
+                'out_of_memory: isolate memory limit exceeded', gasTracker.ceiling);
+        }
         if (msg.includes('Script execution timed out') || msg.includes('disposed')) {
             // Corroborate against the CONSENSUS wall-clock budget this execution
             // actually ran under (carried on hostSignals), not the node's own
@@ -143,11 +167,14 @@ module.exports = {
         // Post-gate, corroborated by the error's native RangeError class (a real
         // V8 overflow) or the recursion/native-depth guard's exact deterministic
         // fault message; a plain Error carrying a lookalike substring falls
-        // through to the generic classification.
+        // through to the generic classification. The class, name and exact text
+        // are all constructible by contract code, so once the resource fault
+        // signal activation is on, only the guard's own host report counts.
         else if (msg.includes('Maximum call stack size exceeded') || msg.includes('call stack')) {
-            const legit = !__corroborate
-                || (error instanceof RangeError) || (error && error.name === 'RangeError')
-                || msg === 'maximum call stack depth exceeded';
+            const legit = !__corroborate || (__faultSignalOn
+                ? hostSignals.stackFault === true
+                : ((error instanceof RangeError) || (error && error.name === 'RangeError')
+                    || msg === 'maximum call stack depth exceeded'));
             if (legit) {
                 return this.errorResult(gasTracker, emissionCollector,
                     'out_of_stack: maximum call depth exceeded', gasTracker.ceiling);

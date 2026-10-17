@@ -31,7 +31,9 @@
  *      passes the gate and throws on its first execution. The taught list is not
  *      a copy: it is required from src/stripped-globals.js, the one definition
  *      sandbox.js and lint-core.js consume too, which is dependency-free so this
- *      module stays isolated-vm-free while sandbox.js is not.
+ *      module stays isolated-vm-free while sandbox.js is not. The height-gated
+ *      BigInt surface strip (BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES plus the
+ *      DataView BigInt accessors) is taught as a separate, conditional rule.
  *   2. buildAuthoringPrompt() turns an English brief or a Solidity source into a
  *      well-formed system+user message pair embedding that knowledge.
  *   3. authorContract() runs a caller-injected `complete()` (any LLM client) and
@@ -55,6 +57,8 @@ const {
     NATIVE_PRIMITIVES,
     CONCEPT_MAP,
     RESERVED_NAMES_TAUGHT,
+    GATED_STRIPPED_GLOBALS_TAUGHT,
+    GATED_STRIPPED_PROTO_METHODS_TAUGHT,
     HARD_RULES,
     CONTRACT_SHAPE
 } = require('./authoring/authoring_knowledge.js');
@@ -75,6 +79,10 @@ const KNOWLEDGE = {
     // Exported so a test can compare it to the enforced list by value rather
     // than by grepping rendered prose.
     strippedGlobals: STRIPPED_GLOBALS_TAUGHT,
+    // The height-gated BigInt surface strip, kept apart from strippedGlobals
+    // because the sandbox deletes it only once its activation height is reached.
+    gatedStrippedGlobals: GATED_STRIPPED_GLOBALS_TAUGHT,
+    gatedStrippedProtoMethods: GATED_STRIPPED_PROTO_METHODS_TAUGHT,
     // The deploy gate's reserved identifiers, derived from metering.js and
     // lint-core.js. Exported for the same reason strippedGlobals is: a test
     // compares it to the enforced lists by value instead of grepping prose.

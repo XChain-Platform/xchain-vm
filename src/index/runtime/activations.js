@@ -232,11 +232,11 @@ function isRestPatternMeterActive(network, blockTime) {
 }
 
 // Activation for metering the native work the other size charges miss: iterator
-// helpers (toArray, drop), String isWellFormed/toWellFormed, the Set algebra family
-// and Function.prototype.apply with a long argument list. Every one moves gasUsed,
-// so it is gated. Mainnet and
-// testnet are unarmed (null) until a release cut schedules an instant; regtest runs
-// the rule from genesis. Unknown or missing networks resolve like mainnet.
+// helpers (toArray, drop), String isWellFormed/toWellFormed and the Set algebra family
+// (Function.prototype.apply is gated in ../apply_length_meter.js). Every one moves gasUsed,
+// so it is gated. Each entry is the block-time instant the rule arms at on that network
+// (null leaves it unarmed, 0 runs it from genesis); the published Flag-Day Values page
+// carries each network's current status. Unknown or missing networks resolve like mainnet.
 const ITER_SET_METER_ACTIVATION = Object.seal({
     mainnet: null,
     testnet: 1791804379,
@@ -274,6 +274,20 @@ const {
     resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
 } = require('../bigint_surface_strip_heights.js');
+const {
+    RESOURCE_FAULT_SIGNAL_ACTIVATION,
+    resolveResourceFaultSignalActive,
+    isResourceFaultSignalActive,
+} = require('../resource_fault_signal_heights.js');
+const {
+    HOST_ERROR_STACK_STRIP_ACTIVATION,
+    isHostErrorStackStripActive,
+} = require('../host_error_stack_strip_heights.js');
+const {
+    NATIVE_STACK_TERMINAL_ACTIVATION,
+    resolveNativeStackTerminalActive,
+    isNativeStackTerminalActive,
+} = require('../native_stack/activation.js');
 
 // Activation for widening the contract.slash `amount` precision ceiling from 8 to
 // MAX_SLASH_AMOUNT_DECIMALS. The 8-dp regex contradicted the other side of the same
@@ -291,7 +305,7 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 }
 
 // Activation for the CONSENSUS wall-clock budget per execution
-// (CONSENSUS_MAX_WALL_MS, ./consensus-wall-clock.js). Below this gate the
+// (CONSENSUS_MAX_WALL_MS, src/consensus-wall-clock.js). Below this gate the
 // wall-clock net is the per-NODE limits.maxCpuTimeMs, which is not a consensus
 // value: two validators configured differently return DIFFERENT statuses and
 // DIFFERENT gasUsed for the same execution (timeout + gasUsed clamped to the
@@ -352,4 +366,12 @@ module.exports = {
     BIGINT_SURFACE_STRIP_ACTIVATION,
     resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
+    RESOURCE_FAULT_SIGNAL_ACTIVATION,
+    resolveResourceFaultSignalActive,
+    isResourceFaultSignalActive,
+    HOST_ERROR_STACK_STRIP_ACTIVATION,
+    isHostErrorStackStripActive,
+    NATIVE_STACK_TERMINAL_ACTIVATION,
+    resolveNativeStackTerminalActive,
+    isNativeStackTerminalActive,
 };

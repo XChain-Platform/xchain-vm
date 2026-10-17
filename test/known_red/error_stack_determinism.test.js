@@ -81,7 +81,42 @@ describe('Error.stack must be neutered', function () {
     });
 });
 
-describe('Error.stack must be neutered', function () {
+async function retOn(code, network) {
+    const vm = createVM();
+    vm.beginBlock();
+    try {
+        return await execute(vm, code, { method: 'default', network });
+    } finally {
+        vm.endBlock();
+    }
+}
+
+describe('Error.stack must be neutered: host-thrown errors', function () {
+    this.timeout(30000);
+
+    // HOST-thrown errors. A gateway function that throws on the host side
+    // reaches the contract as an error isolated-vm builds. Below
+    // HOST_ERROR_STACK_STRIP_ACTIVATION its stack carries the harness call-site
+    // position ("<isolated-vm>:10:34") and isolated-vm's boundary frame. From
+    // the activation (regtest from genesis here) the harness rethrows it as a
+    // fresh in-isolate error, so its stack is the empty string like the vectors above.
+    const HOST_VECTORS = [
+        { id: 'gateway validation error', code: wrap(`try { xchain.emit.send(5); } catch (e) { return String(e.stack); }`) },
+        { id: 'caught revert', code: wrap(`try { xchain.require(false, 'r'); } catch (e) { return String(e.stack); }`) },
+        { id: 'math gateway error', code: wrap(`try { xchain.math.divide('1', '0'); } catch (e) { return String(e.stack); }`) }
+    ];
+
+    for (const v of HOST_VECTORS) {
+        it(`host-thrown ${v.id}: e.stack carries no frames / internal offsets`, async function () {
+            const r = await retOn(v.code, 'regtest');
+            assert.strictEqual(r.success, true, `expected success, got error=${r.error}`);
+            assert.strictEqual(r.returnValue, '""',
+                `host-thrown e.stack must be the empty string; got ${r.returnValue}`);
+        });
+    }
+});
+
+describe('Error.stack must be neutered: stack overflow', function () {
     this.timeout(30000);
 
     // Stack-OVERFLOW path. Deep recursion used to surface as a contract-catchable
@@ -109,7 +144,7 @@ describe('Error.stack must be neutered', function () {
     });
 });
 
-describe('Error.stack must be neutered', function () {
+describe('Error.stack must be neutered: residual message text', function () {
     this.timeout(30000);
 
     // DOCUMENTED RESIDUAL: not in-VM fixable, mitigated by a consensus parameter.
