@@ -69,6 +69,16 @@ const GATED_RAW_WRAPPER = (guard) =>
     '            __allocGas(r.length);\n' +
     '            return r;\n' +
     '        }); }';
+const PER_ELEMENT_RAW_RESULT =
+    '        __allocGas(r.length);\n' +
+    '        return r;\n' +
+    '    });\n' +
+    '    // ----- end per-element meter -----';
+const GATED_PER_ELEMENT_RAW_RESULT =
+    '        if (__stringResultMeterOn) __allocGas(r.length);\n' +
+    '        return r;\n' +
+    '    });\n' +
+    '    // ----- end per-element meter -----';
 
 function buildStringResultMeterHarness(source) {
     // The per-element rule suppresses the legacy String.raw wrapper and installs
@@ -76,14 +86,17 @@ function buildStringResultMeterHarness(source) {
     const plainGuard = "if (typeof __stringRaw === 'function')";
     const perElementGuard = "if (typeof __stringRaw === 'function' && !__pemArmed)";
     const rawGuard = source.includes(RAW_WRAPPER(perElementGuard)) ? perElementGuard : plainGuard;
+    const edits = [
+        [APPLY_LENGTH_LINE, APPLY_LENGTH_LINE +
+            ' var __stringResultMeterOn = globalThis.__STRING_RESULT_METER_ON === true;'],
+        [HTML_WRAPPERS, GATED_HTML_WRAPPERS],
+        [RAW_WRAPPER(rawGuard), GATED_RAW_WRAPPER(rawGuard)],
+    ];
+    if (source.includes(PER_ELEMENT_RAW_RESULT))
+        edits.push([PER_ELEMENT_RAW_RESULT, GATED_PER_ELEMENT_RAW_RESULT]);
     return deriveHarness(source, [{
         label: 'string result meter',
-        edits: [
-            [APPLY_LENGTH_LINE, APPLY_LENGTH_LINE +
-                ' var __stringResultMeterOn = globalThis.__STRING_RESULT_METER_ON === true;'],
-            [HTML_WRAPPERS, GATED_HTML_WRAPPERS],
-            [RAW_WRAPPER(rawGuard), GATED_RAW_WRAPPER(rawGuard)],
-        ],
+        edits,
         helpers: '',
     }]);
 }
