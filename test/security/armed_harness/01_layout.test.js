@@ -27,6 +27,7 @@ const hostCallBounds = require('../../../src/index/armed_harness/host_call_bound
 const stringifyReentry = require('../../../src/index/armed_harness/json_stringify_reentry.js');
 const perElementMeter = require('../../../src/index/armed_harness/per_element_meter.js');
 const hostErrorStackStrip = require('../../../src/index/armed_harness/host_error_stack_strip.js');
+const toStringSizeMeter = require('../../../src/index/armed_harness/tostring_size_meter.js');
 
 // HARNESS_SOURCE as released: line count and sha256.
 const RELEASED_LINES = 1631;
@@ -68,6 +69,8 @@ describe('armed harness selection: layout', function () {
         assert.strictEqual(select.harnessSourceFor(bit(hostCallBounds)), hostCallBounds.HARNESS_SOURCE_HOST_CALL_BOUNDS);
         assert.strictEqual(select.harnessSourceFor(bit(stringifyReentry)), stringifyReentry.HARNESS_SOURCE_STRINGIFY_REENTRY);
         assert.strictEqual(select.harnessSourceFor(bit(perElementMeter)), perElementMeter.HARNESS_SOURCE_PER_ELEMENT_METER);
+        assert.strictEqual(select.harnessSourceFor(bit(toStringSizeMeter)),
+            toStringSizeMeter.HARNESS_SOURCE_TOSTRING_SIZE_METER);
     });
 
     it('the host-call bounds allowance reaches the re-entrant stringify wrapper and __wrapArmed only beside it', function () {
