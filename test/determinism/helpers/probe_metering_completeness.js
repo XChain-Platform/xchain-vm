@@ -62,7 +62,9 @@ const POST_GATE_BLOCK = { height: 100, timestamp: 1786060800, hash: 'gate' };  /
 // un-metered and would read as a finding. Sourced from the constant, not re-typed, so a
 // repin cannot leave the sweep probing the wrong side of the gate.
 const REST_GATE_BLOCK = { height: 100, timestamp: require('../../../src/index.js').REST_PATTERN_METER_GATE_BLOCK_TIME, hash: 'restgate' };
-const APPLY_GATE_BLOCK = { height: 100, timestamp: 4000000000, hash: 'applygate' };
+const STRING_RESULT_GATE_BLOCK = { height: 100,
+    timestamp: require('../../../src/index.js').STRING_RESULT_METER_ACTIVATION.regtest,
+    hash: 'stringresultgate' };
 
 const VECTORS = [
     // --- Array methods G1 should already cover (regression) ---
@@ -85,9 +87,9 @@ const VECTORS = [
     // --- Spread (syntax, like `+`, not a method) ---
     { id: 'spread [...array]',  mk: C => `${ARR}var t=0;for(var i=0;i<${C};i++)t+=[].concat(a).length;return t;` }, // baseline via concat (metered)
     { id: 'spread [...string]', mk: C => `${STR}var t=0;for(var i=0;i<${C};i++)t+=([...s]).length;return t;` },
-    { id: 'String.anchor', network: 'regtest', gateBlock: APPLY_GATE_BLOCK,
+    { id: 'String.anchor', network: 'regtest', gateBlock: STRING_RESULT_GATE_BLOCK,
         mk: C => `${HTML_ARG}var t=0;for(var i=0;i<${C};i++)t+='a'.anchor(x).length;return t;` },
-    { id: 'String.raw direct', network: 'regtest', gateBlock: APPLY_GATE_BLOCK,
+    { id: 'String.raw direct', network: 'regtest', gateBlock: STRING_RESULT_GATE_BLOCK,
         mk: C => `${HTML_ARG}var q={raw:['a','b']},t=0;for(var i=0;i<${C};i++)t+=String.raw(q,x).length;return t;` },
     // --- Destructuring REST (a PATTERN carrying a RestElement, not an expression
     // carrying a SpreadElement). The sweep had spread-EXPRESSION vectors only, so it
