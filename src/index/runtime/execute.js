@@ -154,8 +154,11 @@ module.exports = {
 
         const __execLintCoin   = pkg3CoinFromAddress(opts.contractAddress);
         const __execLintHeight = opts.blockContext && Number(opts.blockContext.height);
-        const __lintRefusal = checkExecLint(this, opts, gasTracker, emissionCollector,
+        const runExecLint = () => checkExecLint(this, opts, gasTracker, emissionCollector,
             __codeStr, __codeBytes, __codeHash, __execLintCoin, __execLintHeight);
+        const __lintRefusal = isHostFaultHaltActive(
+            opts.network, __execLintCoin, __execLintHeight) ?
+            hostSetupStep('checkExecLint', runExecLint) : runExecLint();
         if (__lintRefusal) return __lintRefusal;
         // At the syntax-depth activation the re-lint above has bounded the source, so a
         // host stack overflow while metering or compiling it is a fault of this host:
