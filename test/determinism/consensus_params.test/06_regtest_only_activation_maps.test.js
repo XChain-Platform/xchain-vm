@@ -41,6 +41,19 @@ function assertCoinMapUnarmed(map, isActive) {
     }
 }
 
+// A per-coin height map that landed after the v0.24.0 cut: every entry null, on from genesis
+// on regtest and off on mainnet and testnet at any height until a later train arms it.
+function assertCoinMapNotYetArmed(map, isActive) {
+    assert.deepStrictEqual(Object.keys(map), COIN_KEYS);
+    assert.ok(Object.isFrozen(map));
+    for (const key of COIN_KEYS) assert.strictEqual(map[key], null, key);
+    assert.strictEqual(isActive('regtest', 'BTC', 0), true);
+    for (const coin of ['BTC', 'LTC', 'DOGE']) {
+        assert.strictEqual(isActive('mainnet', coin, 1e9), false, `${coin}:mainnet`);
+        assert.strictEqual(isActive('testnet', coin, 1e9), false, `${coin}:testnet`);
+    }
+}
+
 // A per-network block-time map: sealed, regtest at 0, mainnet and testnet null.
 function assertTimeMapUnarmed(map, isActive) {
     // The v0.24.0 cut arms testnet at its shared change instant; mainnet stays null.
@@ -66,7 +79,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     });
 
     it('HOST_FAULT_HALT_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapUnarmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive);
+        assertCoinMapNotYetArmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive);
     });
 
     it('JSON_STRINGIFY_REENTRY_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
