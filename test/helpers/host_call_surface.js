@@ -22,6 +22,9 @@ const crypto = require('crypto');
 const CTX = { contractAddress: 'C:BTC:7', contractIndex: 7, txHash: 'f'.repeat(64),
     rootActionIndex: 3, callPath: '', actionIndex: 11 };
 const BLOCK = { height: 100, timestamp: 4000000000, hash: 'abc123' };
+// The v0.24.0 cut arms the host-call bounds on testnet at block time 1792303200; the unarmed
+// testnet surface is read one second before it.
+const blockFor = (network) => (network === 'testnet' ? { ...BLOCK, timestamp: 1792303199 } : BLOCK);
 const fn = (body) => 'module.exports = function(xchain) { ' + body + ' };';
 const FILL = 'for (var i = 0; i < 50; i++) xchain.emit.broadcast({});';
 const caught = (call) => 'try { ' + call + '; } catch (e) { return [e.name, e.message, e.stack]; } return 0;';
@@ -53,7 +56,7 @@ async function runOnce(createVM, network, body) {
     vm.beginBlock();
     try {
         return await vm.execute(Object.assign({ code: fn(body), state: {}, method: 'default', params: [],
-            caller: 'a', network, blockContext: BLOCK }, CTX));
+            caller: 'a', network, blockContext: blockFor(network) }, CTX));
     } finally { vm.endBlock(); }
 }
 

@@ -55,14 +55,17 @@ const UNMETERED_EXITS = {
 // A swallow at module top level, after which the dispatcher's own unknown-method throw ends the run.
 const TOPLEVEL_SWALLOW_UNKNOWN_METHOD = PRE + 'module.exports = { other: function(){ return 1; } };';
 
+// The v0.24.0 cut arms testnet at BTC 156908, LTC 4927400 and DOGE 68005165; mainnet stays unarmed.
+const V0240_TESTNET = Object.freeze({ BTC: 156908, LTC: 4927400, DOGE: 68005165 });
+
 describe('gas-ceiling exhaustion gate resolver', function () {
     const coins = ['BTC', 'LTC', 'DOGE'];
 
-    it('exports a frozen six-chain map with every mainnet and testnet chain unarmed', function () {
+    it('exports a frozen six-chain map with mainnet unarmed and testnet at its v0.24.0 heights', function () {
         assert.ok(Object.isFrozen(GAS_CEILING_EXHAUSTED_ACTIVATION));
         assert.deepStrictEqual({ ...GAS_CEILING_EXHAUSTED_ACTIVATION }, {
             'BTC:mainnet': null, 'LTC:mainnet': null, 'DOGE:mainnet': null,
-            'BTC:testnet': null, 'LTC:testnet': null, 'DOGE:testnet': null,
+            'BTC:testnet': 156908, 'LTC:testnet': 4927400, 'DOGE:testnet': 68005165,
         });
     });
 
@@ -71,12 +74,12 @@ describe('gas-ceiling exhaustion gate resolver', function () {
         assert.strictEqual(isGasCeilingExhaustedActive('regtest', null, undefined), true);
     });
 
-    it('keeps every mainnet and testnet chain unarmed at any height', function () {
-        for (const net of ['mainnet', 'testnet']) {
-            for (const coin of coins) {
-                assert.strictEqual(isGasCeilingExhaustedActive(net, coin, 0), false, coin + ':' + net);
-                assert.strictEqual(isGasCeilingExhaustedActive(net, coin, 1e9), false, coin + ':' + net);
-            }
+    it('keeps mainnet unarmed at any height and arms testnet from its v0.24.0 height', function () {
+        for (const coin of coins) {
+            assert.strictEqual(isGasCeilingExhaustedActive('mainnet', coin, 0), false, coin + ':mainnet');
+            assert.strictEqual(isGasCeilingExhaustedActive('mainnet', coin, 1e9), false, coin + ':mainnet');
+            assert.strictEqual(isGasCeilingExhaustedActive('testnet', coin, V0240_TESTNET[coin] - 1), false, coin + ':testnet');
+            assert.strictEqual(isGasCeilingExhaustedActive('testnet', coin, V0240_TESTNET[coin]), true, coin + ':testnet');
         }
     });
 

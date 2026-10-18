@@ -31,9 +31,9 @@ const NATIVE_STACK_TERMINAL_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
     'DOGE:mainnet': null,
-    'BTC:testnet':  null,
-    'LTC:testnet':  null,
-    'DOGE:testnet': null,
+    'BTC:testnet':  156908,
+    'LTC:testnet':  4927400,
+    'DOGE:testnet': 68005165,
 });
 
 function resolveNativeStackTerminalActive(map, network, coin, blockHeight) {

@@ -27,6 +27,9 @@ const crypto = require('crypto');
 const { createVM, execute, XChainVM } = require('../../fuzz/helpers/harness.js');
 
 const LATE = { height: 100, timestamp: 4000000000, hash: 'abc123' };
+// The v0.24.0 cut arms the per-element meter on testnet at block time 1792303200; the
+// unarmed testnet wrappers are read one second before it.
+const blockFor = (network) => (network === 'testnet' ? { ...LATE, timestamp: 1792303199 } : LATE);
 const BODY = `var g = (function(){ return this; })();
 var ip = Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]()));
 var hp = Object.getPrototypeOf([].values().take(0));
@@ -97,7 +100,7 @@ async function readSources(network) {
     vm.beginBlock();
     try {
         const r = await execute(vm, `module.exports = function(xchain) { ${BODY} };`,
-            { method: 'default', network, blockContext: LATE });
+            { method: 'default', network, blockContext: blockFor(network) });
         assert.strictEqual(r.success, true, r.error);
         const texts = JSON.parse(JSON.parse(r.returnValue));
         const got = { gasUsed: r.gasUsed };

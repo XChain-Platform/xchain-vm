@@ -84,7 +84,8 @@ const PROBE = 'module.exports = function(xchain) {\n' +
 // Captured from the pre-activation tree: gasUsed and sha256 of the returned text.
 const PINNED = {
     mainnet: { height: 970000, gasUsed: 6088, sha256: 'aa90801bb2b0b0ecb54b98f24c41869c87321c8fb30c4448e86b5c0696280064' },
-    testnet: { height: 4900000, gasUsed: 6450, sha256: 'b4aa21d6a9181a3c2a43546cb7bb0741660f597cebedf653117b854f262ba1f7' },
+    // Just below the v0.24.0 testnet arms (BTC 156908, change instant 1792303200); every earlier testnet gate is armed here.
+    testnet: { height: 156907, timestamp: 1792303199, gasUsed: 6450, sha256: 'b4aa21d6a9181a3c2a43546cb7bb0741660f597cebedf653117b854f262ba1f7' },
 };
 const METER_PINNED = {
     'false,false,false': 'f493c13cfe7930e0847f014695417deb506df766f5da68aa69859bdd49392b52',
@@ -107,7 +108,7 @@ async function runProbe(network) {
     vm.beginBlock();
     const r = await vm.execute({ code: PROBE, state: {}, method: 'default', params: [], caller: 'c',
         contractAddress: 'C:BTC:7', contractIndex: 7, txHash: 'f'.repeat(64),
-        blockContext: { height: PINNED[network].height, timestamp: 1795000000, hash: 'h' }, network });
+        blockContext: { height: PINNED[network].height, timestamp: PINNED[network].timestamp || 1795000000, hash: 'h' }, network });
     vm.endBlock();
     await vm.shutdown();
     return r;
@@ -178,19 +179,21 @@ describe('consensus parameters: native stack terminal activation', function () {
         assert.strictEqual(XChainVM.MAX_STACK_DEPTH_MUSL, 256);
     });
 
-    it('NATIVE_STACK_TERMINAL_ACTIVATION is frozen and unarmed outside regtest', function () {
+    it('NATIVE_STACK_TERMINAL_ACTIVATION is frozen, unarmed on mainnet, and armed on testnet at its v0.24.0 heights', function () {
         assert.deepStrictEqual(XChainVM.NATIVE_STACK_TERMINAL_ACTIVATION, {
             'BTC:mainnet': null,
             'LTC:mainnet': null,
             'DOGE:mainnet': null,
-            'BTC:testnet': null,
-            'LTC:testnet': null,
-            'DOGE:testnet': null,
+            'BTC:testnet': 156908,
+            'LTC:testnet': 4927400,
+            'DOGE:testnet': 68005165,
         });
         assert.ok(Object.isFrozen(XChainVM.NATIVE_STACK_TERMINAL_ACTIVATION));
         assert.strictEqual(XChainVM.isNativeStackTerminalActive('regtest', 'BTC', 0), true);
-        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
+        for (const network of ['mainnet', 'unknown', undefined]) {
             assert.strictEqual(XChainVM.isNativeStackTerminalActive(network, 'BTC', 99999999), false, String(network));
         }
+        assert.strictEqual(XChainVM.isNativeStackTerminalActive('testnet', 'BTC', 156907), false, 'testnet below');
+        assert.strictEqual(XChainVM.isNativeStackTerminalActive('testnet', 'BTC', 156908), true, 'testnet at');
     });
 });

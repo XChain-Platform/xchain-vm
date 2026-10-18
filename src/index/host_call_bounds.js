@@ -27,7 +27,7 @@
 // unarmed, 0 runs it from genesis); unknown networks stay unarmed.
 const HOST_CALL_BOUNDS_ACTIVATION = Object.seal({
     mainnet: null,
-    testnet: null,
+    testnet: 1792303200,
     regtest: 0,
 });
 

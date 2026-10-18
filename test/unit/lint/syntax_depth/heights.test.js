@@ -23,28 +23,31 @@ const {
 } = require('../../../../src/index/lint_syntax_depth_heights.js');
 const XChainVM = require('../../../../src/index.js');
 
+// The v0.24.0 cut arms testnet at BTC 156908, LTC 4927400 and DOGE 68005165; mainnet stays unarmed.
+const V0240_TESTNET = Object.freeze({ BTC: 156908, LTC: 4927400, DOGE: 68005165 });
+
 describe('syntax-depth lint activation', function () {
     const coins = ['BTC', 'LTC', 'DOGE'];
 
-    it('exports a frozen map with every mainnet and testnet chain unarmed', function () {
+    it('exports a frozen map with mainnet unarmed and testnet at its v0.24.0 heights', function () {
         assert.ok(Object.isFrozen(LINT_SYNTAX_DEPTH_ACTIVATION));
         assert.deepStrictEqual(LINT_SYNTAX_DEPTH_ACTIVATION, {
             'BTC:mainnet': null,
             'LTC:mainnet': null,
             'DOGE:mainnet': null,
-            'BTC:testnet': null,
-            'LTC:testnet': null,
-            'DOGE:testnet': null,
+            'BTC:testnet': 156908,
+            'LTC:testnet': 4927400,
+            'DOGE:testnet': 68005165,
         });
     });
 
-    it('is active on regtest at genesis and dark on every public chain', function () {
+    it('is active on regtest at genesis, dark on mainnet and armed on testnet from its height', function () {
         assert.strictEqual(isLintSyntaxDepthActive('regtest', 'BTC', 0), true);
         for (const coin of coins) {
-            for (const network of ['mainnet', 'testnet']) {
-                assert.strictEqual(isLintSyntaxDepthActive(network, coin, 1), false, coin + ':' + network);
-                assert.strictEqual(isLintSyntaxDepthActive(network, coin, 99999999), false, coin + ':' + network);
-            }
+            assert.strictEqual(isLintSyntaxDepthActive('mainnet', coin, 1), false, coin + ':mainnet');
+            assert.strictEqual(isLintSyntaxDepthActive('mainnet', coin, 99999999), false, coin + ':mainnet');
+            assert.strictEqual(isLintSyntaxDepthActive('testnet', coin, V0240_TESTNET[coin] - 1), false, coin + ':testnet');
+            assert.strictEqual(isLintSyntaxDepthActive('testnet', coin, V0240_TESTNET[coin]), true, coin + ':testnet');
         }
     });
 

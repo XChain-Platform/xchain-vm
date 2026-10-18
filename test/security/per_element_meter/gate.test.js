@@ -119,9 +119,11 @@ async function checkFamily(name, build, perElement) {
 (XChainVM ? describe : describe.skip)('per-element metering gate: activation', function () {
     this.timeout(120000);
 
-    it('resolves armed on regtest only, and the toggle used below really switches it', function () {
+    it('resolves armed on regtest, on testnet from its v0.24.0 instant, and the toggle used below really switches it', function () {
         assert.strictEqual(isPerElementMeterActive('regtest', 0), true);
-        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
+        assert.strictEqual(isPerElementMeterActive('testnet', 1792303199), false, 'testnet before its instant');
+        assert.strictEqual(isPerElementMeterActive('testnet', 1792303200), true, 'testnet at its instant');
+        for (const network of ['mainnet', 'unknown', undefined]) {
             assert.strictEqual(isPerElementMeterActive(network, LATE.timestamp), false, String(network));
         }
         const saved = PER_ELEMENT_METER_ACTIVATION.regtest;

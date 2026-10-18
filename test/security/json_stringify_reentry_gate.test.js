@@ -31,13 +31,17 @@ const { createVM, execute, XChainVM } = require('../fuzz/helpers/harness.js');
 // Past the testnet value-hook flag day, so testnet runs the value-hook path
 // with the re-entry activation unarmed.
 const LATE = { height: 200000, timestamp: 4000000000, hash: 'reentry' };
+// The v0.24.0 cut arms testnet at BTC 156908 (LTC and DOGE higher) and at block time 1792303200;
+// testnet probes run just below both, where every earlier testnet gate is already armed.
+const PRE_ARM_TESTNET = { height: 156907, timestamp: 1792303199 };
+const contextFor = (network) => (network === 'testnet' ? { ...LATE, ...PRE_ARM_TESTNET } : LATE);
 const ADDRESS = 'C:BTC:7';
 
 async function run(body, network, gasCeiling) {
     const vm = createVM(gasCeiling ? { gasCeiling } : undefined);
     vm.beginBlock();
     const code = 'module.exports = function(xchain) { ' + body + ' };';
-    const r = await execute(vm, code, { network, contractAddress: ADDRESS, blockContext: LATE });
+    const r = await execute(vm, code, { network, contractAddress: ADDRESS, blockContext: contextFor(network) });
     vm.endBlock();
     return r;
 }
@@ -116,15 +120,17 @@ function registerDerivationTests() {
 
 function registerMapTests() {
     describe('activation map', function () {
-        it('is unarmed on every mainnet and testnet chain and active on regtest', function () {
+        it('is unarmed on mainnet, armed on testnet at its v0.24.0 heights, and active on regtest', function () {
             const map = XChainVM.JSON_STRINGIFY_REENTRY_ACTIVATION;
             const isActive = XChainVM.isJsonStringifyReentryActive;
             assert.ok(Object.isFrozen(map));
             for (const coin of ['BTC', 'LTC', 'DOGE']) {
-                for (const network of ['mainnet', 'testnet']) {
-                    assert.strictEqual(map[coin + ':' + network], null);
-                    assert.strictEqual(isActive(network, coin, 1e9), false, coin + ':' + network);
-                }
+                const armedAt = { BTC: 156908, LTC: 4927400, DOGE: 68005165 }[coin];
+                assert.strictEqual(map[coin + ':mainnet'], null);
+                assert.strictEqual(isActive('mainnet', coin, 1e9), false, coin + ':mainnet');
+                assert.strictEqual(map[coin + ':testnet'], armedAt);
+                assert.strictEqual(isActive('testnet', coin, armedAt - 1), false, coin + ':testnet below');
+                assert.strictEqual(isActive('testnet', coin, armedAt), true, coin + ':testnet at');
             }
             assert.strictEqual(isActive('regtest', 'BTC', 0), true);
             assert.strictEqual(isActive('regtest', null, NaN), true);
@@ -157,7 +163,7 @@ function registerShapeTests() {
 function registerCycleTests() {
     describe('a cycle inside the inner call', function () {
         for (const network of ['regtest', 'testnet', 'mainnet']) {
-            const cycleCaught = XChainVM && XChainVM.isHostCallBoundsActive(network, LATE.timestamp);
+            const cycleCaught = XChainVM && XChainVM.isHostCallBoundsActive(network, contextFor(network).timestamp);
             it(network + (cycleCaught ? ' catches the cycle the host-call bounds rule detects'
                 : ' takes the out_of_stack fault'), async function () {
                 const r = await run(CYCLE_INSIDE_INNER, network);

@@ -31,7 +31,7 @@
 // Arming mainnet or testnet is a coordinated release event with an operator ruling.
 const PER_ELEMENT_METER_ACTIVATION = Object.seal({
     mainnet: null,
-    testnet: null,
+    testnet: 1792303200,
     regtest: 0,
 });
 
