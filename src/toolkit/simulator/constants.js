@@ -179,6 +179,9 @@ const TIME_NETWORK_GATES = Object.freeze([
     { label: 'per-element meter', source: 'PER_ELEMENT_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.PER_ELEMENT_METER_ACTIVATION, network)
             ? XChainVM.PER_ELEMENT_METER_ACTIVATION[network] : null) },
+    { label: 'string-receiver meter', source: 'STRING_RECEIVER_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.STRING_RECEIVER_METER_ACTIVATION, network)
+            ? XChainVM.STRING_RECEIVER_METER_ACTIVATION[network] : null) },
     { label: 'string-result meter', source: 'STRING_RESULT_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.STRING_RESULT_METER_ACTIVATION, network)
             ? XChainVM.STRING_RESULT_METER_ACTIVATION[network] : null) },
