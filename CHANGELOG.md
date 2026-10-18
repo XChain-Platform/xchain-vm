@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Rebound the metered String and Number aliases and kept the legacy global string charging below the activation heights.
-- Armed HOST_FAULT_HALT_ACTIVATION on testnet at BTC 157040, LTC 4928000 and DOGE 68008400.
+- Armed HOST_FAULT_HALT_ACTIVATION on testnet at BTC 157053, LTC 4928170 and DOGE 68008790.
 
 ## [0.24.0] - 2026-10-17
 

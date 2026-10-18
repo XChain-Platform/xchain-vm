@@ -64,7 +64,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work, unarmed on mainnet and armed on testnet', function () {
-        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, deferred = 9999999999, sizeArmed = 1792416600; // v0.25.0 testnet toString size instant
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, deferred = 9999999999, sizeArmed = 1792432800; // v0.25.0 testnet toString size instant
         assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
             { mainnet: null, testnet: armed, regtest: 0 });

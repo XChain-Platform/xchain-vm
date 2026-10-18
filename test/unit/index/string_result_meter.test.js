@@ -19,9 +19,9 @@ const {
 
 describe('string-result meter activation', function () {
     it('is sealed, armed on regtest from genesis and on testnet at its v0.25.0 instant', function () {
-        // The v0.25.0 cut arms testnet at block time 1792416600.
+        // The v0.25.0 cut arms testnet at block time 1792432800.
         assert.deepStrictEqual(STRING_RESULT_METER_ACTIVATION,
-            { mainnet: null, testnet: 1792416600, regtest: 0 });
+            { mainnet: null, testnet: 1792432800, regtest: 0 });
         assert.ok(Object.isSealed(STRING_RESULT_METER_ACTIVATION));
         assert.strictEqual(isStringResultMeterActive('regtest', 0), true);
         assert.strictEqual(isStringResultMeterActive('regtest', undefined), true);
@@ -33,8 +33,8 @@ describe('string-result meter activation', function () {
             assert.strictEqual(isStringResultMeterActive(network, 4000000000), false,
                 String(network));
         }
-        assert.strictEqual(isStringResultMeterActive('testnet', 1792416599), false);
-        assert.strictEqual(isStringResultMeterActive('testnet', 1792416600), true);
+        assert.strictEqual(isStringResultMeterActive('testnet', 1792432799), false);
+        assert.strictEqual(isStringResultMeterActive('testnet', 1792432800), true);
     });
 
     it('requires a finite block time for a positive activation', function () {

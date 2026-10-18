@@ -17,7 +17,7 @@
 const TOSTRING_SIZE_METER_GATE_BLOCK_TIME = 9999999999;
 const TOSTRING_SIZE_METER_ACTIVATION = Object.seal({
     mainnet: TOSTRING_SIZE_METER_GATE_BLOCK_TIME,
-    testnet: 1792416600,
+    testnet: 1792432800,
     regtest: 0,
 });
 

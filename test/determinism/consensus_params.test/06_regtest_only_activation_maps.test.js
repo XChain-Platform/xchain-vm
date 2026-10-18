@@ -25,7 +25,7 @@ const COIN_KEYS = ['BTC:mainnet', 'LTC:mainnet', 'DOGE:mainnet', 'BTC:testnet', 
 // The v0.24.0 cut arms each testnet chain at these heights; mainnet stays null.
 const V0240_TESTNET = { BTC: 156908, LTC: 4927400, DOGE: 68005165 };
 // The v0.25.0 cut arms the maps that landed after v0.24.0 at these heights.
-const V0250_TESTNET = { BTC: 157040, LTC: 4928000, DOGE: 68008400 };
+const V0250_TESTNET = { BTC: 157053, LTC: 4928170, DOGE: 68008790 };
 
 // A per-coin height map: the six keys in order, frozen, every mainnet entry null, on from
 // genesis on regtest, off on mainnet at any height, and on testnet from its armed height.

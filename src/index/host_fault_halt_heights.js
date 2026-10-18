@@ -19,9 +19,9 @@ const HOST_FAULT_HALT_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
     'DOGE:mainnet': null,
-    'BTC:testnet':  157040,
-    'LTC:testnet':  4928000,
-    'DOGE:testnet': 68008400,
+    'BTC:testnet':  157053,
+    'LTC:testnet':  4928170,
+    'DOGE:testnet': 68008790,
 });
 
 function isHostFaultHaltActive(network, coin, blockHeight) {
