@@ -37,7 +37,6 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
 const acorn = require('acorn');
 
 describe('Preflight: sandbox engine must load', function() {
@@ -327,8 +326,20 @@ function assertSuiteRegistersTest(src, label) {
 }
 
 function suiteFiles() {
-    const out = execFileSync('git', ['ls-files', '-z', 'test'], { cwd: SUITE_ROOT, encoding: 'utf8', maxBuffer: 1 << 28 });
-    return out.split('\0').filter((f) => SUITE_FILE_RE.test(f));
+    const files = [];
+    const pending = [path.join(SUITE_ROOT, 'test')];
+    while (pending.length > 0) {
+        const dir = pending.pop();
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const absolute = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                pending.push(absolute);
+            } else if ((entry.isFile() || entry.isSymbolicLink()) && SUITE_FILE_RE.test(entry.name)) {
+                files.push(path.relative(SUITE_ROOT, absolute).split(path.sep).join('/'));
+            }
+        }
+    }
+    return files.sort();
 }
 
 describe('Preflight: every suite file registers a test', function() {
@@ -345,6 +356,14 @@ describe('Preflight: every suite file registers a test', function() {
             if (KNOWN_EMPTY_SUITES.has(file)) continue;
             assertSuiteRegistersTest(fs.readFileSync(path.join(SUITE_ROOT, file), 'utf8'), file);
         }
+    });
+
+    it('discovers nested suites without including non-suite helpers', function() {
+        const files = suiteFiles();
+        assert.ok(files.includes('test/preflight.test.js'));
+        assert.ok(files.includes('test/boundary/boundary.test/01_boundary_state_management.test.js'));
+        assert.ok(files.every((file) => file.startsWith('test/') && SUITE_FILE_RE.test(file)));
+        assert.deepStrictEqual(files, files.slice().sort());
     });
 
     it('fails an empty file, and passes a file with one real invoked test call', function() {
