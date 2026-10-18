@@ -325,9 +325,9 @@ function assertSuiteRegistersTest(src, label) {
     assert.ok(!registersNoTests(src), label + ' registers zero tests');
 }
 
-function suiteFiles() {
+function suiteFiles(suiteRoot = SUITE_ROOT) {
     const files = [];
-    const pending = [path.join(SUITE_ROOT, 'test')];
+    const pending = [path.join(suiteRoot, 'test')];
     while (pending.length > 0) {
         const dir = pending.pop();
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -335,7 +335,7 @@ function suiteFiles() {
             if (entry.isDirectory()) {
                 pending.push(absolute);
             } else if ((entry.isFile() || entry.isSymbolicLink()) && SUITE_FILE_RE.test(entry.name)) {
-                files.push(path.relative(SUITE_ROOT, absolute).split(path.sep).join('/'));
+                files.push(path.relative(suiteRoot, absolute).split(path.sep).join('/'));
             }
         }
     }
@@ -358,12 +358,20 @@ describe('Preflight: every suite file registers a test', function() {
         }
     });
 
-    it('discovers nested suites without including non-suite helpers', function() {
-        const files = suiteFiles();
-        assert.ok(files.includes('test/preflight.test.js'));
-        assert.ok(files.includes('test/boundary/boundary.test/01_boundary_state_management.test.js'));
-        assert.ok(files.every((file) => file.startsWith('test/') && SUITE_FILE_RE.test(file)));
-        assert.deepStrictEqual(files, files.slice().sort());
+    it('discovers an untracked nested suite without including non-suite helpers', function() {
+        const scratchRoot = path.join(SUITE_ROOT, 'tmp');
+        fs.mkdirSync(scratchRoot, { recursive: true });
+        const fixtureRoot = fs.mkdtempSync(path.join(scratchRoot, 'preflight-suite-walk-'));
+        try {
+            const nestedTestDir = path.join(fixtureRoot, 'test', 'nested');
+            fs.mkdirSync(nestedTestDir, { recursive: true });
+            fs.writeFileSync(path.join(nestedTestDir, 'untracked.test.js'), 'it("runs", function() {});\n');
+            fs.writeFileSync(path.join(nestedTestDir, 'helper.js'), 'module.exports = {};\n');
+
+            assert.deepStrictEqual(suiteFiles(fixtureRoot), ['test/nested/untracked.test.js']);
+        } finally {
+            fs.rmSync(fixtureRoot, { recursive: true, force: true });
+        }
     });
 
     it('fails an empty file, and passes a file with one real invoked test call', function() {
