@@ -28,17 +28,20 @@ describe('toString size meter public activation', function () {
         ]) assert.strictEqual(XChainVM[name], activation[name], name);
     });
 
-    it('keeps mainnet and testnet unarmed while regtest is active from genesis', function () {
+    it('keeps mainnet unarmed and arms testnet at its v0.25.0 instant while regtest is active from genesis', function () {
+        // The v0.25.0 cut arms testnet at block time 1792416600.
+        const testnetArmed = 1792416600;
         assert.strictEqual(XChainVM.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, deferred);
         assert.ok(Object.isSealed(XChainVM.TOSTRING_SIZE_METER_ACTIVATION));
         assert.deepStrictEqual(XChainVM.TOSTRING_SIZE_METER_ACTIVATION, {
             mainnet: deferred,
-            testnet: deferred,
+            testnet: testnetArmed,
             regtest: 0,
         });
         assert.strictEqual(XChainVM.isToStringSizeMeterActive('regtest', 0), true);
         assert.strictEqual(XChainVM.isToStringSizeMeterActive('mainnet', 4000000000), false);
-        assert.strictEqual(XChainVM.isToStringSizeMeterActive('testnet', 4000000000), false);
+        assert.strictEqual(XChainVM.isToStringSizeMeterActive('testnet', testnetArmed - 1), false);
+        assert.strictEqual(XChainVM.isToStringSizeMeterActive('testnet', testnetArmed), true);
     });
 
     it('fails unknown networks to the unarmed mainnet sentinel', function () {

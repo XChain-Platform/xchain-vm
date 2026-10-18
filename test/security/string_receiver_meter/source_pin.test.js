@@ -30,6 +30,17 @@ const PINNED = {
     replaceAll: '43355e2f1307b4b8d1c8a71e043e8dea42869f8c1900fda6d7bdc0ab9f56d9aa',
     indexOf: 'cb08a355daef6a762a33bd4f923a8cbf116ac4d82004ba8ca23fb3d7779dcd0a',
 };
+// The v0.25.0 cut arms testnet at this block time. These are the armed wrappers'
+// String(fn) hashes, taken from this file's own body on testnet at that instant; regtest
+// produces the same five.
+const TESTNET_ARMED = 1792416600;
+const ARMED = {
+    repeat: '20cb035ee9ce4e28333d448694d8c6c36519eca877ee84e4b92e80c322a4bf91',
+    concat: '8d1c3d24d8a66f7f291eddbc9e8846fb0eeafccc2372368b402bca33cb6496bc',
+    replace: 'ec4215b23f4101a320580f14062994a6a63b18d058707a45f95ad46ece8f2b5b',
+    replaceAll: 'ec4215b23f4101a320580f14062994a6a63b18d058707a45f95ad46ece8f2b5b',
+    indexOf: '84ba955d2e6ed9b50af6a98a54e518de88531daf23f0f4fca027235737095546',
+};
 
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
@@ -54,8 +65,14 @@ describe('string receiver meter: harness source pin', function () {
 (XChainVM ? describe : describe.skip)('string receiver meter: unarmed wrapper source text', function () {
     this.timeout(60000);
 
-    for (const network of ['mainnet', 'testnet']) {
-        it(`${network} retains every wrapper's released String(fn)`, async function () {
+    for (const [title, network, timestamp, pins] of [
+        ["mainnet retains every wrapper's released String(fn)", 'mainnet', LATE.timestamp, PINNED],
+        ["testnet before its v0.25.0 instant retains every wrapper's released String(fn)",
+            'testnet', TESTNET_ARMED - 1, PINNED],
+        ["testnet from its v0.25.0 instant carries every wrapper's armed String(fn)",
+            'testnet', TESTNET_ARMED, ARMED],
+    ]) {
+        it(title, async function () {
             const vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: 30000 });
             vm.beginBlock();
             try {
@@ -64,12 +81,12 @@ describe('string receiver meter: harness source pin', function () {
                     replace:String.prototype.replace,replaceAll:String.prototype.replaceAll,
                     indexOf:String.prototype.indexOf};var r={};Object.keys(f).forEach(function(k){r[k]=String(f[k]);});
                     return JSON.stringify(r);};`;
-                const result = await execute(vm, body, { network, blockContext: LATE });
+                const result = await execute(vm, body, { network, blockContext: { ...LATE, timestamp } });
                 assert.strictEqual(result.success, true, result.error);
                 const texts = JSON.parse(JSON.parse(result.returnValue));
                 const got = {};
                 for (const [name, text] of Object.entries(texts)) got[name] = sha256(text);
-                assert.deepStrictEqual(got, PINNED);
+                assert.deepStrictEqual(got, pins);
             } finally { if (vm.endBlock) vm.endBlock(); }
         });
     }

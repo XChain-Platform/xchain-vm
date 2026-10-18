@@ -64,7 +64,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work, unarmed on mainnet and armed on testnet', function () {
-        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, deferred = 9999999999;
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, deferred = 9999999999, sizeArmed = 1792416600; // v0.25.0 testnet toString size instant
         assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
             { mainnet: null, testnet: armed, regtest: 0 });
@@ -77,7 +77,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isApplyLengthMeterActive('testnet', armed), true);
         assert.deepStrictEqual([vm.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, Object.isSealed(vm.TOSTRING_SIZE_METER_ACTIVATION), vm.TOSTRING_SIZE_METER_ACTIVATION,
             vm.toStringSizeMeterGateTime('unknown'), vm.isToStringSizeMeterActive('regtest', 0), vm.isToStringSizeMeterActive('mainnet', 4000000000)],
-            [deferred, true, { mainnet: deferred, testnet: deferred, regtest: 0 }, deferred, true, false]);
+            [deferred, true, { mainnet: deferred, testnet: sizeArmed, regtest: 0 }, deferred, true, false]);
     });
 });
 

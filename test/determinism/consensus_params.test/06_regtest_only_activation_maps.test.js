@@ -22,13 +22,16 @@ const vm = require('../../../src/index.js');
 
 const COIN_KEYS = ['BTC:mainnet', 'LTC:mainnet', 'DOGE:mainnet', 'BTC:testnet', 'LTC:testnet', 'DOGE:testnet'];
 
-// A per-coin height map: the six keys in order, frozen, every entry null, on from genesis
-// on regtest and off on mainnet and testnet at any height.
-function assertCoinMapUnarmed(map, isActive) {
+// The v0.24.0 cut arms each testnet chain at these heights; mainnet stays null.
+const V0240_TESTNET = { BTC: 156908, LTC: 4927400, DOGE: 68005165 };
+// The v0.25.0 cut arms the maps that landed after v0.24.0 at these heights.
+const V0250_TESTNET = { BTC: 157040, LTC: 4928000, DOGE: 68008400 };
+
+// A per-coin height map: the six keys in order, frozen, every mainnet entry null, on from
+// genesis on regtest, off on mainnet at any height, and on testnet from its armed height.
+function assertCoinMapUnarmed(map, isActive, TESTNET = V0240_TESTNET) {
     assert.deepStrictEqual(Object.keys(map), COIN_KEYS);
     assert.ok(Object.isFrozen(map));
-    // The v0.24.0 cut arms each testnet chain; mainnet stays null.
-    const TESTNET = { BTC: 156908, LTC: 4927400, DOGE: 68005165 };
     for (const key of COIN_KEYS) {
         const [coin, network] = key.split(':');
         assert.strictEqual(map[key], network === 'testnet' ? TESTNET[coin] : null, key);
@@ -38,19 +41,6 @@ function assertCoinMapUnarmed(map, isActive) {
         assert.strictEqual(isActive('mainnet', coin, 1e9), false, `${coin}:mainnet`);
         assert.strictEqual(isActive('testnet', coin, TESTNET[coin] - 1), false, `${coin}:testnet below`);
         assert.strictEqual(isActive('testnet', coin, TESTNET[coin]), true, `${coin}:testnet at`);
-    }
-}
-
-// A per-coin height map that landed after the v0.24.0 cut: every entry null, on from genesis
-// on regtest and off on mainnet and testnet at any height until a later train arms it.
-function assertCoinMapNotYetArmed(map, isActive) {
-    assert.deepStrictEqual(Object.keys(map), COIN_KEYS);
-    assert.ok(Object.isFrozen(map));
-    for (const key of COIN_KEYS) assert.strictEqual(map[key], null, key);
-    assert.strictEqual(isActive('regtest', 'BTC', 0), true);
-    for (const coin of ['BTC', 'LTC', 'DOGE']) {
-        assert.strictEqual(isActive('mainnet', coin, 1e9), false, `${coin}:mainnet`);
-        assert.strictEqual(isActive('testnet', coin, 1e9), false, `${coin}:testnet`);
     }
 }
 
@@ -79,7 +69,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     });
 
     it('HOST_FAULT_HALT_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapNotYetArmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive);
+        assertCoinMapUnarmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive, V0250_TESTNET);
     });
 
     it('JSON_STRINGIFY_REENTRY_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {

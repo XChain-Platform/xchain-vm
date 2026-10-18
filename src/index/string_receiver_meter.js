@@ -13,7 +13,7 @@
 
 const STRING_RECEIVER_METER_ACTIVATION = Object.seal({
     mainnet: null,
-    testnet: null,
+    testnet: 1792416600,
     regtest: 0,
 });
 

@@ -18,20 +18,23 @@ const {
 } = require('../../../src/index/string_result_meter.js');
 
 describe('string-result meter activation', function () {
-    it('is sealed and armed only on regtest from genesis', function () {
+    it('is sealed, armed on regtest from genesis and on testnet at its v0.25.0 instant', function () {
+        // The v0.25.0 cut arms testnet at block time 1792416600.
         assert.deepStrictEqual(STRING_RESULT_METER_ACTIVATION,
-            { mainnet: null, testnet: null, regtest: 0 });
+            { mainnet: null, testnet: 1792416600, regtest: 0 });
         assert.ok(Object.isSealed(STRING_RESULT_METER_ACTIVATION));
         assert.strictEqual(isStringResultMeterActive('regtest', 0), true);
         assert.strictEqual(isStringResultMeterActive('regtest', undefined), true);
     });
 
-    it('keeps production networks and unknown names unarmed', function () {
-        for (const network of ['mainnet', 'testnet', 'signet', 'unknown',
+    it('keeps mainnet and unknown names unarmed and arms testnet from its v0.25.0 instant', function () {
+        for (const network of ['mainnet', 'signet', 'unknown',
             '__proto__', 'toString', undefined, null]) {
             assert.strictEqual(isStringResultMeterActive(network, 4000000000), false,
                 String(network));
         }
+        assert.strictEqual(isStringResultMeterActive('testnet', 1792416599), false);
+        assert.strictEqual(isStringResultMeterActive('testnet', 1792416600), true);
     });
 
     it('requires a finite block time for a positive activation', function () {

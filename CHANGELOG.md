@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-18
+
+### Added
+- Added the string receiver, string result and toString size meters, armed on testnet and unarmed on mainnet.
+- Gated escaped worker throws, execute lint faults and wrapper compile faults as host faults, armed on testnet and unarmed on mainnet.
+- Added an ARM64 musl differential fuzz leg.
+
+### Changed
+- Rebound the metered String and Number aliases and kept the legacy global string charging below the activation heights.
+- Armed HOST_FAULT_HALT_ACTIVATION on testnet at BTC 157040, LTC 4928000 and DOGE 68008400.
+
 ## [0.24.0] - 2026-10-17
 
 ### Added
