@@ -8,7 +8,7 @@
     "src/lint-core.js": {
       "canonical": "e7ba51d00d02a293b279b2b755fa5ed8daa809eb1564eea97349bb09a563a68f",
       "vendoredInSdk": "e7ba51d00d02a293b279b2b755fa5ed8daa809eb1564eea97349bb09a563a68f",
-      "sdkCommit": "525ddf536f5d4f0172b905263a5bdd63227a1049",
+      "sdkCommit": "0df4567f5290c23a9460fc474f3e04870c61b399",
       "sdkPath": "xchain-sdk/src/contract/lint-core.js",
       "sdkPathAtOrigin": "xchain-sdk/src/contract/lint_core.js"
     },
