@@ -213,6 +213,5 @@ module.exports = {
     objectPatternEntries,
     isGlobalObjectRef,
     isGlobalObjectPathRef,
-    patternDeclares,
     scopeDeclares
 };
