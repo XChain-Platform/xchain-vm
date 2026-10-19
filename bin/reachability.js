@@ -28,7 +28,7 @@
  *   runtime   the require closure of what the service actually starts:
  *             the Dockerfile CMD, and every `node <file>` an npm script runs.
  *             A file outside this closure cannot execute in production.
- *   tooling   the closure of bin/, scripts/ and tools/: operator commands,
+ *   tooling   the closure of bin/ and tools/: operator commands,
  *             verifiers, benchmarks. Real callers, not production ones.
  *   test      the closure of test/. A file reached only from here exists to
  *             be tested and nothing else, which CODE-STYLE calls a signal that
@@ -315,7 +315,7 @@ function analyse(opts) {
     const sources = Array.from(fileSet).filter((f) => f.startsWith('src/')).sort();
 
     const runtimeEntryList = runtimeEntries(fileSet);
-    const toolingEntryList = entriesUnder(['bin/', 'scripts/', 'tools/'], fileSet);
+    const toolingEntryList = entriesUnder(['bin/', 'tools/'], fileSet);
     const testEntryList = entriesUnder(['test/'], fileSet);
 
     const runtime = closure(runtimeEntryList, fileSet);

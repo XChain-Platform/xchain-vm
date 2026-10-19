@@ -1088,10 +1088,10 @@
       "gate wiring: the preflight cannot be dropped silently the preflight spec exists on disk"
     ],
     "b3d7c9ed4f762088": [
-      "scripts/mutation-report (static contract) emits the mutation summary markdown",
-      "scripts/mutation-report (static contract) is syntactically valid JavaScript (compiles without executing)",
-      "scripts/mutation-report (static contract) performs no network I/O (report generation is offline)",
-      "scripts/mutation-report (static contract) reads the Stryker and custom mutant report inputs"
+      "bin/mutation-report (static contract) emits the mutation summary markdown",
+      "bin/mutation-report (static contract) is syntactically valid JavaScript (compiles without executing)",
+      "bin/mutation-report (static contract) performs no network I/O (report generation is offline)",
+      "bin/mutation-report (static contract) reads the Stryker and custom mutant report inputs"
     ],
     "b6e5dbcaf7af8843": [
       "ActionValidator allowed actions every production-allowed action is covered (mirror is bound, not copied)",
