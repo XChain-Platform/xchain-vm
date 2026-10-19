@@ -53,14 +53,14 @@ function indexerFlagDayLiterals(sources, name) {
 }
 describe('consensus parameters are frozen (track 8 guard)', function () {
     it('APPLY_LENGTH_METER_ACTIVATION is sealed, unarmed on mainnet and armed on testnet', function () {
-        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, late = 4102444800, deferred = 9999999999;
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, late = 4102444800, deferred = 9999999999, sizeArmed = 1792454400; // v0.25.0 testnet toString size instant
         assert.ok(Number.isSafeInteger(armed) && armed > 1 && Object.isSealed(vm.APPLY_LENGTH_METER_ACTIVATION));
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION, { mainnet: null, testnet: armed, regtest: 0 });
         for (const [network, t, on] of [['regtest', 0, true], ['mainnet', late, false], ['unknown', late, false], [undefined, late, false], ['testnet', 1, false], ['testnet', armed, true]])
             assert.strictEqual(vm.isApplyLengthMeterActive(network, t), on, `${network}@${t}`);
         assert.deepStrictEqual([vm.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, Object.isSealed(vm.TOSTRING_SIZE_METER_ACTIVATION), vm.TOSTRING_SIZE_METER_ACTIVATION,
             vm.toStringSizeMeterGateTime('unknown'), vm.isToStringSizeMeterActive('regtest', 0), vm.isToStringSizeMeterActive('mainnet', 4000000000)],
-            [deferred, true, { mainnet: deferred, testnet: deferred, regtest: 0 }, deferred, true, false]);
+            [deferred, true, { mainnet: deferred, testnet: sizeArmed, regtest: 0 }, deferred, true, false]);
     });
 });
 describe('consensus parameters are frozen (track 8 guard)', function () {

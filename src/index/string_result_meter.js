@@ -18,7 +18,7 @@ const { deriveHarness } = require('./armed_harness/derivation.js');
 // closed.
 const STRING_RESULT_METER_ACTIVATION = Object.seal({
     mainnet: null,
-    testnet: null,
+    testnet: 1792454400,
     regtest: 0,
 });
 

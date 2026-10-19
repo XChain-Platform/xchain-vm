@@ -26,11 +26,16 @@ const wrap = (body) => `module.exports = function() { ${body} };`;
 const RECEIVER = `var s=new Array(${K + 1}).join('x');` +
     'var o={length:0,toString:function(){return s;}};';
 
-async function run(body, network) {
+// The v0.25.0 cut arms the string receiver meter on testnet at this block time.
+const TESTNET_ARMED = 1792454400;
+const TESTNET_BEFORE = { ...LATE, timestamp: TESTNET_ARMED - 1 };
+const TESTNET_AT = { ...LATE, timestamp: TESTNET_ARMED };
+
+async function run(body, network, blockContext = LATE) {
     const vm = createVM({ gasCeiling: 1000000, maxCpuTimeMs: 30000 });
     vm.beginBlock();
     try {
-        return await execute(vm, wrap(body), { method: 'default', network, blockContext: LATE });
+        return await execute(vm, wrap(body), { method: 'default', network, blockContext });
     } finally { if (vm.endBlock) vm.endBlock(); }
 }
 
@@ -50,15 +55,17 @@ async function pair(body) {
 }
 
 describe('string receiver meter: activation', function () {
-    it('is armed only on regtest', function () {
+    it('is armed on regtest from genesis and on testnet from its v0.25.0 instant', function () {
         assert.deepStrictEqual(STRING_RECEIVER_METER_ACTIVATION, {
-            mainnet: null, testnet: null, regtest: 0,
+            mainnet: null, testnet: TESTNET_ARMED, regtest: 0,
         });
         assert.strictEqual(Object.isSealed(STRING_RECEIVER_METER_ACTIVATION), true);
         assert.strictEqual(isStringReceiverMeterActive('regtest', 0), true);
-        for (const network of ['mainnet', 'testnet', 'unknown', undefined]) {
+        for (const network of ['mainnet', 'unknown', undefined]) {
             assert.strictEqual(isStringReceiverMeterActive(network, LATE.timestamp), false, String(network));
         }
+        assert.strictEqual(isStringReceiverMeterActive('testnet', TESTNET_ARMED - 1), false);
+        assert.strictEqual(isStringReceiverMeterActive('testnet', TESTNET_ARMED), true);
     });
 });
 
@@ -85,11 +92,11 @@ describe('string receiver meter: activation', function () {
         assert.strictEqual(on.gasUsed, off.gasUsed);
     });
 
-    it('mainnet and testnet retain the legacy undercharge', async function () {
+    it('mainnet and testnet before its v0.25.0 instant retain the legacy undercharge', async function () {
         const body = `${RECEIVER}return String.prototype.indexOf.call(o,'!');`;
         const armed = await run(body, 'regtest');
         const mainnet = await run(body, 'mainnet');
-        const testnet = await run(body, 'testnet');
+        const testnet = await run(body, 'testnet', TESTNET_BEFORE);
         assert.strictEqual(armed.success, true, armed.error);
         assert.strictEqual(mainnet.success, true, mainnet.error);
         assert.strictEqual(testnet.success, true, testnet.error);
@@ -97,5 +104,15 @@ describe('string receiver meter: activation', function () {
         assert.strictEqual(mainnet.returnValue, testnet.returnValue);
         assert.ok(armed.gasUsed >= mainnet.gasUsed + K);
         assert.ok(armed.gasUsed >= testnet.gasUsed + K);
+    });
+
+    it('testnet charges the coerced receiver from its v0.25.0 instant', async function () {
+        const body = `${RECEIVER}return String.prototype.indexOf.call(o,'!');`;
+        const before = await run(body, 'testnet', TESTNET_BEFORE);
+        const at = await run(body, 'testnet', TESTNET_AT);
+        assert.strictEqual(before.success, true, before.error);
+        assert.strictEqual(at.success, true, at.error);
+        assert.strictEqual(at.returnValue, before.returnValue);
+        assert.ok(at.gasUsed >= before.gasUsed + K, `${at.gasUsed} vs ${before.gasUsed}`);
     });
 });
