@@ -24,6 +24,8 @@ const harnessPart5 = require('../../src/index/runtime/harness_part_5.js');
 const K = 100000;
 const WALL_MS = 30000;
 const LATE = { height: 100, timestamp: 4000000000, hash: 'abc123' };
+// The v0.25.0 cut arms the string-result meter on testnet at this block time.
+const TESTNET_ARMED = 1792454400;
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
 function stringRawHarnessFragment() {
@@ -38,7 +40,7 @@ describe('direct String.raw result-length wrapper', function () {
         const large = 'x'.repeat(K);
         const context = nodeVM.createContext({ large });
         const source = `
-            var charged = 0, __perElemMeterOn = false;
+            var charged = 0, __perElemMeterOn = false, __stringResultMeterOn = true;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -53,7 +55,7 @@ describe('direct String.raw result-length wrapper', function () {
     it('preserves native coercion counts, return value and thrown errors', function () {
         const context = nodeVM.createContext({});
         const source = `
-            var charged = 0, __perElemMeterOn = false;
+            var charged = 0, __perElemMeterOn = false, __stringResultMeterOn = true;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -71,13 +73,16 @@ describe('direct String.raw result-length wrapper', function () {
     });
 });
 
-// Legacy gas of one body on mainnet, pre-arm testnet, no network and an unknown one.
+// Legacy gas of one body on mainnet, testnet, no network and an unknown one. Block time
+// 0 runs testnet before its armed instant.
 async function legacyGas(run, body) {
     const gas = {};
-    const early = { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 };
+    assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.mainnet, null);
+    assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.testnet, TESTNET_ARMED);
     for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-        const extra = network === 'testnet' ? { blockContext: early } : undefined;
-        const result = await run(body, network, extra);
+        const result = await run(body, network, {
+            blockContext: { ...LATE, timestamp: 0 },
+        });
         assert.strictEqual(result.success, true, `${network}: ${result.error}`);
         gas[String(network)] = result.gasUsed;
     }
@@ -92,6 +97,23 @@ async function runRegtestWithoutPerElement(run, body) {
     perElement.regtest = null;
     try { return await run(body, 'regtest', { gasCeiling: undefined }); }
     finally { perElement.regtest = saved; }
+}
+
+// Testnet one second before its armed instant against testnet at that instant.
+function defineTestnetActivationCase(run) {
+    it('meters testnet from its v0.25.0 instant and not one second before', async function () {
+        const body = `var s='x'.repeat(${K});return String.raw({raw:['a','b']},s).length;`;
+        const before = await run(body, 'testnet', {
+            blockContext: { ...LATE, timestamp: TESTNET_ARMED - 1 }, gasCeiling: undefined,
+        });
+        const at = await run(body, 'testnet', {
+            blockContext: { ...LATE, timestamp: TESTNET_ARMED }, gasCeiling: undefined,
+        });
+        assert.strictEqual(before.success, true, before.error);
+        assert.strictEqual(at.success, true, at.error);
+        assert.strictEqual(at.returnValue, before.returnValue);
+        assert.ok(at.gasUsed >= before.gasUsed + K, `${at.gasUsed} vs ${before.gasUsed}`);
+    });
 }
 
 (XChainVM ? describe : describe.skip)('direct String.raw metering gate', function () {
@@ -135,16 +157,15 @@ async function runRegtestWithoutPerElement(run, body) {
             `${armed.gasUsed} vs ${legacy.gasUsed}`);
     });
 
-    it('leaves legacy gas on unarmed, unknown and pre-arm testnet blocks', async function () {
+    it('leaves legacy gas on unarmed and unknown networks', async function () {
         const body = `var s='x'.repeat(${K});return String.raw({raw:['a','b']},s).length;`;
         const gas = await legacyGas(run, body);
         assert.strictEqual(gas.mainnet, gas.testnet);
         assert.strictEqual(gas.undefined, gas.unknown);
 
         const armed = await runRegtestWithoutPerElement(run, body);
-        // Before the v0.24.0 per-element instant, so only the String.raw meter separates it from legacy.
-        const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined, blockContext: { ...LATE, timestamp: 1792303199 } });
-        assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed);
         assert.ok(armed.gasUsed >= gas.mainnet + K);
     });
+
+    defineTestnetActivationCase(run);
 });

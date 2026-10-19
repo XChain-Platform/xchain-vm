@@ -27,7 +27,7 @@
  * lint global-alias, lint optional-chain, lint banned-with, lint destructure,
  * lint syntax depth, BigInt surface strip, resource fault signal, native stack
  * terminal, gas-ceiling exhaustion, JSON.stringify re-entry, host error stack
- * strip), and the per-network activation tables listed in NETWORK_GATES
+ * strip, host-fault halt), and the per-network activation tables listed in NETWORK_GATES
  * (iterator/Set meter, apply-length meter, host-call bounds, per-element meter,
  * gas-ceiling success, JSON.stringify hook; null is off, 0 is on from genesis),
  * whose latest armed time is folded into the probe block. The height gates only
@@ -86,6 +86,7 @@ const HEIGHT_GATES = [
     { name: 'gas-ceiling-exhausted', source: 'GAS_CEILING_EXHAUSTED_ACTIVATION', active: XChainVM.isGasCeilingExhaustedActive },
     { name: 'json-stringify-reentry', source: 'JSON_STRINGIFY_REENTRY_ACTIVATION', active: XChainVM.isJsonStringifyReentryActive },
     { name: 'host-error-stack-strip', source: 'HOST_ERROR_STACK_STRIP_ACTIVATION', active: XChainVM.isHostErrorStackStripActive },
+    { name: 'host-fault-halt', source: 'HOST_FAULT_HALT_ACTIVATION', active: XChainVM.isHostFaultHaltActive },
 ].map((g) => ({ ...g, table: XChainVM[g.source] }));
 // A per-coin height table keys on '<COIN>:<network>'; a per-network table keys on the bare network.
 const COIN_NETWORK_KEY = /^[A-Z]+:[a-z]+$/;
@@ -95,6 +96,9 @@ const NETWORK_GATES = [
     { name: 'apply-length-meter', source: 'APPLY_LENGTH_METER_ACTIVATION', active: XChainVM.isApplyLengthMeterActive },
     { name: 'host-call-bounds', source: 'HOST_CALL_BOUNDS_ACTIVATION', active: XChainVM.isHostCallBoundsActive },
     { name: 'per-element-meter', source: 'PER_ELEMENT_METER_ACTIVATION', active: XChainVM.isPerElementMeterActive },
+    { name: 'string-receiver-meter', source: 'STRING_RECEIVER_METER_ACTIVATION', active: XChainVM.isStringReceiverMeterActive },
+    { name: 'string-result-meter', source: 'STRING_RESULT_METER_ACTIVATION', active: XChainVM.isStringResultMeterActive },
+    { name: 'tostring-size-meter', source: 'TOSTRING_SIZE_METER_ACTIVATION', active: XChainVM.isToStringSizeMeterActive },
     { name: 'gas-ceiling-success', source: 'GAS_CEILING_SUCCESS_ACTIVATION', active: XChainVM.isGasCeilingSuccessActive },
     // No is-active export exists for this one; the in-isolate check compares against the gate time.
     { name: 'json-stringify-hook', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',
@@ -119,6 +123,10 @@ const VECTORS = [
     { group: 'metered', id: 'JSON.stringify loop', body: `${ARR}var t=0;for(;;){t+=JSON.stringify(a).length;}` },
     { group: 'metered', id: 'string split loop', body: `var s=('7,').repeat(${K});var t=0;for(;;){t+=s.split(',').length;}` },
     { group: 'metered', id: 'string spread loop', body: `var s=('7').repeat(${K});var t=0;for(;;){t+=[...s].length;}` },
+    { group: 'metered', id: 'String trimLeft loop', body: `var s=(' ').repeat(${K})+'x';var t=0;for(;;){t+=s.trimLeft().length;}` },
+    { group: 'metered', id: 'String trimRight loop', body: `var s='x'+(' ').repeat(${K});var t=0;for(;;){t+=s.trimRight().length;}` },
+    { group: 'metered', id: 'Number.parseInt loop', body: `var s=('1').repeat(${K});var t=0;for(;;){t+=Number.parseInt(s,10);}` },
+    { group: 'metered', id: 'Number.parseFloat loop', body: `var s=('1').repeat(${K});var t=0;for(;;){t+=Number.parseFloat(s);}` },
     { group: 'unmetered-suspect', id: 'Sparse some loop', body: `var a=new Array(${K});var t=0;for(;;){if(a.some(function(){return false;}))t++;}` },
     { group: 'unmetered-suspect', id: 'Array-like forEach loop', body: `var a={length:${K}};var t=0;for(;;){Array.prototype.forEach.call(a,function(){t++;});}` },
     { group: 'unmetered-suspect', id: 'Sparse flatMap loop', body: `var a=new Array(${K});var t=0;for(;;){t+=a.flatMap(function(v){return [v];}).length;}` },

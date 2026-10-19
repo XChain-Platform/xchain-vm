@@ -23,6 +23,13 @@ const select = require('../../../src/index/armed_harness/select.js');
 const { createVM, execute, XChainVM } = require('../../fuzz/helpers/harness.js');
 
 describe('armed harness selection: per execution', function () {
+    it('assigns the toString size meter its own selectable bit', function () {
+        const rule = select.RULES.find(({ LABEL }) => LABEL === 'tostring size meter');
+        assert.ok(rule);
+        const bit = 1 << select.RULES.indexOf(rule);
+        assert.strictEqual(select.harnessMask({ toStringSizeMeter: true }), bit);
+    });
+
     it('selects the unarmed harness on mainnet and testnet and every rule on regtest', function () {
         const far = { blockContext: { height: 1e9, timestamp: 4102444800 } };
         assert.strictEqual(select.executionHarnessMask(Object.assign({ network: 'mainnet' }, far), 'BTC', 1e9, false, false), 0, 'mainnet');

@@ -188,6 +188,34 @@ and errors match the bare built-in. The one visible difference from the
 earlier testnet charge is that it read a set-like argument's `size` a second
 time; the armed path does not.
 
+### String receiver charges (`STRING_RECEIVER_METER_ACTIVATION`)
+
+Generic calls to metered `String.prototype` methods historically read the
+receiver object's own `length` property when computing gas, even though the
+native method performs its work on `String(receiver)`. A receiver could
+therefore report a short or absent `length` while coercing to a long string.
+
+From the `STRING_RECEIVER_METER_ACTIVATION` block time on each network
+(regtest from genesis; mainnet and testnet unarmed), `repeat`, `concat`,
+`replace`, `replaceAll`, and the string methods installed through
+`__meterLen` charge against `String(receiver).length`. Array methods installed
+through the shared helper retain their element-count charge. The activation
+map and `isStringReceiverMeterActive` resolver are exported from `xchain-vm`.
+
+### Global string conversion charges (`TOSTRING_SIZE_METER_ACTIVATION`)
+
+The global URI codecs, legacy `escape` and `unescape`, and numeric parsers can
+coerce an object to a long string while the legacy harness charges only a
+primitive string argument. The toString size meter charges the length of the
+coerced string before those native functions run.
+
+The rule is active from genesis on regtest. Mainnet and testnet use the
+`9999999999` unarmed sentinel until a coordinated release assigns a live block
+time. `TOSTRING_SIZE_METER_GATE_BLOCK_TIME`, the sealed
+`TOSTRING_SIZE_METER_ACTIVATION` map, `toStringSizeMeterGateTime`, and
+`isToStringSizeMeterActive` are exported from `xchain-vm`. Unknown networks
+resolve like mainnet and therefore remain unarmed.
+
 ## Developer Toolkit (`xchain-foundry`)
 
 A local on-ramp for authoring XChain contracts: write, lint, gas-profile, and

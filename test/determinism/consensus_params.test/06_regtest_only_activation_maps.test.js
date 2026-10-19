@@ -22,13 +22,16 @@ const vm = require('../../../src/index.js');
 
 const COIN_KEYS = ['BTC:mainnet', 'LTC:mainnet', 'DOGE:mainnet', 'BTC:testnet', 'LTC:testnet', 'DOGE:testnet'];
 
-// A per-coin height map: the six keys in order, frozen, every entry null, on from genesis
-// on regtest and off on mainnet and testnet at any height.
-function assertCoinMapUnarmed(map, isActive) {
+// The v0.24.0 cut arms each testnet chain at these heights; mainnet stays null.
+const V0240_TESTNET = { BTC: 156908, LTC: 4927400, DOGE: 68005165 };
+// The v0.25.0 cut arms the maps that landed after v0.24.0 at these heights.
+const V0250_TESTNET = { BTC: 157073, LTC: 4928460, DOGE: 68009330 };
+
+// A per-coin height map: the six keys in order, frozen, every mainnet entry null, on from
+// genesis on regtest, off on mainnet at any height, and on testnet from its armed height.
+function assertCoinMapUnarmed(map, isActive, TESTNET = V0240_TESTNET) {
     assert.deepStrictEqual(Object.keys(map), COIN_KEYS);
     assert.ok(Object.isFrozen(map));
-    // The v0.24.0 cut arms each testnet chain; mainnet stays null.
-    const TESTNET = { BTC: 156908, LTC: 4927400, DOGE: 68005165 };
     for (const key of COIN_KEYS) {
         const [coin, network] = key.split(':');
         assert.strictEqual(map[key], network === 'testnet' ? TESTNET[coin] : null, key);
@@ -63,6 +66,10 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('HOST_ERROR_STACK_STRIP_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
         assertCoinMapUnarmed(vm.HOST_ERROR_STACK_STRIP_ACTIVATION, vm.isHostErrorStackStripActive);
+    });
+
+    it('HOST_FAULT_HALT_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
+        assertCoinMapUnarmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive, V0250_TESTNET);
     });
 
     it('JSON_STRINGIFY_REENTRY_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {

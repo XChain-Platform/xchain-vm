@@ -35,7 +35,8 @@ const REFERENCE_LEG = 'linux-x64-glibc';
 const EXPECTED_LEGS = Object.freeze({
     'linux-x64-glibc':   /^linux-x64-node22-v8_(.+)-glibc[0-9.]+$/,
     'linux-arm64-glibc': /^linux-arm64-node22-v8_(.+)-glibc[0-9.]+$/,
-    'linux-x64-musl':    /^linux-x64-node22-v8_(.+)-nonglibc$/
+    'linux-x64-musl':    /^linux-x64-node22-v8_(.+)-nonglibc$/,
+    'linux-arm64-musl':  /^linux-arm64-node22-v8_(.+)-nonglibc$/
 });
 
 const MANIFEST_PREFIX = Object.freeze({

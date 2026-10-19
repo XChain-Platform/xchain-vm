@@ -11,22 +11,21 @@
  * contact legal@dankest.llc.
  *
  **********************************************************************
- * XChain VM: isolate setup host-fault boundary
+ * XChain VM: execution setup host-fault boundary
  *
- * Wraps the execute() setup steps that take no contract input, so a throw
- * from one of them halts and retries instead of becoming a committed result.
+ * Wraps execute() host operations whose failure must halt and retry instead
+ * of becoming a committed result.
  ********************************************************************/
 // @ts-nocheck
 
 const { HostFaultError } = require('../../../errors.js');
 
-// Run one isolate setup step and raise any throw as a HostFaultError, so the caller halts and retries.
-// The step takes only fixed scripts and host-chosen values, so on a healthy host it never throws and
-// replay is unchanged; a throw is this host's fault and committing it would fork from healthy peers.
-function hostSetupStep(step, fn) {
+// Run one host operation and, when enabled, raise any throw as a HostFaultError.
+function hostSetupStep(step, fn, haltOnFailure = true) {
     try {
         return fn();
     } catch (e) {
+        if (!haltOnFailure) throw e;
         if (e instanceof HostFaultError) throw e;
         throw new HostFaultError('execution setup failed (' + step + '): ' + (e && e.message));
     }

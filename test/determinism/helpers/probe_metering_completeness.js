@@ -62,7 +62,15 @@ const POST_GATE_BLOCK = { height: 100, timestamp: 1786060800, hash: 'gate' };  /
 // un-metered and would read as a finding. Sourced from the constant, not re-typed, so a
 // repin cannot leave the sweep probing the wrong side of the gate.
 const REST_GATE_BLOCK = { height: 100, timestamp: require('../../../src/index.js').REST_PATTERN_METER_GATE_BLOCK_TIME, hash: 'restgate' };
-const APPLY_GATE_BLOCK = { height: 100, timestamp: 4000000000, hash: 'applygate' };
+const STRING_RESULT_GATE_BLOCK = { height: 100,
+    timestamp: require('../../../src/index.js').STRING_RESULT_METER_ACTIVATION.regtest,
+    hash: 'stringresultgate' };
+// The derived rule rewrites the older F3 global wrappers, so both gates must be
+// active for an object-coercion vector to exercise the new charge.
+const TOSTRING_SIZE_GATE_BLOCK = { height: 100,
+    timestamp: Math.max(require('../../../src/index.js').BINARY_ALLOC_GATE_BLOCK_TIME,
+        require('../../../src/index.js').TOSTRING_SIZE_METER_ACTIVATION.regtest),
+    hash: 'tostringsizegate' };
 
 const VECTORS = [
     // --- Array methods G1 should already cover (regression) ---
@@ -85,9 +93,9 @@ const VECTORS = [
     // --- Spread (syntax, like `+`, not a method) ---
     { id: 'spread [...array]',  mk: C => `${ARR}var t=0;for(var i=0;i<${C};i++)t+=[].concat(a).length;return t;` }, // baseline via concat (metered)
     { id: 'spread [...string]', mk: C => `${STR}var t=0;for(var i=0;i<${C};i++)t+=([...s]).length;return t;` },
-    { id: 'String.anchor', network: 'regtest', gateBlock: APPLY_GATE_BLOCK,
+    { id: 'String.anchor', network: 'regtest', gateBlock: STRING_RESULT_GATE_BLOCK,
         mk: C => `${HTML_ARG}var t=0;for(var i=0;i<${C};i++)t+='a'.anchor(x).length;return t;` },
-    { id: 'String.raw direct', network: 'regtest', gateBlock: APPLY_GATE_BLOCK,
+    { id: 'String.raw direct', network: 'regtest', gateBlock: STRING_RESULT_GATE_BLOCK,
         mk: C => `${HTML_ARG}var q={raw:['a','b']},t=0;for(var i=0;i<${C};i++)t+=String.raw(q,x).length;return t;` },
     // --- Destructuring REST (a PATTERN carrying a RestElement, not an expression
     // carrying a SpreadElement). The sweep had spread-EXPRESSION vectors only, so it
@@ -102,7 +110,11 @@ const VECTORS = [
     { id: 'escape',             gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=escape(s).length;return t;` },
     { id: 'unescape',           gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=unescape(s).length;return t;` },
     { id: 'parseInt',           gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=(parseInt(s,10)>0?1:0);return t;` },
-    { id: 'parseFloat',         gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=(parseFloat(s)>0?1:0);return t;` }
+    { id: 'parseFloat',         gated: true, mk: C => `${GSTR}var t=0;for(var i=0;i<${C};i++)t+=(parseFloat(s)>0?1:0);return t;` },
+    { id: 'decodeURIComponent ToString', network: 'regtest', gateBlock: TOSTRING_SIZE_GATE_BLOCK,
+        mk: C => `${GSTR}var o={toString:function(){return s;}},t=0;for(var i=0;i<${C};i++)t+=decodeURIComponent(o).length;return t;` },
+    { id: 'parseInt ToString', network: 'regtest', gateBlock: TOSTRING_SIZE_GATE_BLOCK,
+        mk: C => `${GSTR}var o={toString:function(){return s;}},t=0;for(var i=0;i<${C};i++)t+=(parseInt(o,10)>0?1:0);return t;` }
 ];
 
 async function run(code, blockContext, network) {

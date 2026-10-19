@@ -123,6 +123,23 @@ function row(obj, k) {
         'value' in x ? (v === null ? 'null' : typeof v) : 'accessor', typeof v === 'function' ? v.length : null];
 }
 
+describe('XChainVM inherited static descriptors', function () {
+    it('exposes the toString size meter gate through immutable descriptors', function () {
+        const carrier = Object.getPrototypeOf(Object.getPrototypeOf(XChainVM));
+        assert.deepStrictEqual([
+            'TOSTRING_SIZE_METER_GATE_BLOCK_TIME',
+            'TOSTRING_SIZE_METER_ACTIVATION',
+            'toStringSizeMeterGateTime',
+            'isToStringSizeMeterActive',
+        ].map((k) => row(carrier, k)), [
+            ['TOSTRING_SIZE_METER_GATE_BLOCK_TIME', false, false, false, 'number', null],
+            ['TOSTRING_SIZE_METER_ACTIVATION', false, false, false, 'object', null],
+            ['toStringSizeMeterGateTime', false, false, false, 'function', 1],
+            ['isToStringSizeMeterActive', false, false, false, 'function', 2],
+        ]);
+    });
+});
+
 describe('XChainVM prototype and static descriptors (split surface pin)', function () {
 
     it('prototype descriptor rows match the unsplit class', function () {

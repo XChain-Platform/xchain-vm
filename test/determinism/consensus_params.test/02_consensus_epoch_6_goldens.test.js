@@ -21,6 +21,7 @@ const {
     findNestingDepth,
     lintSource
 } = require('../../../src/lint-core.js');
+const armedHarness = require('../../../src/index/armed_harness/select.js');
 
 describe('consensus epoch 7 goldens', function () {
     const source = 'module.exports = ' + '('.repeat(65) + '1' + ')'.repeat(65) + ';';
@@ -30,6 +31,13 @@ describe('consensus epoch 7 goldens', function () {
         assert.strictEqual(CONSENSUS_VERSION, '7');
         assert.strictEqual(MAX_NESTING_DEPTH, 64);
         assert.ok(CONSENSUS_RULES.has('nesting-depth'));
+    });
+
+    it('pins the ordered armed harness rules', function () {
+        assert.deepStrictEqual(armedHarness.RULES.map(({ LABEL }) => LABEL), [
+            'resource fault signal', 'host error stack strip', 'host-call bounds', 'stringify re-entry',
+            'per-element meter', 'string receiver meter', 'tostring size meter', 'native stack terminal'
+        ]);
     });
 
     it('pins nesting-depth scanning and line reporting', function () {

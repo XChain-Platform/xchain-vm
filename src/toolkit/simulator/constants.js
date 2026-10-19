@@ -65,8 +65,8 @@ const GATE_FALLBACK_BLOCK_TIME = 1786060800;
 // block time: the Package-3 sandbox bundle, the execute-time source re-lint, the
 // lint global-alias, optional-chain and destructure refinements, the banned-with
 // lint, the syntax-depth bound, the BigInt surface strip, the gas-ceiling exhaustion
-// settlement, the resource fault signal, the host error stack strip, the
-// JSON.stringify re-entry rule and the native stack terminal rule all resolve
+// settlement, the resource fault signal, the host error stack strip, the host-fault
+// halt, the JSON.stringify re-entry rule and the native stack terminal rule all resolve
 // `<COIN>:<network>` against a threshold map. Whether a gate is on from genesis is
 // decided per gate by its own predicate, never per network (the optional-chain
 // gate is genesis-on for regtest only and needs a threshold on testnet). A default
@@ -87,6 +87,7 @@ const HEIGHT_GATES = Object.freeze([
     { label: 'gas-ceiling exhaustion', map: 'GAS_CEILING_EXHAUSTED_ACTIVATION', isActive: 'isGasCeilingExhaustedActive' },
     { label: 'resource fault signal',  map: 'RESOURCE_FAULT_SIGNAL_ACTIVATION', isActive: 'isResourceFaultSignalActive' },
     { label: 'host error stack strip', map: 'HOST_ERROR_STACK_STRIP_ACTIVATION', isActive: 'isHostErrorStackStripActive' },
+    { label: 'host-fault halt',        map: 'HOST_FAULT_HALT_ACTIVATION',       isActive: 'isHostFaultHaltActive' },
     { label: 'stringify re-entry',     map: 'JSON_STRINGIFY_REENTRY_ACTIVATION', isActive: 'isJsonStringifyReentryActive' },
     { label: 'native stack terminal',  map: 'NATIVE_STACK_TERMINAL_ACTIVATION', isActive: 'isNativeStackTerminalActive' }
 ]);
@@ -177,7 +178,15 @@ const TIME_NETWORK_GATES = Object.freeze([
     // spread and rest); a network the map does not name is unarmed.
     { label: 'per-element meter', source: 'PER_ELEMENT_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.PER_ELEMENT_METER_ACTIVATION, network)
-            ? XChainVM.PER_ELEMENT_METER_ACTIVATION[network] : null) }
+            ? XChainVM.PER_ELEMENT_METER_ACTIVATION[network] : null) },
+    { label: 'string-receiver meter', source: 'STRING_RECEIVER_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.STRING_RECEIVER_METER_ACTIVATION, network)
+            ? XChainVM.STRING_RECEIVER_METER_ACTIVATION[network] : null) },
+    { label: 'string-result meter', source: 'STRING_RESULT_METER_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.STRING_RESULT_METER_ACTIVATION, network)
+            ? XChainVM.STRING_RESULT_METER_ACTIVATION[network] : null) },
+    { label: 'toString size meter', source: 'TOSTRING_SIZE_METER_ACTIVATION',
+        resolve: (network) => XChainVM.toStringSizeMeterGateTime(network) }
 ]);
 
 module.exports = {

@@ -24,6 +24,7 @@ const cr = require('../../src/consensus-runtime.js');
 const vm = require('../../src/index.js');
 const lintCore = require('../../src/lint-core.js');
 const metering = require('../../src/metering.js');
+const armedHarness = require('../../src/index/armed_harness/select.js');
 
 // A per-coin height map a release cut armed on testnet: the six keys in order, every
 // mainnet chain unarmed (null), every testnet chain at an armed height read off the map,
@@ -63,7 +64,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('APPLY_LENGTH_METER_ACTIVATION guards length-driven native work, unarmed on mainnet and armed on testnet', function () {
-        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet;
+        const armed = vm.APPLY_LENGTH_METER_ACTIVATION.testnet, deferred = 9999999999, sizeArmed = 1792454400; // v0.25.0 testnet toString size instant
         assert.ok(Number.isSafeInteger(armed) && armed > 1, 'testnet armed block time');
         assert.deepStrictEqual(vm.APPLY_LENGTH_METER_ACTIVATION,
             { mainnet: null, testnet: armed, regtest: 0 });
@@ -74,6 +75,9 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         }
         assert.strictEqual(vm.isApplyLengthMeterActive('testnet', 1), false);
         assert.strictEqual(vm.isApplyLengthMeterActive('testnet', armed), true);
+        assert.deepStrictEqual([vm.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, Object.isSealed(vm.TOSTRING_SIZE_METER_ACTIVATION), vm.TOSTRING_SIZE_METER_ACTIVATION,
+            vm.toStringSizeMeterGateTime('unknown'), vm.isToStringSizeMeterActive('regtest', 0), vm.isToStringSizeMeterActive('mainnet', 4000000000)],
+            [deferred, true, { mainnet: deferred, testnet: sizeArmed, regtest: 0 }, deferred, true, false]);
     });
 });
 
@@ -82,6 +86,13 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
         assert.strictEqual(cr.CONSENSUS_VERSION, '7');
         assert.strictEqual(vm.CONSENSUS_VERSION, '7', 're-export must match');
+    });
+
+    it('armed harness rule order is frozen', function () {
+        assert.deepStrictEqual(armedHarness.RULES.map(({ LABEL }) => LABEL), [
+            'resource fault signal', 'host error stack strip', 'host-call bounds', 'stringify re-entry',
+            'per-element meter', 'string receiver meter', 'tostring size meter', 'native stack terminal'
+        ]);
     });
 });
 

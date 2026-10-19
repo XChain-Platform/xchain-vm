@@ -24,6 +24,8 @@ const harnessPart5 = require('../../src/index/runtime/harness_part_5.js');
 const K = 100000;
 const WALL_MS = 30000;
 const LATE = { height: 100, timestamp: 4000000000, hash: 'abc123' };
+// The v0.25.0 cut arms the string-result meter on testnet at this block time.
+const TESTNET_ARMED = 1792454400;
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 const METHODS = [
     ['anchor', `'x'.repeat(${K})`],
@@ -52,7 +54,7 @@ describe('Annex B String HTML result-length wrapper', function () {
     it('charges the exact returned string length for all 13 methods', function () {
         const context = nodeVM.createContext({});
         const source = `
-            var charged = 0;
+            var charged = 0, __stringResultMeterOn = true;
             var __allocGas = function(n) { charged += n; };
             var __lockMethod = function(o, k, fn) {
                 Object.defineProperty(o, k, {value:fn,writable:false,configurable:false});
@@ -121,13 +123,16 @@ function defineCoercionCase(run) {
 }
 
 function defineLegacyGasCase(run) {
-    it('leaves legacy gas on unarmed, unknown and pre-arm testnet blocks', async function () {
+    it('leaves legacy gas on unarmed and unknown networks', async function () {
         const body = `return 'a'.anchor('x'.repeat(${K})).length;`;
         const gas = {};
-        const early = { ...LATE, timestamp: runtime.APPLY_LENGTH_METER_ACTIVATION.testnet - 1 };
+        // Block time 0 runs testnet before its armed instant.
+        assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.mainnet, null);
+        assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.testnet, TESTNET_ARMED);
         for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
-            const extra = network === 'testnet' ? { blockContext: early } : undefined;
-            const result = await run(body, network, extra);
+            const result = await run(body, network, {
+                blockContext: { ...LATE, timestamp: 0 },
+            });
             assert.strictEqual(result.success, true, `${network}: ${result.error}`);
             gas[String(network)] = result.gasUsed;
         }
@@ -135,9 +140,21 @@ function defineLegacyGasCase(run) {
         assert.strictEqual(gas.undefined, gas.unknown);
 
         const armed = await run(body, 'regtest', { gasCeiling: undefined });
-        const armedTestnet = await run(body, 'testnet', { gasCeiling: undefined });
-        assert.strictEqual(armedTestnet.gasUsed, armed.gasUsed);
         assert.ok(armed.gasUsed >= gas.mainnet + K);
+    });
+
+    it('meters testnet from its v0.25.0 instant and not one second before', async function () {
+        const body = `return 'a'.anchor('x'.repeat(${K})).length;`;
+        const before = await run(body, 'testnet', {
+            blockContext: { ...LATE, timestamp: TESTNET_ARMED - 1 }, gasCeiling: undefined,
+        });
+        const at = await run(body, 'testnet', {
+            blockContext: { ...LATE, timestamp: TESTNET_ARMED }, gasCeiling: undefined,
+        });
+        assert.strictEqual(before.success, true, before.error);
+        assert.strictEqual(at.success, true, at.error);
+        assert.strictEqual(at.returnValue, before.returnValue);
+        assert.ok(at.gasUsed >= before.gasUsed + K, `${at.gasUsed} vs ${before.gasUsed}`);
     });
 }
 
