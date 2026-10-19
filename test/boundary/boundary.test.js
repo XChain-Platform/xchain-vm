@@ -40,12 +40,7 @@ const assert = require('assert');
 const GasTracker = require('../../src/gas.js');
 const { meterCode } = require('../../src/metering.js');
 
-let XChainVM;
-try {
-    XChainVM = require('../../src/index.js');
-} catch (e) {
-    console.log('Skipping VM boundary tests (isolated-vm not available):', e);
-}
+const XChainVM = require('../../src/index.js');
 
 const GAS_SCHEDULE = {
     VM_COMPUTATION: 1, VM_STATE_READ: 100, VM_STATE_WRITE: 200,
