@@ -24,6 +24,8 @@ const harnessPart5 = require('../../src/index/runtime/harness_part_5.js');
 const K = 100000;
 const WALL_MS = 30000;
 const LATE = { height: 100, timestamp: 4000000000, hash: 'abc123' };
+// The v0.25.0 cut arms the string-result meter on testnet at this block time.
+const TESTNET_ARMED = 1792454400;
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
 function stringRawHarnessFragment() {
@@ -71,10 +73,12 @@ describe('direct String.raw result-length wrapper', function () {
     });
 });
 
-// Legacy gas of one body on mainnet, testnet, no network and an unknown one.
+// Legacy gas of one body on mainnet, testnet, no network and an unknown one. Block time
+// 0 runs testnet before its armed instant.
 async function legacyGas(run, body) {
     const gas = {};
-    assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.testnet, null);
+    assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.mainnet, null);
+    assert.strictEqual(runtime.STRING_RESULT_METER_ACTIVATION.testnet, TESTNET_ARMED);
     for (const network of ['mainnet', 'testnet', undefined, 'unknown']) {
         const result = await run(body, network, {
             blockContext: { ...LATE, timestamp: 0 },
@@ -93,6 +97,23 @@ async function runRegtestWithoutPerElement(run, body) {
     perElement.regtest = null;
     try { return await run(body, 'regtest', { gasCeiling: undefined }); }
     finally { perElement.regtest = saved; }
+}
+
+// Testnet one second before its armed instant against testnet at that instant.
+function defineTestnetActivationCase(run) {
+    it('meters testnet from its v0.25.0 instant and not one second before', async function () {
+        const body = `var s='x'.repeat(${K});return String.raw({raw:['a','b']},s).length;`;
+        const before = await run(body, 'testnet', {
+            blockContext: { ...LATE, timestamp: TESTNET_ARMED - 1 }, gasCeiling: undefined,
+        });
+        const at = await run(body, 'testnet', {
+            blockContext: { ...LATE, timestamp: TESTNET_ARMED }, gasCeiling: undefined,
+        });
+        assert.strictEqual(before.success, true, before.error);
+        assert.strictEqual(at.success, true, at.error);
+        assert.strictEqual(at.returnValue, before.returnValue);
+        assert.ok(at.gasUsed >= before.gasUsed + K, `${at.gasUsed} vs ${before.gasUsed}`);
+    });
 }
 
 (XChainVM ? describe : describe.skip)('direct String.raw metering gate', function () {
@@ -145,4 +166,6 @@ async function runRegtestWithoutPerElement(run, body) {
         const armed = await runRegtestWithoutPerElement(run, body);
         assert.ok(armed.gasUsed >= gas.mainnet + K);
     });
+
+    defineTestnetActivationCase(run);
 });
