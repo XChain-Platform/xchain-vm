@@ -27,7 +27,7 @@ const RECEIVER = `var s=new Array(${K + 1}).join('x');` +
     'var o={length:0,toString:function(){return s;}};';
 
 // The v0.25.0 cut arms the string receiver meter on testnet at this block time.
-const TESTNET_ARMED = 1792432800;
+const TESTNET_ARMED = 1792454400;
 const TESTNET_BEFORE = { ...LATE, timestamp: TESTNET_ARMED - 1 };
 const TESTNET_AT = { ...LATE, timestamp: TESTNET_ARMED };
 

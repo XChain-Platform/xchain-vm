@@ -33,7 +33,7 @@ const PINNED = {
 // The v0.25.0 cut arms testnet at this block time. These are the armed wrappers'
 // String(fn) hashes, taken from this file's own body on testnet at that instant; regtest
 // produces the same five.
-const TESTNET_ARMED = 1792432800;
+const TESTNET_ARMED = 1792454400;
 const ARMED = {
     repeat: '20cb035ee9ce4e28333d448694d8c6c36519eca877ee84e4b92e80c322a4bf91',
     concat: '8d1c3d24d8a66f7f291eddbc9e8846fb0eeafccc2372368b402bca33cb6496bc',

@@ -25,7 +25,7 @@ const K = 100000;
 const WALL_MS = 30000;
 const LATE = { height: 100, timestamp: 4000000000, hash: 'abc123' };
 // The v0.25.0 cut arms the string-result meter on testnet at this block time.
-const TESTNET_ARMED = 1792432800;
+const TESTNET_ARMED = 1792454400;
 const wrap = (body) => `module.exports = function(xchain) { ${body} };`;
 
 function stringRawHarnessFragment() {

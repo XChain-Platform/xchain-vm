@@ -29,8 +29,8 @@ describe('toString size meter public activation', function () {
     });
 
     it('keeps mainnet unarmed and arms testnet at its v0.25.0 instant while regtest is active from genesis', function () {
-        // The v0.25.0 cut arms testnet at block time 1792432800.
-        const testnetArmed = 1792432800;
+        // The v0.25.0 cut arms testnet at block time 1792454400.
+        const testnetArmed = 1792454400;
         assert.strictEqual(XChainVM.TOSTRING_SIZE_METER_GATE_BLOCK_TIME, deferred);
         assert.ok(Object.isSealed(XChainVM.TOSTRING_SIZE_METER_ACTIVATION));
         assert.deepStrictEqual(XChainVM.TOSTRING_SIZE_METER_ACTIVATION, {

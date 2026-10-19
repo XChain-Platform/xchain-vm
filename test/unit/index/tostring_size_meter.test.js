@@ -21,8 +21,8 @@ const {
 describe('toString size meter activation', function () {
     const deferred = 9999999999;
 
-    // The v0.25.0 cut arms testnet at block time 1792432800.
-    const testnetArmed = 1792432800;
+    // The v0.25.0 cut arms testnet at block time 1792454400.
+    const testnetArmed = 1792454400;
 
     it('exports the deferred scalar and sealed network activation map', function () {
         assert.strictEqual(TOSTRING_SIZE_METER_GATE_BLOCK_TIME, deferred);
