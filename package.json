@@ -84,7 +84,7 @@
     "mutation:custom": "node test/mutation/support/stryker-xchain-vm-mutator/index.js",
     "mutation:custom:critical": "node test/mutation/support/stryker-xchain-vm-mutator/index.js --mutate 'src/gas.js,src/sandbox.js,src/metering.js,src/index.js,src/index/*.js,src/index/methods/*.js'",
     "mutation:custom:dryrun": "node test/mutation/support/stryker-xchain-vm-mutator/index.js --dryRun",
-    "mutation:report": "node scripts/mutation-report.js",
+    "mutation:report": "node bin/mutation-report.js",
     "mutation:ci": "stryker run test/mutation/stryker.config.json --incremental --incrementalFile reports/mutation/.stryker-incremental.json",
     "test:regression:smoke": "mocha --timeout 10000 'test/regression/p0_smoke_regression.test.js'",
     "test:regression:core": "mocha --timeout 30000 'test/regression/p0_smoke_regression.test.js' 'test/regression/p1_security_regression.test.js'",
