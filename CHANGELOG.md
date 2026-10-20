@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-20
+
+### Changed
+- Moved the shared height-gate resolver into src/index/height_gates.
+- Wired lint nesting depth into simulator deploy verdicts.
+- Hardened the lint scanners and coin resolvers.
+
+### Fixed
+- Listed the string-receiver meter in the simulator network time gates.
+
 ## [0.25.0] - 2026-10-18
 
 ### Added
