@@ -80,4 +80,4 @@ function deriveHarness(source, rules) {
     return out.slice(0, out.length - CLOSING.length) + helpers + CLOSING;
 }
 
-module.exports = { deriveHarness, locateEdits, CLOSING };
+module.exports = { deriveHarness };

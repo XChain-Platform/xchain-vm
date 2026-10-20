@@ -51,7 +51,8 @@ function manifest(leg, over) {
         platform: TAGS[leg],
         node: '22.22.3',
         entries: [{ index: 0, resultHash: 'a' }, { index: 1, resultHash: 'b' }],
-        consensusRuntime: { ok: true, mismatches: [] }
+        consensusRuntime: { ok: true, mismatches: [] },
+        consensusDependencies: { ok: true, mismatches: [] }
     }, over || {});
 }
 
@@ -133,6 +134,14 @@ describe('differential-fuzz leg identity check', function () {
         const leg = 'linux-x64-glibc';
         const p = checkLegManifest(leg, manifest(leg, { platform: 'linux-x64-node22-v8_12.4.254.99-node.1-glibc2.39' }));
         assert.ok(p.some(x => /pinned/.test(x)), p.join('\n'));
+    });
+
+    it('fails an off-pin or unrecorded consensus dependency set', function () {
+        const off = { ok: false, mismatches: [{ key: 'mathjs', expected: '15.1.1', actual: '15.2.0' }] };
+        assert.ok(checkLegManifest('linux-arm64-musl', manifest('linux-arm64-musl', { consensusDependencies: off }))
+            .some(x => /consensus dependencies off-pin/.test(x)));
+        assert.ok(checkLegManifest('linux-arm64-musl', manifest('linux-arm64-musl', { consensusDependencies: undefined }))
+            .some(x => /no consensusDependencies/.test(x)));
     });
 
     it('fails an unknown leg name', function () {

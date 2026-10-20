@@ -71,6 +71,9 @@ function checkLegManifest(leg, manifest, expected) {
     const rt = manifest.consensusRuntime;
     if (!rt || typeof rt !== 'object') problems.push(`${leg}: no consensusRuntime verdict (record without --require-pinned-runtime?)`);
     else if (rt.ok !== true) problems.push(`${leg}: consensus runtime off-pin: ${JSON.stringify(rt.mismatches || [])}`);
+    const deps = manifest.consensusDependencies;
+    if (!deps || typeof deps !== 'object') problems.push(`${leg}: no consensusDependencies verdict (record without --require-pinned-runtime?)`);
+    else if (deps.ok !== true) problems.push(`${leg}: consensus dependencies off-pin: ${JSON.stringify(deps.mismatches || [])}`);
     const m = pattern.exec(String(manifest.platform || ''));
     if (!m) problems.push(`${leg}: platform ${JSON.stringify(manifest.platform)} does not match ${pattern}`);
     else if (m[1] !== PINNED.v8) problems.push(`${leg}: V8 ${m[1]}, pinned ${PINNED.v8}`);

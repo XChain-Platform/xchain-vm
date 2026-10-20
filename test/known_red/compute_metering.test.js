@@ -135,7 +135,7 @@ describe('Object statics must be size-metered', function () {
     }
 });
 
-describe('Object statics must be size-metered', function () {
+describe('syntax-level allocators (spread) must be size-metered', function () {
     this.timeout(120000);
 
     // Syntax-level allocators (G4): the metering pass rewrites these into the

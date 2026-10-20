@@ -4,6 +4,7 @@
 const acorn = require('acorn');
 const walk  = require('acorn-walk');
 const { CONTRACT_ECMA_VERSION } = require('../metering.js');
+const { isHostStackOverflow } = require('../metering/reserved_identifiers.js');
 const {
     BANNED_MATH_MEMBERS,
     SAFE_MATH_MEMBERS,
@@ -37,9 +38,10 @@ const {
  *        (SDK linter, CLI, unit tests), as the sibling scanners do.
  * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
  * @param {boolean} [destructure=true] - LINT_DESTRUCTURE consensus flag
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse
  * @returns {Array<{name: string, line: (number|string), transcendental: boolean}>}
  */
-function findBannedMathCalls(code, hardened, aliased, optionalChain, destructure) {
+function findBannedMathCalls(code, hardened, aliased, optionalChain, destructure, overflowIsHostFault) {
     if (hardened === undefined) hardened = true;
     if (aliased === undefined) aliased = true;
     if (optionalChain === undefined) optionalChain = true;
@@ -53,6 +55,7 @@ function findBannedMathCalls(code, hardened, aliased, optionalChain, destructure
             locations: true
         });
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         // Parse failure; validateSyntax's earlier checks would have caught this.
         return hits;
     }
@@ -152,14 +155,16 @@ function findBannedProtoMethods(code) {
  * Emitted under rule 'banned-math'; contracts use xchain.math.pow() instead.
  *
  * @param {string} code - Contract source code
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse
  * @returns {Array<{op: string, line: (number|string)}>}
  */
-function findBannedExponentiation(code) {
+function findBannedExponentiation(code, overflowIsHostFault) {
     const hits = [];
     let ast;
     try {
         ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         return hits;
     }
     walk.simple(ast, {
@@ -181,9 +186,10 @@ function findBannedExponentiation(code) {
  * first offending name or null, mirroring metering.js findReservedIdentifier.
  *
  * @param {string} code - Contract source code
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse or walk
  * @returns {string|null}
  */
-function findReservedControlBinding(code) {
+function findReservedControlBinding(code, overflowIsHostFault) {
     let found = null;
     try {
         const ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script' });
@@ -192,6 +198,7 @@ function findReservedControlBinding(code) {
                 found = node.name;
         });
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         // Parse failure; lintSource's metering pass reports it as blocking.
     }
     return found;
@@ -203,14 +210,16 @@ function findReservedControlBinding(code) {
  * `bigint` property and RegExp literals with a `regex` property on the Literal node.
  *
  * @param {string} code - Contract source code
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse
  * @returns {Array<{kind: string, line: (number|string)}>}
  */
-function findBannedLiterals(code) {
+function findBannedLiterals(code, overflowIsHostFault) {
     const hits = [];
     let ast;
     try {
         ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         return hits;
     }
     walk.simple(ast, {
@@ -316,14 +325,16 @@ function collectBannedRest(node, stack, hits) {
  * contract using these forms deploys and replays exactly as it historically did.
  *
  * @param {string} code - Contract source code
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse
  * @returns {Array<{kind: string, line: (number|string)}>}
  */
-function findBannedRest(code) {
+function findBannedRest(code, overflowIsHostFault) {
     const hits = [];
     let ast;
     try {
         ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         return hits;
     }
     // NOT walk.ancestor. acorn-walk's ObjectPattern base descends straight into a rest

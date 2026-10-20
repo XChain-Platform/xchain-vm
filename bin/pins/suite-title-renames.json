@@ -40,7 +40,7 @@
     "test/unit/read-manifest.test.js": "test/unit/runtime/read_manifest.test.js",
     "test/unit/readonly-accessors.test.js": "test/unit/state/readonly_accessors.test.js",
     "test/unit/sandbox.test.js": "test/unit/sandbox/sandbox.test.js",
-    "test/unit/scripts-mutation-report.test.js": "test/unit/meta/scripts_mutation_report.test.js",
+    "test/unit/scripts-mutation-report.test.js": "test/unit/meta/bin_mutation_report.test.js",
     "test/unit/security/configuration/dependency-advisories.test.js": "test/unit/security/configuration/dependency_advisories.test.js",
     "test/unit/sibling-coverage.test.js": "test/unit/meta/sibling_coverage.test.js",
     "test/unit/state.test.js": "test/unit/state/state.test.js",

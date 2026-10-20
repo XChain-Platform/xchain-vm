@@ -26,6 +26,8 @@
  ********************************************************************/
 'use strict';
 
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
+
 const RESOURCE_FAULT_SIGNAL_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
@@ -35,16 +37,8 @@ const RESOURCE_FAULT_SIGNAL_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-function resolveResourceFaultSignalActive(map, network, coin, blockHeight) {
-    if (network === 'regtest') return true;
-    if (network !== 'testnet' && network !== 'mainnet') return false;
-
-    const height = Number(blockHeight);
-    if (!Number.isFinite(height) || coin == null) return false;
-
-    const threshold = map[coin + ':' + network];
-    return Number.isFinite(threshold) && height >= threshold;
-}
+// Resolve this gate through the shared regtest-genesis per-coin height rule.
+const resolveResourceFaultSignalActive = resolveRegtestGenesisHeightGate;
 
 function isResourceFaultSignalActive(network, coin, blockHeight) {
     return resolveResourceFaultSignalActive(

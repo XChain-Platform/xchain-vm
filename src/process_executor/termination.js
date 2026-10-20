@@ -45,4 +45,4 @@ function hostTerminatedResult(gasCeiling, kind) {
     };
 }
 
-module.exports = { SELF_INFLICTED_SIGNALS, isSelfInflicted, hostTerminatedResult };
+module.exports = { isSelfInflicted, hostTerminatedResult };

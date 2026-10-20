@@ -12,8 +12,8 @@
  *
  *********************************************************************/
 
-// Coverage for the scripts component
-// (scripts/mutation-report.js). The report generator self-executes on load
+// Coverage for the mutation report generator
+// (bin/mutation-report.js). The report generator self-executes on load
 // (it reads Stryker/custom JSON and writes reports/mutation/MUTATION_SUMMARY.md),
 // so running it here would mutate the repo. This pins its structural contract
 // by compiling and inspecting the source: it must read the two known mutant
@@ -24,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const SRC = path.join(__dirname, '../../../scripts/mutation-report.js');
+const SRC = path.join(__dirname, '../../../bin/mutation-report.js');
 const source = fs.readFileSync(SRC, 'utf8').replace(/^#!.*\n/, '');
 
 // main() self-executes on load and can process.exit(1), so the
@@ -43,7 +43,7 @@ function loadReportInternals() {
     return sandbox.module.exports;
 }
 
-describe('scripts/mutation-report (static contract)', function () {
+describe('bin/mutation-report (static contract)', function () {
     it('is syntactically valid JavaScript (compiles without executing)', function () {
         assert.doesNotThrow(() => new vm.Script(source, { filename: 'mutation-report.js' }));
     });

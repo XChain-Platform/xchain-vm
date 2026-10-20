@@ -44,14 +44,24 @@ const DEPTH_HELPERS = ['__depth_enter', '__depth_exit'];
 const RESERVED_IDENTIFIERS = ['__gas'].concat(ALLOC_HELPERS).concat(DEPTH_HELPERS);
 const HELPER_SET = new Set(ALLOC_HELPERS);
 
+// A host stack overflow: a property of this machine's stack size and JIT state, not
+// of the source. V8 says RangeError, SpiderMonkey InternalError ("too much recursion").
+// Lives here, a leaf every lint scanner can require without a cycle.
+function isHostStackOverflow(e) {
+    return !!e && (e.name === 'RangeError' || e.name === 'InternalError') &&
+        /call stack|too much recursion/i.test(String(e.message));
+}
+
 /**
  * Find the first reserved identifier used in the source, if any. Reserved names
  * are the harness-injected metering hooks (__gas + the allocator helpers); a
  * contract may not define or reference them or it could bypass/forge metering.
  * @param {string} source - Contract source code
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow instead of
+ *        reporting no reserved name (lintSource passes its own flag)
  * @returns {string|null} the offending reserved name, or null if none
  */
-function findReservedIdentifier(source) {
+function findReservedIdentifier(source, overflowIsHostFault) {
     try {
         const ast = acorn.parse(source, {
             ecmaVersion: CONTRACT_ECMA_VERSION,
@@ -66,6 +76,7 @@ function findReservedIdentifier(source) {
         });
         return found;
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         // If parsing fails, let validateSyntax handle it
         return null;
     }
@@ -74,4 +85,7 @@ function findReservedIdentifier(source) {
 // Back-compat boolean form (the __gas-only check callers may still use).
 function hasGasIdentifier(source) { return findReservedIdentifier(source) !== null; }
 
-module.exports = { CONTRACT_ECMA_VERSION, ALLOC_HELPERS, DEPTH_HELPERS, RESERVED_IDENTIFIERS, HELPER_SET, findReservedIdentifier, hasGasIdentifier };
+module.exports = {
+    CONTRACT_ECMA_VERSION, ALLOC_HELPERS, DEPTH_HELPERS, RESERVED_IDENTIFIERS, HELPER_SET,
+    findReservedIdentifier, hasGasIdentifier, isHostStackOverflow
+};

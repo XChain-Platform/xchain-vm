@@ -53,8 +53,11 @@
  *   - height-gate activation: the default block HEIGHT sits at the newest armed
  *     per-coin activation for the configured (coin, network), so a mainnet
  *     simulation runs the Package-3 sandbox and the other height-keyed gates the
- *     live chain runs. regtest/testnet stay at height 1 (genesis-active). Pin a
- *     lower height to simulate the pre-activation rules (it warns once).
+ *     live chain runs. testnet follows the same rule: some height gates are not
+ *     on from genesis there, so it starts at testnet's highest armed threshold.
+ *     regtest stays at height 1, since every height gate is on from genesis
+ *     there. Pin a lower height to simulate the pre-activation rules (it warns
+ *     once).
  *
  * What it does NOT do (out of scope; that is the real indexer + regtest):
  *   - process emitted ACTIONs against the ledger (SEND/ISSUE/... are captured
@@ -256,9 +259,11 @@ class ContractSimulator {
      *        block-time-keyed meters are ON and gas matches a live chain; a
      *        lower value simulates the pre-activation rule set and warns once.
      *        height defaults to the newest ARMED activation height for
-     *        (coin, network) across the exported per-coin gate maps -- 1 on
-     *        regtest/testnet, which activate from genesis -- so a mainnet
-     *        simulation runs today's rule set; a lower value warns once too.
+     *        (coin, network) across the exported per-coin gate maps (1 on
+     *        regtest, where every height gate is on from genesis; on testnet
+     *        the highest armed threshold of any gate not on from genesis
+     *        there), so a mainnet or testnet simulation runs today's rule set;
+     *        a lower value warns once too.
      * @param {string} [opts.defaultCaller]  - caller address used when a call omits one
      * @param {string} [opts.execution='in-process'] - VM execution mode. Not a
      *        pure latency knob: the two modes differ on a RESULT. in-process

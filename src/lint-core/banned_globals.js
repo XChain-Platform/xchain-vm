@@ -4,13 +4,15 @@
 const acorn = require('acorn');
 const walk  = require('acorn-walk');
 const { CONTRACT_ECMA_VERSION } = require('../metering.js');
+const { isHostStackOverflow } = require('../metering/reserved_identifiers.js');
 const { ADVISORY_STRIPPED_GLOBALS } = require('./constants.js');
 const {
     isGlobalObjectRef, isGlobalObjectPathRef, staticMemberKey,
     objectPatternEntries, scopeDeclares
 } = require('./scope_analysis.js');
 
-function parseSource(code) {
+// With overflowIsHostFault a host stack overflow is rethrown, never read as "no hits".
+function parseSource(code, overflowIsHostFault) {
     try {
         return acorn.parse(code, {
             ecmaVersion: CONTRACT_ECMA_VERSION,
@@ -18,6 +20,7 @@ function parseSource(code) {
             locations: true
         });
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         return null;
     }
 }
@@ -67,15 +70,16 @@ function destructuredGlobalEntries(node, name, aliased, optionalChain) {
  * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
  * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
  * @param {boolean} [destructure=true] - LINT_DESTRUCTURE consensus flag
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse
  * @returns {Array<{kind: string, line: (number|string)}>}
  */
-function findBannedAsync(code, hardened, aliased, optionalChain, destructure) {
+function findBannedAsync(code, hardened, aliased, optionalChain, destructure, overflowIsHostFault) {
     if (hardened === undefined) hardened = true;
     if (aliased === undefined) aliased = true;
     if (optionalChain === undefined) optionalChain = true;
     if (destructure === undefined) destructure = true;
     const hits = [];
-    const ast = parseSource(code);
+    const ast = parseSource(code, overflowIsHostFault);
     if (!ast) return hits;
     const markAsync = (node) => {
         if (node.async) hits.push({ kind: 'async', line: node.loc ? node.loc.start.line : '?' });
@@ -146,14 +150,16 @@ function findBannedAsync(code, hardened, aliased, optionalChain, destructure) {
  * in sloppy-mode script, never a YieldExpression) is intentionally NOT matched.
  *
  * @param {string} code - Contract source code
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse
  * @returns {Array<{kind: string, line: (number|string)}>}
  */
-function findBannedGenerator(code) {
+function findBannedGenerator(code, overflowIsHostFault) {
     const hits = [];
     let ast;
     try {
         ast = acorn.parse(code, { ecmaVersion: CONTRACT_ECMA_VERSION, sourceType: 'script', locations: true });
     } catch (e) {
+        if (overflowIsHostFault && isHostStackOverflow(e)) throw e;
         return hits;
     }
     const markGen = (node) => {
@@ -198,14 +204,15 @@ function findBannedGenerator(code) {
  * @param {boolean} [aliased=true] - LINT_GLOBAL_ALIAS consensus flag
  * @param {boolean} [optionalChain=true] - LINT_OPTIONAL_CHAIN consensus flag
  * @param {boolean} [destructure=true] - LINT_DESTRUCTURE consensus flag
+ * @param {boolean} [overflowIsHostFault] - rethrow a host stack overflow from the parse
  * @returns {Array<{line: (number|string)}>}
  */
-function findBannedWasm(code, aliased, optionalChain, destructure) {
+function findBannedWasm(code, aliased, optionalChain, destructure, overflowIsHostFault) {
     if (aliased === undefined) aliased = true;
     if (optionalChain === undefined) optionalChain = true;
     if (destructure === undefined) destructure = true;
     const hits = [];
-    const ast = parseSource(code);
+    const ast = parseSource(code, overflowIsHostFault);
     if (!ast) return hits;
     const markDestructuredWasm = (node) => {
         if (!destructure) return;

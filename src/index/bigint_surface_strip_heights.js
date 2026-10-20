@@ -15,6 +15,8 @@
  ********************************************************************/
 'use strict';
 
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
+
 const BIGINT_SURFACE_STRIP_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
@@ -24,16 +26,8 @@ const BIGINT_SURFACE_STRIP_ACTIVATION = Object.freeze({
     'DOGE:testnet': 67989993,
 });
 
-function resolveBigIntSurfaceStripActive(map, network, coin, blockHeight) {
-    if (network === 'regtest') return true;
-    if (network !== 'testnet' && network !== 'mainnet') return false;
-
-    const height = Number(blockHeight);
-    if (!Number.isFinite(height) || coin == null) return false;
-
-    const threshold = map[coin + ':' + network];
-    return Number.isFinite(threshold) && height >= threshold;
-}
+// Resolve this gate through the shared regtest-genesis per-coin height rule.
+const resolveBigIntSurfaceStripActive = resolveRegtestGenesisHeightGate;
 
 function isBigIntSurfaceStripActive(network, coin, blockHeight) {
     return resolveBigIntSurfaceStripActive(

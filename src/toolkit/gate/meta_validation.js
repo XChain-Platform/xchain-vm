@@ -319,10 +319,8 @@ module.exports = {
     META_DESCRIPTION_MAX_BYTES,
     META_VERSION_MAX_BYTES,
     isBannedMetaCodePoint,
-    META_EDGE_CODE_POINTS,
     isMetaEdgeCodePoint,
     isValidMetaText,
-    readMetaLiterals,
     getExportedMeta,
     checkContractMeta
 };

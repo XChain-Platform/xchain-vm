@@ -91,9 +91,22 @@ const GATED_STRIPPED_PROTO_METHODS_TAUGHT = Object.freeze([
 // Matching in findReservedIdentifier / findReservedControlBinding is on the exact
 // name, so a prefix wording would ban ordinary names (`__gasBudget`) the chain
 // allows while missing the helpers it does not.
-const { RESERVED_IDENTIFIERS } = require('../../metering.js');
+const { RESERVED_IDENTIFIERS, CONTRACT_ECMA_VERSION } = require('../../metering.js');
 const { RESERVED_CONTROL_BINDINGS } = require('../../lint-core.js');
 const RESERVED_NAMES_TAUGHT = RESERVED_IDENTIFIERS.concat(RESERVED_CONTROL_BINDINGS);
+
+// The resource caps, taught from resolveLimits(), the VM's own isolated-vm-free
+// back-fill, which simulator_defaults_cross_repo pins to the indexer. The key cap is
+// only StateManager's inline fallback (its error text is frozen), so it is restated
+// here and held equal to StateManager's behaviour by test/toolkit/authoring.test.js.
+const { resolveLimits } = require('../../index/runtime/limits_defaults.js');
+const VM_DEFAULT_LIMITS = resolveLimits();
+const LIMITS_TAUGHT = Object.freeze({
+    maxStateKeySize:   1024,
+    maxStateValueSize: VM_DEFAULT_LIMITS.maxStateValueSize,
+    maxStateKeys:      VM_DEFAULT_LIMITS.maxStateKeys,
+    maxEmissions:      VM_DEFAULT_LIMITS.maxEmissions
+});
 
 // Non-negotiable rules the generated contract MUST satisfy; teaching them up
 // front cuts repair rounds. Most are deploy-blocking (lint-core CONSENSUS_RULES,
@@ -131,11 +144,15 @@ const HARD_RULES = [
         '. The sandbox deletes these behind an activation height (always on regtest and in the ' +
         'simulator default, on testnet past its activation height, on mainnet once activated), ' +
         'so a contract that uses one deploys and then throws at execution. Use xchain.math.* instead.',
-    'ES2020 syntax maximum (no numeric separators, no logical-assignment, no top-level await).',
+    // The bracketed examples are the features just past ES2020; revisit them when
+    // CONTRACT_ECMA_VERSION moves.
+    'ES' + CONTRACT_ECMA_VERSION + ' syntax maximum (no numeric separators, no logical-assignment, no top-level await).',
     'Do not declare or reference these reserved identifiers (the metering pass and the contract wrapper inject them; the deploy gate rejects any reference): ' +
         RESERVED_NAMES_TAUGHT.join(', ') +
         '. Matching is on the exact name, so an ordinary name such as `__gasBudget` is fine.',
-    'State keys <= 1024 bytes, values <= 65536 bytes (JSON), <= 10000 keys total; at most 50 emitted actions per call.'
+    'State keys <= ' + LIMITS_TAUGHT.maxStateKeySize + ' bytes, values <= ' + LIMITS_TAUGHT.maxStateValueSize +
+        ' bytes (JSON), <= ' + LIMITS_TAUGHT.maxStateKeys + ' keys total; at most ' + LIMITS_TAUGHT.maxEmissions +
+        ' emitted actions per call.'
 ];
 
 const CONTRACT_SHAPE = [
@@ -167,6 +184,7 @@ module.exports = {
     GATED_STRIPPED_GLOBALS_TAUGHT,
     GATED_STRIPPED_PROTO_METHODS_TAUGHT,
     RESERVED_NAMES_TAUGHT,
+    LIMITS_TAUGHT,
     HARD_RULES,
     CONTRACT_SHAPE
 };

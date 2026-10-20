@@ -374,10 +374,10 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('XCALL_MAX_HOPS is single-sourced from the emit-time enforcer and pinned', function () {
-        // gateway-emit.js declares the hop cap it enforces (crossExecute's hop
-        // gate) and index.js re-exports that same binding for the cross-service
-        // parity suite. Pin both the value and the single-sourcing so a future
-        // bump cannot leave the enforcer and the parity-tested export diverging.
+        // gateway-emit.js reads the hop cap from src/protocol/constants.js and
+        // enforces it (crossExecute's hop gate); src/index/constants.js re-exports
+        // that same binding for the cross-service parity suite. Pin both the value
+        // and the shared binding so the enforcer and the export cannot diverge.
         const gatewayEmit = require('../../../src/gateway-emit.js');
         assert.strictEqual(vm.XCALL_MAX_HOPS, 2);
         assert.strictEqual(gatewayEmit.XCALL_MAX_HOPS, vm.XCALL_MAX_HOPS,

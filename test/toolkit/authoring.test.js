@@ -113,6 +113,26 @@ describe('Toolkit authoring: knowledge base', function () {
         }
     });
 
+    it('teaches the resource caps and ES version the VM enforces, not a copy of them', function () {
+        const { LIMITS_TAUGHT } = require('../../src/toolkit/authoring/authoring_knowledge.js');
+        const { resolveLimits } = require('../../src/index/runtime/limits_defaults.js');
+        const StateManager = require('../../src/state.js');
+        const vm = resolveLimits();
+        for (const key of ['maxStateValueSize', 'maxStateKeys', 'maxEmissions']) {
+            assert.strictEqual(LIMITS_TAUGHT[key], vm[key], key + ' is taught as a different cap than the VM applies');
+        }
+        // The taught key cap is the one StateManager enforces when limits omit it.
+        const state = new StateManager({}, { maxStateValueSize: vm.maxStateValueSize, maxStateKeys: vm.maxStateKeys });
+        state.set('k'.repeat(LIMITS_TAUGHT.maxStateKeySize), '1');
+        assert.throws(() => state.set('k'.repeat(LIMITS_TAUGHT.maxStateKeySize + 1), '1'),
+            /state key exceeds max size/);
+        const text = KNOWLEDGE.hardRules.join('\n');
+        assert.ok(text.includes('ES' + meteringMod.CONTRACT_ECMA_VERSION + ' syntax maximum'));
+        assert.ok(text.includes('State keys <= ' + LIMITS_TAUGHT.maxStateKeySize + ' bytes, values <= ' +
+            LIMITS_TAUGHT.maxStateValueSize + ' bytes (JSON), <= ' + LIMITS_TAUGHT.maxStateKeys +
+            ' keys total; at most ' + LIMITS_TAUGHT.maxEmissions + ' emitted actions per call.'));
+    });
+
     it('KNOWLEDGE.contractShape is itself a gate-clean contract', function () {
         // If our own teaching example would be rejected on deploy, the prompt is lying.
         const g = runGate(KNOWLEDGE.contractShape);

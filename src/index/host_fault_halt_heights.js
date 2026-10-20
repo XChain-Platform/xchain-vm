@@ -15,6 +15,8 @@
  ********************************************************************/
 'use strict';
 
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
+
 const HOST_FAULT_HALT_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
@@ -25,14 +27,7 @@ const HOST_FAULT_HALT_ACTIVATION = Object.freeze({
 });
 
 function isHostFaultHaltActive(network, coin, blockHeight) {
-    if (network === 'regtest') return true;
-    if (network !== 'mainnet' && network !== 'testnet') return false;
-
-    const height = Number(blockHeight);
-    if (!Number.isFinite(height) || coin == null) return false;
-
-    const threshold = HOST_FAULT_HALT_ACTIVATION[coin + ':' + network];
-    return Number.isFinite(threshold) && height >= threshold;
+    return resolveRegtestGenesisHeightGate(HOST_FAULT_HALT_ACTIVATION, network, coin, blockHeight);
 }
 
 module.exports = {

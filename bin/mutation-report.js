@@ -22,10 +22,10 @@
 //   - Operator summary statistics
 //
 // Usage:
-//   node scripts/mutation-report.js
-//   node scripts/mutation-report.js --stryker reports/mutation/mutation-score.json
-//   node scripts/mutation-report.js --custom reports/mutation/custom-mutant-results.json
-//   node scripts/mutation-report.js --stryker path1 --custom path2
+//   node bin/mutation-report.js
+//   node bin/mutation-report.js --stryker reports/mutation/mutation-score.json
+//   node bin/mutation-report.js --custom reports/mutation/custom-mutant-results.json
+//   node bin/mutation-report.js --stryker path1 --custom path2
 
 const fs   = require('fs');
 const path = require('path');

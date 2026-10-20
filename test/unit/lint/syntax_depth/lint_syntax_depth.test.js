@@ -147,6 +147,55 @@ describe('deploy-lint: syntax depth refusals', function () {
     });
 });
 
+describe('deploy-lint: host stack overflow in the consensus scanners', function () {
+    this.timeout(60000);
+
+    it('treats a host stack overflow in every consensus scanner as a fault only when asked', function () {
+        const lint = require('../../../../src/lint-core.js');
+        const { findReservedIdentifier } = require('../../../../src/metering.js');
+        const code = wrap(SHAPES.not(60000));
+        const scanners = {
+            findReservedIdentifier: [(f) => findReservedIdentifier(code, f), null],
+            findReservedControlBinding: [(f) => lint.findReservedControlBinding(code, f), null],
+            findBannedMathCalls: [(f) => lint.findBannedMathCalls(code, true, true, true, true, f), []],
+            findBannedExponentiation: [(f) => lint.findBannedExponentiation(code, f), []],
+            findBannedLiterals: [(f) => lint.findBannedLiterals(code, f), []],
+            findBannedAsync: [(f) => lint.findBannedAsync(code, true, true, true, true, f), []],
+            findBannedGenerator: [(f) => lint.findBannedGenerator(code, f), []],
+            findBannedRest: [(f) => lint.findBannedRest(code, f), []],
+            findBannedWasm: [(f) => lint.findBannedWasm(code, true, true, true, f), []],
+            findBannedWith: [(f) => lint.findBannedWith(code, f), []]
+        };
+        for (const [name, [scan, empty]] of Object.entries(scanners)) {
+            assert.throws(() => scan(true), (e) => isHostStackOverflow(e), name);
+            assert.deepStrictEqual(scan(undefined), empty, name);
+        }
+    });
+
+    it('never turns a scanner overflow after a clean metering parse into a clean deploy verdict', function () {
+        const acorn = require('acorn');
+        const { HostFaultError } = require('../../../../src/errors.js');
+        const code = 'module.exports = { m: function (xchain) { return Math.pow(2, 3); } };';
+        const real = acorn.parse;
+        // Overflow parse number `target`; calls 1 to 10 after the metering parse (call 0)
+        // are the ten consensus scanners.
+        const withOverflowAt = (target, run) => {
+            let calls = 0;
+            acorn.parse = function () {
+                if (calls++ === target) throw new RangeError('Maximum call stack size exceeded');
+                return real.apply(this, arguments);
+            };
+            try { return run(); } finally { acorn.parse = real; }
+        };
+        for (let target = 1; target <= 10; target++) {
+            assert.throws(() => withOverflowAt(target, () => validateSyntax(code, REGTEST_DEPLOY)),
+                (e) => e instanceof HostFaultError, 'call ' + target);
+            assert.doesNotThrow(() => withOverflowAt(target, () => validateSyntax(code, UNARMED_DEPLOY)), 'call ' + target);
+        }
+        assert.strictEqual(validateSyntax(code, REGTEST_DEPLOY).valid, false);
+    });
+});
+
 describe('execute-time lint: syntax depth', function () {
     this.timeout(60000);
     let vm;

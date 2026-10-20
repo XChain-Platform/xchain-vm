@@ -29,7 +29,8 @@
  * terminal, gas-ceiling exhaustion, JSON.stringify re-entry, host error stack
  * strip, host-fault halt), and the per-network activation tables listed in NETWORK_GATES
  * (iterator/Set meter, apply-length meter, host-call bounds, per-element meter,
- * gas-ceiling success, JSON.stringify hook; null is off, 0 is on from genesis),
+ * string-receiver meter, string-result meter, toString size meter, gas-ceiling
+ * success, JSON.stringify hook; null is off, 0 is on from genesis),
  * whose latest armed time is folded into the probe block. The height gates only
  * resolve on a named network, so the probe passes NETWORK explicitly, and it
  * refuses to run when an armed gate is not active at the probe block or when a
@@ -61,6 +62,7 @@ const runtime = require('../../../src/consensus-runtime.js');
 const { CONSENSUS_MAX_WALL_MS } = require('../../../src/consensus-wall-clock.js');
 
 const GAS_CEILING = 1000000;
+// Quoted for PINNED v8 12.4.254.21-node.56; re-measure and update every copy on a re-pin.
 const DOCUMENTED_MS = 750;
 const ADVISORY_RATIO = 10;
 const K = 100000;

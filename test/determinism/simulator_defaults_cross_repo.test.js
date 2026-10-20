@@ -74,6 +74,7 @@ const { CANONICAL_GAS_KEYS } = require('../../src/gas.js');
 const { MAX_CODE_SIZE } = require('../../src/lint-core.js');
 const { VM_MAX_CALL_DEPTH, VM_MIN_CALL_GAS } = require('../../src/protocol/constants.js');
 const { CONSENSUS_MAX_WALL_MS } = require('../../src/consensus-wall-clock.js');
+const { resolveLimits } = require('../../src/index/runtime/limits_defaults.js');
 
 // The frozen values. Editing one here without moving the indexer coin configs
 // (and the VM constants the limits are single-sourced from) is the exact mistake
@@ -194,6 +195,13 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
         // and at/after the flag-day it is the value every node actually runs.
         assert.strictEqual(DEFAULT_LIMITS.maxCpuTimeMs, CONSENSUS_MAX_WALL_MS,
             'the simulator wall budget no longer matches the consensus wall-clock constant');
+        // The VM's own back-fill is what the authoring prompt teaches, so tying it to
+        // these indexer-pinned defaults ties the prompt to the chain too.
+        const vm = resolveLimits();
+        for (const key of ['maxEmissions', 'maxStateKeys', 'maxStateValueSize']) {
+            assert.strictEqual(vm[key], DEFAULT_LIMITS[key],
+                'resolveLimits() ' + key + ' disagrees with the simulator default the indexer is pinned to');
+        }
     });
 });
 

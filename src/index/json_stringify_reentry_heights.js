@@ -15,6 +15,8 @@
  ********************************************************************/
 'use strict';
 
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
+
 // Activation for re-entrant JSON.stringify on the value-hook path. That path keeps
 // its walk state in a frame pool and a forwarded key list shared by every call, so a
 // toJSON method, replacer function or getter that calls JSON.stringify itself
@@ -33,16 +35,8 @@ const JSON_STRINGIFY_REENTRY_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-function resolveJsonStringifyReentryActive(map, network, coin, blockHeight) {
-    if (network === 'regtest') return true;
-    if (network !== 'testnet' && network !== 'mainnet') return false;
-
-    const height = Number(blockHeight);
-    if (!Number.isFinite(height) || coin == null) return false;
-
-    const threshold = map[coin + ':' + network];
-    return Number.isFinite(threshold) && height >= threshold;
-}
+// Resolve this gate through the shared regtest-genesis per-coin height rule.
+const resolveJsonStringifyReentryActive = resolveRegtestGenesisHeightGate;
 
 function isJsonStringifyReentryActive(network, coin, blockHeight) {
     return resolveJsonStringifyReentryActive(
