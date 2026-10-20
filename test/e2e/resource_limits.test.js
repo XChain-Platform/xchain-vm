@@ -161,9 +161,7 @@ async function executeHealthyContractAfterExhaustion(h) {
             assert.strictEqual(result.stateChanges.length, 0);
             assert.strictEqual(result.emittedActions.length, 0);
         });
-    });
 
-    describe('E2E-041: Memory exhaustion (OOM)', function() {
         it('should remain stable after OOM/timeout', async function() {
             const r = await executeHealthyContractAfterExhaustion(h);
             assertSuccess(r);

@@ -29,85 +29,87 @@ function initializeVM() {
     if (!vm) vm = createVM();
 }
 
+async function caseShouldExposeBlockContextCorrectly() {
+    const r = await execute(vm, `
+        module.exports = function(xchain) {
+            return {
+                h: xchain.getBlockHeight(),
+                t: xchain.getBlockTimestamp(),
+                hash: xchain.getBlockHash()
+            };
+        };
+    `, { blockContext: { height: 999, timestamp: 1700000000, hash: 'abc' } });
+    assert.strictEqual(r.success, true);
+    const v = JSON.parse(r.returnValue);
+    assert.strictEqual(v.h, 999);
+    assert.strictEqual(v.t, 1700000000);
+    assert.strictEqual(v.hash, 'abc');
+}
+
+async function caseShouldExposeSourceAndContractAddresses() {
+    const r = await execute(vm, `
+        module.exports = function(xchain) {
+            return {
+                src: xchain.getSourceAddress(),
+                con: xchain.getContractAddress()
+            };
+        };
+    `, { caller: 'caller_addr', contractAddress: 'C:BTC:42' });
+    assert.strictEqual(r.success, true);
+    const v = JSON.parse(r.returnValue);
+    assert.strictEqual(v.src, 'caller_addr');
+    assert.strictEqual(v.con, 'C:BTC:42');
+}
+
+async function caseShouldProvideBalanceQueriesWhenBalances() {
+    const r = await execute(vm, `
+        module.exports = function(xchain) {
+            return xchain.getBalance('addr1', 'TOK');
+        };
+    `, { balances: { addr1: { TOK: '500' } } });
+    assert.strictEqual(r.success, true);
+    assert.strictEqual(JSON.parse(r.returnValue), '500');
+}
+
+async function caseShouldProvideXchainRequireForConditional() {
+    const r = await execute(vm, `
+        module.exports = function(xchain) {
+            xchain.require(1 === 1, 'this should pass');
+            xchain.require(1 === 2, 'this should fail');
+        };
+    `);
+    assert.strictEqual(r.success, false);
+    assert(r.error.includes('this should fail'));
+}
+
+async function caseShouldProvideLogging() {
+    const r = await execute(vm, `
+        module.exports = function(xchain) {
+            xchain.log('msg1');
+            xchain.log('msg2');
+            return xchain.getLogCount();
+        };
+    `);
+    assert.strictEqual(r.success, true);
+    assert.strictEqual(r.logs.length, 2);
+    assert.strictEqual(r.logs[0], 'msg1');
+    assert.strictEqual(r.logs[1], 'msg2');
+}
+
 describe('[P3] Integration Regression', function() {
     // GATEWAY CONTEXT
     describe('Gateway context', function() {
 
         before(function() { initializeVM(); });
 
-        it('should expose block context correctly', async function() {
-            const r = await execute(vm, `
-                module.exports = function(xchain) {
-                    return {
-                        h: xchain.getBlockHeight(),
-                        t: xchain.getBlockTimestamp(),
-                        hash: xchain.getBlockHash()
-                    };
-                };
-            `, { blockContext: { height: 999, timestamp: 1700000000, hash: 'abc' } });
-            assert.strictEqual(r.success, true);
-            const v = JSON.parse(r.returnValue);
-            assert.strictEqual(v.h, 999);
-            assert.strictEqual(v.t, 1700000000);
-            assert.strictEqual(v.hash, 'abc');
-        });
+        it('should expose block context correctly', caseShouldExposeBlockContextCorrectly);
 
-        it('should expose source and contract addresses', async function() {
-            const r = await execute(vm, `
-                module.exports = function(xchain) {
-                    return {
-                        src: xchain.getSourceAddress(),
-                        con: xchain.getContractAddress()
-                    };
-                };
-            `, { caller: 'caller_addr', contractAddress: 'C:BTC:42' });
-            assert.strictEqual(r.success, true);
-            const v = JSON.parse(r.returnValue);
-            assert.strictEqual(v.src, 'caller_addr');
-            assert.strictEqual(v.con, 'C:BTC:42');
-        });
-    });
-});
+        it('should expose source and contract addresses', caseShouldExposeSourceAndContractAddresses);
 
-describe('[P3] Integration Regression', function() {
-    // GATEWAY CONTEXT
-    describe('Gateway context', function() {
+        it('should provide balance queries when balances supplied', caseShouldProvideBalanceQueriesWhenBalances);
 
-        before(function() { initializeVM(); });
+        it('should provide xchain.require() for conditional revert', caseShouldProvideXchainRequireForConditional);
 
-        it('should provide balance queries when balances supplied', async function() {
-            const r = await execute(vm, `
-                module.exports = function(xchain) {
-                    return xchain.getBalance('addr1', 'TOK');
-                };
-            `, { balances: { addr1: { TOK: '500' } } });
-            assert.strictEqual(r.success, true);
-            assert.strictEqual(JSON.parse(r.returnValue), '500');
-        });
-
-        it('should provide xchain.require() for conditional revert', async function() {
-            const r = await execute(vm, `
-                module.exports = function(xchain) {
-                    xchain.require(1 === 1, 'this should pass');
-                    xchain.require(1 === 2, 'this should fail');
-                };
-            `);
-            assert.strictEqual(r.success, false);
-            assert(r.error.includes('this should fail'));
-        });
-
-        it('should provide logging', async function() {
-            const r = await execute(vm, `
-                module.exports = function(xchain) {
-                    xchain.log('msg1');
-                    xchain.log('msg2');
-                    return xchain.getLogCount();
-                };
-            `);
-            assert.strictEqual(r.success, true);
-            assert.strictEqual(r.logs.length, 2);
-            assert.strictEqual(r.logs[0], 'msg1');
-            assert.strictEqual(r.logs[1], 'msg2');
-        });
+        it('should provide logging', caseShouldProvideLogging);
     });
 });
