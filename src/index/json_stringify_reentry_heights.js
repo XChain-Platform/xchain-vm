@@ -15,7 +15,7 @@
  ********************************************************************/
 'use strict';
 
-const { resolveRegtestGenesisHeightGate } = require('./regtest_genesis_height_gate.js');
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
 
 // Activation for re-entrant JSON.stringify on the value-hook path. That path keeps
 // its walk state in a frame pool and a forwarded key list shared by every call, so a

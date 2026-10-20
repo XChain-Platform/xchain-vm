@@ -15,7 +15,7 @@
  ********************************************************************/
 'use strict';
 
-const { resolveRegtestGenesisHeightGate } = require('./regtest_genesis_height_gate.js');
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
 
 const LINT_DESTRUCTURE_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,

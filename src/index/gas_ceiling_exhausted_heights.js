@@ -15,7 +15,7 @@
  ********************************************************************/
 'use strict';
 
-const { resolveRegtestGenesisHeightGate } = require('./regtest_genesis_height_gate.js');
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
 
 // Activation for settling every run whose gas tracker crossed its ceiling as
 // out_of_gas at the ceiling, whichever path the run reached the host by.

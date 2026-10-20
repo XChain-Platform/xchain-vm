@@ -17,7 +17,7 @@
 
 // Resolve one per-coin height gate: always on for regtest, per-coin height for testnet and mainnet.
 // Every *_heights.js map that arms regtest at genesis resolves through here, so the rule has one copy.
-// runtime/activation_heights.js keeps its own resolver because it also arms testnet at genesis.
+// ../runtime/activation_heights.js keeps its own resolver because it also arms testnet at genesis.
 function resolveRegtestGenesisHeightGate(map, network, coin, blockHeight) {
     // Regtest runs every gate from genesis
     if (network === 'regtest') return true;
