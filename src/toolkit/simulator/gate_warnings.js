@@ -17,8 +17,8 @@ const XChainVM = require('../../index.js');
 const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
 const { isLintBannedWithActive } = require('../../index/lint_banned_with_heights.js');
 const { isLintDestructureActive } = require('../../index/lint_destructure_heights.js');
-const { isLintSyntaxDepthActive } = require('../../index/lint_syntax_depth_heights.js');
-const { HEIGHT_GATES } = require('./constants.js');
+const { isLintSyntaxDepthActive, resolveSyntaxDepthActive } = require('../../index/lint_syntax_depth_heights.js');
+const { HEIGHT_GATES, LINT_NESTING_DEPTH_HEIGHTS } = require('./constants.js');
 const { heightGateThreshold, heightGateNeed, defaultBlockHeight } = require('./block_time_gates.js');
 const {
     isContractMetaRequiredActive,
@@ -155,6 +155,8 @@ module.exports = {
      * so they resolve the same verdict without a second copy of the thresholds.
      * The per-coin height-keyed flags take the CONFIGURED coin, matching actions/deploy/lint.js,
      * which reads its node's COIN rather than deriving one from the address.
+     * The delimiter-nesting flag has no VM predicate, so it resolves from the mirrored
+     * LINT_NESTING_DEPTH_HEIGHTS table (see constants.js for why and how it is checked).
      *
      * banned-rest rides the REST_PATTERN_METER block-time flag-day,
      * so it resolves from isRestPatternMeterActive exactly as the execute-time
@@ -169,26 +171,21 @@ module.exports = {
         const height = Number(this.block.height);
         const pkg3   = XChainVM.isPkg3SandboxActive(this.network, this.coin, height);
         try {
+            // Keep every flag an ordinary (enumerable) property so the key-set guards see all of them.
             const options = {
-                enforceBannedAsync:     XChainVM.isAsyncSurfaceActive(this.network, time),
-                enforceLintHardening:   XChainVM.isLintHardeningActive(this.network, time),
-                enforceBannedGenerator: pkg3,
-                enforceBannedWasm:      pkg3,
-                enforceLintGlobalAlias: XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
-                enforceBannedRest:      XChainVM.isRestPatternMeterActive(this.network, time)
+                enforceBannedAsync:       XChainVM.isAsyncSurfaceActive(this.network, time),
+                enforceLintHardening:     XChainVM.isLintHardeningActive(this.network, time),
+                enforceBannedGenerator:   pkg3,
+                enforceBannedWasm:        pkg3,
+                enforceLintGlobalAlias:   XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
+                enforceLintOptionalChain: isLintOptionalChainActive(this.network, this.coin, height),
+                enforceBannedWith:        isLintBannedWithActive(this.network, this.coin, height),
+                enforceLintNestingDepth:  resolveSyntaxDepthActive(
+                    LINT_NESTING_DEPTH_HEIGHTS, this.network, this.coin, height),
+                enforceLintDestructure:   isLintDestructureActive(this.network, this.coin, height),
+                enforceBannedRest:        XChainVM.isRestPatternMeterActive(this.network, time),
+                enforceLintSyntaxDepth:   isLintSyntaxDepthActive(this.network, this.coin, height)
             };
-            Object.defineProperty(options, 'enforceLintOptionalChain', {
-                value: isLintOptionalChainActive(this.network, this.coin, height)
-            });
-            Object.defineProperty(options, 'enforceBannedWith', {
-                value: isLintBannedWithActive(this.network, this.coin, height)
-            });
-            Object.defineProperty(options, 'enforceLintDestructure', {
-                value: isLintDestructureActive(this.network, this.coin, height)
-            });
-            Object.defineProperty(options, 'enforceLintSyntaxDepth', {
-                value: isLintSyntaxDepthActive(this.network, this.coin, height)
-            });
             return this.vm.validateSyntax(src, options);
         } catch (e) {
             // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a

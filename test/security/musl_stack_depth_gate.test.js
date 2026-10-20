@@ -20,8 +20,11 @@
  * the window (the clamp cases are pinned further down). A musl/Alpine validator
  * runs on a 128KB thread stack, so its native sinks overflow shallower than a
  * glibc/macOS one; the bound makes the guard poison (deterministic out_of_stack)
- * first. MAX_STACK_DEPTH_MUSL's comment says which musl onsets are measured
- * (join, stringify, flat) and which are not (the JSON.parse reviver walk).
+ * first. MAX_STACK_DEPTH_MUSL's comment is the record of the musl evidence: join,
+ * stringify and flat were drilled on real aarch64 musl, and the JSON.parse reviver
+ * walk on real musl on both arches, with the limits that comment lists (the x86-64
+ * leg ran under Rosetta, each depth ran once, and that leg used a floating
+ * node:22-alpine build, not the pinned engine). Read it before moving the bound.
  *
  * This suite pins the gate BEHAVIOUR on both sides:
  *   - below the height: __DEPTH_LIMIT stays 512, so 300-deep recursion runs
@@ -86,7 +89,7 @@ const RECURSE = `function r(n){ if(n<=0){ return 0; } return 1+r(n-1); }`;
     // case in this block), but the F-NR sinks read the clamped
     // min(__DEPTH_LIMIT, MAX_STACK_DEPTH_MUSL). Without the clamp, a coin reaching the
     // block-TIME gate before its per-coin block-HEIGHT gate would hand a 257..512-deep
-    // value to the native sinks, whose musl onset is not measured for every sink.
+    // value to the native sinks, past 256, the deepest the musl drills cover for every sink.
     it('below the height gate, an active native guard still poisons a 300-deep JSON.stringify (clamped to 256)', async function () {
         const r = await run(SPINE_300 + `try{JSON.stringify(a);return 'no-throw';}catch(e){return 'SWALLOWED';}`,
             { height: H_BELOW, timestamp: T_FNR_ON, hash: 'h' });

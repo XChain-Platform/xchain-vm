@@ -85,10 +85,10 @@ const MAX_STACK_DEPTH_MUSL = 256;
 // host-side (execute/index.js processEmission + actions/xcall/index.js).
 const XCALL_MIN_GAS             = PROTO.XCALL_MIN_GAS;     // = MIN_CALL_GAS
 const XCALL_MAX_GAS             = PROTO.XCALL_MAX_GAS;     // target-side ceiling cap (the run is fee-less on the target chain)
-// Single in-VM source of truth: gateway-emit.js declares the hop cap it
-// ENFORCES (emit.crossExecute's hop gate) and this module re-exports it, so a
-// future bump cannot leave the enforcer and the exported/parity-tested value
-// disagreeing. (gateway-emit.js has no require-cycle back into this file.)
+// Re-export the hop cap through its enforcer: the VM's one literal is in the vendored
+// src/protocol/constants.js, gateway-emit.js reads and ENFORCES it (crossExecute's
+// hop gate), and this module re-exports that binding so the enforced and exported
+// values cannot disagree. (gateway-emit.js has no require-cycle back into here.)
 const XCALL_MAX_HOPS            = require('../gateway-emit.js').XCALL_MAX_HOPS;  // user→remote = 1, remote→back = 2
 const XCALL_MIN_DEADLINE_BLOCKS = PROTO.XCALL_MIN_DEADLINE_BLOCKS;
 const XCALL_MAX_DEADLINE_BLOCKS = PROTO.XCALL_MAX_DEADLINE_BLOCKS;

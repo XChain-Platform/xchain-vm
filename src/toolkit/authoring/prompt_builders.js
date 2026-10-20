@@ -184,9 +184,6 @@ function buildRepairPrompt(previousCode, gateResult) {
 }
 
 module.exports = {
-    renderConceptMap,
-    renderNativePrimitives,
-    renderNumbered,
     buildSystemPrompt,
     renderIdentityAsk,
     buildUserPrompt,

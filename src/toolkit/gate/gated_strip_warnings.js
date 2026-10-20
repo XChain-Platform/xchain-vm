@@ -80,4 +80,4 @@ function gatedStripWarnings(code) {
     return out;
 }
 
-module.exports = { gatedStripWarnings, GATED_STRIP_RULE: RULE };
+module.exports = { gatedStripWarnings };

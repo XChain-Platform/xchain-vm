@@ -255,17 +255,26 @@ function registerMainnetDeployVerdictTest() {
         // this set and nothing went red, because an omitted key reads as `true`
         // rather than as an error. A flag added to the indexer's
         // deploy call site and missed here must break this test, not stay invisible.
+        // Collect every own property, enumerable or not, so a flag hidden with
+        // defineProperty cannot slip past; the cross-repo twin is simulator_deploy_lint_cross_repo.
         const EXPECTED = [
             'enforceBannedAsync', 'enforceBannedGenerator', 'enforceBannedRest',
-            'enforceBannedWasm', 'enforceLintGlobalAlias', 'enforceLintHardening'
+            'enforceBannedWasm', 'enforceBannedWith', 'enforceLintDestructure',
+            'enforceLintGlobalAlias', 'enforceLintHardening', 'enforceLintNestingDepth',
+            'enforceLintOptionalChain', 'enforceLintSyntaxDepth'
         ].sort();
         const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
         const seen = [];
         const real = sim.vm.validateSyntax.bind(sim.vm);
-        sim.vm.validateSyntax = (src, opts) => { seen.push(Object.keys(opts).sort()); return real(src, opts); };
+        sim.vm.validateSyntax = (src, opts) => {
+            seen.push({ own: Object.getOwnPropertyNames(opts).sort(), enumerable: Object.keys(opts).sort() });
+            return real(src, opts);
+        };
         try {
             await sim.deploy('module.exports = function(){ return "x"; };');
-            assert.deepStrictEqual(seen[0], EXPECTED, 'deploy-gate option set drifted');
+            assert.deepStrictEqual(seen[0].own, EXPECTED, 'deploy-gate option set drifted');
+            assert.deepStrictEqual(seen[0].enumerable, seen[0].own,
+                'a deploy-gate flag is non-enumerable, which hides it from key-set guards');
         } finally { sim.vm.validateSyntax = real; await sim.close(); }
     });
 

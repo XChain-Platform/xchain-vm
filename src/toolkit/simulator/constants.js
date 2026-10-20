@@ -134,6 +134,20 @@ const CONTRACT_META_REQUIRED_TIMES = Object.freeze({
     regtest: 0
 });
 
+// Heights at which the indexer's deploy lint turns on the delimiter-nesting rule (its
+// VM_LINT_NESTING_DEPTH_ACTIVATION registry row, read by actions/deploy/lint.js). Mirrored
+// because the VM exports no twin of that row: omitting the flag would enforce the rule on
+// mainnet, where the chain accepts such a DEPLOY. null is unarmed and regtest is on from
+// genesis; test/determinism/simulator_deploy_lint_cross_repo.test.js compares it to the row.
+const LINT_NESTING_DEPTH_HEIGHTS = Object.freeze({
+    'BTC:mainnet':  null,
+    'LTC:mainnet':  null,
+    'DOGE:mainnet': null,
+    'BTC:testnet':  156230,
+    'LTC:testnet':  4912984,
+    'DOGE:testnet': 67989993
+});
+
 // Mirror DEPLOY_INIT_STRICT, the indexer rule that a DEPLOY runs an exported `initialize` with or
 // without params (constructor_run.js planConstructor). No VM twin exists, so the cross-repo manifest
 // gate test pins these against the changes_3.js row; an unnamed network resolves like mainnet.
@@ -196,6 +210,7 @@ module.exports = {
     isArmedGateTime,
     HEIGHT_GATES,
     CONTRACT_META_REQUIRED_TIMES,
+    LINT_NESTING_DEPTH_HEIGHTS,
     DEPLOY_INIT_STRICT_TIMES,
     TIME_NETWORK_GATES,
     GUARD_GAS_CEILING,

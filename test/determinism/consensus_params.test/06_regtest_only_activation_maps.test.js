@@ -13,9 +13,9 @@
  ********************************************************************/
 // @ts-nocheck
 
-// Activations that run on regtest from genesis and stay unarmed on mainnet and testnet
-// until a release cut arms them. Arming one moves consensus output, so a change here
-// is a release event, never a drive-by edit.
+// Activations that run on regtest from genesis, stay unarmed on mainnet, and are armed on
+// testnet at the release cut that named them. Arming or re-pinning one moves consensus
+// output, so a change here is a release event, never a drive-by edit.
 
 const assert = require('assert');
 const vm = require('../../../src/index.js');
@@ -29,7 +29,7 @@ const V0250_TESTNET = { BTC: 157073, LTC: 4928460, DOGE: 68009330 };
 
 // A per-coin height map: the six keys in order, frozen, every mainnet entry null, on from
 // genesis on regtest, off on mainnet at any height, and on testnet from its armed height.
-function assertCoinMapUnarmed(map, isActive, TESTNET = V0240_TESTNET) {
+function assertCoinMapTestnetArmed(map, isActive, TESTNET = V0240_TESTNET) {
     assert.deepStrictEqual(Object.keys(map), COIN_KEYS);
     assert.ok(Object.isFrozen(map));
     for (const key of COIN_KEYS) {
@@ -44,8 +44,8 @@ function assertCoinMapUnarmed(map, isActive, TESTNET = V0240_TESTNET) {
     }
 }
 
-// A per-network block-time map: sealed, regtest at 0, mainnet and testnet null.
-function assertTimeMapUnarmed(map, isActive) {
+// A per-network block-time map: sealed, regtest at 0, mainnet null, testnet armed.
+function assertTimeMapTestnetArmed(map, isActive) {
     // The v0.24.0 cut arms testnet at its shared change instant; mainnet stays null.
     assert.deepStrictEqual(map, { mainnet: null, testnet: 1792303200, regtest: 0 });
     assert.ok(Object.isSealed(map));
@@ -56,35 +56,35 @@ function assertTimeMapUnarmed(map, isActive) {
 }
 
 describe('consensus parameters are frozen (track 8 guard)', function () {
-    it('GAS_CEILING_EXHAUSTED_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapUnarmed(vm.GAS_CEILING_EXHAUSTED_ACTIVATION, vm.isGasCeilingExhaustedActive);
+    it('GAS_CEILING_EXHAUSTED_ACTIVATION is frozen, unarmed on mainnet and armed on testnet at the v0.24.0 cut', function () {
+        assertCoinMapTestnetArmed(vm.GAS_CEILING_EXHAUSTED_ACTIVATION, vm.isGasCeilingExhaustedActive);
     });
 
-    it('RESOURCE_FAULT_SIGNAL_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapUnarmed(vm.RESOURCE_FAULT_SIGNAL_ACTIVATION, vm.isResourceFaultSignalActive);
+    it('RESOURCE_FAULT_SIGNAL_ACTIVATION is frozen, unarmed on mainnet and armed on testnet at the v0.24.0 cut', function () {
+        assertCoinMapTestnetArmed(vm.RESOURCE_FAULT_SIGNAL_ACTIVATION, vm.isResourceFaultSignalActive);
     });
 
-    it('HOST_ERROR_STACK_STRIP_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapUnarmed(vm.HOST_ERROR_STACK_STRIP_ACTIVATION, vm.isHostErrorStackStripActive);
+    it('HOST_ERROR_STACK_STRIP_ACTIVATION is frozen, unarmed on mainnet and armed on testnet at the v0.24.0 cut', function () {
+        assertCoinMapTestnetArmed(vm.HOST_ERROR_STACK_STRIP_ACTIVATION, vm.isHostErrorStackStripActive);
     });
 
-    it('HOST_FAULT_HALT_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapUnarmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive, V0250_TESTNET);
+    it('HOST_FAULT_HALT_ACTIVATION is frozen, unarmed on mainnet and armed on testnet at the v0.25.0 cut', function () {
+        assertCoinMapTestnetArmed(vm.HOST_FAULT_HALT_ACTIVATION, vm.isHostFaultHaltActive, V0250_TESTNET);
     });
 
-    it('JSON_STRINGIFY_REENTRY_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapUnarmed(vm.JSON_STRINGIFY_REENTRY_ACTIVATION, vm.isJsonStringifyReentryActive);
+    it('JSON_STRINGIFY_REENTRY_ACTIVATION is frozen, unarmed on mainnet and armed on testnet at the v0.24.0 cut', function () {
+        assertCoinMapTestnetArmed(vm.JSON_STRINGIFY_REENTRY_ACTIVATION, vm.isJsonStringifyReentryActive);
     });
 
-    it('LINT_SYNTAX_DEPTH_ACTIVATION is frozen and unarmed on mainnet and testnet', function () {
-        assertCoinMapUnarmed(vm.LINT_SYNTAX_DEPTH_ACTIVATION, vm.isLintSyntaxDepthActive);
+    it('LINT_SYNTAX_DEPTH_ACTIVATION is frozen, unarmed on mainnet and armed on testnet at the v0.24.0 cut', function () {
+        assertCoinMapTestnetArmed(vm.LINT_SYNTAX_DEPTH_ACTIVATION, vm.isLintSyntaxDepthActive);
     });
 
-    it('HOST_CALL_BOUNDS_ACTIVATION is sealed and unarmed on mainnet and testnet', function () {
-        assertTimeMapUnarmed(vm.HOST_CALL_BOUNDS_ACTIVATION, vm.isHostCallBoundsActive);
+    it('HOST_CALL_BOUNDS_ACTIVATION is sealed, unarmed on mainnet and armed on testnet at the v0.24.0 cut', function () {
+        assertTimeMapTestnetArmed(vm.HOST_CALL_BOUNDS_ACTIVATION, vm.isHostCallBoundsActive);
     });
 
-    it('PER_ELEMENT_METER_ACTIVATION is sealed and unarmed on mainnet and testnet', function () {
-        assertTimeMapUnarmed(vm.PER_ELEMENT_METER_ACTIVATION, vm.isPerElementMeterActive);
+    it('PER_ELEMENT_METER_ACTIVATION is sealed, unarmed on mainnet and armed on testnet at the v0.24.0 cut', function () {
+        assertTimeMapTestnetArmed(vm.PER_ELEMENT_METER_ACTIVATION, vm.isPerElementMeterActive);
     });
 });

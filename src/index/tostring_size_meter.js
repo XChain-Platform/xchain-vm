@@ -11,9 +11,9 @@
  ********************************************************************/
 // @ts-nocheck
 
-// Activation for the toString size meter. Mainnet and testnet remain deferred,
-// while regtest exercises the consensus rule from genesis. Unknown or missing
-// networks resolve like mainnet so they cannot accidentally arm the rule.
+// Activation for the toString size meter. Mainnet stays deferred on the unarmed
+// sentinel, testnet arms at the block time in its row below, and regtest runs the
+// rule from genesis. Unknown networks resolve like mainnet so cannot arm it early.
 const TOSTRING_SIZE_METER_GATE_BLOCK_TIME = 9999999999;
 const TOSTRING_SIZE_METER_ACTIVATION = Object.seal({
     mainnet: TOSTRING_SIZE_METER_GATE_BLOCK_TIME,
