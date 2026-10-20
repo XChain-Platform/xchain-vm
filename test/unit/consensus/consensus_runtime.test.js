@@ -79,6 +79,8 @@ describe('Consensus runtime pin', function () {
             assert.match(msg, /CONSENSUS RUNTIME MISMATCH/);
             assert.match(msg, /v8: running "9.9.9" != pinned/);
             assert.ok(msg.includes(REFERENCE_NODE));
+            // Check the re-pin steps name the wall-clock calibration re-run.
+            assert.ok(msg.includes('test/determinism/helpers/probe_wall_clock_calibration.js'));
         });
     });
 

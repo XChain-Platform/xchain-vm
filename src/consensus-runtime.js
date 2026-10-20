@@ -40,8 +40,12 @@
  * RE-PINNING IS A CONSENSUS EVENT. Do not bump these to silence a failing
  * gate on a dev box running a different Node. Either run the canonical
  * runtime, or (if the fleet is deliberately upgrading its engine) re-pin
- * here AND regenerate the determinism manifests AND coordinate an atomic
- * fleet activation (a mixed-engine fleet can fork). The canonical runtime
+ * here AND regenerate the determinism manifests AND re-run
+ * test/determinism/helpers/probe_wall_clock_calibration.js on the new engine,
+ * updating the ~750 ms gas-ceiling burn figure wherever it is quoted
+ * (src/consensus-wall-clock.js, the probe's DOCUMENTED_MS, the xchain-indexer
+ * EXECUTE batch weights) AND coordinate an atomic fleet activation (a
+ * mixed-engine fleet can fork). The canonical runtime
  * below was confirmed BYTE-IDENTICAL on linux/arm64 and linux/amd64
  * (node:22-bookworm) on 2026-06-07.
  *
@@ -249,7 +253,9 @@ function describeMismatch(result) {
         lines.join('\n') +
         `\nInstall the canonical runtime (${REFERENCE_NODE}, node:22-bookworm) ` +
         'or, if the fleet is deliberately upgrading, re-pin src/consensus-runtime.js ' +
-        '+ regenerate the determinism manifests + coordinate an atomic fleet activation.'
+        '+ regenerate the determinism manifests + re-run ' +
+        'test/determinism/helpers/probe_wall_clock_calibration.js and update the ~750 ms ' +
+        'wall-clock figure wherever it is quoted + coordinate an atomic fleet activation.'
     );
 }
 

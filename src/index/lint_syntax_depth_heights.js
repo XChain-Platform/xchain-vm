@@ -23,6 +23,8 @@
  ********************************************************************/
 'use strict';
 
+const { resolveRegtestGenesisHeightGate } = require('./regtest_genesis_height_gate.js');
+
 const LINT_SYNTAX_DEPTH_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
     'LTC:mainnet':  null,
@@ -32,16 +34,8 @@ const LINT_SYNTAX_DEPTH_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-function resolveSyntaxDepthActive(map, network, coin, blockHeight) {
-    if (network === 'regtest') return true;
-    if (network !== 'testnet' && network !== 'mainnet') return false;
-
-    const height = Number(blockHeight);
-    if (!Number.isFinite(height) || coin == null) return false;
-
-    const threshold = map[coin + ':' + network];
-    return Number.isFinite(threshold) && height >= threshold;
-}
+// Resolve this gate through the shared regtest-genesis per-coin height rule.
+const resolveSyntaxDepthActive = resolveRegtestGenesisHeightGate;
 
 function isLintSyntaxDepthActive(network, coin, blockHeight) {
     return resolveSyntaxDepthActive(

@@ -46,7 +46,12 @@ const {
 } = require('./differential.js');
 const { buildPostGateManifest } = require('./differential_postgate.js');
 const { checkLegSet } = require('./differential_legs.js');
-const { checkConsensusRuntime, describeMismatch } = require('../../../src/consensus-runtime.js');
+const {
+    checkConsensusRuntime,
+    describeMismatch,
+    checkConsensusDependencies,
+    describeDependencyMismatch
+} = require('../../../src/consensus-runtime.js');
 
 const PROFILES = ['legacy', 'post-gate'];
 
@@ -97,11 +102,16 @@ async function cmdRecord(flags) {
     const execution = flags.execution && flags.execution !== true ? flags.execution : 'in-process';
     const profile = flagProfile(flags);
 
-    // Fail closed before the corpus runs: a leg on an off-pin engine compares an
-    // engine no validator may run.
+    // Fail closed before the corpus runs: a leg on an off-pin engine or an off-pin
+    // consensus dependency compares a build no validator may run.
     const runtime = checkConsensusRuntime();
     if (flags['require-pinned-runtime'] && !runtime.ok) {
         process.stderr.write(describeMismatch(runtime) + '\n');
+        return 4;
+    }
+    const dependencies = checkConsensusDependencies();
+    if (flags['require-pinned-runtime'] && !dependencies.ok) {
+        process.stderr.write(describeDependencyMismatch(dependencies) + '\n');
         return 4;
     }
 
@@ -110,6 +120,7 @@ async function cmdRecord(flags) {
 
     const manifest = await buildFor(profile, { seed, cases, execution });
     manifest.consensusRuntime = { ok: runtime.ok, mismatches: runtime.mismatches };
+    manifest.consensusDependencies = { ok: dependencies.ok, mismatches: dependencies.mismatches };
     if (Array.isArray(manifest.regime) && manifest.regime.length) {
         process.stderr.write('post-gate profile is not in the post-gate regime:\n  - ' +
             manifest.regime.join('\n  - ') + '\n');

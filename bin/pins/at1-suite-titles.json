@@ -545,6 +545,24 @@
       "lint parity (validateSyntax \u21c6 lintSource) + drift float warnings parity checkFloatWarnings === lintSource warning messages",
       "lint parity (validateSyntax \u21c6 lintSource) + drift good fixture valid under both validateSyntax and lintSource"
     ],
+    "3f955b81d2812a2e": [
+      "deploy-lint: host stack overflow in the consensus scanners never turns a scanner overflow after a clean metering parse into a clean deploy verdict",
+      "deploy-lint: host stack overflow in the consensus scanners treats a host stack overflow in every consensus scanner as a fault only when asked",
+      "deploy-lint: syntax depth carries a statement head across a comma and an else across a semicolon",
+      "deploy-lint: syntax depth charges a left-deep chain that continues after a closed frame to that frame",
+      "deploy-lint: syntax depth freezes the bound and reuses the nesting-depth consensus rule",
+      "deploy-lint: syntax depth grows linearly in every shape, so no shape can nest without being counted",
+      "deploy-lint: syntax depth keeps flat code low however long it is",
+      "deploy-lint: syntax depth measures a prefix the tokenizer cannot finish, since a parser recurses through it first",
+      "deploy-lint: syntax depth refusals leaves the unarmed deploy path untouched: a source over the bound is still judged by the old passes",
+      "deploy-lint: syntax depth refusals lintSource reports the same first error as validateSyntax",
+      "deploy-lint: syntax depth refusals makes deploy enforce the delimiter rule whatever the nesting flag says",
+      "deploy-lint: syntax depth refusals refuses every shape at the first N over the bound and accepts the N below it",
+      "deploy-lint: syntax depth refusals treats a host stack overflow in the parse step as a fault only when asked",
+      "execute-time lint: syntax depth agrees with the deploy verdict for every shape on either side of the bound",
+      "execute-time lint: syntax depth does not apply the bound on an unarmed network",
+      "execute-time lint: syntax depth keys the verdict cache on the syntax-depth bit and forwards it exactly"
+    ],
     "4016a3b9ca0dc5ad": [
       "lint consensus error order is pinned puts banned-rest ahead of banned-wasm when both fire",
       "lint consensus error order is pinned records the banned-rest message once the rest gate is active",
@@ -970,6 +988,16 @@
       "Metering meterCode should produce valid JavaScript output",
       "Metering wraps a nested call that sits in its parent call's argument array"
     ],
+    "651df68ac35ae890": [
+      "Toolkit authoring: knowledge base KNOWLEDGE.contractShape is itself a gate-clean contract",
+      "Toolkit authoring: knowledge base every taught reserved identifier reaches the rendered hard rules",
+      "Toolkit authoring: knowledge base every taught stripped global reaches the rendered hard rules",
+      "Toolkit authoring: knowledge base exposes the canonical concept map and hard rules",
+      "Toolkit authoring: knowledge base teaches the one shared definition, not a copy of it",
+      "Toolkit authoring: knowledge base teaches the resource caps and ES version the VM enforces, not a copy of them",
+      "Toolkit authoring: knowledge base the taught reserved identifiers are the set the deploy gate rejects",
+      "Toolkit authoring: knowledge base the taught stripped-global list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES"
+    ],
     "65c7a463390eaec0": [
       "Toolkit authoring: response extraction falls back to raw text when there is no fence",
       "Toolkit authoring: response extraction pulls the first fenced block and separates trailing notes",
@@ -1156,22 +1184,6 @@
     ],
     "7b80a544ad80565e": [
       "Gateway (host-function surface) logging log stringifies and joins args; counters reflect collector"
-    ],
-    "7f98cd18b8138864": [
-      "deploy-lint: syntax depth carries a statement head across a comma and an else across a semicolon",
-      "deploy-lint: syntax depth charges a left-deep chain that continues after a closed frame to that frame",
-      "deploy-lint: syntax depth freezes the bound and reuses the nesting-depth consensus rule",
-      "deploy-lint: syntax depth grows linearly in every shape, so no shape can nest without being counted",
-      "deploy-lint: syntax depth keeps flat code low however long it is",
-      "deploy-lint: syntax depth measures a prefix the tokenizer cannot finish, since a parser recurses through it first",
-      "deploy-lint: syntax depth refusals leaves the unarmed deploy path untouched: a source over the bound is still judged by the old passes",
-      "deploy-lint: syntax depth refusals lintSource reports the same first error as validateSyntax",
-      "deploy-lint: syntax depth refusals makes deploy enforce the delimiter rule whatever the nesting flag says",
-      "deploy-lint: syntax depth refusals refuses every shape at the first N over the bound and accepts the N below it",
-      "deploy-lint: syntax depth refusals treats a host stack overflow in the parse step as a fault only when asked",
-      "execute-time lint: syntax depth agrees with the deploy verdict for every shape on either side of the bound",
-      "execute-time lint: syntax depth does not apply the bound on an unarmed network",
-      "execute-time lint: syntax depth keys the verdict cache on the syntax-depth bit and forwards it exactly"
     ],
     "832a875ffe0e9683": [
       "Toolkit authoring: authorContract harness accepts an injected gate override (deterministic, no isolate)",
@@ -1595,21 +1607,6 @@
       "banned-with execute-time lint threading simulator deploy lint resolves the configured network and coin",
       "banned-with execute-time lint threading validateSyntax accepts below the gate and rejects at the gate"
     ],
-    "b8f6e51c5a11bc0f": [
-      "differential-fuzz leg identity check check-legs exits non-zero on a missing leg and zero on a full set",
-      "differential-fuzz leg identity check checks a post-gate leg set by its own file names and targeted count",
-      "differential-fuzz leg identity check fails a V8 build other than the pinned engine",
-      "differential-fuzz leg identity check fails a musl leg that recorded a glibc platform",
-      "differential-fuzz leg identity check fails a seed or cases mismatch and an empty entry list",
-      "differential-fuzz leg identity check fails an arm64 leg that recorded an x64 platform",
-      "differential-fuzz leg identity check fails an arm64 musl leg that recorded the x64 musl platform",
-      "differential-fuzz leg identity check fails an off-pin or unrecorded consensus runtime",
-      "differential-fuzz leg identity check fails an unknown leg name",
-      "differential-fuzz leg identity check fails two legs reporting one platform tag",
-      "differential-fuzz leg identity check fails when the arm64 musl leg left no manifest",
-      "differential-fuzz leg identity check fails when the musl leg left no manifest",
-      "differential-fuzz leg identity check passes three present, distinct, pinned legs"
-    ],
     "ba89d94f4239e18c": [
       "wall-clock calibration probe: callback Array methods includes the Array-like forEach loop suspect vector",
       "wall-clock calibration probe: callback Array methods includes the Sparse flatMap loop suspect vector",
@@ -1628,6 +1625,22 @@
       "wall-clock calibration probe: rebound aliases includes the Number.parseInt loop metered vector",
       "wall-clock calibration probe: rebound aliases includes the String trimLeft loop metered vector",
       "wall-clock calibration probe: rebound aliases includes the String trimRight loop metered vector"
+    ],
+    "bb5f9e144115a926": [
+      "differential-fuzz leg identity check check-legs exits non-zero on a missing leg and zero on a full set",
+      "differential-fuzz leg identity check checks a post-gate leg set by its own file names and targeted count",
+      "differential-fuzz leg identity check fails a V8 build other than the pinned engine",
+      "differential-fuzz leg identity check fails a musl leg that recorded a glibc platform",
+      "differential-fuzz leg identity check fails a seed or cases mismatch and an empty entry list",
+      "differential-fuzz leg identity check fails an arm64 leg that recorded an x64 platform",
+      "differential-fuzz leg identity check fails an arm64 musl leg that recorded the x64 musl platform",
+      "differential-fuzz leg identity check fails an off-pin or unrecorded consensus dependency set",
+      "differential-fuzz leg identity check fails an off-pin or unrecorded consensus runtime",
+      "differential-fuzz leg identity check fails an unknown leg name",
+      "differential-fuzz leg identity check fails two legs reporting one platform tag",
+      "differential-fuzz leg identity check fails when the arm64 musl leg left no manifest",
+      "differential-fuzz leg identity check fails when the musl leg left no manifest",
+      "differential-fuzz leg identity check passes three present, distinct, pinned legs"
     ],
     "be0f159f6ba7cc35": [
       "Toolkit transpile: TS -> ES the VM accepts detects TypeScript by extension",
@@ -1982,15 +1995,6 @@
       "MockLedger.normalizeToTick rounding mode rounds HALF-UP, not half-even, at 8 decimals",
       "MockLedger.normalizeToTick rounding mode rounds away from zero on negatives (half-up, not half-down)"
     ],
-    "e5be3e9519e8bba0": [
-      "Toolkit authoring: knowledge base KNOWLEDGE.contractShape is itself a gate-clean contract",
-      "Toolkit authoring: knowledge base every taught reserved identifier reaches the rendered hard rules",
-      "Toolkit authoring: knowledge base every taught stripped global reaches the rendered hard rules",
-      "Toolkit authoring: knowledge base exposes the canonical concept map and hard rules",
-      "Toolkit authoring: knowledge base teaches the one shared definition, not a copy of it",
-      "Toolkit authoring: knowledge base the taught reserved identifiers are the set the deploy gate rejects",
-      "Toolkit authoring: knowledge base the taught stripped-global list stays equal to sandbox.js STRIPPED_GLOBAL_NAMES"
-    ],
     "e90c2b94f20364ed": [
       "Metering per-iteration gas cost (regression pin) ForStatement charges 2x VM_COMPUTATION per iteration (body + update)",
       "Metering per-iteration gas cost (regression pin) WhileStatement charges only 1x VM_COMPUTATION per iteration (no update slot)",
@@ -2101,7 +2105,7 @@
       "titleCount": 1818,
       "files": {
         "test/preflight.test.js": "440bdc853048b5d0",
-        "test/toolkit/authoring.test.js": "e5be3e9519e8bba0",
+        "test/toolkit/authoring.test.js": "651df68ac35ae890",
         "test/toolkit/authoring.test/01_prompt_construction.test.js": "30a93b723f409828",
         "test/toolkit/authoring.test/02_response_extraction.test.js": "65c7a463390eaec0",
         "test/toolkit/authoring.test/03_author_contract_harness.test.js": "832a875ffe0e9683",
@@ -2132,7 +2136,7 @@
         "test/unit/consensus/engines_node_ceiling.test.js": "59694c41272df7c3",
         "test/unit/consensus/protocol_constants.test.js": "1c95acafc549c68d",
         "test/unit/consensus/wall_clock_probe_network_gates.test.js": "ba89d94f4239e18c",
-        "test/unit/fuzz/differential_legs.test.js": "b8f6e51c5a11bc0f",
+        "test/unit/fuzz/differential_legs.test.js": "bb5f9e144115a926",
         "test/unit/gateway/attestation_envelope_drift.test.js": "1aee4eb799a32dbe",
         "test/unit/gateway/call_limits_parity.test.js": "46fa5a5c1c5a31d8",
         "test/unit/gateway/emit_crossexecute.test.js": "12e89633acef1618",
@@ -2183,7 +2187,7 @@
         "test/unit/lint/optional_chain_active_corpus_shape.test.js": "d18c621a06a2df14",
         "test/unit/lint/syntax.test.js": "2edebd9abdfa3bff",
         "test/unit/lint/syntax_depth/heights.test.js": "f79e3b60a2c1fe64",
-        "test/unit/lint/syntax_depth/lint_syntax_depth.test.js": "7f98cd18b8138864",
+        "test/unit/lint/syntax_depth/lint_syntax_depth.test.js": "3f955b81d2812a2e",
         "test/unit/lint/syntax_optional_chain_forward.test.js": "705a7cd475ac0261",
         "test/unit/math/errors.test.js": "6a3580da0a46a632",
         "test/unit/math/math.test.js": "1ec905aa9509bdfe",

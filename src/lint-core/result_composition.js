@@ -4,6 +4,7 @@
 const acorn = require('acorn');
 const walk  = require('acorn-walk');
 const { meterCode, findReservedIdentifier, CONTRACT_ECMA_VERSION } = require('../metering.js');
+const { isHostStackOverflow } = require('../metering/reserved_identifiers.js');
 const { MAX_CODE_SIZE, STRIPPED_PROTO_METHOD_NAMES, CONSENSUS_RULES } = require('./constants.js');
 const {
     findBannedMathCalls, codeSizeBytes, findBannedProtoMethods, findBannedExponentiation,
@@ -39,13 +40,6 @@ function pushSizeError(code, errors) {
     }
 }
 
-// A host stack overflow: a property of this machine's stack size and JIT state, not
-// of the source. V8 says RangeError, SpiderMonkey InternalError ("too much recursion").
-function isHostStackOverflow(e) {
-    return !!e && (e.name === 'RangeError' || e.name === 'InternalError') &&
-        /call stack|too much recursion/i.test(String(e.message));
-}
-
 // 2. Acorn metering pass. If acorn can't parse it (or it uses post-ES2020
 //    syntax), reject. This also doubles as the blocking parse check.
 // Returns false when the parse failed, so the caller stops scanning.
@@ -76,14 +70,16 @@ function pushParseError(code, errors, overflowIsHostFault) {
 //    reference could bypass or forge SIZE metering, and the call-depth
 //    helpers (DEPTH_HELPERS), where a reference could bypass the
 //    platform-independent recursion bound. Plus __gas itself.
-function pushReservedErrors(code, hardened, errors) {
-    const reserved = findReservedIdentifier(code);
+// Every consensus scanner below re-parses the source and takes overflowIsHostFault,
+// so a host stack overflow in it is rethrown like the parse step's, never read as clean.
+function pushReservedErrors(code, hardened, errors, overflowIsHostFault) {
+    const reserved = findReservedIdentifier(code, overflowIsHostFault);
     if (reserved)
         errors.push({ rule: 'reserved-identifier', message: 'reserved identifier: ' + reserved, line: null, severity: 'error' });
 
     // 3b. (hardened) CONTRACT_WRAPPER control bindings are reserved too.
     if (hardened) {
-        const control = findReservedControlBinding(code);
+        const control = findReservedControlBinding(code, overflowIsHostFault);
         if (control)
             errors.push({ rule: 'reserved-identifier', message: 'reserved identifier: ' + control, line: null, severity: 'error' });
     }
@@ -91,8 +87,8 @@ function pushReservedErrors(code, hardened, errors) {
 
 // 4. Banned Math.* check (transcendentals always; hardened: the full
 //    complement of the sandbox SAFE_MATH_MEMBERS whitelist).
-function pushMathErrors(code, hardened, globalAlias, optionalChain, destructure, errors) {
-    const banned = findBannedMathCalls(code, hardened, globalAlias, optionalChain, destructure);
+function pushMathErrors(code, hardened, globalAlias, optionalChain, destructure, errors, overflowIsHostFault) {
+    const banned = findBannedMathCalls(code, hardened, globalAlias, optionalChain, destructure, overflowIsHostFault);
     for (const hit of banned) {
         errors.push({
             rule: 'banned-math',
@@ -111,7 +107,7 @@ function pushMathErrors(code, hardened, globalAlias, optionalChain, destructure,
     // 4b. (hardened) Banned exponentiation operator. `**` / `**=` invoke the
     //     same Number::exponentiate transcendental the Math.pow ban targets.
     if (hardened) {
-        for (const hit of findBannedExponentiation(code)) {
+        for (const hit of findBannedExponentiation(code, overflowIsHostFault)) {
             errors.push({
                 rule: 'banned-math',
                 message: 'banned operator: ' + hit.op + ' at line ' + hit.line +
@@ -128,8 +124,8 @@ function pushMathErrors(code, hardened, globalAlias, optionalChain, destructure,
 //    per __gas() point, not for the cost INSIDE a single native operation, so
 //    BigInt arithmetic and catastrophic regex backtracking burn heavy CPU for
 //    ~0 gas. Literals can only be blocked at the syntax layer.
-function pushLiteralErrors(code, errors) {
-    for (const hit of findBannedLiterals(code)) {
+function pushLiteralErrors(code, errors, overflowIsHostFault) {
+    for (const hit of findBannedLiterals(code, overflowIsHostFault)) {
         const advice = hit.kind === 'bigint'
             ? 'BigInt is unmetered native arithmetic; use the xchain.math bignumber API instead'
             : 'regular-expression literals can backtrack catastrophically and are unmetered';
@@ -148,8 +144,8 @@ function pushLiteralErrors(code, errors) {
 //    version-dependent microtask-drain timing, which is outside the
 //    consensus_runtime pin: two validators can diverge (success vs timeout,
 //    or differing post-await state). Rejected at deploy like BigInt/RegExp.
-function pushAsyncErrors(code, hardened, globalAlias, optionalChain, destructure, errors) {
-    for (const hit of findBannedAsync(code, hardened, globalAlias, optionalChain, destructure)) {
+function pushAsyncErrors(code, hardened, globalAlias, optionalChain, destructure, errors, overflowIsHostFault) {
+    for (const hit of findBannedAsync(code, hardened, globalAlias, optionalChain, destructure, overflowIsHostFault)) {
         const advice = hit.kind === 'promise'
             ? 'Promise schedules microtasks whose drain timing is isolated-vm version-dependent and unpinned'
             : hit.kind === 'import'
@@ -171,8 +167,8 @@ function pushAsyncErrors(code, hardened, globalAlias, optionalChain, destructure
 //     runs only on drain, so undrained generators leak __stackDepth to the 512
 //     cap and trip a spurious deterministic out_of_stack (29912bd8). Rejected
 //     at deploy like the async surface. Pkg 3 bundle (CONSENSUS_VERSION 3).
-function pushGeneratorErrors(code, errors) {
-    for (const hit of findBannedGenerator(code)) {
+function pushGeneratorErrors(code, errors, overflowIsHostFault) {
+    for (const hit of findBannedGenerator(code, overflowIsHostFault)) {
         const advice = hit.kind === 'yield'
             ? 'yield suspends a generator frame without unwinding the call-depth guard; rewrite without generators'
             : 'a suspended generator frame is not unwound until drained, so undrained generators leak __stackDepth toward the 512 cap and throw a spurious deterministic out_of_stack; use a plain function';
@@ -196,8 +192,8 @@ function pushGeneratorErrors(code, errors) {
 //     expression, and these four positions have none, so the O(n) copy would stay
 //     free. Emitted unconditionally here; validateSyntax drops it from the blocking
 //     set below the REST_PATTERN_METER flag-day (enforceBannedRest).
-function pushRestErrors(code, errors) {
-    for (const hit of findBannedRest(code)) {
+function pushRestErrors(code, errors, overflowIsHostFault) {
+    for (const hit of findBannedRest(code, overflowIsHostFault)) {
         const advice = hit.kind === 'rest parameter'
             ? 'the copy is performed by the caller\'s argument list, which has no source expression to charge, so f.apply(null, bigArr) in a loop copies O(n) elements for ~1 gas. Read arguments.length / index the parameters instead'
             : hit.kind === 'catch-clause rest'
@@ -218,8 +214,8 @@ function pushRestErrors(code, errors) {
 // 6e. Banned `with` statement. A with block resolves free identifiers against an
 //     arbitrary object at runtime, which defeats every identifier-precise ban
 //     (reserved helpers, stripped globals, Math members) from inside the block.
-function pushWithErrors(code, errors) {
-    for (const hit of findBannedWith(code)) {
+function pushWithErrors(code, errors, overflowIsHostFault) {
+    for (const hit of findBannedWith(code, overflowIsHostFault)) {
         errors.push({
             rule: 'banned-with',
             message: 'banned statement: with at line ' + hit.line +
@@ -231,8 +227,8 @@ function pushWithErrors(code, errors) {
     }
 }
 
-function pushWasmErrors(code, globalAlias, optionalChain, destructure, errors) {
-    for (const hit of findBannedWasm(code, globalAlias, optionalChain, destructure)) {
+function pushWasmErrors(code, globalAlias, optionalChain, destructure, errors, overflowIsHostFault) {
+    for (const hit of findBannedWasm(code, globalAlias, optionalChain, destructure, overflowIsHostFault)) {
         errors.push({
             rule: 'banned-wasm',
             message: 'banned global: WebAssembly at line ' + hit.line +
@@ -336,7 +332,8 @@ function pushStrippedGlobalWarnings(code, globalAlias, optionalChain, warnings) 
  *        and Math count as the corresponding direct property reads. Defaults to
  *        true for author-facing callers (SDK linter, CLI, unit tests).
  * @param {boolean} [opts.overflowIsHostFault] - rethrow a host stack overflow from the
- *        parse step instead of reporting it as unsupported syntax. Defaults to the
+ *        parse step or any consensus scanner instead of reporting it as unsupported
+ *        syntax or as no finding. Defaults to the
  *        opts.enforceLintSyntaxDepth flag (itself default true).
  * @returns {{ errors: Array<{rule,message,line,severity}>, warnings: Array<{rule,message,line,severity}> }}
  */
@@ -360,14 +357,14 @@ function lintSource(code, opts) {
     // Without a parse there is nothing more to scan deterministically.
     if (!pushParseError(code, errors, overflowIsHostFault)) return { errors, warnings: [] };
 
-    pushReservedErrors(code, hardened, errors);
-    pushMathErrors(code, hardened, globalAlias, optionalChain, destructure, errors);
-    pushLiteralErrors(code, errors);
-    pushAsyncErrors(code, hardened, globalAlias, optionalChain, destructure, errors);
-    pushGeneratorErrors(code, errors);
-    pushRestErrors(code, errors);
-    pushWasmErrors(code, globalAlias, optionalChain, destructure, errors);
-    pushWithErrors(code, errors);
+    pushReservedErrors(code, hardened, errors, overflowIsHostFault);
+    pushMathErrors(code, hardened, globalAlias, optionalChain, destructure, errors, overflowIsHostFault);
+    pushLiteralErrors(code, errors, overflowIsHostFault);
+    pushAsyncErrors(code, hardened, globalAlias, optionalChain, destructure, errors, overflowIsHostFault);
+    pushGeneratorErrors(code, errors, overflowIsHostFault);
+    pushRestErrors(code, errors, overflowIsHostFault);
+    pushWasmErrors(code, globalAlias, optionalChain, destructure, errors, overflowIsHostFault);
+    pushWithErrors(code, errors, overflowIsHostFault);
 
     const warnings = findFloatWarnings(code);
     pushProtoMethodWarnings(code, warnings);

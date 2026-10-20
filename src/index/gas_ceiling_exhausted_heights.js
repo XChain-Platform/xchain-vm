@@ -15,6 +15,8 @@
  ********************************************************************/
 'use strict';
 
+const { resolveRegtestGenesisHeightGate } = require('./regtest_genesis_height_gate.js');
+
 // Activation for settling every run whose gas tracker crossed its ceiling as
 // out_of_gas at the ceiling, whichever path the run reached the host by.
 //
@@ -44,16 +46,7 @@ const GAS_CEILING_EXHAUSTED_ACTIVATION = Object.freeze({
 // Regtest is active from genesis. An unknown network, an unresolvable coin, a
 // non-finite height or an unarmed (null) entry all resolve to inactive, the
 // replay-safe default.
-function resolveGasCeilingExhaustedActive(map, network, coin, blockHeight) {
-    if (network === 'regtest') return true;
-    if (network !== 'testnet' && network !== 'mainnet') return false;
-
-    const height = Number(blockHeight);
-    if (!Number.isFinite(height) || coin == null) return false;
-
-    const threshold = map[coin + ':' + network];
-    return Number.isFinite(threshold) && height >= threshold;
-}
+const resolveGasCeilingExhaustedActive = resolveRegtestGenesisHeightGate;
 
 function isGasCeilingExhaustedActive(network, coin, blockHeight) {
     return resolveGasCeilingExhaustedActive(

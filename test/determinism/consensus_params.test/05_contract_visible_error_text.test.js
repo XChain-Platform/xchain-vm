@@ -183,6 +183,7 @@ const GOLDEN_THROW_TEXTS = {
     ],
     'index/host_error_stack_strip_heights.js': [],
     'index/native_stack/activation.js': [],
+    'index/regtest_genesis_height_gate.js': [],
     'index/resource_fault_signal_heights.js': [],
     'index/runtime/activation_heights.js': [],
     'index/runtime/activations.js': [],
@@ -212,7 +213,7 @@ const GOLDEN_THROW_TEXTS = {
         'Error: state value must be JSON-serializable'
     ]
 };
-const GOLDEN_THROW_TEXTS_SHA256 = '44c78fea818856d398fad578b548cbf3a7a5f215b9c95601f75cec03d1c7e452';
+const GOLDEN_THROW_TEXTS_SHA256 = 'a14e1537f28c40a38d623d5f1998a563494a57cf5de968f6c912d137d252bc51';
 
 // Trigger each host error a contract can catch from state, math and emit, at the default limits.
 function hostApiMessages() {

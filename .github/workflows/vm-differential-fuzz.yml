@@ -19,7 +19,8 @@
 # leg also runs the depth security suites on its own libc.
 #
 # Every leg is pinned to the consensus runtime (src/consensus-runtime.js) and
-# records refuse an off-pin engine. The diff job asserts the exact leg set and
+# records refuse an off-pin engine or an off-pin consensus dependency
+# (isolated-vm, mathjs, decimal.js, acorn, acorn-walk, astring). The diff job asserts the exact leg set and
 # each leg's platform identity before comparing, so a dropped leg or a lost
 # container stanza fails the run instead of shrinking it.
 name: vm-differential-fuzz
@@ -29,9 +30,41 @@ permissions:
   contents: read
 
 on:
-  # Not on every push (isolated-vm rebuild + subprocess corpus is heavy);
-  # runs on demand and on a weekly cadence so a toolchain/V8 bump that shifts
-  # one build's numerics is caught before it reaches the fleet.
+  # Not on every push (isolated-vm rebuild + subprocess corpus is heavy). Pushes
+  # and PRs run it only when a file that decides cross-build consensus changes:
+  # the runtime pin, the depth bounds, the isolate depth globals, the activation
+  # gates, the lockfile, or this harness. Work lands on develop by direct push as
+  # well as by PR, so both triggers carry the same path list.
+  push:
+    branches: [master, develop]
+    paths:
+      - .github/workflows/vm-differential-fuzz.yml
+      - package.json
+      - package-lock.json
+      - src/consensus-runtime.js
+      - src/index/constants.js
+      - src/index/runtime/isolate_globals.js
+      - src/index/runtime/activation_heights.js
+      - src/index/runtime/activations.js
+      - test/fuzz/helpers/**
+      - test/security/musl_stack_depth_gate.test.js
+      - test/security/native_recursion_depth.test.js
+  pull_request:
+    branches: [master, develop]
+    paths:
+      - .github/workflows/vm-differential-fuzz.yml
+      - package.json
+      - package-lock.json
+      - src/consensus-runtime.js
+      - src/index/constants.js
+      - src/index/runtime/isolate_globals.js
+      - src/index/runtime/activation_heights.js
+      - src/index/runtime/activations.js
+      - test/fuzz/helpers/**
+      - test/security/musl_stack_depth_gate.test.js
+      - test/security/native_recursion_depth.test.js
+  # On demand, and weekly so a toolchain/V8 bump that shifts one build's
+  # numerics is caught before it reaches the fleet.
   workflow_dispatch:
     inputs:
       cases:
@@ -45,6 +78,12 @@ on:
   schedule:
     # Tuesdays 06:00 UTC, offset from the Monday audit cadence.
     - cron: "0 6 * * 2"
+
+# A new push to the same PR cancels its stale run; push, schedule and dispatch
+# runs each get their own group, so they are never cancelled.
+concurrency:
+  group: vm-differential-fuzz-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: true
 
 env:
   DIFF_SEED: ${{ github.event.inputs.seed || '1480804417' }}
@@ -93,10 +132,11 @@ jobs:
 
       # Build isolated-vm from source so the native V8 binding matches THIS
       # leg's arch/libc (a prebuild from another arch would be the very drift
-      # this job exists to detect, or simply fail to load).
+      # this job exists to detect, or simply fail to load). npm ci installs the
+      # lockfile exactly, so every leg compares the same pinned dependency tree.
       - name: Install deps (rebuild isolated-vm from source)
         run: |
-          npm install --ignore-scripts
+          npm ci --ignore-scripts
           npm rebuild isolated-vm --build-from-source
 
       - name: Record differential manifest
@@ -146,7 +186,7 @@ jobs:
             node:22.22.3-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd \
             sh -ec '
               apk add --no-cache python3 make g++ git
-              npm install --ignore-scripts
+              npm ci --ignore-scripts
               npm rebuild isolated-vm --build-from-source
               node test/fuzz/helpers/differential_run.js record \
                 --seed "$DIFF_SEED" --cases "$DIFF_CASES" --require-pinned-runtime \
@@ -189,7 +229,7 @@ jobs:
       # itself requires fast-check/acorn/astring, so those still need to be
       # on disk before the compare step below can run at all.
       - name: Install deps
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Download all manifests
         uses: actions/download-artifact@v4
