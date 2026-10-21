@@ -39,6 +39,7 @@
 // @ts-nocheck
 
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
+const { resolveWorkerCrossChainSnapshot } = require('./process_executor/snapshot_channel.js');
 
 // Readonly accessor own-key lookups: from the gate on, a snapshot key that names an
 // inherited member ('constructor', '__proto__') resolves as absent. Mainnet stays
@@ -130,6 +131,7 @@ function buildContractStakeAccessor(snap, ownKeys = false) {
 
 function buildCrossChainAccessor(snap, ownKeys = false) {
     if (snap == null) return null;
+    snap = resolveWorkerCrossChainSnapshot(snap);
     if (isAccessor(snap, 'getAttestation')) return snap; // legacy passthrough
     const attestations = snap.attestations || {};
     const settled      = snap.settled || {};
