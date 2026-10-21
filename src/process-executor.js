@@ -25,9 +25,12 @@
  * of the chain halting. The child is then respawned for subsequent work.
  *
  * Protocol (parent → child): {type:'init',config} | {type:'beginBlock'} |
- *   {type:'endBlock'} | {type:'execute',id,token,opts}
- * Protocol (child → parent): {type:'ready'} | {type:'result',id,token,result} |
- *   {type:'hostfault',id,token,reason}
+ *   {type:'snapshot',token,crossChainData} | {type:'endBlock'} |
+ *   {type:'execute',id,token,opts}
+ * Protocol (child → parent): {type:'ready'} | {type:'snapshotAck',token} |
+ *   {type:'result',id,token,result} | {type:'hostfault',id,token,reason}
+ * The snapshot is sent once per block; execute frames reference it and are
+ * held until the worker's snapshotAck for that token arrives.
  * The token is a random per-dispatch value the worker echoes, so a reply is
  * accepted only for the dispatch actually in flight (process_executor/frames.js).
  *
@@ -45,8 +48,9 @@ const { fork } = require('child_process');
 const { HostFaultError } = require('./errors.js');
 const { effectiveCeiling } = require('./gas.js');
 const { CONSENSUS_MAX_WALL_MS } = require('./consensus-wall-clock.js');
-const { newDispatchToken, replyFault } = require('./process_executor/frames.js');
+const { replyFault } = require('./process_executor/frames.js');
 const { isSelfInflicted, hostTerminatedResult } = require('./process_executor/termination.js');
+const { WorkerSnapshotChannel } = require('./process_executor/snapshot_channel.js');
 
 const WORKER_PATH = path.join(__dirname, 'vm-worker.js');
 
@@ -98,6 +102,11 @@ class ProcessExecutor {
         this._lastSpawnError = null; // errno of the last failed fork, for the latch message
         this._broken = false;        // host fault latch: worker can't start (recoverable)
         this._lastBrokenRetryAt = 0; // backoff gate for broken-state recovery probes
+        this._snapshots = new WorkerSnapshotChannel((frame) => this.send(frame), () => {
+            const child = this._child;
+            if (child) { try { child.kill('SIGKILL'); } catch (e) {} }
+            this._sawReady = false;
+        }, WORKER_READY_TIMEOUT_MS);
 
         this.spawn();
     }
@@ -107,6 +116,7 @@ class ProcessExecutor {
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
         this._sawReady = false;
         this._everReady = false;
+        this._snapshots.workerSpawned();
         let child;
         try {
             child = fork(WORKER_PATH, [], {
@@ -171,6 +181,7 @@ class ProcessExecutor {
         // A frame from a worker already replaced says nothing about the current one.
         if (child && child !== this._child) return;
         if (!msg || typeof msg !== 'object') return;
+        if (this._snapshots.onMessage(msg)) { this.flush(); return; }
         if (msg.type === 'ready') {
             // A worker signals ready once. A repeat must not re-open dispatch to
             // a worker the watchdog or a bad frame has just marked for death.
@@ -231,32 +242,7 @@ class ProcessExecutor {
     // worker. Racing a dying worker would resolve it as a host-termination on some
     // nodes and run it on others, producing a divergent result and a fork.
     flush() {
-        // AT MOST ONE ENTRY IN FLIGHT (`_pending.size === 0` in the loop guard):
-        // the worker executes strictly sequentially, so a 2nd entry dispatched
-        // alongside would start its watchdog while the 1st still ran, and a slow
-        // validator would fabricate 'watchdog timeout' for a contract a fast one
-        // ran normally → fork. The next entry dispatches when the current one
-        // settles (result / watchdog / worker exit).
-        while (this._queue.length && this._pending.size === 0 &&
-               this._child && this._sawReady && this._child.connected) {
-            const entry = this._queue[0];
-            const token = newDispatchToken();
-            try { this._child.send({ type: 'execute', id: entry.id, token, opts: entry.opts }); }
-            catch (e) {
-                // A throw on a live channel is this entry's opts failing to serialize
-                // (a BigInt, a cycle). Settle it as a host fault so the queue keeps moving.
-                if (!this._child.connected) break;
-                this._queue.shift();
-                entry.reject(new HostFaultError('executor input not serializable: ' + e.message));
-                continue;
-            }
-            this._queue.shift();
-            // Watchdog starts at DISPATCH: counting queue wait (which varies per
-            // host) would fabricate out_of_resource on a backed-up validator → fork.
-            // A never-dispatched request is bounded by the spawn-failure latch instead.
-            entry.timer = setTimeout(() => this.onWatchdog(entry.id), this._watchdogMs);
-            this._pending.set(entry.id, { resolve: entry.resolve, reject: entry.reject, timer: entry.timer, ceiling: entry.ceiling, token });
-        }
+        this._snapshots.flush(this);
     }
 
     // Dispatched but unresponsive past the in-isolate timeout + buffer: the
@@ -285,6 +271,7 @@ class ProcessExecutor {
         if (child !== this._child) return;   // a worker already replaced or shut down
         this._child = null;
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
+        this._snapshots.workerLost();
 
         // Settle only DISPATCHED requests. A self-inflicted death is the contract
         // aborting the host: resolve it deterministically so the block advances.
@@ -332,12 +319,14 @@ class ProcessExecutor {
 
     beginBlock() {
         this._inBlock = true;
+        this._snapshots.beginBlock();
         this.send({ type: 'beginBlock' });
     }
 
     endBlock() {
         this._inBlock = false;
         this.send({ type: 'endBlock' });
+        this._snapshots.endBlock();
     }
 
     execute(opts) {
@@ -376,6 +365,7 @@ class ProcessExecutor {
         this._shuttingDown = true;
         this._releaseSlot();
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
+        this._snapshots.close();
         // A local shutdown is not a contract outcome, even for a dispatched request
         // whose contract had started: every peer finishes it normally, so reject it.
         // Queued (never-dispatched) requests never ran: reject them the same way.
