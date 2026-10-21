@@ -10,9 +10,8 @@
  * license (without AGPL source-disclosure terms) is available -
  * contact legal@dankest.llc.
  *
- * Pins the frames ProcessExecutor sends its worker today: a block of two
- * executes sharing one crossChainData snapshot carries that snapshot inside
- * each execute frame and nowhere else.
+ * Pins the frames ProcessExecutor sends its worker for a block of two
+ * executions sharing one crossChainData snapshot.
  ********************************************************************/
 // @ts-nocheck
 
@@ -89,18 +88,26 @@ function containsSnapshot(frame) {
         }
     });
 
-    it('sends exactly beginBlock, execute, execute, endBlock', function () {
-        assert.deepStrictEqual(frames.map((f) => f.type), ['beginBlock', 'execute', 'execute', 'endBlock']);
+    it('sends exactly beginBlock, snapshot, execute, execute, endBlock', function () {
+        assert.deepStrictEqual(frames.map((f) => f.type),
+            ['beginBlock', 'snapshot', 'execute', 'execute', 'endBlock']);
     });
 
-    it('each execute frame carries the full snapshot in opts.crossChainData', function () {
+    it('the snapshot frame carries the full cross-chain snapshot', function () {
+        const frame = frames.find((f) => f.type === 'snapshot');
+        assert.deepStrictEqual(frame.crossChainData, fixture());
+    });
+
+    it('each execute frame carries only the acknowledged snapshot reference', function () {
+        const snapshot = frames.find((f) => f.type === 'snapshot');
         for (const f of frames.filter((x) => x.type === 'execute')) {
-            assert.deepStrictEqual(f.opts.crossChainData, fixture());
+            assert.deepStrictEqual(f.opts.crossChainData,
+                { __xchainWorkerSnapshot: snapshot.token });
         }
     });
 
-    it('only the two execute frames contain the snapshot bytes', function () {
-        assert.deepStrictEqual(frames.map(containsSnapshot), [false, true, true, false]);
+    it('only the snapshot frame contains the snapshot bytes', function () {
+        assert.deepStrictEqual(frames.map(containsSnapshot), [false, true, false, false, false]);
     });
 
     it('an execute frame has the keys type, id, token, opts in that order', function () {
@@ -109,7 +116,7 @@ function containsSnapshot(frame) {
     });
 
     it('the snapshot keys are attestations, settled and calls in that order', function () {
-        const f = frames.find((x) => x.type === 'execute');
-        assert.deepStrictEqual(Object.keys(f.opts.crossChainData), SNAPSHOT_KEYS);
+        const f = frames.find((x) => x.type === 'snapshot');
+        assert.deepStrictEqual(Object.keys(f.crossChainData), SNAPSHOT_KEYS);
     });
 });
