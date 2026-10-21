@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-21
+
+### Changed
+- Gated process dispatch on the snapshot acknowledgement from the worker.
+
+### Added
+- Added a snapshot send time bench scenario.
+
 ## [0.26.0] - 2026-10-20
 
 ### Changed

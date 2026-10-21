@@ -310,6 +310,7 @@ an isolated-vm binding for the current platform and Node 22. See the
 | `npm run mutation` | Mutation testing (Stryker, full suite) |
 | `npm run bench:quick` | Pipeline + gateway benchmarks |
 | `npm run bench:full` | All benchmarks except soak |
+| `npm run bench:snapshot-send` | Times snapshot delivery through a live worker, inline per execution against once per block; needs the Node 22 isolated-vm binding |
 
 ## Test Suite
 
@@ -480,7 +481,7 @@ xchain-vm/
 |   |-- chaos/            (3-phase chaos tests, 76 tests + helpers + contracts)
 |   |-- regression/       (4-tier + gate/pin regression suite, 159 tests + helpers)
 |   +-- mutation/         (stryker-xchain-vm-mutator/: custom mutation testing operators)
-+-- bench/                (5 benchmark scenarios + harness + contracts)
++-- bench/                (6 benchmark scenarios + harness + contracts)
 ```
 
 ## Integration
