@@ -49,6 +49,8 @@ const LIMITS = {
     maxBlockCacheSize: 1000
 };
 const CODE = 'module.exports = function(){ return xchain.crossChain.isSettled("BTC", 0); };';
+const ACCEPTANCE_SIZES = [1, 10000];
+const ACCEPTANCE_MAX_RATIO = 1;
 
 function makeSnapshot(entries) {
     const settled = {};
@@ -182,6 +184,37 @@ async function runSize(entries, executions, blocks, samples) {
     };
 }
 
+function evaluateAcceptance(results) {
+    const bySize = new Map(results.map((result) => [result.entries, result]));
+    const missingSizes = ACCEPTANCE_SIZES.filter((entries) => !bySize.has(entries));
+    const regressions = ACCEPTANCE_SIZES
+        .filter((entries) => bySize.has(entries))
+        .map((entries) => ({
+            entries,
+            ratio: bySize.get(entries).comparison.medianRatio
+        }))
+        .filter(({ ratio }) => !Number.isFinite(ratio) || ratio > ACCEPTANCE_MAX_RATIO);
+    return {
+        passed: missingSizes.length === 0 && regressions.length === 0,
+        maxRatio: ACCEPTANCE_MAX_RATIO,
+        requiredSizes: ACCEPTANCE_SIZES.slice(),
+        missingSizes,
+        regressions
+    };
+}
+
+function assertAcceptance(acceptance) {
+    if (acceptance.passed) return;
+    const failures = [];
+    if (acceptance.missingSizes.length)
+        failures.push('missing required sizes: ' + acceptance.missingSizes.join(', '));
+    if (acceptance.regressions.length) {
+        failures.push('per-block slower at ' + acceptance.regressions.map(({ entries, ratio }) =>
+            entries + ' entries (' + ratio.toFixed(3) + 'x inline)').join(', '));
+    }
+    throw new Error('Snapshot send benchmark acceptance failed: ' + failures.join('; '));
+}
+
 async function run({ sizes = [1, 1000, 10000], executions = 60, blocks = 3, samples = 3 } = {}) {
     if (!Number.isInteger(executions) || executions < 1)
         throw new Error('executions must be a positive integer');
@@ -191,12 +224,13 @@ async function run({ sizes = [1, 1000, 10000], executions = 60, blocks = 3, samp
         throw new Error('samples must be a positive odd integer');
     const results = [];
     for (const entries of sizes) results.push(await runSize(entries, executions, blocks, samples));
-    return { results };
+    return { results, acceptance: evaluateAcceptance(results) };
 }
 
 function parseArgs(argv) {
     const opts = {
-        sizes: [1, 1000, 10000], executions: 60, blocks: 3, samples: 3, json: false
+        sizes: [1, 1000, 10000], executions: 60, blocks: 3, samples: 3,
+        json: false, check: true
     };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -205,6 +239,7 @@ function parseArgs(argv) {
         else if (arg === '--executions') opts.executions = Number(argv[++i]);
         else if (arg === '--blocks') opts.blocks = Number(argv[++i]);
         else if (arg === '--samples') opts.samples = Number(argv[++i]);
+        else if (arg === '--no-check') opts.check = false;
     }
     return opts;
 }
@@ -214,21 +249,26 @@ async function main() {
     const out = await run(opts);
     if (opts.json) {
         console.log(JSON.stringify(out, null, 2));
-        return;
+    } else {
+        for (const r of out.results) {
+            const ratio = r.comparison.medianRatio;
+            console.log(String(r.entries).padStart(6) + ' entries ' +
+                String(r.bytes).padStart(9) + ' B | inline ' + r.inline.ms.toFixed(1) + 'ms (' +
+                r.inline.perExecMs.toFixed(2) + 'ms/exec, ' + r.inline.executeFramesWithSnapshot +
+                ' full frames) | per block ' + r.perBlock.ms.toFixed(1) + 'ms (' +
+                r.perBlock.perExecMs.toFixed(2) + 'ms/exec, ' + r.perBlock.snapshotFrames +
+                ' snapshot frames, ' + ratio.toFixed(2) + 'x inline median over ' +
+                r.samples + ' samples)');
+        }
+        if (opts.check && out.acceptance.passed) {
+            console.log('Acceptance PASS: per-block is no slower than inline at ' +
+                out.acceptance.requiredSizes.join(' and ') + ' entries.');
+        }
     }
-    for (const r of out.results) {
-        const ratio = r.comparison.medianRatio;
-        console.log(String(r.entries).padStart(6) + ' entries ' +
-            String(r.bytes).padStart(9) + ' B | inline ' + r.inline.ms.toFixed(1) + 'ms (' +
-            r.inline.perExecMs.toFixed(2) + 'ms/exec, ' + r.inline.executeFramesWithSnapshot +
-            ' full frames) | per block ' + r.perBlock.ms.toFixed(1) + 'ms (' +
-            r.perBlock.perExecMs.toFixed(2) + 'ms/exec, ' + r.perBlock.snapshotFrames +
-            ' snapshot frames, ' + ratio.toFixed(2) + 'x inline median over ' +
-            r.samples + ' samples)');
-    }
+    if (opts.check) assertAcceptance(out.acceptance);
 }
 
-module.exports = { makeSnapshot, run };
+module.exports = { assertAcceptance, evaluateAcceptance, makeSnapshot, run };
 
 if (require.main === module) {
     main().catch((err) => { console.error(err); process.exit(1); });
