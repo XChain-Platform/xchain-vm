@@ -22,6 +22,11 @@
  *   - per block: executions inside beginBlock/endBlock, so the snapshot is
  *                sent once per block and execute frames carry a reference
  *
+ * Both modes run the same total execution count on fresh workers. An odd
+ * number of paired samples alternates which mode runs first. Reported timings
+ * come from the pair with the median ratio, so scheduler noise does not decide
+ * the comparison and the two displayed times remain directly comparable.
+ *
  * Frames are counted from child.send, so the numbers show how often the
  * snapshot crossed the process boundary as well as how long it took.
  ********************************************************************/
@@ -84,15 +89,7 @@ async function executeOnce(exec, snapshot) {
     if (!result.success) throw new Error('Execution failed: ' + result.error);
 }
 
-function countFrames(frames) {
-    return {
-        snapshotFrames: frames.filter((f) => f.type === 'snapshot').length,
-        executeFramesWithSnapshot: frames.filter((f) => f.carriesSnapshot).length
-    };
-}
-
-async function runSize(entries, executions, blocks) {
-    const snapshot = makeSnapshot(entries);
+async function withExecutor(runMode) {
     const exec = new ProcessExecutor({
         gasSchedule: SCHEDULE,
         gasCeiling: GAS_CEILING,
@@ -100,50 +97,114 @@ async function runSize(entries, executions, blocks) {
     });
     try {
         await waitReady(exec);
-        const frames = captureFrames(exec);
-
-        const inlineStart = performance.now();
-        for (let i = 0; i < executions; i++) await executeOnce(exec, snapshot);
-        const inlineMs = performance.now() - inlineStart;
-        const inlineFrames = countFrames(frames);
-
-        frames.length = 0;
-        const blockStart = performance.now();
-        for (let b = 0; b < blocks; b++) {
-            exec.beginBlock();
-            for (let i = 0; i < executions; i++) await executeOnce(exec, snapshot);
-            exec.endBlock();
-        }
-        const blockMs = performance.now() - blockStart;
-        const blockFrames = countFrames(frames);
-
-        return {
-            entries,
-            bytes: Buffer.byteLength(JSON.stringify(snapshot)),
-            executions,
-            blocks,
-            inline: { ms: inlineMs, perExecMs: inlineMs / executions, ...inlineFrames },
-            perBlock: { ms: blockMs, perBlockMs: blockMs / blocks, ...blockFrames }
-        };
+        return await runMode(exec, captureFrames(exec));
     } finally {
         await exec.shutdown();
     }
 }
 
-async function run({ sizes = [10, 1000, 10000], executions = 20, blocks = 3 } = {}) {
+function countFrames(frames) {
+    return {
+        snapshotFrames: frames.filter((f) => f.type === 'snapshot').length,
+        executeFramesWithSnapshot: frames.filter((f) => f.carriesSnapshot).length
+    };
+}
+
+async function measureInline(snapshot, executions) {
+    return withExecutor(async (exec, frames) => {
+        const start = performance.now();
+        for (let i = 0; i < executions; i++) await executeOnce(exec, snapshot);
+        const ms = performance.now() - start;
+        return { ms, perExecMs: ms / executions, ...countFrames(frames) };
+    });
+}
+
+async function measurePerBlock(snapshot, executions, blocks) {
+    return withExecutor(async (exec, frames) => {
+        const start = performance.now();
+        for (let b = 0; b < blocks; b++) {
+            exec.beginBlock();
+            const blockExecutions = Math.floor(executions / blocks) +
+                (b < executions % blocks ? 1 : 0);
+            for (let i = 0; i < blockExecutions; i++) await executeOnce(exec, snapshot);
+            exec.endBlock();
+        }
+        const ms = performance.now() - start;
+        return {
+            ms,
+            perExecMs: ms / executions,
+            perBlockMs: ms / blocks,
+            ...countFrames(frames)
+        };
+    });
+}
+
+function median(values) {
+    const sorted = values.slice().sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+}
+
+async function runSize(entries, executions, blocks, samples) {
+    const snapshot = makeSnapshot(entries);
+    const pairs = [];
+    for (let sample = 0; sample < samples; sample++) {
+        let inline;
+        let perBlock;
+        if (sample % 2 === 0) {
+            inline = await measureInline(snapshot, executions);
+            perBlock = await measurePerBlock(snapshot, executions, blocks);
+        } else {
+            perBlock = await measurePerBlock(snapshot, executions, blocks);
+            inline = await measureInline(snapshot, executions);
+        }
+        pairs.push({ inline, perBlock, ratio: perBlock.ms / inline.ms });
+    }
+    const selected = pairs.slice().sort((a, b) => a.ratio - b.ratio)[Math.floor(samples / 2)];
+
+    return {
+        entries,
+        bytes: Buffer.byteLength(JSON.stringify(snapshot)),
+        executions,
+        blocks,
+        samples,
+        inline: Object.assign({}, selected.inline, {
+            medianMs: median(pairs.map((pair) => pair.inline.ms)),
+            sampleMs: pairs.map((pair) => pair.inline.ms)
+        }),
+        perBlock: Object.assign({}, selected.perBlock, {
+            medianMs: median(pairs.map((pair) => pair.perBlock.ms)),
+            sampleMs: pairs.map((pair) => pair.perBlock.ms)
+        }),
+        comparison: {
+            medianRatio: selected.ratio,
+            sampleRatios: pairs.map((pair) => pair.ratio)
+        }
+    };
+}
+
+async function run({ sizes = [1, 1000, 10000], executions = 60, blocks = 3, samples = 3 } = {}) {
+    if (!Number.isInteger(executions) || executions < 1)
+        throw new Error('executions must be a positive integer');
+    if (!Number.isInteger(blocks) || blocks < 1 || blocks > executions)
+        throw new Error('blocks must be a positive integer no greater than executions');
+    if (!Number.isInteger(samples) || samples < 1 || samples % 2 === 0)
+        throw new Error('samples must be a positive odd integer');
     const results = [];
-    for (const entries of sizes) results.push(await runSize(entries, executions, blocks));
+    for (const entries of sizes) results.push(await runSize(entries, executions, blocks, samples));
     return { results };
 }
 
 function parseArgs(argv) {
-    const opts = { sizes: [10, 1000, 10000], executions: 20, blocks: 3, json: false };
+    const opts = {
+        sizes: [1, 1000, 10000], executions: 60, blocks: 3, samples: 3, json: false
+    };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--json') opts.json = true;
         else if (arg === '--sizes') opts.sizes = String(argv[++i]).split(',').map(Number);
         else if (arg === '--executions') opts.executions = Number(argv[++i]);
         else if (arg === '--blocks') opts.blocks = Number(argv[++i]);
+        else if (arg === '--samples') opts.samples = Number(argv[++i]);
     }
     return opts;
 }
@@ -156,12 +217,14 @@ async function main() {
         return;
     }
     for (const r of out.results) {
+        const ratio = r.comparison.medianRatio;
         console.log(String(r.entries).padStart(6) + ' entries ' +
             String(r.bytes).padStart(9) + ' B | inline ' + r.inline.ms.toFixed(1) + 'ms (' +
             r.inline.perExecMs.toFixed(2) + 'ms/exec, ' + r.inline.executeFramesWithSnapshot +
             ' full frames) | per block ' + r.perBlock.ms.toFixed(1) + 'ms (' +
-            r.perBlock.perBlockMs.toFixed(2) + 'ms/block, ' + r.perBlock.snapshotFrames +
-            ' snapshot frames)');
+            r.perBlock.perExecMs.toFixed(2) + 'ms/exec, ' + r.perBlock.snapshotFrames +
+            ' snapshot frames, ' + ratio.toFixed(2) + 'x inline median over ' +
+            r.samples + ' samples)');
     }
 }
 
