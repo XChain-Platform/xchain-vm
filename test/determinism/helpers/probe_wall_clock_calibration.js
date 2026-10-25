@@ -62,7 +62,8 @@ const runtime = require('../../../src/consensus-runtime.js');
 const { CONSENSUS_MAX_WALL_MS } = require('../../../src/consensus-wall-clock.js');
 
 const GAS_CEILING = 1000000;
-// Quoted for PINNED v8 12.4.254.21-node.56; re-measure and update every copy on a re-pin.
+// Quoted for PINNED v8 12.4.254.21-node.56 and held on the node.57 re-pin (epoch 8) by a
+// side-by-side run on both engines; re-measure and update every copy on a re-pin.
 const DOCUMENTED_MS = 750;
 const ADVISORY_RATIO = 10;
 const K = 100000;

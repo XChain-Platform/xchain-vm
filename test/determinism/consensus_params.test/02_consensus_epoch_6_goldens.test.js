@@ -28,7 +28,8 @@ describe('consensus epoch 7 goldens', function () {
     const epoch6Source = 'with (outer) {\n  with (inner) { value; }\n}';
 
     it('binds epoch 7 to the nesting-depth consensus rule', function () {
-        assert.strictEqual(CONSENSUS_VERSION, '7');
+        // Epoch 8 only re-pinned the engine, so the rule epoch 7 froze still holds.
+        assert.ok(Number(CONSENSUS_VERSION) >= 7, 'nesting-depth froze at epoch 7');
         assert.strictEqual(MAX_NESTING_DEPTH, 64);
         assert.ok(CONSENSUS_RULES.has('nesting-depth'));
     });

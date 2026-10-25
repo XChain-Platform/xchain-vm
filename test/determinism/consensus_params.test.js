@@ -84,8 +84,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('CONSENSUS_VERSION is the declared epoch (bump = consensus event)', function () {
-        assert.strictEqual(cr.CONSENSUS_VERSION, '7');
-        assert.strictEqual(vm.CONSENSUS_VERSION, '7', 're-export must match');
+        assert.strictEqual(cr.CONSENSUS_VERSION, '8');
+        assert.strictEqual(vm.CONSENSUS_VERSION, '8', 're-export must match');
     });
 
     it('armed harness rule order is frozen', function () {
@@ -299,8 +299,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('PINNED runtime equals the golden (re-pinning is a consensus event)', function () {
         assert.deepStrictEqual(cr.PINNED, {
-            v8:      '12.4.254.21-node.56',
-            icu:     '78.2',
+            v8:      '12.4.254.21-node.57',
+            icu:     '78.3',
             unicode: '17.0',
             cldr:    '48.0',
             modules: '127'

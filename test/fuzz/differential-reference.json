@@ -4,8 +4,8 @@
   "seed": 1480804417,
   "cases": 150,
   "execution": "in-process",
-  "platform": "linux-arm64-node22-v8_12.4.254.21-node.56-glibc2.39",
-  "node": "22.22.3",
+  "platform": "linux-x64-node22-v8_12.4.254.21-node.57-glibc2.36",
+  "node": "22.23.4",
   "entries": [
     {
       "index": 0,
@@ -1207,5 +1207,13 @@
       "success": true,
       "error": null
     }
-  ]
+  ],
+  "consensusRuntime": {
+    "ok": true,
+    "mismatches": []
+  },
+  "consensusDependencies": {
+    "ok": true,
+    "mismatches": []
+  }
 }

@@ -49,7 +49,7 @@ function manifest(leg, over) {
         cases: CASES,
         execution: 'in-process',
         platform: TAGS[leg],
-        node: '22.22.3',
+        node: '22.23.4',
         entries: [{ index: 0, resultHash: 'a' }, { index: 1, resultHash: 'b' }],
         consensusRuntime: { ok: true, mismatches: [] },
         consensusDependencies: { ok: true, mismatches: [] }

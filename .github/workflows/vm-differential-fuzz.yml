@@ -108,7 +108,7 @@ jobs:
           - leg: linux-x64-musl       # cross-BUILD (musl libc)
             runner: ubuntu-latest
             # The pinned engine release, by digest so a re-tag cannot move it.
-            container: node:22.22.3-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd
+            container: node:22.23.4-alpine@sha256:ce8d97f7cfc7c5386421eb932df20a29df99b1a7f469f6157d5c9956702ffadc
             libc: musl
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container }}
@@ -124,11 +124,11 @@ jobs:
 
       # Pinned to the consensus runtime; a floating "22" resolves to a release
       # the runtime gate refuses (see ci.yml).
-      - name: Use Node.js 22.22.3
+      - name: Use Node.js 22.23.4
         if: ${{ matrix.container == '' }}
         uses: actions/setup-node@v4
         with:
-          node-version: "22.22.3"
+          node-version: "22.23.4"
 
       # Build isolated-vm from source so the native V8 binding matches THIS
       # leg's arch/libc (a prebuild from another arch would be the very drift
@@ -183,7 +183,7 @@ jobs:
             --env DIFF_SEED --env DIFF_CASES \
             --volume "$GITHUB_WORKSPACE:/workspace" \
             --workdir /workspace \
-            node:22.22.3-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd \
+            node:22.23.4-alpine@sha256:ce8d97f7cfc7c5386421eb932df20a29df99b1a7f469f6157d5c9956702ffadc \
             sh -ec '
               apk add --no-cache python3 make g++ git
               npm ci --ignore-scripts
@@ -219,10 +219,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js 22.22.3
+      - name: Use Node.js 22.23.4
         uses: actions/setup-node@v4
         with:
-          node-version: "22.22.3"
+          node-version: "22.23.4"
 
       # compare only diffs already-recorded JSON manifests (no VM execution,
       # so isolated-vm need not build from source here), but differential.js
