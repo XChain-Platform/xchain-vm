@@ -31,6 +31,7 @@ const {
     STRIPPED_GLOBAL_NAMES,
     BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES,
 } = require('./stripped-globals.js');
+const { stripScriptNeuterChecks } = require('./sandbox/neuter_check.js');
 
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
@@ -172,6 +173,7 @@ const stripScriptProtoCtors = () => `
                 Object.defineProperty(proto, 'constructor',
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
+            assertNeutered(proto, 'constructor', 'NEUTERED_PROTO_CONSTRUCTORS ' + ctorTargets[i]);
         }
     })();
 `;
@@ -201,6 +203,7 @@ const stripScriptRegExpAndProtoMethods = () => `
                 Object.defineProperty(proto, protoMethods[i].method,
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
+            assertNeutered(proto, protoMethods[i].method, 'STRIPPED_PROTO_METHODS ' + protoMethods[i].proto);
         }
 
     })();
@@ -221,6 +224,7 @@ const stripScriptBigIntSurface = (enabled) => enabled ? `
                 Object.defineProperty(proto, protoMethods[i].method,
                     { value: undefined, writable: false, configurable: false });
             } catch(e) {}
+            assertNeutered(proto, protoMethods[i].method, 'BIGINT_SURFACE_STRIPPED_PROTO_METHODS ' + protoMethods[i].proto);
         }
         var ctorTargets = ${JSON.stringify(BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS)};
         for (var j = 0; j < ctorTargets.length; j++) {
@@ -228,9 +232,7 @@ const stripScriptBigIntSurface = (enabled) => enabled ? `
             if (!ctorProto) throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: unmapped proto ' + ctorTargets[j]);
             try { Object.defineProperty(ctorProto, 'constructor',
                 { value: undefined, writable: false, configurable: false }); } catch(e) {}
-            var ctorDescriptor = Object.getOwnPropertyDescriptor(ctorProto, 'constructor');
-            if (!ctorDescriptor || ctorDescriptor.value !== undefined || ctorDescriptor.writable || ctorDescriptor.configurable)
-                throw new Error('BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS: constructor remained mutable on ' + ctorTargets[j]);
+            assertNeutered(ctorProto, 'constructor', 'BIGINT_SURFACE_NEUTERED_PROTO_CONSTRUCTORS ' + ctorTargets[j]);
         }
     })();
 ` : '';
@@ -348,6 +350,7 @@ const buildStripScript = (names, stripBigIntSurface) => [
     stripScriptProtoCapture(),
     stripScriptDeleteGlobals(names),
     stripScriptFunctionCtors(),
+    stripScriptNeuterChecks(),
     stripScriptProtoCtors(),
     stripScriptRegExpAndProtoMethods(),
     stripScriptBigIntSurface(stripBigIntSurface),

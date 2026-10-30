@@ -326,7 +326,7 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
         });
 
         it('carries one key bit per flag parameter of getLintVerdict', function () {
-            // Signature is (code, six flags, codeHash, two height flags); a flag given a
+            // Signature is (code, six flags, codeHash, three height flags); a flag given a
             // default drops out of Function.length, and this count must then be updated
             // deliberately.
             const flagCount = newVm().getLintVerdict.length - 2;

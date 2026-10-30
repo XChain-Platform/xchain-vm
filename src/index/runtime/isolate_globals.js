@@ -17,7 +17,7 @@
  ********************************************************************/
 // @ts-nocheck
 
-const { MAX_STACK_DEPTH_MUSL } = require('../constants.js');
+const { MAX_STACK_DEPTH, MAX_STACK_DEPTH_MUSL } = require('../constants.js');
 const { BINARY_ALLOC_GATE_BLOCK_TIME, jsonStringifyHookGateTime, isIterSetMeterActive } = require('./activations.js');
 const ivm = require('isolated-vm');
 const { isApplyLengthMeterActive } = require('../apply_length_meter.js');
@@ -33,8 +33,8 @@ function injectDepthGlobals(context, pkg3SandboxOn, limits) {
         // bound drops to MAX_STACK_DEPTH_MUSL (its comment says what is and is not
 
         // measured on musl); below the window the
-        // injected value is limits.maxStackDepth (the 512 default),
-        // byte-identical to today. This __DEPTH_LIMIT is read only by the
+        // injected value is the MAX_STACK_DEPTH constant (512); a caller's
+        // limits.maxStackDepth never reaches it. This __DEPTH_LIMIT is read only by the
 
         // intra-contract recursion guard; the F-NR native-depth guard reads the
         // clamped __NR_DEPTH_LIMIT injected below. The coin is derived from the
@@ -43,7 +43,7 @@ function injectDepthGlobals(context, pkg3SandboxOn, limits) {
         // bare BTC 961000) stay pre-activation until their own calendar height.
         const __effectiveDepthLimit = pkg3SandboxOn
             ? MAX_STACK_DEPTH_MUSL
-            : limits.maxStackDepth;
+            : MAX_STACK_DEPTH;
         context.global.setSync('__DEPTH_LIMIT', __effectiveDepthLimit);
         // Clamp the F-NR native sinks to the musl-safe bound whatever the height
         // gate says. The native guard's ON/OFF rides the block-TIME binary-alloc

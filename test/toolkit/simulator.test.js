@@ -251,7 +251,7 @@ function registerMainnetDeployVerdictTest() {
     this.timeout(30000);
 
     it('pins the exact deploy-gate option key set deployGateVerdict builds', async function() {
-        // Twin of the execute() drift guard below. enforceBannedRest was missing from
+        // Twin of the execute-path guard in exec_lint_option_keyset.test.js. enforceBannedRest was missing from
         // this set and nothing went red, because an omitted key reads as `true`
         // rather than as an error. A flag added to the indexer's
         // deploy call site and missed here must break this test, not stay invisible.

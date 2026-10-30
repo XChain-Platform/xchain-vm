@@ -35,9 +35,9 @@ function resolveLimits(limits) {
     // caller's limits object predates them (additive, non-breaking).
     if (!Number.isInteger(out.maxCallDepth))      out.maxCallDepth      = MAX_CALL_DEPTH;
     if (!Number.isInteger(out.minCallGas))        out.minCallGas        = MIN_CALL_GAS;
-    // Intra-contract recursion bound (see MAX_STACK_DEPTH). Default the constant
-    // when the caller's limits object predates it (additive, non-breaking).
-    if (!Number.isInteger(out.maxStackDepth))     out.maxStackDepth     = MAX_STACK_DEPTH;
+    // Report the intra-contract recursion bound as the protocol constant whatever the
+    // caller passed (consensus-affecting; isolate_globals.js injects the constant).
+    out.maxStackDepth = MAX_STACK_DEPTH;
     // Core size caps (bac14514): a caller passing a PARTIAL limits object
     // leaves maxCodeSize === undefined, silently disabling the
     // execute-time code-size cap (and likewise the state caps, where

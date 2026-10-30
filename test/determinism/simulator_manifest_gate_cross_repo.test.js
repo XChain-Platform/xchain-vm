@@ -14,10 +14,11 @@
  *
  **********************************************************************
  * Parity gate for the simulator's third DEPLOY leg against the indexer that
- * owns the rule. The toolkit carries second copies of four consensus facts:
+ * owns the rule. The toolkit carries second copies of five consensus facts:
  * the CONTRACT_MANIFEST verdict strings, the policy-row strings, the
- * CONTRACT_META_REQUIRED flag times and the DEPLOY_INIT_STRICT instants that
- * decide when a DEPLOY runs its constructor. Each is compared here against the
+ * CONTRACT_META_REQUIRED flag times, the DEPLOY_INIT_STRICT instants that
+ * decide when a DEPLOY runs its constructor, and the meta text grammar with
+ * its byte caps. Each is compared here against the
  * sibling xchain-indexer, so a change on that side reddens this repo instead
  * of leaving the simulator quoting a status the chain no longer writes.
  *
@@ -31,7 +32,34 @@ const fs     = require('fs');
 const path   = require('path');
 
 const { siblingCheckout, skipOrFail } = require('../helpers/sibling_checkout.js');
-const { META_VERDICTS } = require('../../src/toolkit/gate/meta_validation.js');
+const {
+    META_VERDICTS, META_NAME_MAX_BYTES, META_DESCRIPTION_MAX_BYTES, META_VERSION_MAX_BYTES, isValidMetaText
+} = require('../../src/toolkit/gate/meta_validation.js');
+
+// Build every meta text case the grammar can disagree on: code points by position, caps, non-strings.
+function metaTextCases() {
+    const cases = [];
+    const caps = [META_NAME_MAX_BYTES, META_DESCRIPTION_MAX_BYTES, META_VERSION_MAX_BYTES];
+    const positioned = (ch) => [ch, 'a' + ch + 'a', ch + 'a', 'a' + ch];
+    const points = [];
+    for (let cp = 0; cp <= 0xFFFF; cp++) if (cp < 0xD800 || cp > 0xDFFF) points.push(cp);
+    points.push(0x10000, 0x1F600, 0xE0001, 0x10FFFF);
+    for (const cp of points) {
+        for (const s of positioned(String.fromCodePoint(cp))) cases.push([s, META_NAME_MAX_BYTES, 'U+' + cp.toString(16)]);
+    }
+    for (const s of ['\uD800', '\uDFFF', 'a\uD800b', '\uDC00\uD800', '']) cases.push([s, META_NAME_MAX_BYTES, 'surrogate/empty']);
+    for (const cap of caps) {
+        for (const ch of ['a', 'é', '€', '\u{1F600}']) {
+            const width = Buffer.byteLength(ch, 'utf8');
+            for (const target of [cap - 1, cap, cap + 1]) {
+                const n = Math.floor(target / width);
+                cases.push([ch.repeat(n) + 'a'.repeat(target - n * width), cap, 'cap ' + cap + ' at ' + target + ' bytes']);
+            }
+        }
+    }
+    for (const v of [undefined, null, 0, 1, {}, [], true]) cases.push([v, META_NAME_MAX_BYTES, 'non-string']);
+    return cases;
+}
 
 // constants.js loads the VM, so the flag-time and policy checks skip with it.
 let simConstants = null;
@@ -101,5 +129,38 @@ describe('simulator deploy-gate manifest leg agrees with the indexer', function 
             testnet: Number(row[2]),
             regtest: Number(row[3])
         }, 'the simulator runs the constructor under a different trigger instant than the chain');
+    });
+});
+
+describe('simulator meta text grammar agrees with the indexer', function () {
+
+    it('carries the indexer meta byte caps', function () {
+        const file = siblingOrSkip(this, path.join('xchain-indexer', 'src', 'actions', 'deploy', 'contract_meta.js'));
+        if (!file) return;
+        const chain = require(file);
+        assert.deepStrictEqual(
+            [META_NAME_MAX_BYTES, META_DESCRIPTION_MAX_BYTES, META_VERSION_MAX_BYTES],
+            [chain.META_NAME_MAX_BYTES, chain.META_DESCRIPTION_MAX_BYTES, chain.META_VERSION_MAX_BYTES],
+            'toolkit meta byte caps drifted from the caps the indexer enforces');
+    });
+
+    it('applies the indexer meta text grammar code point for code point', function () {
+        const file = siblingOrSkip(this, path.join('xchain-indexer', 'src', 'actions', 'deploy', 'contract_meta.js'));
+        if (!file) return;
+        const chain = require(file).isValidMetaText;
+        assert.strictEqual(typeof chain, 'function', 'contract_meta.js no longer exports isValidMetaText');
+        const cases = metaTextCases();
+        const drift = [];
+        for (const [s, cap, label] of cases) {
+            for (const allowLf of [false, true]) {
+                const ours = isValidMetaText(s, cap, allowLf);
+                const theirs = chain(s, cap, allowLf);
+                if (ours !== theirs) drift.push(label + ' ' + JSON.stringify(s).slice(0, 24) + ' lf=' + allowLf +
+                    ' toolkit=' + ours + ' chain=' + theirs);
+            }
+        }
+        assert.ok(cases.length > 250000, 'case table shrank to ' + cases.length);
+        assert.deepStrictEqual(drift.slice(0, 20), [],
+            drift.length + ' meta text verdicts differ from the chain grammar');
     });
 });

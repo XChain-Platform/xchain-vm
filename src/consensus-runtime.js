@@ -42,10 +42,10 @@
  * runtime, or (if the fleet is deliberately upgrading its engine) re-pin
  * here AND regenerate the determinism manifests AND re-run
  * test/determinism/helpers/probe_wall_clock_calibration.js on the new engine,
- * updating the ~750 ms gas-ceiling burn figure wherever it is quoted
+ * updating the measured gas-ceiling burn figures wherever they are quoted
  * (src/consensus-wall-clock.js, the probe's DOCUMENTED_MS, the xchain-indexer
- * EXECUTE batch weights) AND coordinate an atomic fleet activation (a
- * mixed-engine fleet can fork). The canonical runtime
+ * EXECUTE weight comment in src/actions/batch/limits.js) AND coordinate an
+ * atomic fleet activation (a mixed-engine fleet can fork). The canonical runtime
  * below was confirmed BYTE-IDENTICAL on linux/arm64 and linux/amd64
  * (node:22-bookworm) on 2026-06-07, and the epoch-8 node.57 build again on
  * 2026-10-24 (golden manifest and the 150-case differential reference).
@@ -262,8 +262,8 @@ function describeMismatch(result) {
         `\nInstall the canonical runtime (${REFERENCE_NODE}, node:22-bookworm) ` +
         'or, if the fleet is deliberately upgrading, re-pin src/consensus-runtime.js ' +
         '+ regenerate the determinism manifests + re-run ' +
-        'test/determinism/helpers/probe_wall_clock_calibration.js and update the ~750 ms ' +
-        'wall-clock figure wherever it is quoted + coordinate an atomic fleet activation.'
+        'test/determinism/helpers/probe_wall_clock_calibration.js and update the measured ' +
+        'gas-ceiling burn figures wherever they are quoted + coordinate an atomic fleet activation.'
     );
 }
 

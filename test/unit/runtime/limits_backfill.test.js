@@ -121,3 +121,63 @@ describe('resolveLimits back-fills the emission cap', function () {
         assert.strictEqual(resolveLimits(undefined).maxEmissions, 50);
     });
 });
+
+describe('resolveLimits pins the recursion bound to the protocol constant', function () {
+    const { resolveLimits } = require('../../../src/index/runtime/limits_defaults.js');
+    const { MAX_STACK_DEPTH } = require('../../../src/index/constants.js');
+
+    it('reports MAX_STACK_DEPTH whatever maxStackDepth the caller supplies', function () {
+        for (const v of [0, -1, 1, 100, 512, 4000, 1.5, '600', null])
+            assert.strictEqual(resolveLimits({ maxStackDepth: v }).maxStackDepth, MAX_STACK_DEPTH, String(v));
+        assert.strictEqual(resolveLimits(undefined).maxStackDepth, MAX_STACK_DEPTH);
+    });
+});
+
+(XChainVM ? describe : describe.skip)('a caller maxStackDepth cannot move the recursion bound', function () {
+
+    // Recurse `depth` contract frames below every height gate (BTC, height 1).
+    function recursion(depth) {
+        return 'module.exports = function(xchain) {\n' +
+               '    function f(k) { return k <= 0 ? 0 : 1 + f(k - 1); }\n' +
+               '    return f(' + depth + ');\n' +
+               '};';
+    }
+
+    async function run(vm, depth) {
+        vm.beginBlock();
+        try {
+            const r = await vm.execute({
+                code: recursion(depth), state: {}, method: 'default', params: [],
+                caller: 'addr', contractAddress: 'C:BTC:TEST',
+                blockContext: { height: 1, timestamp: 1700000000, hash: 'h' }
+            });
+            return { success: r.success, error: r.error, gasUsed: r.gasUsed, returnValue: r.returnValue };
+        } finally {
+            vm.endBlock();
+        }
+    }
+
+    function make(limits) {
+        return new XChainVM({ gasSchedule: GAS_SCHEDULE, gasCeiling: 1000000,
+                              execution: 'in-process', limits });
+    }
+
+    it('gives every override the default VM result at depths 300 and 600', async function () {
+        const baseline = make(undefined);
+        const expected = { 300: await run(baseline, 300), 600: await run(baseline, 600) };
+        assert.strictEqual(expected[300].success, true, expected[300].error);
+        assert.strictEqual(expected[600].success, false);
+        for (const v of [0, -1, 100, 4000]) {
+            const vm = make({ maxStackDepth: v });
+            for (const depth of [300, 600])
+                assert.deepStrictEqual(await run(vm, depth), expected[depth], 'maxStackDepth ' + v + ' at depth ' + depth);
+        }
+    });
+
+    it('ignores maxStackDepth changed on vm.limits after construction', async function () {
+        const expected = await run(make(undefined), 600);
+        const vm = make(undefined);
+        vm.limits.maxStackDepth = 0;
+        assert.deepStrictEqual(await run(vm, 600), expected);
+    });
+});
