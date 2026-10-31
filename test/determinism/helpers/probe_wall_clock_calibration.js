@@ -14,9 +14,9 @@
  * Calibration: how long does the worst-case EXECUTE take to burn the
  * 1,000,000-gas ceiling on the pinned consensus runtime?
  *
- * src/consensus-wall-clock.js grounds CONSENSUS_MAX_WALL_MS (30 s) and the
- * gas-ceiling batch weights on a measured ~750 ms worst-case burn, i.e. about
- * 40x headroom. This probe re-derives that figure instead of trusting the
+ * src/consensus-wall-clock.js states the measured worst-case gas-ceiling burns
+ * behind CONSENSUS_MAX_WALL_MS (30 s) and the gas-ceiling batch weights. This
+ * probe re-derives those figures instead of trusting the
  * comment: it refuses to call a run a calibration off the PINNED runtime, runs
  * as a MAINNET node past every ARMED flag-day so the activated metering is what
  * gets measured, and reports the headroom ratio against CONSENSUS_MAX_WALL_MS.
@@ -62,9 +62,10 @@ const runtime = require('../../../src/consensus-runtime.js');
 const { CONSENSUS_MAX_WALL_MS } = require('../../../src/consensus-wall-clock.js');
 
 const GAS_CEILING = 1000000;
-// Quoted for PINNED v8 12.4.254.21-node.56 and held on the node.57 re-pin (epoch 8) by a
-// side-by-side run on both engines; re-measure and update every copy on a re-pin.
-const DOCUMENTED_MS = 750;
+// Quote the worst metered mainnet burn on the node.57 pin: the trimLeft/trimRight/Number.parse*
+// vectors take 15-29 s while the string-receiver meter is unarmed there (~750 ms for the rest).
+// Re-measure and update every copy on a re-pin or a metering flag-day.
+const DOCUMENTED_MS = 29000;
 const ADVISORY_RATIO = 10;
 const K = 100000;
 // Gate constants at or above this are unarmed sentinels, not scheduled flag-days.

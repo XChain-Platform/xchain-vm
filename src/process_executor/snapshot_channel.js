@@ -154,8 +154,10 @@ if (require.main && /[\\/]vm-worker[.]js$/.test(require.main.filename) &&
 function resolveWorkerCrossChainSnapshot(snap) {
     if (!snap || typeof snap !== 'object' ||
         !Object.prototype.hasOwnProperty.call(snap, '__xchainWorkerSnapshot')) return snap;
+    // Halt on a stale reference: it is this worker's IPC state, which no contract can
+    // influence, so committing it as a failed result would fork from every healthy peer.
     if (snap['__xchainWorkerSnapshot'] !== workerCrossChainSnapshotToken)
-        throw new Error('worker cross-chain snapshot reference is unavailable');
+        throw new HostFaultError('worker cross-chain snapshot reference is unavailable');
     return workerCrossChainSnapshot;
 }
 
