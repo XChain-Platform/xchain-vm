@@ -215,7 +215,8 @@ const CONSENSUS_VERSION = '8';
 // 'out_of_resource' (the gas-vs-wallclock fork fix); adding/splitting a token
 // is a consensus change. STATUS_ERROR_PREFIXES documents the raw error prefixes
 // the VM's classifyError (+ process_executor) can emit, which the indexer maps
-// into the tokens above; the cross-service parity test locks the mapping.
+// into the tokens above. The indexer's vm_status_error_prefix_coupling test locks
+// every prefix to its consensus token.
 // NOTE: 'out_of_gas' remains in STATUS_ERROR_PREFIXES as a raw prefix the VM
 // can still emit; the indexer's vmFailureStatus normalises it to 'out_of_resource',
 // but the parity gate still asserts the prefix exists here to lock that mapping.

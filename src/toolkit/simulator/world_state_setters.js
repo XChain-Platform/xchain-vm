@@ -27,6 +27,25 @@ function stakeAmount(amount) {
     }
 }
 
+function stakeBucket(sim, contractIndex) {
+    if (contractIndex === undefined || contractIndex === null) return sim.contractStakeData;
+    const index = Number(contractIndex);
+    if (!sim.contractStakeDataByIndex.has(index)) {
+        sim.contractStakeDataByIndex.set(index,
+            { stakeByPubkeyTick: {}, totalByTick: {}, stakersByTick: {} });
+    }
+    return sim.contractStakeDataByIndex.get(index);
+}
+
+function attestationBucket(sim, contractIndex) {
+    if (contractIndex === undefined || contractIndex === null) return sim.attestationData;
+    const index = Number(contractIndex);
+    if (!sim.attestationDataByIndex.has(index)) {
+        sim.attestationDataByIndex.set(index, { responses: {} });
+    }
+    return sim.attestationDataByIndex.get(index);
+}
+
 module.exports = {
     // ---- read-only-state seeding -------------------------------------------
 
@@ -89,10 +108,12 @@ module.exports = {
     /**
      * Seed a settled ATTEST response (read by attestation.getResponse in a
      * callback method). Keys are request_ids; the simulator does not derive
-     * them, so pass the id your callback will be handed.
+     * them, so pass the id your callback will be handed. With contractIndex,
+     * only that contract sees the response, matching the chain. Without it,
+     * every contract without its own scoped bucket sees the response.
      */
-    setAttestationResponse(requestId, value) {
-        this.attestationData.responses[String(requestId)] = value;
+    setAttestationResponse(requestId, value, contractIndex) {
+        attestationBucket(this, contractIndex).responses[String(requestId)] = value;
         return this;
     },
 
@@ -110,8 +131,10 @@ module.exports = {
     },
 
     /**
-     * Seed one staker's stake on THIS contract, keeping the three derived
-     * views the accessor reads in agreement. Mirrors the indexer snapshot
+     * Seed one staker's stake, keeping the three derived views the accessor
+     * reads in agreement. With contractIndex, only that contract sees the
+     * stake, matching the chain. Without it, every contract without its own
+     * scoped bucket sees the stake. Mirrors the indexer snapshot
      * with exact BigNumber arithmetic: `stakersByTick` (what getStakers
      * returns verbatim) is sorted by descending amount with an ascending
      * pubkey tiebreak and capped at 1000, and `totalByTick` sums every
@@ -120,16 +143,18 @@ module.exports = {
      * @param {string} pubkey
      * @param {string} tick
      * @param {string|number} amount
+     * @param {number} [contractIndex]
      */
-    setStake(pubkey, tick, amount) {
+    setStake(pubkey, tick, amount, contractIndex) {
         const pk = String(pubkey || '').toLowerCase();
         const tk = String(tick || '');
+        const bucket = stakeBucket(this, contractIndex);
         stakeAmount(amount);
-        this.contractStakeData.stakeByPubkeyTick[pk + '|' + tk] = String(amount);
+        bucket.stakeByPubkeyTick[pk + '|' + tk] = String(amount);
 
         // Rebuild from every seeded stake on the tick, so the cap never loses a staker.
         const roster = [];
-        for (const [key, amt] of Object.entries(this.contractStakeData.stakeByPubkeyTick)) {
+        for (const [key, amt] of Object.entries(bucket.stakeByPubkeyTick)) {
             const bar = key.indexOf('|');
             if (key.slice(bar + 1) !== tk) continue;
             const big = stakeAmount(amt);
@@ -137,9 +162,9 @@ module.exports = {
         }
         roster.sort((a, b) => (b.big.gt(a.big) ? 1 : a.big.gt(b.big) ? -1
             : a.pubkey < b.pubkey ? -1 : a.pubkey > b.pubkey ? 1 : 0));
-        this.contractStakeData.stakersByTick[tk] = roster.slice(0, MAX_STAKERS_PER_TICK)
+        bucket.stakersByTick[tk] = roster.slice(0, MAX_STAKERS_PER_TICK)
             .map((s) => ({ pubkey: s.pubkey, amount: s.amount }));
-        this.contractStakeData.totalByTick[tk] =
+        bucket.totalByTick[tk] =
             roster.reduce((sum, s) => sum.plus(s.big), bignumber(0)).toString();
         return this;
     },
