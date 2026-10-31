@@ -17,6 +17,41 @@ const { toContractJs } = require('../transpile.js');
 const { GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER } = require('./constants.js');
 const { isDeployInitStrictActive } = require('./manifest_gate.js');
 
+function executionOptions(simulator, contract, index, method, params, opts, caller) {
+    return {
+        code: contract.code,
+        state: contract.state,
+        method: method || 'default',
+        params: Array.isArray(params) ? params : [],
+        caller,
+        contractAddress: contract.address,
+        contractIndex: index,
+        network: simulator.network,
+        blockContext: {
+            height: simulator.block.height,
+            timestamp: simulator.block.timestamp,
+            hash: simulator.block.hash
+        },
+        balances: simulator.balances,
+        tokenInfo: simulator.tokenInfo,
+        oracleData: simulator.oracle,
+        crossChainData: simulator.crossChainData,
+        attestationData: simulator.attestationDataByIndex.get(index) || simulator.attestationData,
+        pollData: simulator.pollData,
+        contractStakeData: simulator.contractStakeDataByIndex.get(index) || simulator.contractStakeData,
+        // Identity fields. The VM defaults every one of these itself
+        // (txHash '', actionIndex null, rootActionIndex null, callPath '',
+        // callDepth 0, providerDeadlines null), so an omitted opt lands on
+        // exactly the value the simulator produced before they existed.
+        txHash: opts.txHash != null ? String(opts.txHash) : '',
+        actionIndex: opts.actionIndex != null ? Number(opts.actionIndex) : null,
+        rootActionIndex: opts.rootActionIndex != null ? opts.rootActionIndex : null,
+        callPath: typeof opts.callPath === 'string' ? opts.callPath : '',
+        callDepth: Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
+        providerDeadlines: opts.providerDeadlines || null
+    };
+}
+
 module.exports = {
     /** Merge fields into the current block context ({ height, timestamp, hash }). */
     setBlock(partial) {
@@ -97,7 +132,8 @@ module.exports = {
             : (Array.isArray(given) ? given.join('|') : String(given));
         const strict = isDeployInitStrictActive(this.network, this.block.timestamp);
         if (!(strict ? (hasInitialize || paramStr !== '') : paramStr !== '')) return null;
-        return this.call(index, 'initialize', paramStr !== '' ? given : [], { caller: opts.caller });
+        return this.execute(index, 'initialize', paramStr !== '' ? given : [],
+            { caller: opts.caller }, { attestationData: null, contractStakeData: null });
     },
 
     /**
@@ -172,7 +208,8 @@ module.exports = {
      * call() has always built it.
      */
     async execute(contractIndex, method, params, opts, modeOverrides) {
-        const contract = this.contracts.get(Number(contractIndex));
+        const index = Number(contractIndex);
+        const contract = this.contracts.get(index);
         if (!contract) {
             throw new Error('no contract deployed at index ' + contractIndex);
         }
@@ -181,40 +218,10 @@ module.exports = {
         this.warnIfPreHeightGate(contract.address);
         this.warnIfBalanceOutOfScope(caller, contract.address);
 
-        const execOpts = {
-            code: contract.code,
-            state: contract.state,
-            method: method || 'default',
-            params: Array.isArray(params) ? params : [],
-            caller,
-            contractAddress: contract.address,
-            contractIndex: Number(contractIndex),
-            network: this.network,
-            blockContext: {
-                height: this.block.height,
-                timestamp: this.block.timestamp,
-                hash: this.block.hash
-            },
-            balances: this.balances,
-            tokenInfo: this.tokenInfo,
-            oracleData: this.oracle,
-            crossChainData: this.crossChainData,
-            attestationData: this.attestationData,
-            pollData: this.pollData,
-            contractStakeData: this.contractStakeData,
-            // Identity fields. The VM defaults every one of these itself
-            // (txHash '', actionIndex null, rootActionIndex null, callPath '',
-            // callDepth 0, providerDeadlines null), so an omitted opt lands on
-            // exactly the value the simulator produced before they existed.
-            txHash: opts.txHash != null ? String(opts.txHash) : '',
-            actionIndex: opts.actionIndex != null ? Number(opts.actionIndex) : null,
-            rootActionIndex: opts.rootActionIndex != null ? opts.rootActionIndex : null,
-            callPath: typeof opts.callPath === 'string' ? opts.callPath : '',
-            callDepth: Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
-            providerDeadlines: opts.providerDeadlines || null
-        };
+        const execOpts = executionOptions(this, contract, index, method, params, opts, caller);
         if (opts.gasLimit != null) execOpts.gasCeiling = Number(opts.gasLimit);
         if (modeOverrides) Object.assign(execOpts, modeOverrides);
+        this.warnIfStakeOutOfScope(execOpts.contractStakeData, execOpts.attestationData);
 
         const result = await this.vm.execute(execOpts);
 

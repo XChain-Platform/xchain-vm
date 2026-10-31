@@ -137,6 +137,29 @@ module.exports = {
     },
 
     /**
+     * Warn once when a multi-contract simulation relies on an unscoped stake or
+     * attestation seed. The chain builds both snapshots for one target contract,
+     * while an unscoped simulator seed remains a compatibility fallback.
+     */
+    warnIfStakeOutOfScope(contractStakeData, attestationData) {
+        if (this._stakeScopeWarned || this.contracts.size < 2) return;
+        const stakeShared = contractStakeData === this.contractStakeData
+            && Object.keys(this.contractStakeData.stakeByPubkeyTick).length > 0;
+        const attestationShared = attestationData === this.attestationData
+            && Object.keys(this.attestationData.responses).length > 0;
+        if (!stakeShared && !attestationShared) return;
+        this._stakeScopeWarned = true;
+        const kinds = [stakeShared && 'stakes', attestationShared && 'attestation responses']
+            .filter(Boolean).join(' and ');
+        console.warn(
+            '[xchain-vm simulator] ' + kinds + ' were seeded without a contractIndex, so ' +
+            'contracts without their own scoped bucket read them here. On chain, a contract ' +
+            'reads only data that targets it. Pass contractIndex to setStake or ' +
+            'setAttestationResponse to model that scope.'
+        );
+    },
+
+    /**
      * Run the first two legs of the chain's DEPLOY gate (size cap, validateSyntax)
      * over already-transpiled source and return their verdict as `{ valid, error }`;
      * manifestGateVerdict is the third leg. ADVISORY: deploy() reports it and warns once,
