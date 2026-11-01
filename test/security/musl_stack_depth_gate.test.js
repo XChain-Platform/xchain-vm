@@ -24,7 +24,8 @@
  * stringify and flat were drilled on real aarch64 musl, and the JSON.parse reviver
  * walk on real musl on both arches, with the limits that comment lists (the x86-64
  * leg ran under Rosetta, each depth ran once, and that leg used a floating
- * node:22-alpine build, not the pinned engine). Read it before moving the bound.
+ * node:22-alpine build, the node.57 engine epoch 8 pins rather than the epoch-7 one). Read it
+ * before moving the bound.
  *
  * This suite pins the gate BEHAVIOUR on both sides:
  *   - below the height: __DEPTH_LIMIT stays 512, so 300-deep recursion runs

@@ -43,11 +43,14 @@
  * It is the documented default the fleet already runs, so promoting it to a
  * protocol constant changes the outcome of NO execution on a default-configured
  * node: this change closes the heterogeneity fork surface without also moving
- * the bound. The magnitude is a separate question with a real cost (a measured
- * worst-case metered EXECUTE burns the 1,000,000-gas ceiling in ~750 ms on the
- * pinned runtime, so 30 s is roughly 40x the metered worst case, which is
- * exactly why batch cost weights grounded on a gas-ceiling burn are grounded on
- * today's metering coverage and not on this bound). Re-measure it with
+ * the bound. The magnitude is a separate question with a real cost. On mainnet
+ * as armed today, String trimLeft/trimRight and Number.parseInt/parseFloat burn
+ * the 1,000,000-gas ceiling in about 15-29 s on the pinned runtime, because the
+ * string-receiver meter that prices them is unarmed there, so 30 s is only
+ * about 1-2x that worst case; every other metered vector the probe runs burns
+ * it in ~750 ms, about 40x. That is why batch cost weights grounded on a
+ * gas-ceiling burn are grounded on today's metering coverage and not on this
+ * bound. Re-measure it with
  * test/determinism/helpers/probe_wall_clock_calibration.js after any re-pin or
  * metering change; its unmetered-suspect vectors show which builtins still
  * reach this bound before the gas ceiling. Tightening it is a consensus

@@ -62,7 +62,8 @@ const MAX_STACK_DEPTH = 512;
 // guard on, clean to 256 and out_of_stack from 257. Limits of that evidence: the
 // x86-64 leg ran under Rosetta translation on an aarch64 host (musl still sets the
 // 128KB thread stack), each depth ran once, and that leg used a floating
-// node:22-alpine build (V8 12.4.254.21-node.57), not the pinned engine.
+// node:22-alpine build (V8 12.4.254.21-node.57), the engine epoch 8 pins, not the epoch-7
+// engine the other legs ran.
 // Earlier Node 22 probes on reduced thread stacks (not musl) put the reviver onset
 // near 200 at 100KB and near 290 at 128KB, with isolated-vm leaving a musl pool
 // thread about 104KB usable; the musl drills came out well above that. The ~290

@@ -26,7 +26,8 @@ const cr = require('../../../src/consensus-runtime.js');
 
 // Record one row per epoch. A new epoch adds its row; a row once recorded is never edited.
 const PIN_DIGEST_BY_EPOCH = Object.freeze({
-    '7': 'e9520c7a8baeefc28ff2d8d1e1ec08917e0150581d1c4bdc676636bdb5280ae4'
+    '7': 'e9520c7a8baeefc28ff2d8d1e1ec08917e0150581d1c4bdc676636bdb5280ae4',
+    '8': 'ebf35088ddfe274a09d3504f536a2eaf5a227fa7175318cdf3f9fc195c20d8fb'
 });
 
 // Serialize with sorted keys, so reordering a pin object is not read as a re-pin.

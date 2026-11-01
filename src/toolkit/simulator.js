@@ -27,8 +27,9 @@
  *   - block lifecycle: beginBlock / endBlock bracket execution; the compile
  *     cache is per-block and cleared on advance.
  *   - read-only snapshots: balances, tokenInfo, the oracle, cross-chain,
- *     attestation, poll and contract-stake data are passed as the same
- *     plain-snapshot shapes the indexer threads into execute().
+ *     attestation, poll and contract-stake data use the same plain-snapshot
+ *     shapes the indexer threads into execute(). Stake and attestation seeds
+ *     can be scoped to one contract, matching the indexer's per-contract view.
  *   - controller-guard mode: callGuard() reproduces the indexer's
  *     runControllerGuard invocation (method `guard`, seven positional string
  *     params, isGuard, attestationData null, callPath '') at the same
@@ -298,6 +299,8 @@ class ContractSimulator {
         this.attestationData   = { responses: {} };
         this.pollData          = { polls: {} };
         this.contractStakeData = { stakeByPubkeyTick: {}, totalByTick: {}, stakersByTick: {} };
+        this.attestationDataByIndex = new Map();
+        this.contractStakeDataByIndex = new Map();
 
         // Deployed contracts: index -> { code, address, state }
         this.contracts = new Map();

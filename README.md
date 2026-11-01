@@ -4,8 +4,8 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.21.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/tests-2%2C557%2B%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/version-0.27.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/tests-3%2C575%2B%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
 </p>
@@ -290,26 +290,27 @@ an isolated-vm binding for the current platform and Node 22. See the
 
 | Command | Description |
 |---|---|
-| `npm test` | Unit tests (1,196 tests, 30s timeout) |
-| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator requires a Node 22 isolated-vm binding) (141 tests) |
-| `npm run test:integration` | Integration tests (194 tests) |
-| `npm run test:security` | Security tests (298 tests) |
-| `npm run test:boundary` | Boundary condition tests (117 tests) |
-| `npm run test:determinism` | Determinism tests (152 tests) |
+| `npm test` | Unit tests (1,860 tests, 30s timeout) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator requires a Node 22 isolated-vm binding) (223 tests) |
+| `npm run test:integration` | Integration tests (231 tests) |
+| `npm run test:security` | Security tests (519 tests) |
+| `npm run test:boundary` | Boundary condition tests (125 tests) |
+| `npm run test:determinism` | Determinism tests (256 tests) |
 | `npm run test:performance` | Performance benchmarks-as-tests (5 tests) |
-| `npm run test:all` | Every `*.test.js` under `test/` (2,557+ tests) |
-| `npm run test:e2e` | E2E tests only (66 tests) |
-| `npm run smoke` | Smoke tests (12 tests, < 5s) |
-| `npm run test:fuzz` | Fuzz / property-based tests (92 tests) |
-| `npm run test:chaos` | Chaos engineering tests (95 tests) |
+| `npm run test:all` | Every `*.test.js` under `test/` (3,575+ tests) |
+| `npm run test:e2e` | E2E tests only (75 tests) |
+| `npm run smoke` | Smoke tests (20 tests, < 5s) |
+| `npm run test:fuzz` | Fuzz / property-based tests (104 tests) |
+| `npm run test:chaos` | Chaos engineering tests (103 tests) |
 | `npm run test:regression:smoke` | P0 regression (11 tests, < 50ms) |
 | `npm run test:regression:core` | P0+P1 regression (45 tests, < 200ms) |
-| `npm run test:regression:full` | P0-P3 + gate/pin regression (149 tests, < 1s) |
-| `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 (341 tests) |
-| `npm run test:regression:release` | All tests + mutation testing (2,557 tests) |
+| `npm run test:regression:full` | P0-P3 + gate/pin regression (158 tests, < 1s) |
+| `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 (355 tests) |
+| `npm run test:regression:release` | All tests + mutation testing (3,575 tests) |
 | `npm run mutation` | Mutation testing (Stryker, full suite) |
 | `npm run bench:quick` | Pipeline + gateway benchmarks |
 | `npm run bench:full` | All benchmarks except soak |
+| `npm run bench:snapshot-send` | Times snapshot delivery through a live worker, inline per execution against once per block; needs the Node 22 isolated-vm binding |
 
 ## Test Suite
 
@@ -480,7 +481,7 @@ xchain-vm/
 |   |-- chaos/            (3-phase chaos tests, 76 tests + helpers + contracts)
 |   |-- regression/       (4-tier + gate/pin regression suite, 159 tests + helpers)
 |   +-- mutation/         (stryker-xchain-vm-mutator/: custom mutation testing operators)
-+-- bench/                (5 benchmark scenarios + harness + contracts)
++-- bench/                (6 benchmark scenarios + harness + contracts)
 ```
 
 ## Integration

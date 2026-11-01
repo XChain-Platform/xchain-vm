@@ -42,12 +42,13 @@
  * runtime, or (if the fleet is deliberately upgrading its engine) re-pin
  * here AND regenerate the determinism manifests AND re-run
  * test/determinism/helpers/probe_wall_clock_calibration.js on the new engine,
- * updating the ~750 ms gas-ceiling burn figure wherever it is quoted
+ * updating the measured gas-ceiling burn figures wherever they are quoted
  * (src/consensus-wall-clock.js, the probe's DOCUMENTED_MS, the xchain-indexer
- * EXECUTE batch weights) AND coordinate an atomic fleet activation (a
- * mixed-engine fleet can fork). The canonical runtime
+ * EXECUTE weight comment in src/actions/batch/limits.js) AND coordinate an
+ * atomic fleet activation (a mixed-engine fleet can fork). The canonical runtime
  * below was confirmed BYTE-IDENTICAL on linux/arm64 and linux/amd64
- * (node:22-bookworm) on 2026-06-07.
+ * (node:22-bookworm) on 2026-06-07, and the epoch-8 node.57 build again on
+ * 2026-10-24 (golden manifest and the 150-case differential reference).
  *
  * PLATFORMS. Only glibc linux/amd64 and linux/arm64 are confirmed
  * byte-identical. checkConsensusRuntime() compares engine strings only and does
@@ -78,8 +79,8 @@ const { createRequire } = require('module');
 // primitives). The Node ABI ('modules') is pinned too: a different ABI means
 // a different V8/ICU build and an incompatible isolated-vm binary.
 const PINNED = Object.freeze({
-    v8:      '12.4.254.21-node.56',
-    icu:     '78.2',
+    v8:      '12.4.254.21-node.57',
+    icu:     '78.3',
     unicode: '17.0',
     cldr:    '48.0',
     modules: '127'
@@ -135,7 +136,7 @@ const DEPENDENCY_PINNED = Object.freeze({
 // a different Node PATCH that carries the SAME v8/icu/unicode/cldr/modules
 // is consensus-equivalent and intentionally NOT rejected. Recorded so the
 // gate's failure message can name the canonical release to install.
-const REFERENCE_NODE = 'v22.22.3';
+const REFERENCE_NODE = 'v22.23.4';
 
 // The declared consensus epoch. ONE number that covers the whole consensus
 // surface frozen with the wire format (LAUNCH-PLAN track 8): this PINNED
@@ -199,7 +200,14 @@ const REFERENCE_NODE = 'v22.22.3';
 //
 // Epoch '7' adds the pre-parse 'nesting-depth' deploy rule. A non-recursive token
 // scan rejects delimiter nesting above 64 before either JavaScript parser runs.
-const CONSENSUS_VERSION = '7';
+//
+// Epoch '8' re-pins the engine to the Node 22.23.4 build (V8 12.4.254.21-node.57,
+// ICU 78.3) so validators run the October 2026 Node security release. No contract
+// rule or sandbox surface changes. The determinism golden manifest and the
+// differential-fuzz reference were regenerated on the new engine and must stay
+// byte-identical to the epoch-7 figures. The fleet still moves its engine in one
+// atomic window, since the gate refuses a validator on the other build.
+const CONSENSUS_VERSION = '8';
 
 // The FROZEN status vocabulary. CONSENSUS_STATUS_TOKENS is the closed set the
 // indexer may intern into index_statuses and hash into contract_hash
@@ -207,7 +215,8 @@ const CONSENSUS_VERSION = '7';
 // 'out_of_resource' (the gas-vs-wallclock fork fix); adding/splitting a token
 // is a consensus change. STATUS_ERROR_PREFIXES documents the raw error prefixes
 // the VM's classifyError (+ process_executor) can emit, which the indexer maps
-// into the tokens above; the cross-service parity test locks the mapping.
+// into the tokens above. The indexer's vm_status_error_prefix_coupling test locks
+// every prefix to its consensus token.
 // NOTE: 'out_of_gas' remains in STATUS_ERROR_PREFIXES as a raw prefix the VM
 // can still emit; the indexer's vmFailureStatus normalises it to 'out_of_resource',
 // but the parity gate still asserts the prefix exists here to lock that mapping.
@@ -254,8 +263,8 @@ function describeMismatch(result) {
         `\nInstall the canonical runtime (${REFERENCE_NODE}, node:22-bookworm) ` +
         'or, if the fleet is deliberately upgrading, re-pin src/consensus-runtime.js ' +
         '+ regenerate the determinism manifests + re-run ' +
-        'test/determinism/helpers/probe_wall_clock_calibration.js and update the ~750 ms ' +
-        'wall-clock figure wherever it is quoted + coordinate an atomic fleet activation.'
+        'test/determinism/helpers/probe_wall_clock_calibration.js and update the measured ' +
+        'gas-ceiling burn figures wherever they are quoted + coordinate an atomic fleet activation.'
     );
 }
 
