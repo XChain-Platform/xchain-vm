@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-01
+
+### Changed
+- Moved the consensus runtime to epoch 8 on the pinned Node 22 patch, so validators on any other Node build refuse to join the fleet.
+- Added a snapshot send benchmark with an acceptance check to the full benchmark run.
+
+### Fixed
+- Simulator execution and world-state setters were corrected, and the simulator now reports gate warnings.
+- The sandbox now checks that its neutered globals stay neutered, and consensus runtime and wall-clock checks are stricter.
+
 ## [0.26.2] - 2026-10-21
 
 ### Changed
