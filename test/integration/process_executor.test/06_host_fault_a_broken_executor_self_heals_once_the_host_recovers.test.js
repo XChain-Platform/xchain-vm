@@ -31,6 +31,8 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
         const ProcessExecutor = require('../../../src/process-executor.js');
         const exec = new ProcessExecutor({ gasSchedule: GAS_SCHEDULE, gasCeiling: GAS_CEILING, limits: LIMITS });
         exec.beginBlock();
+        const pidA = exec._child.pid;
+        let shutDown = false;
         try {
             // Broken, but the backoff has elapsed → execute() probes a fresh spawn,
             // which succeeds (the host is actually fine here) → the request runs.
@@ -40,8 +42,19 @@ const { assert, hashResult, GAS_SCHEDULE, LIMITS, GAS_CEILING, makeVM, BASE, HAV
             assert.strictEqual(r.success, true, 'recovery probe should run the contract: ' + r.error);
             assert.strictEqual(r.returnValue, '"healed"');
             assert.strictEqual(exec._broken, false, '_broken must clear after a successful recovery');
-        } finally {
+            assert.notStrictEqual(exec._child.pid, pidA, 'the probe forks a fresh worker');
             await exec.shutdown();
+            shutDown = true;
+            // The probe must retire the worker it replaced: no process left behind.
+            let alive = true;
+            for (let i = 0; i < 50 && alive; i++) {
+                try { process.kill(pidA, 0); await new Promise((res) => setTimeout(res, 100)); }
+                catch (e) { alive = e.code !== 'ESRCH'; if (alive) throw e; }
+            }
+            assert.strictEqual(alive, false, 'replaced worker ' + pidA + ' must not survive shutdown()');
+        } finally {
+            if (!shutDown) await exec.shutdown();
+            try { process.kill(pidA, 'SIGKILL'); } catch (e) {}
         }
     });
 });

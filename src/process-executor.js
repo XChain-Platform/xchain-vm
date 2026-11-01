@@ -111,8 +111,18 @@ class ProcessExecutor {
         this.spawn();
     }
 
+    // Kill a live worker before forking: overwriting _child would orphan it (its exit
+    // handler ignores a non-current child and shutdown() kills only the current one).
+    retireLiveChild() {
+        const stale = this._child; this._child = null;
+        if (!stale) return;
+        try { stale.removeAllListeners('message'); if (stale.connected) stale.disconnect(); } catch (e) {}
+        try { stale.kill('SIGKILL'); } catch (e) {}
+    }
+
     spawn() {
         if (this._shuttingDown) return;
+        this.retireLiveChild();
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
         this._sawReady = false;
         this._everReady = false;
