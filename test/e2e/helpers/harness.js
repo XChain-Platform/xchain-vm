@@ -19,6 +19,7 @@
 // @ts-nocheck
 
 const fs   = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 const MockLedger  = require('./MockLedger.js');
 const MockIndexer = require('./MockIndexer.js');
@@ -57,6 +58,14 @@ function resolveStart(overrides) {
         blockHeight:    o.blockHeight ?? height,
         blockTimestamp: o.blockTimestamp ?? GATES.liveBlockTime(undefined, network ?? undefined)
     };
+}
+
+// Contract index from a C:<COIN>:<index> address; any other address gets a stable
+// hash-derived index so distinct contracts never share request-id preimage inputs.
+function contractIndexOf(address) {
+    const m = /:(\d+)$/.exec(String(address));
+    if (m) return Number(m[1]);
+    return crypto.createHash("sha256").update(String(address)).digest().readUInt32BE(0);
 }
 
 class E2EHarness {
@@ -124,6 +133,11 @@ class E2EHarness {
         return { success: initResult.success, error: initResult.error, gasUsed: initResult.gasUsed, result: initResult };
     }
 
+    /** Unique, deterministic per-execution tx hash (stable across identical harness runs). */
+    _defaultTxHash() {
+        return crypto.createHash("sha256").update("e2e-tx:" + this._executionLog.length).digest("hex");
+    }
+
     /**
      * Execute a contract method.
      * @param {object} opts
@@ -132,6 +146,7 @@ class E2EHarness {
      * @param {string[]} [opts.params]
      * @param {string} opts.caller
      * @param {object} [opts.blockContext] - Override block context
+     * @param {string} [opts.txHash] - Request-id preimage tx hash (defaults to a per-execution hash)
      * @returns {object} Full VM result + applied ledger changes
      */
     async execute(opts) {
@@ -157,6 +172,11 @@ class E2EHarness {
             crossChainData:  this.ledger.buildCrossChainAccessor(),
             pollData:        this.ledger.buildPollAccessor(),
             attestationData: this.ledger.buildAttestationAccessor(),
+            // Request-id preimage inputs (tx hash, root index, contract index): without
+            // them every contract derives the same attestation request_id.
+            txHash:          opts.txHash || this._defaultTxHash(),
+            rootActionIndex: opts.rootActionIndex != null ? opts.rootActionIndex : 0,
+            contractIndex:   opts.contractIndex != null ? opts.contractIndex : contractIndexOf(opts.contractAddress),
             ...(this.network == null ? {} : { network: this.network })
         });
 
