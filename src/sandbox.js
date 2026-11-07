@@ -32,7 +32,6 @@ const {
     BIGINT_SURFACE_STRIPPED_GLOBAL_NAMES,
 } = require('./stripped-globals.js');
 const { stripScriptNeuterChecks } = require('./sandbox/neuter_check.js');
-
 // The canonical, FROZEN set of consensus-critical PROTOTYPE-METHOD neuters the
 // sandbox replaces with `undefined`. Deleting a global (above) is NOT enough for
 // these: they live on built-in prototypes and stay reachable. Each entry names the
@@ -75,7 +74,6 @@ const STRIPPED_PROTO_METHODS = Object.freeze([
 const NEUTERED_PROTO_CONSTRUCTORS = Object.freeze([
     'Object', 'Array', 'String', 'Number', 'Boolean', 'RegExp'
 ]);
-
 const BIGINT_SURFACE_STRIPPED_PROTO_METHODS = Object.freeze([
     { proto: 'DataView', method: 'getBigInt64' }, { proto: 'DataView', method: 'getBigUint64' },
     { proto: 'DataView', method: 'setBigInt64' }, { proto: 'DataView', method: 'setBigUint64' }
@@ -127,6 +125,7 @@ const stripScriptDeleteGlobals = (names) => `
 const stripScriptFunctionCtors = () => `
     // Block eval and Function constructor
     try { globalThis.eval = undefined; } catch(e) {}
+    if (typeof globalThis.eval !== 'undefined') throw new Error('eval was not removed');
     try {
         // Save a private reference for the contract wrapper to use
         globalThis.__Function = Function;
@@ -256,11 +255,12 @@ const stripScriptErrorStacks = () => `
     try {
         Object.defineProperty(Error, 'stackTraceLimit', { value: 0, writable: false, configurable: false });
     } catch(e) {}
+    assertLocked(Error, 'stackTraceLimit', 0, 'Error.stackTraceLimit');
+    var _stackHookDesc = { value: function() { return ''; }, writable: false, configurable: false };
     try {
-        Object.defineProperty(Error, 'prepareStackTrace', {
-            value: function() { return ''; }, writable: false, configurable: false
-        });
+        Object.defineProperty(Error, 'prepareStackTrace', _stackHookDesc);
     } catch(e) {}
+    assertLocked(Error, 'prepareStackTrace', _stackHookDesc.value, 'Error.prepareStackTrace');
 `;
 
 // Saves Object.defineProperty for the harness, then freezes defineProperty,

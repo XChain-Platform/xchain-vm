@@ -23,7 +23,7 @@ const ivm = require('isolated-vm');
 const { isApplyLengthMeterActive } = require('../apply_length_meter.js');
 const { isStringResultMeterActive } = require('../string_result_meter.js');
 
-function injectDepthGlobals(context, pkg3SandboxOn, limits) {
+function injectDepthGlobals(context, pkg3SandboxOn) {
         // Inject the deterministic recursion bound. The harness captures this
         // into a closure and enforces it on the metering-injected depth hooks,
         // so a contract that catches a stack fault cannot observe a
@@ -114,8 +114,8 @@ function injectStackFaultSignal(context, hostSignals) {
 // ../native_stack/harness_hooks.js, resolved once per execution by the caller and
 // injected only while armed; the cleanup pass strips it with the other __-prefixed
 // globals.
-function injectExecutionGlobals(context, opts, pkg3SandboxOn, limits, hostSignals, nativeStackTerminalOn) {
-    injectDepthGlobals(context, pkg3SandboxOn, limits);
+function injectExecutionGlobals(context, opts, pkg3SandboxOn, hostSignals, nativeStackTerminalOn) {
+    injectDepthGlobals(context, pkg3SandboxOn);
     injectStackFaultSignal(context, hostSignals);
     if (nativeStackTerminalOn === true) context.global.setSync('__NATIVE_STACK_TERMINAL_ON', true);
     return injectMeteringGlobals(context, opts);

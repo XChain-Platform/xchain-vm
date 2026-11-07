@@ -236,7 +236,7 @@ module.exports = {
             // hooks and the metering transform can never disagree within one execution.
             const __nativeStackTerminal = isNativeStackTerminalActive(opts.network, __pkg3Coin, __pkg3Height);
             const __iterSetMeterOn = hostSetupStep('injectExecutionGlobals', () => injectExecutionGlobals(
-                context, opts, __pkg3SandboxOn, this.limits, hostSignals, __nativeStackTerminal));
+                context, opts, __pkg3SandboxOn, hostSignals, __nativeStackTerminal));
 
             // Run harness script to assemble xchain object inside isolate.
             // Reuse cached V8 bytecode when available: each harness source is a

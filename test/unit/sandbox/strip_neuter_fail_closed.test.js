@@ -106,3 +106,35 @@ describe('Sandbox strip neuters fail closed', function () {
             /AsyncFunction\.prototype: constructor was not neutered/);
     });
 });
+
+describe('Sandbox eval and Error stack neuters fail closed', function () {
+    this.timeout(30000);
+
+    it('throws when eval was locked before setup', function () {
+        assert.throws(() => stripWith(lockScript('globalThis', 'eval'), {}),
+            /eval was not removed/);
+    });
+
+    it('throws when either Error stack neuter was locked before setup', function () {
+        for (const key of ['stackTraceLimit', 'prepareStackTrace']) {
+            assert.throws(() => stripWith(lockScript('Error', key), {}),
+                new RegExp('Error\\.' + key + ' was not neutered'));
+            assert.throws(() => stripWith(lockScript('Error', key, true), {}),
+                new RegExp('Error\\.' + key + ' was not neutered'));
+        }
+    });
+
+    it('locks eval and Error stack output on a healthy isolate', function () {
+        const state = JSON.parse(stripWith('', {}, `(function () {
+            var limit = Object.getOwnPropertyDescriptor(Error, 'stackTraceLimit');
+            var hook = Object.getOwnPropertyDescriptor(Error, 'prepareStackTrace');
+            return JSON.stringify({ evalType: typeof eval, limit: limit.value,
+                limitWritable: limit.writable, limitConfigurable: limit.configurable,
+                hookResult: hook.value(), hookWritable: hook.writable,
+                hookConfigurable: hook.configurable });
+        })()`));
+        assert.deepStrictEqual(state, { evalType: 'undefined', limit: 0,
+            limitWritable: false, limitConfigurable: false, hookResult: '',
+            hookWritable: false, hookConfigurable: false });
+    });
+});

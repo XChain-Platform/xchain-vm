@@ -170,7 +170,8 @@ re-goldened determinism baselines, and an atomic fleet deploy.
 Some native built-ins do work per element while the legacy schedule charged
 them a constant per call, so their wall time per gas grew with the input. From
 the `PER_ELEMENT_METER_ACTIVATION` block time on each network (regtest from
-genesis; mainnet and testnet unarmed until a coordinated release arms them),
+genesis; testnet from block time 1792303200; mainnet unarmed until a
+coordinated release arms it),
 the harness charges them per element. One gas unit is one `VM_COMPUTATION`.
 
 | Built-in | Legacy charge | Charge once armed |
@@ -184,9 +185,9 @@ the harness charges them per element. One gas unit is one `VM_COMPUTATION`.
 
 The set-like argument is read once, in spec order (`size`, `has`, `keys`), and
 its `has` and `keys` run with the argument as `this`, so results, read order
-and errors match the bare built-in. The one visible difference from the
-earlier testnet charge is that it read a set-like argument's `size` a second
-time; the armed path does not.
+and errors match the bare built-in. The one visible difference from the legacy
+pre-activation testnet charge is that it read a set-like argument's `size` a
+second time; the armed path does not.
 
 ### String receiver charges (`STRING_RECEIVER_METER_ACTIVATION`)
 
@@ -196,7 +197,8 @@ native method performs its work on `String(receiver)`. A receiver could
 therefore report a short or absent `length` while coercing to a long string.
 
 From the `STRING_RECEIVER_METER_ACTIVATION` block time on each network
-(regtest from genesis; mainnet and testnet unarmed), `repeat`, `concat`,
+(regtest from genesis; testnet from block time 1792454400; mainnet unarmed),
+`repeat`, `concat`,
 `replace`, `replaceAll`, and the string methods installed through
 `__meterLen` charge against `String(receiver).length`. Array methods installed
 through the shared helper retain their element-count charge. The activation
@@ -209,9 +211,9 @@ coerce an object to a long string while the legacy harness charges only a
 primitive string argument. The toString size meter charges the length of the
 coerced string before those native functions run.
 
-The rule is active from genesis on regtest. Mainnet and testnet use the
-`9999999999` unarmed sentinel until a coordinated release assigns a live block
-time. `TOSTRING_SIZE_METER_GATE_BLOCK_TIME`, the sealed
+The rule is active from genesis on regtest and from block time 1792454400 on
+testnet. Mainnet uses the `9999999999` unarmed sentinel until a coordinated
+release assigns a live block time. `TOSTRING_SIZE_METER_GATE_BLOCK_TIME`, the sealed
 `TOSTRING_SIZE_METER_ACTIVATION` map, `toStringSizeMeterGateTime`, and
 `isToStringSizeMeterActive` are exported from `xchain-vm`. Unknown networks
 resolve like mainnet and therefore remain unarmed.

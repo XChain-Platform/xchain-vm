@@ -23,6 +23,12 @@ const stripScriptNeuterChecks = () => `
         if (!d || d.value !== undefined || d.writable !== false || d.configurable !== false)
             throw new Error(label + ': ' + String(key) + ' was not neutered');
     }
+    // Throw unless a property is locked to the exact installed value.
+    function assertLocked(target, key, expected, label) {
+        var d = Object.getOwnPropertyDescriptor(target, key);
+        if (!d || d.value !== expected || d.writable !== false || d.configurable !== false)
+            throw new Error(label + ' was not neutered');
+    }
     // Read the Function-family neuters back OUTSIDE their swallowing try; a target that
     // was never resolved throws a TypeError here, which fails setup the same way.
     var fnFamilyTargets = [
