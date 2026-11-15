@@ -14,6 +14,7 @@
 // @ts-nocheck
 
 const { toContractJs } = require('../transpile.js');
+const GasTracker = require('../../gas.js');
 const { GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER } = require('./constants.js');
 const { isDeployInitStrictActive } = require('./manifest_gate.js');
 
@@ -155,14 +156,15 @@ module.exports = {
      * @param {string[]} [params=[]]
      * @param {object} [opts]
      * @param {string} [opts.caller]
-     * @param {number} [opts.gasLimit] - per-call ceiling (clamped to gasCeiling)
+     * @param {number} [opts.gasLimit] - positive integer below gasCeiling, otherwise gasCeiling applies
      * @param {string} [opts.txHash]   - identity pass-throughs. Forwarded
      * @param {number} [opts.actionIndex]       verbatim; the VM does its own
      * @param {string|number} [opts.rootActionIndex]  normalization. Supply them
      * @param {string} [opts.callPath]          to make a derived request_id /
      * @param {number} [opts.callDepth]         call_id match a real one.
      * @param {object} [opts.providerDeadlines] - ATTEST provider deadline windows
-     * @returns {Promise<object>} the VM execute() result, unchanged.
+     * @returns {Promise<object>} the VM result with gasUsed capped to the settled ceiling;
+     *          gasUsedRaw carries the uncapped value only when the cap applies.
      */
     async call(contractIndex, method = 'default', params = [], opts = {}) {
         return this.execute(contractIndex, method, params, opts, null);
@@ -182,7 +184,8 @@ module.exports = {
      *        proceedsTick }; each is coerced to a string, absent becomes ''.
      * @param {object} [opts] - as call(), except attestationData is forced null
      *        and callPath is forced ''. gasLimit still overrides the ceiling.
-     * @returns {Promise<object>} the VM execute() result, unchanged.
+     * @returns {Promise<object>} the VM result with gasUsed capped to the settled ceiling;
+     *          gasUsedRaw carries the uncapped value only when the cap applies.
      */
     async callGuard(contractIndex, action = {}, opts = {}) {
         const params = GUARD_PARAM_ORDER.map((k) => {
@@ -224,6 +227,11 @@ module.exports = {
         this.warnIfStakeOutOfScope(execOpts.contractStakeData, execOpts.attestationData);
 
         const result = await this.vm.execute(execOpts);
+        const ceiling = GasTracker.effectiveCeiling(execOpts.gasCeiling, this.vm.gasCeiling);
+        if (result && Number.isFinite(result.gasUsed) && result.gasUsed > ceiling) {
+            result.gasUsedRaw = result.gasUsed;
+            result.gasUsed = ceiling;
+        }
 
         // Commit committed state exactly as the indexer does. On failure the VM
         // returns empty change/delete arrays, so this is a no-op then (atomicity).

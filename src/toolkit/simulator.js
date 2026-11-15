@@ -38,6 +38,9 @@
  *     it fails on chain instead of simulating green at 5x the gas headroom.
  *   - failure atomicity: on a reverted / out-of-gas / errored call the VM
  *     returns empty stateChanges + emittedActions, so nothing is committed.
+ *   - gas settlement: gasUsed is capped at the effective execution ceiling,
+ *     matching indexer fee settlement. gasUsedRaw is present only when the VM
+ *     returned a larger value after a gas-exhaustion fault was swallowed.
  *   - metering activation: the default block time sits at the VM's newest
  *     ELAPSED block-time flag-day, the configured network's own per-network time
  *     gates included (testnet's armed JSON.stringify hook and meta-required

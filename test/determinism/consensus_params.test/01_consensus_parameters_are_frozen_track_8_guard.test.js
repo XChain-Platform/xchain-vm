@@ -149,7 +149,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // flag day: the VM gates the metering rewrite on it, the indexer gates the deploy
         // rejection on it (deploy/index.js enforceBannedRest). A repin that edits one and misses
         // the other passes BOTH CIs and forks the fleet at activation. Same construction as
-        // the six-gate CONTROLLER_GUARD guard below; skips when the sibling repo is absent
+        // the seven-gate CONTROLLER_GUARD guard below; skips when the sibling repo is absent
         // (standalone clone, where the hard pin above still holds) and fails instead under
         // XCHAIN_REQUIRE_SIBLINGS=1. The row is read from src/protocol_changes/changes_2.js.
         const sources = indexerProtocolChangeSources(this, 'the REST_PATTERN_METER cross-repo repin guard');
@@ -336,17 +336,17 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
 describe('consensus parameters are frozen (track 8 guard)', function () {
 
     it('all six gate constants match the indexer protocol_changes.js CONTROLLER_GUARD literal (cross-repo repin guard)', function () {
-        // The six literal pins above freeze the VM's flag-day value, and the
+        // The seven literal pins above freeze the VM's flag-day value, and the
         // indexer's own suite freezes its value, but nothing tied the two files
         // together: a coordinated repin that edits the indexer literal and misses
         // one VM constant passes BOTH CIs and forks the fleet at activation.
         // Read the indexer source directly (monorepo sibling checkout: the registry
-        // entry plus its part files, the row is src/protocol_changes/changes_1.js:272)
+        // entry plus its part files, the row is src/protocol_changes/changes_1.js:277)
         // and assert every VM gate equals the CONTROLLER_GUARD activation time. Skips
         // when the sibling repo is absent (standalone clone, where the hard value pins
         // above still guard) and fails instead under XCHAIN_REQUIRE_SIBLINGS=1. This guard
         // couples the repos through the flag-day timestamp, independent of a tier-only rename.
-        const sources = indexerProtocolChangeSources(this, 'the six-gate CONTROLLER_GUARD cross-repo repin guard');
+        const sources = indexerProtocolChangeSources(this, 'the seven-gate CONTROLLER_GUARD cross-repo repin guard');
         const all = indexerFlagDayLiterals(sources, 'CONTROLLER_GUARD');
         assert.strictEqual(all.length, 1,
             "expected exactly one CONTROLLER_GUARD row across the indexer's src/protocol_changes.js and src/protocol_changes/*.js, found "
@@ -355,11 +355,11 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         const gates = [
             'ASYNC_SURFACE_GATE_BLOCK_TIME', 'BINARY_ALLOC_GATE_BLOCK_TIME',
             'CALL_SPREAD_METER_GATE_BLOCK_TIME', 'STATE_KEY_NUL_GATE_BLOCK_TIME',
-            'METERING_EVAL_ORDER_GATE_BLOCK_TIME', 'STATE_KEY_TYPE_GATE_BLOCK_TIME'
+            'METERING_EVAL_ORDER_GATE_BLOCK_TIME', 'STATE_KEY_TYPE_GATE_BLOCK_TIME', 'VM_LINT_HARDENING_GATE_BLOCK_TIME'
         ];
         for (const g of gates) {
             assert.strictEqual(vm[g], indexerFlagDay,
-                g + ' diverged from the indexer CONTROLLER_GUARD flag-day: a repin must move all six VM gates and the indexer literal in lockstep');
+                g + ' diverged from the indexer CONTROLLER_GUARD flag-day: a repin must move all seven VM gates and the indexer literal in lockstep');
         }
         // REST_PATTERN_METER_GATE_BLOCK_TIME is deliberately NOT in that list: the
         // contract-era instant is in the PAST, so riding it would retroactively re-price
