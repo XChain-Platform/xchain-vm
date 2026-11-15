@@ -17,7 +17,8 @@ const XChainVM = require('../../index.js');
 const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
 const { isLintBannedWithActive } = require('../../index/lint_banned_with_heights.js');
 const { isLintDestructureActive } = require('../../index/lint_destructure_heights.js');
-const { isLintSyntaxDepthActive, resolveSyntaxDepthActive } = require('../../index/lint_syntax_depth_heights.js');
+const { isLintSyntaxDepthActive } = require('../../index/lint_syntax_depth_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('../../index/height_gates/regtest_genesis.js');
 const { HEIGHT_GATES, LINT_NESTING_DEPTH_HEIGHTS } = require('./constants.js');
 const { heightGateThreshold, heightGateNeed, defaultBlockHeight } = require('./block_time_gates.js');
 const {
@@ -203,7 +204,7 @@ module.exports = {
                 enforceLintGlobalAlias:   XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
                 enforceLintOptionalChain: isLintOptionalChainActive(this.network, this.coin, height),
                 enforceBannedWith:        isLintBannedWithActive(this.network, this.coin, height),
-                enforceLintNestingDepth:  resolveSyntaxDepthActive(
+                enforceLintNestingDepth:  resolveRegtestGenesisHeightGate(
                     LINT_NESTING_DEPTH_HEIGHTS, this.network, this.coin, height),
                 enforceLintDestructure:   isLintDestructureActive(this.network, this.coin, height),
                 enforceBannedRest:        XChainVM.isRestPatternMeterActive(this.network, time),

@@ -29,6 +29,11 @@ const stripScriptNeuterChecks = () => `
         if (!d || d.value !== expected || d.writable !== false || d.configurable !== false)
             throw new Error(label + ' was not neutered');
     }
+    function assertRemoved(target, key, label) {
+        var d = Object.getOwnPropertyDescriptor(target, key);
+        if (typeof target[key] !== 'undefined' || (d && (d.get || d.set)))
+            throw new Error(label + ' was not removed');
+    }
     // Read the Function-family neuters back OUTSIDE their swallowing try; a target that
     // was never resolved throws a TypeError here, which fails setup the same way.
     var fnFamilyTargets = [

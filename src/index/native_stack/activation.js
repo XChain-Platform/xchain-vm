@@ -38,11 +38,8 @@ const NATIVE_STACK_TERMINAL_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveNativeStackTerminalActive = resolveRegtestGenesisHeightGate;
-
 function isNativeStackTerminalActive(network, coin, blockHeight) {
-    return resolveNativeStackTerminalActive(
+    return resolveRegtestGenesisHeightGate(
         NATIVE_STACK_TERMINAL_ACTIVATION,
         network,
         coin,
@@ -52,6 +49,5 @@ function isNativeStackTerminalActive(network, coin, blockHeight) {
 
 module.exports = {
     NATIVE_STACK_TERMINAL_ACTIVATION,
-    resolveNativeStackTerminalActive,
     isNativeStackTerminalActive,
 };

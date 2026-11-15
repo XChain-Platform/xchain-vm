@@ -146,3 +146,24 @@ describe('wall-clock calibration probe: rebound aliases', function () {
         });
     }
 });
+
+describe('wall-clock calibration probe: coerced arguments to the size-metered globals', function () {
+    const vectorsById = new Map(probe.VECTORS.map((vector) => [vector.id, vector]));
+
+    for (const [id, shape] of [
+        ['decodeURIComponent boxed String loop', /new String\(.*\)\).*decodeURIComponent\(o\)/],
+        ['decodeURIComponent toString object loop', /toString:function\(\)\{return s;\}.*decodeURIComponent\(o\)/],
+        ['parseInt toString object loop', /toString:function\(\)\{return s;\}.*parseInt\(o,10\)/],
+    ]) {
+        it(`includes the ${id} suspect vector`, function () {
+            const vector = vectorsById.get(id);
+            assert.ok(vector, `${id} must remain in the calibration probe`);
+            assert.strictEqual(vector.group, 'unmetered-suspect');
+            assert.match(vector.body, shape);
+        });
+    }
+
+    it('keeps the toString size meter unarmed on the probe network, which is why these stay suspects', function () {
+        assert.strictEqual(probe.armedTime(probe.NETWORK_GATES.find((g) => g.name === 'tostring-size-meter')), null);
+    });
+});

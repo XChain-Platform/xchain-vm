@@ -34,11 +34,8 @@ const LINT_SYNTAX_DEPTH_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveSyntaxDepthActive = resolveRegtestGenesisHeightGate;
-
 function isLintSyntaxDepthActive(network, coin, blockHeight) {
-    return resolveSyntaxDepthActive(
+    return resolveRegtestGenesisHeightGate(
         LINT_SYNTAX_DEPTH_ACTIVATION,
         network,
         coin,
@@ -48,6 +45,5 @@ function isLintSyntaxDepthActive(network, coin, blockHeight) {
 
 module.exports = {
     LINT_SYNTAX_DEPTH_ACTIVATION,
-    resolveSyntaxDepthActive,
     isLintSyntaxDepthActive,
 };

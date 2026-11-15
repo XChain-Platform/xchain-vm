@@ -31,7 +31,7 @@ const fs     = require('fs');
 const path   = require('path');
 
 const { siblingCheckout, skipOrFail } = require('../helpers/sibling_checkout.js');
-const { resolveSyntaxDepthActive } = require('../../src/index/lint_syntax_depth_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('../../src/index/height_gates/regtest_genesis.js');
 
 // The simulator loads the VM (isolated-vm), so its checks skip with it.
 let ContractSimulator = null;
@@ -134,7 +134,7 @@ describe('simulator deploy-gate lint leg agrees with the indexer', function () {
                 const t = ours[coin + ':' + network];
                 const heights = [0, 1, 99999999].concat(Number.isFinite(t) ? [t - 1, t] : []);
                 for (const h of heights) {
-                    assert.strictEqual(resolveSyntaxDepthActive(ours, network, coin, h),
+                    assert.strictEqual(resolveRegtestGenesisHeightGate(ours, network, coin, h),
                         registry.activeAt(NESTING_KEY, network, coin, h, null),
                         coin + ':' + network + '@' + h + ': simulator and indexer disagree on delimiter nesting');
                     checked++;

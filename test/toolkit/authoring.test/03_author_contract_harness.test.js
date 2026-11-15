@@ -142,6 +142,14 @@ describe('Toolkit authoring: authorContract harness', function () {
         assert.strictEqual(res.attempts, 2);
     });
 
+    it('returns a null gate when the model never returns contract code', async function () {
+        const complete = fakeComplete(['']);
+        const res = await authorContract({ mode: 'describe', input: 'x', complete, maxRepairs: 2 });
+        assert.strictEqual(res.ok, false);
+        assert.strictEqual(res.gate, null);
+        assert.strictEqual(res.attempts, 3);
+    });
+
     it('from-solidity: captures the model differences notes on success', async function () {
         const notes = 'msg.value has no equivalent; fund via DEPOSIT + BATCH.';
         const complete = fakeComplete([reply(CLEAN_CONTRACT, 'javascript', notes)]);

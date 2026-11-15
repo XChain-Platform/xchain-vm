@@ -131,6 +131,12 @@ const VECTORS = [
     { group: 'metered', id: 'String trimRight loop', body: `var s='x'+(' ').repeat(${K});var t=0;for(;;){t+=s.trimRight().length;}` },
     { group: 'metered', id: 'Number.parseInt loop', body: `var s=('1').repeat(${K});var t=0;for(;;){t+=Number.parseInt(s,10);}` },
     { group: 'metered', id: 'Number.parseFloat loop', body: `var s=('1').repeat(${K});var t=0;for(;;){t+=Number.parseFloat(s);}` },
+    // The global size meter charges only primitive-string arguments; a boxed String or a
+    // toString-coercible object reaches the same native scan with no size charge until the
+    // toString size meter is armed.
+    { group: 'unmetered-suspect', id: 'decodeURIComponent boxed String loop', body: `var o=new String(('5').repeat(${K}));var t=0;for(;;){t+=decodeURIComponent(o).length;}` },
+    { group: 'unmetered-suspect', id: 'decodeURIComponent toString object loop', body: `var s=('5').repeat(${K});var o={toString:function(){return s;}};var t=0;for(;;){t+=decodeURIComponent(o).length;}` },
+    { group: 'unmetered-suspect', id: 'parseInt toString object loop', body: `var s=('1').repeat(${K});var o={toString:function(){return s;}};var t=0;for(;;){t+=parseInt(o,10);}` },
     { group: 'unmetered-suspect', id: 'Sparse some loop', body: `var a=new Array(${K});var t=0;for(;;){if(a.some(function(){return false;}))t++;}` },
     { group: 'unmetered-suspect', id: 'Array-like forEach loop', body: `var a={length:${K}};var t=0;for(;;){Array.prototype.forEach.call(a,function(){t++;});}` },
     { group: 'unmetered-suspect', id: 'Sparse flatMap loop', body: `var a=new Array(${K});var t=0;for(;;){t+=a.flatMap(function(v){return [v];}).length;}` },

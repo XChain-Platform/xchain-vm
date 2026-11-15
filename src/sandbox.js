@@ -117,6 +117,7 @@ const stripScriptDeleteGlobals = (names) => `
     for (const name of toDelete) {
         try { delete globalThis[name]; } catch(e) {}
         try { globalThis[name] = undefined; } catch(e) {}
+        assertRemoved(globalThis, name, name);
     }
 `;
 
@@ -153,6 +154,7 @@ const stripScriptFunctionCtors = () => `
             try { Object.defineProperty(AsyncGeneratorFunction, 'constructor', { value: undefined, writable: false, configurable: false }); } catch(e) {}
         } catch(e) {}
     } catch(e) {}
+    assertRemoved(globalThis, 'Function', 'Function');
 `;
 
 // Neuters .constructor on the frozen NEUTERED_PROTO_CONSTRUCTORS prototypes
@@ -183,6 +185,7 @@ const stripScriptRegExpAndProtoMethods = () => `
     // Neuter RegExp to prevent catastrophic backtracking (ReDoS)
     // Contracts should not need regex; string operations suffice.
     try { globalThis.RegExp = undefined; } catch(e) {}
+    assertRemoved(globalThis, 'RegExp', 'RegExp');
 
     // Neuter consensus-critical PROTOTYPE METHODS (regex coercion + locale/ICU).
     // Deleting the RegExp/Intl globals above does NOT disable these: they live on
@@ -214,6 +217,7 @@ const stripScriptBigIntSurface = (enabled) => enabled ? `
         for (var g = 0; g < globalNames.length; g++) {
             try { delete globalThis[globalNames[g]]; } catch(e) {}
             try { globalThis[globalNames[g]] = undefined; } catch(e) {}
+            assertRemoved(globalThis, globalNames[g], globalNames[g]);
         }
         var protoMethods = ${JSON.stringify(BIGINT_SURFACE_STRIPPED_PROTO_METHODS)};
         for (var i = 0; i < protoMethods.length; i++) {
@@ -279,34 +283,27 @@ const stripScriptDefineProperty = () => `
         });
     } catch(e) {}
 
-    // Freeze Object.defineProperty/defineProperties to prevent getter/setter traps
-    // that could execute unmetered code via property access
-    try {
-        _defineProperty(Object, 'defineProperty', { value: undefined, writable: false, configurable: false });
-        _defineProperty(Object, 'defineProperties', { value: undefined, writable: false, configurable: false });
-        // Also block Object.create with property descriptors (second argument)
-        // Keep Object.create(null) working for prototype-free objects
-        var _origCreate = Object.create;
-        _defineProperty(Object, 'create', {
-            value: function(proto) {
-                if (arguments.length > 1) throw new Error('Object.create with property descriptors is not allowed');
-                return _origCreate(proto);
-            },
-            writable: false,
-            configurable: false
-        });
-    } catch(e) {}
+    // Block descriptor APIs while preserving Object.create(null).
+    try { _defineProperty(Object, 'defineProperty', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+    assertNeutered(Object, 'defineProperty', 'Object.defineProperty');
+    try { _defineProperty(Object, 'defineProperties', { value: undefined, writable: false, configurable: false }); } catch(e) {}
+    assertNeutered(Object, 'defineProperties', 'Object.defineProperties');
+    var _origCreate = Object.create;
+    var _safeCreate = function(proto) { if (arguments.length > 1) throw new Error('Object.create with property descriptors is not allowed'); return _origCreate(proto); };
+    try { _defineProperty(Object, 'create', { value: _safeCreate, writable: false, configurable: false }); } catch(e) {}
+    assertLocked(Object, 'create', _safeCreate, 'Object.create');
 `;
 
 // Removes console and the host process/require/importScripts surface.
 const stripScriptHostGlobals = () => `
     // Remove console (xchain.log is provided separately by the gateway)
     try { globalThis.console = undefined; } catch(e) {}
-
     // Remove process/require/import (shouldn't exist in isolate, but defensive)
     try { globalThis.process = undefined; } catch(e) {}
     try { globalThis.require = undefined; } catch(e) {}
     try { globalThis.importScripts = undefined; } catch(e) {}
+    var hostNames = ['console', 'process', 'require', 'importScripts'];
+    for (var h = 0; h < hostNames.length; h++) assertRemoved(globalThis, hostNames[h], hostNames[h]);
 `;
 
 // Replaces Math with the frozen SAFE_MATH_MEMBERS subset (interpolated) and
@@ -338,6 +335,7 @@ const stripScriptSafeMath = () => `
         return m;
     })();
     globalThis.Math = _freeze(SafeMath);
+    if (globalThis.Math !== SafeMath) throw new Error('Math was not replaced');
 })();
 `;
 

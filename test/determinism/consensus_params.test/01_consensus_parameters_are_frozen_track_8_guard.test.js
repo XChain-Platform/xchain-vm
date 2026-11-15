@@ -173,8 +173,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         // 2.0.0 gates this keys on block HEIGHT, PER COIN, riding the ~961000 window.
         assert.strictEqual(vm.MAX_STACK_DEPTH, 512, 'pre-activation bound is the legacy 512');
         assert.strictEqual(vm.MAX_STACK_DEPTH_MUSL, 256, 'post-activation musl-safe bound');
-        // Per-coin activation-height map (LTC/DOGE mainnet PROPOSED, awaiting operator
-        // ratification at train sign-off). A bare BTC 961000 would be active-on-deploy
+        // Per-coin activation-height map (LTC/DOGE mainnet RATIFIED 2026-07-22 and FROZEN;
+        // source: index/runtime/activation_heights.js). A bare BTC 961000 would be active-on-deploy
         // on LTC/DOGE (tips already far past it); each coin gets its calendar-equiv height.
         assert.strictEqual(vm.PKG3_SANDBOX_ACTIVATION['BTC:mainnet'], 961000);
         assert.strictEqual(vm.PKG3_SANDBOX_ACTIVATION['LTC:mainnet'], 3154250);

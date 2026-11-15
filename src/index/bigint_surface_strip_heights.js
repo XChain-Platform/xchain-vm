@@ -26,11 +26,8 @@ const BIGINT_SURFACE_STRIP_ACTIVATION = Object.freeze({
     'DOGE:testnet': 67989993,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveBigIntSurfaceStripActive = resolveRegtestGenesisHeightGate;
-
 function isBigIntSurfaceStripActive(network, coin, blockHeight) {
-    return resolveBigIntSurfaceStripActive(
+    return resolveRegtestGenesisHeightGate(
         BIGINT_SURFACE_STRIP_ACTIVATION,
         network,
         coin,
@@ -40,6 +37,5 @@ function isBigIntSurfaceStripActive(network, coin, blockHeight) {
 
 module.exports = {
     BIGINT_SURFACE_STRIP_ACTIVATION,
-    resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
 };

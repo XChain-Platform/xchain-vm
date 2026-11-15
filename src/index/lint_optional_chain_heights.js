@@ -26,11 +26,8 @@ const LINT_OPTIONAL_CHAIN_ACTIVATION = Object.freeze({
     'DOGE:testnet': 67962387,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveOptionalChainActive = resolveRegtestGenesisHeightGate;
-
 function isLintOptionalChainActive(network, coin, blockHeight) {
-    return resolveOptionalChainActive(
+    return resolveRegtestGenesisHeightGate(
         LINT_OPTIONAL_CHAIN_ACTIVATION,
         network,
         coin,
@@ -40,6 +37,5 @@ function isLintOptionalChainActive(network, coin, blockHeight) {
 
 module.exports = {
     LINT_OPTIONAL_CHAIN_ACTIVATION,
-    resolveOptionalChainActive,
     isLintOptionalChainActive,
 };

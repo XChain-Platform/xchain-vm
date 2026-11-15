@@ -18,9 +18,9 @@
 const assert = require('assert');
 const {
     LINT_DESTRUCTURE_ACTIVATION,
-    resolveDestructureActive,
     isLintDestructureActive,
 } = require('../../../../src/index/lint_destructure_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('../../../../src/index/height_gates/regtest_genesis.js');
 const XChainVM = require('../../../../src/index.js');
 
 describe('destructure lint activation', function () {
@@ -73,9 +73,9 @@ describe('destructure lint activation', function () {
 
     it('resolves local armed thresholds and absent keys', function () {
         const armed = { 'BTC:testnet': 100 };
-        assert.strictEqual(resolveDestructureActive(armed, 'testnet', 'BTC', 99), false);
-        assert.strictEqual(resolveDestructureActive(armed, 'testnet', 'BTC', 100), true);
-        assert.strictEqual(resolveDestructureActive(armed, 'testnet', 'BTC', 101), true);
-        assert.strictEqual(resolveDestructureActive(armed, 'testnet', 'LTC', 100), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 99), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 100), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 101), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'LTC', 100), false);
     });
 });

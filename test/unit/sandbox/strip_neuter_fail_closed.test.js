@@ -138,3 +138,59 @@ describe('Sandbox eval and Error stack neuters fail closed', function () {
             hookWritable: false, hookConfigurable: false });
     });
 });
+
+describe('Sandbox global and Object strips fail closed', function () {
+    this.timeout(30000);
+
+    it('enforces gated global removal without changing pre-gate behavior', function () {
+        assert.throws(() => stripWith(lockScript('globalThis', 'Promise'), { stripPromise: true }),
+            /Promise was not removed/);
+        assert.doesNotThrow(() => stripWith(lockScript('globalThis', 'Promise'), {}));
+        assert.throws(() => stripWith(lockScript('globalThis', 'WebAssembly'), { stripWasm: true }),
+            /WebAssembly was not removed/);
+        assert.throws(() => stripWith(lockScript('globalThis', 'BigInt64Array'), { stripWasm: true }),
+            /BigInt64Array was not removed/);
+    });
+
+    it('rejects an accessor that hides a stripped global', function () {
+        assert.throws(() => stripWith(lockScript('globalThis', 'Date', true), {}),
+            /Date was not removed/);
+    });
+
+    it('checks each Object trap neuter independently', function () {
+        assert.throws(() => stripWith(lockScript('Object', 'defineProperty'), {}),
+            /Object\.defineProperty/);
+        assert.throws(() => stripWith(lockScript('Object', 'defineProperties'), {}),
+            /Object\.defineProperties/);
+        assert.throws(() => stripWith(lockScript('Object', 'create'), {}),
+            /Object\.create/);
+    });
+
+    it('checks host globals and deterministic replacements', function () {
+        for (const name of ['console', 'process']) {
+            const install = `Object.defineProperty(globalThis, '${name}', ` +
+                '{ value: {}, writable: false, configurable: false });';
+            assert.throws(() => stripWith(install, {}), new RegExp(name + ' was not removed'));
+        }
+        assert.throws(() => stripWith(lockScript('globalThis', 'RegExp'), {}),
+            /RegExp was not removed/);
+        assert.throws(() => stripWith(lockScript('globalThis', 'Function'), {}),
+            /Function was not removed/);
+        assert.throws(() => stripWith(lockScript('globalThis', 'Math'), {}),
+            /Math was not replaced/);
+    });
+
+    it('strips the checked surfaces on a healthy isolate', function () {
+        const state = JSON.parse(stripWith('', { stripPromise: true, stripWasm: true }, `(function () {
+            var nullProto = Object.create(null);
+            var descriptorCreateThrew = false;
+            try { Object.create({}, {}); } catch (e) { descriptorCreateThrew = true; }
+            return JSON.stringify({ promise: typeof Promise, wasm: typeof WebAssembly,
+                consoleType: typeof console, definePropertyType: typeof Object.defineProperty,
+                nullProto: Object.getPrototypeOf(nullProto) === null, descriptorCreateThrew: descriptorCreateThrew });
+        })()`));
+        assert.deepStrictEqual(state, { promise: 'undefined', wasm: 'undefined',
+            consoleType: 'undefined', definePropertyType: 'undefined', nullProto: true,
+            descriptorCreateThrew: true });
+    });
+});

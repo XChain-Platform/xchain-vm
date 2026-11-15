@@ -35,11 +35,8 @@ const JSON_STRINGIFY_REENTRY_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveJsonStringifyReentryActive = resolveRegtestGenesisHeightGate;
-
 function isJsonStringifyReentryActive(network, coin, blockHeight) {
-    return resolveJsonStringifyReentryActive(
+    return resolveRegtestGenesisHeightGate(
         JSON_STRINGIFY_REENTRY_ACTIVATION,
         network,
         coin,
@@ -49,6 +46,5 @@ function isJsonStringifyReentryActive(network, coin, blockHeight) {
 
 module.exports = {
     JSON_STRINGIFY_REENTRY_ACTIVATION,
-    resolveJsonStringifyReentryActive,
     isJsonStringifyReentryActive,
 };

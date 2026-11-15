@@ -26,11 +26,8 @@ const LINT_DESTRUCTURE_ACTIVATION = Object.freeze({
     'DOGE:testnet': 67989993,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveDestructureActive = resolveRegtestGenesisHeightGate;
-
 function isLintDestructureActive(network, coin, blockHeight) {
-    return resolveDestructureActive(
+    return resolveRegtestGenesisHeightGate(
         LINT_DESTRUCTURE_ACTIVATION,
         network,
         coin,
@@ -40,6 +37,5 @@ function isLintDestructureActive(network, coin, blockHeight) {
 
 module.exports = {
     LINT_DESTRUCTURE_ACTIVATION,
-    resolveDestructureActive,
     isLintDestructureActive,
 };

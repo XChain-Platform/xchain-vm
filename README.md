@@ -26,7 +26,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **External attestation**: `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
 - **Deterministic math**: `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point; native `Math.sqrt/pow/log/log2/log10` rejected at deploy time
 - **Contract state management**: key-value state with dirty tracking, key count limits, and value size limits
-- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly checks (see `CONSENSUS_RULES` in `src/lint_core.js`), float usage warnings
+- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly/rest-pattern/`with` checks, plus nesting-depth, unsupported-syntax and invalid-type rejects (the deploy-blocking set is `CONSENSUS_RULES` in `src/lint-core/constants.js`), float usage warnings
 - **Per-block compilation cache**: V8 cached compilation data eliminates redundant parsing for hot contracts
 - **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap
 - **Consensus wall-clock bound**: one execution's wall-clock budget is a protocol constant (`CONSENSUS_MAX_WALL_MS`), not a per-node setting; see below

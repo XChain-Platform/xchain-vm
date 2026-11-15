@@ -271,12 +271,10 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
 const { MAX_SLASH_AMOUNT_DECIMALS } = require('../../gateway/slash_limits.js');
 const {
     BIGINT_SURFACE_STRIP_ACTIVATION,
-    resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
 } = require('../bigint_surface_strip_heights.js');
 const {
     RESOURCE_FAULT_SIGNAL_ACTIVATION,
-    resolveResourceFaultSignalActive,
     isResourceFaultSignalActive,
 } = require('../resource_fault_signal_heights.js');
 const {
@@ -285,7 +283,6 @@ const {
 } = require('../host_error_stack_strip_heights.js');
 const {
     NATIVE_STACK_TERMINAL_ACTIVATION,
-    resolveNativeStackTerminalActive,
     isNativeStackTerminalActive,
 } = require('../native_stack/activation.js');
 
@@ -364,14 +361,11 @@ module.exports = {
     isSlashAmountPrecisionActive,
     isConsensusWallClockActive,
     BIGINT_SURFACE_STRIP_ACTIVATION,
-    resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
     RESOURCE_FAULT_SIGNAL_ACTIVATION,
-    resolveResourceFaultSignalActive,
     isResourceFaultSignalActive,
     HOST_ERROR_STACK_STRIP_ACTIVATION,
     isHostErrorStackStripActive,
     NATIVE_STACK_TERMINAL_ACTIVATION,
-    resolveNativeStackTerminalActive,
     isNativeStackTerminalActive,
 };

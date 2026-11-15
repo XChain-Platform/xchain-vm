@@ -103,7 +103,7 @@
  *     execution: 'subprocess' (xchain-indexer/src/actions/index.js), where the same
  *     contract kills only the worker and the executor returns the deterministic
  *     `out_of_resource: execution host terminated (...)` with gasUsed at the
- *     ceiling (src/process-executor.js hostTerminatedResult). Pass
+ *     ceiling (src/process_executor/termination.js hostTerminatedResult). Pass
  *     execution: 'subprocess' (or `xchain-foundry simulate --execution
  *     subprocess`) to see that result. The wall-clock half of this seam IS
  *     faithful: DEFAULT_LIMITS.maxCpuTimeMs equals CONSENSUS_MAX_WALL_MS.

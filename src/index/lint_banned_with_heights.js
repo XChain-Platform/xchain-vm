@@ -26,11 +26,8 @@ const LINT_BANNED_WITH_ACTIVATION = Object.freeze({
     'DOGE:testnet': 67989993,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveBannedWithActive = resolveRegtestGenesisHeightGate;
-
 function isLintBannedWithActive(network, coin, blockHeight) {
-    return resolveBannedWithActive(
+    return resolveRegtestGenesisHeightGate(
         LINT_BANNED_WITH_ACTIVATION,
         network,
         coin,
@@ -40,6 +37,5 @@ function isLintBannedWithActive(network, coin, blockHeight) {
 
 module.exports = {
     LINT_BANNED_WITH_ACTIVATION,
-    resolveBannedWithActive,
     isLintBannedWithActive,
 };

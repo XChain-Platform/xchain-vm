@@ -30,8 +30,10 @@ function isSelfInflicted(code, signal) {
 }
 
 // Deterministic result for any non-gas host termination (crash / hang).
-// gasUsed = ceiling matches src/index.js's timeout/OOM/stack clamp so the
-// indexer's fee = gasUsed * GAS_PRICE is identical on every validator.
+// gasUsed = ceiling matches the in-process timeout/OOM/stack clamp (errorResult's
+// gasOverride in src/index/methods/error_results.js, fed by the gasTracker.ceiling
+// clamps in src/index/runtime/classify_error.js) so the indexer's
+// fee = gasUsed * GAS_PRICE is identical on every validator.
 function hostTerminatedResult(gasCeiling, kind) {
     return {
         success:        false,
