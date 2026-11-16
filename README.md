@@ -500,7 +500,8 @@ this.vm = new XChainVM({
 });
 ```
 
-Per-block compilation caching:
+Per-block lifecycle, including compilation caching and the subprocess executor's
+pinned cross-chain snapshot:
 ```javascript
 this.actions.vm.beginBlock();   // before processing block transactions
 // ... process transactions ...

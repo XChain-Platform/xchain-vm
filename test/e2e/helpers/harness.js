@@ -26,10 +26,11 @@ const MockIndexer = require('./MockIndexer.js');
 
 // Fee and limit defaults and the chain anchors load with the VM. Guarded so a
 // host without isolated-vm still loads this module and its suites skip, as before.
-let SIM = null, GATES = null, SIM_LOAD_ERROR = null;
+let SIM = null, GATES = null, resolveDeployLintFlags = null, SIM_LOAD_ERROR = null;
 try {
     SIM   = require('../../../src/toolkit/simulator.js');
     GATES = require('../../../src/toolkit/simulator/block_time_gates.js');
+    ({ resolveDeployLintFlags } = require('../../../src/toolkit/simulator/deploy_lint_flags.js'));
 } catch (e) { SIM_LOAD_ERROR = e; }
 
 // Wall budget kept tighter than the simulator's so a runaway contract fails fast;
@@ -105,7 +106,13 @@ class E2EHarness {
         const { code, deployer, contractAddress, params } = opts;
 
         // Validate syntax
-        const syntaxResult = this.vm.validateSyntax(code);
+        const block = this.ledger.getBlockContext();
+        const syntaxResult = this.vm.validateSyntax(code, resolveDeployLintFlags({
+            network: this.network,
+            coin: this.coin,
+            height: Number(block.height),
+            time: Number(block.timestamp)
+        }));
         if (!syntaxResult.valid) {
             return { success: false, error: syntaxResult.error };
         }

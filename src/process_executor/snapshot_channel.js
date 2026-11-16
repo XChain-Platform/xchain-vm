@@ -17,6 +17,7 @@
 
 const { HostFaultError } = require('../errors.js');
 const { newDispatchToken } = require('./frames.js');
+const { isDeepStrictEqual } = require('util');
 
 function hasSerializableCrossChainSnapshot(opts) {
     if (!opts || !Object.prototype.hasOwnProperty.call(opts, 'crossChainData')) return false;
@@ -24,6 +25,9 @@ function hasSerializableCrossChainSnapshot(opts) {
     return !!snap && typeof snap === 'object' && typeof snap.getAttestation !== 'function';
 }
 
+// In-block executions should reuse one immutable snapshot object. Equal copies
+// may use the pinned token too. Any different snapshot travels inline so the
+// subprocess observes the same input as the in-process executor.
 class WorkerSnapshotChannel {
     constructor(send, kill, timeoutMs) {
         this.send = send;
@@ -51,6 +55,7 @@ class WorkerSnapshotChannel {
         this.set = false;
         this.snapshot = null;
         this.token = null;
+        this.inlineMismatches = 0;
         this.workerSpawned();
     }
 
@@ -97,6 +102,16 @@ class WorkerSnapshotChannel {
 
     reference(opts) {
         if (!this.set || !hasSerializableCrossChainSnapshot(opts)) return opts;
+        if (opts.crossChainData !== this.snapshot &&
+            !isDeepStrictEqual(opts.crossChainData, this.snapshot)) {
+            this.inlineMismatches += 1;
+            if (this.inlineMismatches === 1) {
+                process.emitWarning(
+                    'in-block cross-chain snapshot differs from the pinned snapshot; sending inline',
+                    'XChainVMSnapshotWarning');
+            }
+            return opts;
+        }
         return Object.assign({}, opts, {
             crossChainData: { __xchainWorkerSnapshot: this.token }
         });

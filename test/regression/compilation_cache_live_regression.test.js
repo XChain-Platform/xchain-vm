@@ -40,6 +40,7 @@ const CODE = `module.exports = function(x){
     a.sort();
     return a.indexOf(3) + ':' + a.join(',');
 };`;
+const EXPECTED = JSON.stringify('9:0,0,0,1,1,10,10,2,2,3,3,3,4,4,5,5,6,6,7,7,7,8,8,9,9');
 
 (XChainVM ? describe : describe.skip)('compilation cache is live (M-15 regression)', function () {
     this.timeout(30000);
@@ -79,9 +80,15 @@ const CODE = `module.exports = function(x){
     it('warm-cache execution is byte-identical to cold (cache stays transparent)', async function () {
         const vm = createVM();
         vm.beginBlock();
-        const cold = hashResult(await execute(vm, CODE, { contractIndex: 7 }));
-        const warm = hashResult(await execute(vm, CODE, { contractIndex: 7 }));
+        const coldResult = await execute(vm, CODE, { contractIndex: 7 });
+        const warmResult = await execute(vm, CODE, { contractIndex: 7 });
         vm.endBlock();
+        assert.strictEqual(coldResult.success, true, 'cold execution failed: ' + coldResult.error);
+        assert.strictEqual(warmResult.success, true, 'warm execution failed: ' + warmResult.error);
+        assert.strictEqual(coldResult.returnValue, EXPECTED, 'cold execution returned an unexpected value');
+        assert.strictEqual(warmResult.returnValue, EXPECTED, 'warm execution returned an unexpected value');
+        const cold = hashResult(coldResult);
+        const warm = hashResult(warmResult);
         assert.strictEqual(warm, cold, 'warm != cold: the live cache changed a consensus-visible result');
     });
 });

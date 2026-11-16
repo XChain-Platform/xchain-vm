@@ -46,6 +46,12 @@ function opts() {
     });
 }
 
+function optsWithAttestation(value) {
+    const out = opts();
+    out.crossChainData.attestations['BTC:7'] = value;
+    return out;
+}
+
 let exec;
 
 async function cleanUpExecutor() {
@@ -106,6 +112,32 @@ async function sendsFreshSnapshotForNextBlock() {
     assert.notStrictEqual(snapshots[0].token, snapshots[1].token);
 }
 
+async function sendsChangedSnapshotInline() {
+    exec = newExecutor();
+    await waitReady(exec);
+    const { frames } = captureFrames();
+    const warnings = [];
+    const realWarn = process.emitWarning;
+    process.emitWarning = (msg) => warnings.push(msg);
+    try {
+        exec.beginBlock();
+        const first = await exec.execute(optsWithAttestation('attested-value-7'));
+        const second = await exec.execute(optsWithAttestation('other-value'));
+        assert.strictEqual(JSON.parse(first.returnValue), 'attested-value-7');
+        assert.strictEqual(JSON.parse(second.returnValue), 'other-value');
+        const snapshots = frames.filter((frame) => frame.type === 'snapshot');
+        const executes = frames.filter((frame) => frame.type === 'execute');
+        assert.strictEqual(snapshots.length, 1);
+        assert.deepStrictEqual(executes[0].opts.crossChainData,
+            { __xchainWorkerSnapshot: snapshots[0].token });
+        assert.deepStrictEqual(executes[1].opts.crossChainData,
+            optsWithAttestation('other-value').crossChainData);
+        assert.strictEqual(exec._snapshots.inlineMismatches, 1);
+        assert.strictEqual(warnings.length, 1);
+        exec.endBlock();
+    } finally { process.emitWarning = realWarn; }
+}
+
 function holdSnapshots() {
     const { child, frames, realSend } = captureFrames();
     let heldSnapshot;
@@ -160,6 +192,7 @@ function snapshotAcknowledgementTests() {
     it('sends one snapshot per block and keeps snapshot bytes out of execute frames',
         sendsOneSnapshotPerBlock);
     it('sends a fresh snapshot after the next block begins', sendsFreshSnapshotForNextBlock);
+    it('sends a changed snapshot inline when endBlock was omitted', sendsChangedSnapshotInline);
     it('does not dispatch until the worker acknowledges the snapshot token',
         waitsForSnapshotAcknowledgement);
     it('ignores an acknowledgement carrying a stale token', ignoresStaleSnapshotAcknowledgement);

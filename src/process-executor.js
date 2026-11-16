@@ -175,8 +175,8 @@ class ProcessExecutor {
 
         // Initialize the worker's VM.
         this.send({ type: 'init', config: this._config });
-        // A respawn mid-block must restore the worker's block state (cache only;
-        // correctness holds without it, but keep behavior consistent).
+        // This restores the compilation-cache scope. Snapshot state is restored
+        // by workerSpawned() above and the next snapshot-channel flush.
         if (this._inBlock) this.send({ type: 'beginBlock' });
     }
 

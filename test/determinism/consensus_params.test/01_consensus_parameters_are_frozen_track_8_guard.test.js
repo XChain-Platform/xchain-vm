@@ -237,7 +237,7 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
         assert.strictEqual(vm.isExecLintActive('mainnet', 'BTC', 961000), true);
         assert.strictEqual(vm.isExecLintActive('mainnet', 'LTC', 10000000), true);
         assert.strictEqual(vm.isExecLintActive('mainnet', 'DOGE', Number.MAX_SAFE_INTEGER), true);
-        // Unknown network is treated as mainnet (conservative), unknown coin resolves off.
+        // Unknown network or coin resolves pre-activation (safe legacy default).
         assert.strictEqual(vm.isExecLintActive(undefined, 'BTC', 961000), false);
         assert.strictEqual(vm.isExecLintActive('mainnet', 'XYZ', 961000), false);
         assert.strictEqual(vm.isExecLintActive('mainnet', null, 961000), false);

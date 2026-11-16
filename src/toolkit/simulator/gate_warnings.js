@@ -14,13 +14,9 @@
 // @ts-nocheck
 
 const XChainVM = require('../../index.js');
-const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
-const { isLintBannedWithActive } = require('../../index/lint_banned_with_heights.js');
-const { isLintDestructureActive } = require('../../index/lint_destructure_heights.js');
-const { isLintSyntaxDepthActive } = require('../../index/lint_syntax_depth_heights.js');
-const { resolveRegtestGenesisHeightGate } = require('../../index/height_gates/regtest_genesis.js');
-const { HEIGHT_GATES, LINT_NESTING_DEPTH_HEIGHTS } = require('./constants.js');
+const { HEIGHT_GATES } = require('./constants.js');
 const { heightGateThreshold, heightGateNeed, defaultBlockHeight } = require('./block_time_gates.js');
+const { resolveDeployLintFlags } = require('./deploy_lint_flags.js');
 const {
     isContractMetaRequiredActive,
     manifestPolicyError,
@@ -191,25 +187,13 @@ module.exports = {
     deployGateVerdict(src) {
         if (Buffer.byteLength(src, 'utf8') > this.limits.maxCodeSize)
             return { valid: false, error: 'exceeds max size' };
-        const time   = Number(this.block.timestamp);
-        const height = Number(this.block.height);
-        const pkg3   = XChainVM.isPkg3SandboxActive(this.network, this.coin, height);
         try {
-            // Keep every flag an ordinary (enumerable) property so the key-set guards see all of them.
-            const options = {
-                enforceBannedAsync:       XChainVM.isAsyncSurfaceActive(this.network, time),
-                enforceLintHardening:     XChainVM.isLintHardeningActive(this.network, time),
-                enforceBannedGenerator:   pkg3,
-                enforceBannedWasm:        pkg3,
-                enforceLintGlobalAlias:   XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
-                enforceLintOptionalChain: isLintOptionalChainActive(this.network, this.coin, height),
-                enforceBannedWith:        isLintBannedWithActive(this.network, this.coin, height),
-                enforceLintNestingDepth:  resolveRegtestGenesisHeightGate(
-                    LINT_NESTING_DEPTH_HEIGHTS, this.network, this.coin, height),
-                enforceLintDestructure:   isLintDestructureActive(this.network, this.coin, height),
-                enforceBannedRest:        XChainVM.isRestPatternMeterActive(this.network, time),
-                enforceLintSyntaxDepth:   isLintSyntaxDepthActive(this.network, this.coin, height)
-            };
+            const options = resolveDeployLintFlags({
+                network: this.network,
+                coin: this.coin,
+                height: Number(this.block.height),
+                time: Number(this.block.timestamp)
+            });
             return this.vm.validateSyntax(src, options);
         } catch (e) {
             // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a
