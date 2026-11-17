@@ -204,6 +204,8 @@ const GOLDEN_THROW_TEXTS = {
         'Error: contract exceeds max state keys ({this.limits.maxStateKeys})',
         'Error: state key contains a NUL (0x00) byte',
         'Error: state key contains a NUL (0x00) byte',
+        'Error: state key contains a code point above U+FFFF',
+        'Error: state key exceeds max length ({MAX_STATE_KEY_CHARS = 256} characters)',
         'Error: state key exceeds max size ({maxKeySize = this.limits.maxStateKeySize || 1024} bytes)',
         'Error: state key exceeds max size ({maxKeySize = this.limits.maxStateKeySize || 1024} bytes)',
         'Error: state key must be a string, number, or boolean',
@@ -213,7 +215,7 @@ const GOLDEN_THROW_TEXTS = {
         'Error: state value must be JSON-serializable'
     ]
 };
-const GOLDEN_THROW_TEXTS_SHA256 = 'e6f9777bf6653e96deae7bcd776bdf0b20256d3a357cd3d797d5f329285b6bec';
+const GOLDEN_THROW_TEXTS_SHA256 = '270c45b6db22138cef583427285f28a1144fecc5ce2198417d90030d37ae4fc2';
 
 // Trigger each host error a contract can catch from state, math and emit, at the default limits.
 function hostApiMessages() {
@@ -222,7 +224,7 @@ function hostApiMessages() {
         try { fn(); } catch (e) { return e.constructor.name + ': ' + e.message; }
         return 'no throw';
     };
-    const gated = () => new StateManager({}, limits, { rejectNulKeys: true, normalizeKeys: true });
+    const gated = () => new StateManager({}, limits, { rejectNulKeys: true, normalizeKeys: true, rejectUnstorableKeys: true });
     const full = {};
     for (let i = 0; i < limits.maxStateKeys; i++) full['k' + i] = 1;
     const math = buildMathAPI(null);
@@ -231,6 +233,8 @@ function hostApiMessages() {
         caught(() => gated().set({}, 1)),
         caught(() => gated().set('k'.repeat(1025), 1)),
         caught(() => gated().set('a\u0000b', 1)),
+        caught(() => gated().set('k'.repeat(257), 1)),
+        caught(() => gated().set('k😀', 1)),
         caught(() => gated().set('a', null)),
         caught(() => gated().set('a', Infinity)),
         caught(() => gated().set('a', () => 1)),
@@ -257,6 +261,8 @@ describe('consensus parameters are frozen (track 8 guard)', function () {
             'Error: state key must be a string, number, or boolean',
             'Error: state key exceeds max size (1024 bytes)',
             'Error: state key contains a NUL (0x00) byte',
+            'Error: state key exceeds max length (256 characters)',
+            'Error: state key contains a code point above U+FFFF',
             'Error: state value cannot be null or undefined; use state.delete() to remove keys',
             'Error: state value cannot be NaN or Infinity; use xchain.math for numeric operations',
             'Error: state value must be JSON-serializable',

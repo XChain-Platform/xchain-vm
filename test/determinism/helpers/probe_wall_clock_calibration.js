@@ -104,6 +104,7 @@ const NETWORK_GATES = [
     { name: 'string-result-meter', source: 'STRING_RESULT_METER_ACTIVATION', active: XChainVM.isStringResultMeterActive },
     { name: 'tostring-size-meter', source: 'TOSTRING_SIZE_METER_ACTIVATION', active: XChainVM.isToStringSizeMeterActive },
     { name: 'gas-ceiling-success', source: 'GAS_CEILING_SUCCESS_ACTIVATION', active: XChainVM.isGasCeilingSuccessActive },
+    { name: 'state-key-storable', source: 'STATE_KEY_STORABLE_ACTIVATION', active: XChainVM.isStateKeyStorableActive },
     // No is-active export exists for this one; the in-isolate check compares against the gate time.
     { name: 'json-stringify-hook', source: 'JSON_STRINGIFY_HOOK_ACTIVATION',
         active: (network, blockTime) => blockTime >= XChainVM.jsonStringifyHookGateTime(network) },
