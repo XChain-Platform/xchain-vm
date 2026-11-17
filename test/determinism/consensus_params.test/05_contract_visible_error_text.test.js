@@ -191,6 +191,7 @@ const GOLDEN_THROW_TEXTS = {
         'Error: \x03GAS:{e.used}:{e.ceiling}',
         'throw e'
     ],
+    'index/runtime/lint_gates/regex_group_depth.js': [],
     'math.js': [
         'ContractRevertError: math error: {e.message}',
         'Error: Division by zero',
@@ -215,7 +216,7 @@ const GOLDEN_THROW_TEXTS = {
         'Error: state value must be JSON-serializable'
     ]
 };
-const GOLDEN_THROW_TEXTS_SHA256 = '270c45b6db22138cef583427285f28a1144fecc5ce2198417d90030d37ae4fc2';
+const GOLDEN_THROW_TEXTS_SHA256 = '10254c0562aa31bb75be65dc6dce27be01590eef5c976ac6d57b354ab7c06cb6';
 
 // Trigger each host error a contract can catch from state, math and emit, at the default limits.
 function hostApiMessages() {

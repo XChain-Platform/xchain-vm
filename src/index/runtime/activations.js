@@ -262,21 +262,10 @@ const STATE_KEY_STORABLE_ACTIVATION = Object.seal({
     regtest: 0,
 });
 
-// Activation for refusing regex literals whose group nesting exceeds the fixed
-// lint-core bound. Mainnet stays unarmed, testnet arms at the v0.27.0 cut, and
-// regtest exercises the rule from genesis. Unknown networks stay unarmed.
-const LINT_REGEX_GROUP_DEPTH_ACTIVATION = Object.seal({
-    mainnet: null,
-    testnet: 1794873600,
-    regtest: 0,
-});
+// The regex group-nesting gate lives in a part file; re-exported below unchanged.
+const { LINT_REGEX_GROUP_DEPTH_ACTIVATION, isLintRegexGroupDepthActive } = require('./lint_gates/regex_group_depth');
 function isStateKeyStorableActive(network, blockTime) {
     const gate = STATE_KEY_STORABLE_ACTIVATION[network];
-    if (!Number.isFinite(gate)) return false;
-    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
-}
-function isLintRegexGroupDepthActive(network, blockTime) {
-    const gate = LINT_REGEX_GROUP_DEPTH_ACTIVATION[network];
     if (!Number.isFinite(gate)) return false;
     return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
 }

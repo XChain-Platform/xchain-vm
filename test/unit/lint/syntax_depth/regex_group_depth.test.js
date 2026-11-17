@@ -51,6 +51,12 @@ describe('deploy-lint: gated regex group depth', function () {
         assert.strictEqual(regexGroupDepth('\\(\\(\\('), 0);
         assert.strictEqual(regexGroupDepth('[\\]((]((a))'), 2);
     });
+});
+
+// Same suite name as above, split only to keep each callback inside the
+// 60-line function budget; the full test titles are unchanged.
+describe('deploy-lint: gated regex group depth', function () {
+    this.timeout(30000);
 
     it('keeps the historical 65-group verdict before activation', function () {
         const code = wrap(nestedRegex(MAX_REGEX_GROUP_DEPTH + 1));
