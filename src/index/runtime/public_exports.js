@@ -35,6 +35,7 @@ const {
     METERING_EVAL_ORDER_GATE_BLOCK_TIME, CALL_SPREAD_METER_GATE_BLOCK_TIME,
     REST_PATTERN_METER_GATE_BLOCK_TIME, isRestPatternMeterActive, isSlashTokenDelimGuardActive,
     ITER_SET_METER_ACTIVATION, isIterSetMeterActive, isSlashAmountPrecisionActive,
+    STATE_KEY_STORABLE_ACTIVATION, isStateKeyStorableActive,
     isConsensusWallClockActive, PKG3_SANDBOX_ACTIVATION,
     pkg3CoinFromAddress, isPkg3SandboxActive, EXEC_LINT_ACTIVATION, LINT_GLOBAL_ALIAS_ACTIVATION,
     isLintGlobalAliasActive, EXEC_LINT_GAS_BYTES_PER_UNIT, isExecLintActive,
@@ -244,6 +245,8 @@ function attachStatics(target) {
         TOSTRING_SIZE_METER_ACTIVATION: { value: TOSTRING_SIZE_METER_ACTIVATION },
         toStringSizeMeterGateTime: { value: toStringSizeMeterGateTime },
         isToStringSizeMeterActive: { value: isToStringSizeMeterActive },
+        STATE_KEY_STORABLE_ACTIVATION: { value: STATE_KEY_STORABLE_ACTIVATION },
+        isStateKeyStorableActive: { value: isStateKeyStorableActive },
     });
     Object.setPrototypeOf(target, applyLengthMeterExports);
 }

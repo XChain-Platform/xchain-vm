@@ -200,7 +200,11 @@ const TIME_NETWORK_GATES = Object.freeze([
         resolve: (network) => (Object.hasOwn(XChainVM.STRING_RESULT_METER_ACTIVATION, network)
             ? XChainVM.STRING_RESULT_METER_ACTIVATION[network] : null) },
     { label: 'toString size meter', source: 'TOSTRING_SIZE_METER_ACTIVATION',
-        resolve: (network) => XChainVM.toStringSizeMeterGateTime(network) }
+        resolve: (network) => XChainVM.toStringSizeMeterGateTime(network) },
+    // Storable state keys; a network the map does not name is unarmed, as in its predicate.
+    { label: 'storable state keys', source: 'STATE_KEY_STORABLE_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.STATE_KEY_STORABLE_ACTIVATION, network)
+            ? XChainVM.STATE_KEY_STORABLE_ACTIVATION[network] : null) }
 ]);
 
 module.exports = {

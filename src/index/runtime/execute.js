@@ -32,7 +32,7 @@ const { resolveAccessors, isAccessorOwnKeyActive } = require('../../readonly-acc
 const {
     BINARY_ALLOC_GATE_BLOCK_TIME, isAsyncSurfaceActive,
     isLintHardeningActive, isStateKeyNulRejectActive, isStateKeyTypeNormalizeActive,
-    isMeteringEvalOrderActive, isCallSpreadMeterActive, isRestPatternMeterActive,
+    isStateKeyStorableActive, isMeteringEvalOrderActive, isCallSpreadMeterActive, isRestPatternMeterActive,
     pkg3CoinFromAddress, isPkg3SandboxActive, isBigIntSurfaceStripActive,
     isResourceFaultSignalActive, isNativeStackTerminalActive,
 } = require('./activations.js');
@@ -94,15 +94,15 @@ module.exports = {
         // H-5 gate: NUL-byte state keys wedge the indexer's block merkle root
         // (see isStateKeyNulRejectActive). Network-aware like the async-surface
         // gate; a missing/garbage timestamp resolves to NaN → pre-activation on
-        // mainnet.
+        // mainnet. The storable-key gate refuses a key state_key cannot hold.
         const __skBlockTime     = opts.blockContext && Number(opts.blockContext.timestamp);
         const stateManager      = new StateManager(opts.state || {}, this.limits, {
             rejectNulKeys:  isStateKeyNulRejectActive(opts.network, __skBlockTime),
             // Canonical-string-key gate: post-gate, primitive keys normalize via
             // String(key) and non-primitive keys throw deterministically, so the
             // size/NUL/keyCount guards can no longer be skipped by key type.
-            normalizeKeys:  isStateKeyTypeNormalizeActive(opts.network, __skBlockTime)
-        });
+            normalizeKeys:  isStateKeyTypeNormalizeActive(opts.network, __skBlockTime),
+            rejectUnstorableKeys: isStateKeyStorableActive(opts.network, __skBlockTime) });
         // F-PS gate: recursive prototype-key stripping of emitted params (defense in
         // depth; the shallow top-level strip left nested __proto__/constructor own
         // keys in emissions). It can drop keys from a pathological emitted param, so
