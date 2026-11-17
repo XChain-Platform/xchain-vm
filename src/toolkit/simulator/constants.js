@@ -180,6 +180,9 @@ const TIME_NETWORK_GATES = Object.freeze([
     { label: 'iter/Set meter', source: 'ITER_SET_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.ITER_SET_METER_ACTIVATION, network)
             ? XChainVM.ITER_SET_METER_ACTIVATION[network] : null) },
+    { label: 'lint regex group depth', source: 'LINT_REGEX_GROUP_DEPTH_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.LINT_REGEX_GROUP_DEPTH_ACTIVATION, network)
+            ? XChainVM.LINT_REGEX_GROUP_DEPTH_ACTIVATION[network] : null) },
     { label: 'apply-length meter', source: 'APPLY_LENGTH_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.APPLY_LENGTH_METER_ACTIVATION, network)
             ? XChainVM.APPLY_LENGTH_METER_ACTIVATION[network] : null) },

@@ -39,6 +39,12 @@ const MAX_NESTING_DEPTH = 64;
 // about 990 with the 984 KB default, across every measured shape; 200 keeps 2x headroom
 // at 400 KB and 5x at the default, and sits about 4x above the deepest shipped contract.
 const MAX_SYNTAX_DEPTH = 200;
+// The group-nesting bound for one regex literal body (regex_group_depth.js). acorn
+// validates a body by recursion, one call chain per group level, inside its tokenizer:
+// cold, a 400 KB V8 stack first overflows at about 650 levels at top level and at about
+// 476 under the deepest parse context measured, and the 984 KB default at about 1717.
+// 64, the delimiter bound above, keeps over 7x headroom in every measured case.
+const MAX_REGEX_GROUP_DEPTH = 64;
 
 // The sandbox's hard-neutered prototype METHODS (sandbox.js
 // STRIPPED_PROTO_METHODS). Duplicated here for the dependency-light reason
@@ -136,6 +142,7 @@ module.exports = {
     MAX_CODE_SIZE,
     MAX_NESTING_DEPTH,
     MAX_SYNTAX_DEPTH,
+    MAX_REGEX_GROUP_DEPTH,
     STRIPPED_PROTO_METHOD_NAMES,
     REGEX_COERCING_METHODS,
     STRIPPED_GLOBAL_NAMES,

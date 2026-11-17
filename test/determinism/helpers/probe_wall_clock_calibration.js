@@ -97,6 +97,7 @@ const COIN_NETWORK_KEY = /^[A-Z]+:[a-z]+$/;
 // Per-network time tables, read from the exports by name (a null entry is unarmed, an absent one is refused).
 const NETWORK_GATES = [
     { name: 'iter-set-meter', source: 'ITER_SET_METER_ACTIVATION', active: XChainVM.isIterSetMeterActive },
+    { name: 'lint-regex-group-depth', source: 'LINT_REGEX_GROUP_DEPTH_ACTIVATION', active: XChainVM.isLintRegexGroupDepthActive },
     { name: 'apply-length-meter', source: 'APPLY_LENGTH_METER_ACTIVATION', active: XChainVM.isApplyLengthMeterActive },
     { name: 'host-call-bounds', source: 'HOST_CALL_BOUNDS_ACTIVATION', active: XChainVM.isHostCallBoundsActive },
     { name: 'per-element-meter', source: 'PER_ELEMENT_METER_ACTIVATION', active: XChainVM.isPerElementMeterActive },

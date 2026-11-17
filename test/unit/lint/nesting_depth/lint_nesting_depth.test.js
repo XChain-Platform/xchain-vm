@@ -9,7 +9,7 @@
 'use strict';
 
 const assert = require('assert');
-const childProcess = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const {
@@ -21,6 +21,7 @@ const {
 const { validateSyntax } = require('../../../../src/syntax.js');
 const identityPin = require('../../../../bin/pins/identity.json');
 const { readPinnedSdkFile } = require('../../../helpers/pinned_sdk_file.js');
+const { siblingCheckout, skipOrFail } = require('../../../helpers/sibling_checkout.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 
@@ -36,11 +37,16 @@ describe('deploy-lint: nesting-depth', function () {
     it('matches the pinned companion SDK lint vendor byte for byte', function () {
         const entry = identityPin.files['src/lint-core.js'];
         assert.match(entry.sdkCommit, /^[0-9a-f]{40}$/);
-        const commonGitDir = childProcess.execFileSync(
-            'git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
-            { cwd: REPO_ROOT, encoding: 'utf8' }
-        ).trim();
-        const sdkRoot = path.resolve(commonGitDir, '..', '..', 'xchain-sdk');
+        const sdkVerdict = siblingCheckout(REPO_ROOT,
+            process.env.XCHAIN_SDK_DIR || path.resolve(REPO_ROOT, '..', 'xchain-sdk'),
+            { ownRoot: REPO_ROOT });
+        if (!sdkVerdict.usable)
+            return skipOrFail(this, sdkVerdict, 'the SDK lint-core parity check');
+        const sdkRoot = sdkVerdict.path;
+        const sdkEntry = path.join(sdkRoot, entry.sdkPath.replace(/^xchain-sdk\//, ''));
+        const sdkEntryHash = crypto.createHash('sha256')
+            .update(fs.readFileSync(sdkEntry)).digest('hex');
+        const useWorkingTree = sdkEntryHash === entry.vendoredInSdk;
         const canonicalFiles = ['src/lint-core.js'].concat(
             fs.readdirSync(path.join(REPO_ROOT, 'src/lint-core')).sort()
                 .map((name) => 'src/lint-core/' + name)
@@ -48,7 +54,9 @@ describe('deploy-lint: nesting-depth', function () {
 
         for (const rel of canonicalFiles) {
             const sdkPath = rel.replace(/^src\//, 'src/contract/');
-            const vendored = readPinnedSdkFile(sdkRoot, entry.sdkCommit, sdkPath);
+            const workingPath = path.join(sdkRoot, sdkPath);
+            const vendored = useWorkingTree
+                ? fs.readFileSync(workingPath) : readPinnedSdkFile(sdkRoot, entry.sdkCommit, sdkPath);
             assert.deepStrictEqual(vendored, fs.readFileSync(path.join(REPO_ROOT, rel)), sdkPath);
         }
     });

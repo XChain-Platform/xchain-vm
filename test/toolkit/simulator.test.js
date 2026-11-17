@@ -261,7 +261,7 @@ function registerMainnetDeployVerdictTest() {
             'enforceBannedAsync', 'enforceBannedGenerator', 'enforceBannedRest',
             'enforceBannedWasm', 'enforceBannedWith', 'enforceLintDestructure',
             'enforceLintGlobalAlias', 'enforceLintHardening', 'enforceLintNestingDepth',
-            'enforceLintOptionalChain', 'enforceLintSyntaxDepth'
+            'enforceLintOptionalChain', 'enforceLintRegexGroupDepth', 'enforceLintSyntaxDepth'
         ].sort();
         const sim = new ContractSimulator({ coin: 'BTC', network: 'mainnet' });
         const seen = [];

@@ -312,7 +312,7 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
             const sentinel = 'f'.repeat(64);
             const vm2 = newVm();
             vm2.getLintVerdict(CLEAN, true, true, true, true, true, true, sentinel);
-            assert.deepStrictEqual([...vm2._lintVerdictCache.keys()], [sentinel + ':111111000']);
+            assert.deepStrictEqual([...vm2._lintVerdictCache.keys()], [sentinel + ':1111110000']);
         });
 
         it('evicts FIFO at the bound instead of growing without limit', function () {
@@ -326,7 +326,7 @@ describe('execute-time consensus source-lint enforcement @regression @tier1', fu
         });
 
         it('carries one key bit per flag parameter of getLintVerdict', function () {
-            // Signature is (code, six flags, codeHash, three height flags); a flag given a
+            // Signature is (code, six flags, codeHash, four gated flags); a flag given a
             // default drops out of Function.length, and this count must then be updated
             // deliberately.
             const flagCount = newVm().getLintVerdict.length - 2;

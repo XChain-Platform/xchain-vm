@@ -35,7 +35,8 @@ describe('wall-clock calibration probe: per-network activation tables', function
     it('lists every bare-network activation table the VM exports', function () {
         assert.deepStrictEqual(probe.unlistedNetworkTables(), []);
         const sources = probe.NETWORK_GATES.map((g) => g.source);
-        for (const s of ['ITER_SET_METER_ACTIVATION', 'APPLY_LENGTH_METER_ACTIVATION', 'GAS_CEILING_SUCCESS_ACTIVATION']) {
+        for (const s of ['ITER_SET_METER_ACTIVATION', 'LINT_REGEX_GROUP_DEPTH_ACTIVATION',
+            'APPLY_LENGTH_METER_ACTIVATION', 'GAS_CEILING_SUCCESS_ACTIVATION']) {
             assert.ok(sources.includes(s), `${s} must be a probe network gate`);
         }
     });

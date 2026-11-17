@@ -1,9 +1,8 @@
 // Non-recursive delimiter-depth scanner for the deploy lint pre-parse guard.
 // @ts-nocheck
 
-const acorn = require('acorn');
-const { CONTRACT_ECMA_VERSION } = require('../metering.js');
 const { MAX_NESTING_DEPTH } = require('./constants.js');
+const { boundedTokenizer } = require('./regex_group_depth.js');
 
 const OPEN_TOKENS = new Set(['(', '[', '{', '${']);
 const CLOSE_TOKENS = new Set([')', ']', '}']);
@@ -11,22 +10,19 @@ const CLOSE_TOKENS = new Set([')', ']', '}']);
 /**
  * Find the first token whose delimiter depth exceeds the consensus limit.
  * Tokenization is iterative and ignores delimiter text in comments, strings,
- * regular expressions and template chunks.
+ * regular expressions and template chunks. When the regex-depth gate is on, an
+ * over-bound regex stops the scan before acorn recurses into its body.
  * @param {string} code
  * @param {number} [limit=MAX_NESTING_DEPTH]
  * @returns {Array<{line: number, depth: number}>}
  */
-function findNestingDepth(code, limit) {
+function findNestingDepth(code, limit, enforceRegexGroupDepth) {
     if (typeof code !== 'string') return [];
     const maxDepth = limit === undefined ? MAX_NESTING_DEPTH : limit;
     const stack = [];
     let tokenizer;
     try {
-        tokenizer = acorn.tokenizer(code, {
-            ecmaVersion: CONTRACT_ECMA_VERSION,
-            sourceType: 'script',
-            locations: true
-        });
+        tokenizer = boundedTokenizer(code, enforceRegexGroupDepth);
         for (;;) {
             const token = tokenizer.getToken();
             const label = token.type.label;
@@ -45,8 +41,8 @@ function findNestingDepth(code, limit) {
     }
 }
 
-function nestingDepthFinding(code) {
-    const hit = findNestingDepth(code)[0];
+function nestingDepthFinding(code, enforceRegexGroupDepth) {
+    const hit = findNestingDepth(code, undefined, enforceRegexGroupDepth)[0];
     if (!hit) return null;
     return {
         rule: 'nesting-depth',

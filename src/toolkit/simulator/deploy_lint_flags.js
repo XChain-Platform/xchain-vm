@@ -37,7 +37,8 @@ function resolveDeployLintFlags({ network, coin, height, time }) {
             LINT_NESTING_DEPTH_HEIGHTS, network, coin, height),
         enforceLintDestructure:   isLintDestructureActive(network, coin, height),
         enforceBannedRest:        XChainVM.isRestPatternMeterActive(network, time),
-        enforceLintSyntaxDepth:   isLintSyntaxDepthActive(network, coin, height)
+        enforceLintSyntaxDepth:   isLintSyntaxDepthActive(network, coin, height),
+        enforceLintRegexGroupDepth: XChainVM.isLintRegexGroupDepthActive(network, time)
     };
 }
 
