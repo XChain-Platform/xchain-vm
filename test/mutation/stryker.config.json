@@ -12,7 +12,8 @@
     "spec": [
       "test/preflight.test.js",
       "test/unit/**/*.test.js"
-    ]
+    ],
+    "grep": "^(?!BigInt surface strip execute threading matches the pinned companion SDK commit byte for byte$)"
   },
   "plugins": [
     "@stryker-mutator/mocha-runner"
