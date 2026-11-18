@@ -28,7 +28,9 @@
  ********************************************************************/
 // @ts-nocheck
 
-const { GUARD_REGTEST_TIME_ENV, guardStakeShapeRegtestTime } = require('../../config.js');
+// Name the indexer env var whose value a regtest host passes to setGuardRegtestTime.
+const GUARD_REGTEST_TIME_ENV = 'GUARD_STAKE_SNAPSHOT_DECIMAL_STRINGS_REGTEST_TIME';
+let guardRegtestOverride = 0;
 
 // null is unarmed; 0 is active from genesis. A network not named resolves like mainnet.
 const STAKE_SNAPSHOT_DECIMAL_STRINGS_TIMES = Object.freeze({
@@ -37,16 +39,21 @@ const STAKE_SNAPSHOT_DECIMAL_STRINGS_TIMES = Object.freeze({
     regtest: 0
 });
 
-// The regtest entry is read from the environment like the indexer row is (see guardRegtestTime).
+// The regtest entry is the value the host passed to setGuardRegtestTime (see guardRegtestTime).
 const GUARD_STAKE_SNAPSHOT_DECIMAL_STRINGS_TIMES = Object.freeze({
     mainnet: null,
     testnet: 1792303200,
     regtest: null
 });
 
-// The indexer's regtest guard row is `parseInt(env) || 0`, then unarmed when that is 0.
+// Mirror the indexer's regtest guard row, `parseInt(env) || 0`, unarmed when that is 0.
 function guardRegtestTime() {
-    return guardStakeShapeRegtestTime() || null;
+    return guardRegtestOverride || null;
+}
+
+// Set the regtest guard instant the host's indexer env carries (env is read in config.js only).
+function setGuardRegtestTime(value) {
+    guardRegtestOverride = parseInt(value) || 0;
 }
 
 /**
@@ -82,6 +89,7 @@ module.exports = {
     STAKE_SNAPSHOT_DECIMAL_STRINGS_TIMES,
     GUARD_STAKE_SNAPSHOT_DECIMAL_STRINGS_TIMES,
     GUARD_REGTEST_TIME_ENV,
+    setGuardRegtestTime,
     stakeDecimalStringsTime,
     isStakeDecimalStringsActive
 };

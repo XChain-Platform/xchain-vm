@@ -53,8 +53,10 @@ async function withGuardEnv(value, fn) {
     const had = Object.prototype.hasOwnProperty.call(process.env, ENV);
     const prior = process.env[ENV];
     if (value === undefined) delete process.env[ENV]; else process.env[ENV] = value;
+    shapeGate.setGuardRegtestTime(value);
     try { return await fn(); } finally {
         if (had) process.env[ENV] = prior; else delete process.env[ENV];
+        shapeGate.setGuardRegtestTime(had ? prior : undefined);
     }
 }
 
