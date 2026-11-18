@@ -17,6 +17,7 @@
 
 const { HostFaultError } = require('../errors.js');
 const { newDispatchToken } = require('./frames.js');
+const { closureAccessorField } = require('./opts_guard.js');
 const { isDeepStrictEqual } = require('util');
 
 function hasSerializableCrossChainSnapshot(opts) {
@@ -123,6 +124,13 @@ class WorkerSnapshotChannel {
         while (exec._queue.length && exec._pending.size === 0 &&
                exec._child && exec._sawReady && exec._child.connected) {
             const entry = exec._queue[0];
+            const closure = closureAccessorField(entry.opts);
+            if (closure) {
+                exec._queue.shift();
+                entry.reject(new HostFaultError('executor input not serializable: ' + closure +
+                    ' is a closure accessor and cannot cross the worker channel; pass a plain snapshot'));
+                continue;
+            }
             if (this.hold(entry.opts, exec._inBlock)) return;
             const token = newDispatchToken();
             const opts = this.reference(entry.opts);

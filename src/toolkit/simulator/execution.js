@@ -17,6 +17,7 @@ const { toContractJs } = require('../transpile.js');
 const GasTracker = require('../../gas.js');
 const { GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER } = require('./constants.js');
 const { isDeployInitStrictActive } = require('./manifest_gate.js');
+const { wireParams, callbackParams, paramsReshaped } = require('./wire_params.js');
 
 function executionOptions(simulator, contract, index, method, params, opts, caller) {
     return {
@@ -128,12 +129,10 @@ module.exports = {
      * @returns {Promise<?object>} the constructor's execute() result, or null when it does not run
      */
     async runDeployConstructor(index, opts, hasInitialize) {
-        const given = opts.constructorParams;
-        const paramStr = (given === undefined || given === null) ? ''
-            : (Array.isArray(given) ? given.join('|') : String(given));
+        const args = wireParams(opts.constructorParams);
         const strict = isDeployInitStrictActive(this.network, this.block.timestamp);
-        if (!(strict ? (hasInitialize || paramStr !== '') : paramStr !== '')) return null;
-        return this.execute(index, 'initialize', paramStr !== '' ? given : [],
+        if (!(strict ? (hasInitialize || args.length > 0) : args.length > 0)) return null;
+        return this.execute(index, 'initialize', args,
             { caller: opts.caller }, { attestationData: null, contractStakeData: null });
     },
 
@@ -153,9 +152,15 @@ module.exports = {
      * Execute a method on a deployed contract against its persisted state.
      * @param {number} contractIndex
      * @param {string} [method='default']
-     * @param {string[]} [params=[]]
+     * @param {string[]} [params=[]] - delivered as the chain delivers a user
+     *        EXECUTE's arguments: joined with '|' and split back (see wireParams).
+     *        With opts.callback they are delivered as a framework-injected callback's
+     *        arguments instead (see callbackParams).
      * @param {object} [opts]
      * @param {string} [opts.caller]
+     * @param {boolean} [opts.callback] - the method is one the framework calls back
+     *        (an ATTEST response or expiry, an XCALL result, a binding VOTE). From
+     *        CALLBACK_ARGS_EXACT on, its arguments keep a '|' inside one element whole.
      * @param {number} [opts.gasLimit] - positive integer below gasCeiling, otherwise gasCeiling applies
      * @param {string} [opts.txHash]   - identity pass-throughs. Forwarded
      * @param {number} [opts.actionIndex]       verbatim; the VM does its own
@@ -167,7 +172,26 @@ module.exports = {
      *          gasUsedRaw carries the uncapped value only when the cap applies.
      */
     async call(contractIndex, method = 'default', params = [], opts = {}) {
-        return this.execute(contractIndex, method, params, opts, null);
+        const args = opts.callback
+            ? callbackParams(params, this.network, this.block.timestamp)
+            : wireParams(params);
+        this.warnIfParamsReshaped(params, args);
+        return this.execute(contractIndex, method, args, opts, null);
+    },
+
+    /**
+     * Warn once per simulator when the arguments a contract receives differ from the
+     * ones the caller passed (a number became a string, a '|' split an element, an
+     * empty string became no argument), so a local result is read against the wire form.
+     */
+    warnIfParamsReshaped(given, delivered) {
+        if (this._paramsReshapedWarned || !paramsReshaped(given, delivered)) return;
+        this._paramsReshapedWarned = true;
+        console.warn(
+            '[xchain-vm simulator] call params were reshaped to the arguments the chain delivers: ' +
+            'strings, split on \'|\', an empty string meaning none. Pass strings without \'|\' to ' +
+            'avoid it, or set opts.callback for a framework-injected callback method.'
+        );
     },
 
     /**
@@ -225,6 +249,7 @@ module.exports = {
         if (opts.gasLimit != null) execOpts.gasCeiling = Number(opts.gasLimit);
         if (modeOverrides) Object.assign(execOpts, modeOverrides);
         this.warnIfStakeOutOfScope(execOpts.contractStakeData, execOpts.attestationData);
+        this.warnIfStakeShapeDiverges(execOpts.contractStakeData, execOpts.isGuard === true);
 
         const result = await this.vm.execute(execOpts);
         const ceiling = GasTracker.effectiveCeiling(execOpts.gasCeiling, this.vm.gasCeiling);

@@ -134,12 +134,17 @@ module.exports = {
      * Seed one staker's stake, keeping the three derived views the accessor
      * reads in agreement. With contractIndex, only that contract sees the
      * stake, matching the chain. Without it, every contract without its own
-     * scoped bucket sees the stake. Mirrors the indexer snapshot
+     * scoped bucket sees the stake. Mirrors the indexer snapshot layout
      * with exact BigNumber arithmetic: `stakersByTick` (what getStakers
      * returns verbatim) is sorted by descending amount with an ascending
      * pubkey tiebreak and capped at 1000, and `totalByTick` sums every
      * staker. Re-seeding a pubkey replaces its stake; a zero stake removes
      * it. Amounts are taken as given, so seed them at the token's precision.
+     * Amounts always read back as decimal strings, the shape the indexer hands a
+     * contract only once its decimal-string stake snapshot row is active for the
+     * network, block time and path. Below that row a node hands mathjs JSON objects
+     * instead, which the simulator does not reproduce; it warns once when a call
+     * or callGuard reads seeded stakes there (see stake_shape_gate.js).
      * @param {string} pubkey
      * @param {string} tick
      * @param {string|number} amount

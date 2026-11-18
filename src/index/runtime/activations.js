@@ -342,9 +342,10 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 // below the gate. TIGHTENING the value later is a different change and needs
 // its own future flag-day (see consensus-wall-clock.js).
 //
-// NOTE for a future reader: three comments inside HARNESS_SOURCE (the F3-globals,
-// Set/Map and TypedArray metering notes) still describe maxCpuTimeMs as "the
-// binding constraint" and "not a consensus value". They are deliberately left
+// NOTE for a future reader: four comments inside HARNESS_SOURCE (the F3-globals,
+// Set/Map, replace/replaceAll and TypedArray metering notes) still describe the
+// per-node maxCpuTimeMs net as "the binding constraint" or "not a consensus
+// value". They are deliberately left
 // byte-identical: HARNESS_SOURCE is concatenated ahead of the contract before
 // compilation, so editing a comment in it shifts every in-isolate line number and
 // with it the positions V8 reports in error text a contract can read. Their

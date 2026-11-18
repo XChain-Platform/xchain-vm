@@ -22,6 +22,7 @@ const {
     manifestPolicyError,
     contractMetaError
 } = require('./manifest_gate.js');
+const { isStakeDecimalStringsActive, stakeDecimalStringsTime } = require('./stake_shape_gate.js');
 
 // Judge a manifest read: the policy rows first, then the meta ladder once it is armed.
 function manifestLegVerdict(read, network, blockTime) {
@@ -153,6 +154,29 @@ module.exports = {
             'contracts without their own scoped bucket read them here. On chain, a contract ' +
             'reads only data that targets it. Pass contractIndex to setStake or ' +
             'setAttestationResponse to model that scope.'
+        );
+    },
+
+    /**
+     * Warn once when seeded stake amounts read back here as decimal strings while a
+     * node at this network, block time and path hands the contract mathjs JSON
+     * objects instead (see stake_shape_gate.js). Advisory, like the scope warnings:
+     * the simulator keeps serving strings, the shape the chain is moving to.
+     */
+    warnIfStakeShapeDiverges(contractStakeData, isGuard) {
+        if (this._stakeShapeWarned || !contractStakeData) return;
+        if (!Object.keys(contractStakeData.stakeByPubkeyTick || {}).length) return;
+        if (isStakeDecimalStringsActive(this.network, this.block.timestamp, isGuard)) return;
+        this._stakeShapeWarned = true;
+        const row = (isGuard ? 'GUARD_' : '') + 'STAKE_SNAPSHOT_DECIMAL_STRINGS';
+        const at = stakeDecimalStringsTime(this.network, isGuard);
+        console.warn(
+            '[xchain-vm simulator] stake amounts read back here as decimal strings, but ' + row +
+            ' is ' + (at === null ? 'unarmed' : 'not active until block time ' + at) + ' on ' +
+            JSON.stringify(this.network) + ', so a node hands getStake, getTotalStaked and ' +
+            'getStakers amounts as {"mathjs":"BigNumber","value":"..."} objects on this ' +
+            (isGuard ? 'controller-guard' : 'call') + ' path. A contract that treats them as ' +
+            'strings passes here and behaves differently on chain.'
         );
     },
 

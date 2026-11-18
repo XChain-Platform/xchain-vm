@@ -54,6 +54,12 @@
  *     gas exhaustion the status, can differ from what a live chain settles. Pass
  *     network: 'mainnet' (`xchain-foundry simulate --network mainnet`) to
  *     reproduce mainnet.
+ *   - stake read shape: seeded stake amounts always read back as decimal
+ *     strings. A node delivers that shape only once its decimal-string stake
+ *     snapshot row is active for the path (unarmed on mainnet today, and unarmed
+ *     on a stock regtest node's controller-guard path); below it, contracts read
+ *     mathjs JSON objects. A call or callGuard that reads seeded stakes there
+ *     warns once (see simulator/stake_shape_gate.js).
  *   - height-gate activation: the default block HEIGHT sits at the newest armed
  *     per-coin activation for the configured (coin, network), so a mainnet
  *     simulation runs the Package-3 sandbox and the other height-keyed gates the
