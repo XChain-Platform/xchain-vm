@@ -28,6 +28,8 @@
  ********************************************************************/
 // @ts-nocheck
 
+const { GUARD_REGTEST_TIME_ENV, guardStakeShapeRegtestTime } = require('../../config.js');
+
 // null is unarmed; 0 is active from genesis. A network not named resolves like mainnet.
 const STAKE_SNAPSHOT_DECIMAL_STRINGS_TIMES = Object.freeze({
     mainnet: null,
@@ -42,11 +44,9 @@ const GUARD_STAKE_SNAPSHOT_DECIMAL_STRINGS_TIMES = Object.freeze({
     regtest: null
 });
 
-const GUARD_REGTEST_TIME_ENV = 'GUARD_STAKE_SNAPSHOT_DECIMAL_STRINGS_REGTEST_TIME';
-
 // The indexer's regtest guard row is `parseInt(env) || 0`, then unarmed when that is 0.
 function guardRegtestTime() {
-    return (parseInt(process.env[GUARD_REGTEST_TIME_ENV]) || 0) || null;
+    return guardStakeShapeRegtestTime() || null;
 }
 
 /**
