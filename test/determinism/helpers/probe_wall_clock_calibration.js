@@ -142,6 +142,21 @@ const VECTORS = [
     { group: 'unmetered-suspect', id: 'Sparse some loop', body: `var a=new Array(${K});var t=0;for(;;){if(a.some(function(){return false;}))t++;}` },
     { group: 'unmetered-suspect', id: 'Array-like forEach loop', body: `var a={length:${K}};var t=0;for(;;){Array.prototype.forEach.call(a,function(){t++;});}` },
     { group: 'unmetered-suspect', id: 'Sparse flatMap loop', body: `var a=new Array(${K});var t=0;for(;;){t+=a.flatMap(function(v){return [v];}).length;}` },
+    // A native function passed as the callback is not metered by a callback body, so these
+    // walk the receiver for the call-site charge alone.
+    { group: 'unmetered-suspect', id: 'Sparse findIndex native callback loop', body: `var a=new Array(${K});var t=0;for(;;){t+=a.findIndex(Number.isNaN);}` },
+    { group: 'unmetered-suspect', id: 'Sparse findLast native callback loop', body: `var a=new Array(${K});var t=0;for(;;){if(a.findLast(Number.isNaN)===void 0)t++;}` },
+    { group: 'unmetered-suspect', id: 'TypedArray every native callback loop', body: `var a=new Uint8Array(${K});var t=0;for(;;){if(a.every(Number.isFinite))t++;}` },
+    { group: 'unmetered-suspect', id: 'Map forEach native callback loop', body: `var m=new Map();for(var j=0;j<${K};j++){m.set(j,j);}var t=0;for(;;){m.forEach(Math.abs);t++;}` },
+    { group: 'unmetered-suspect', id: 'Set forEach native callback loop', body: `var m=new Set();for(var j=0;j<${K};j++){m.add(j);}var t=0;for(;;){m.forEach(Math.abs);t++;}` },
+    // ToNumber on a long numeric string scans it; no wrapper or operator rewrite charges for the length.
+    // The alternating form keeps an optimiser from hoisting one constant parse out of the loop.
+    { group: 'unmetered-suspect', id: 'Unary plus numeric string loop', body: `var s=('1').repeat(${K});var t=0;for(;;){t+=+s;}` },
+    { group: 'unmetered-suspect', id: 'Number(string) loop', body: `var s=('1').repeat(${K});var t=0;for(;;){t+=Number(s);}` },
+    { group: 'unmetered-suspect', id: 'isNaN(string) loop', body: `var s=('1').repeat(${K});var t=0;for(;;){if(isNaN(s))t++;}` },
+    { group: 'unmetered-suspect', id: 'isFinite(string) loop', body: `var s=('1').repeat(${K});var t=0;for(;;){if(isFinite(s))t++;}` },
+    { group: 'unmetered-suspect', id: 'Multiply numeric string loop', body: `var s=('1').repeat(${K});var t=0;for(;;){t+=s*1;}` },
+    { group: 'unmetered-suspect', id: 'Alternating unary plus numeric string loop', body: `var s1=('1').repeat(${K}),s2=('2').repeat(${K});var t=0,i=0;for(;;){t+=+(i++&1?s1:s2);}` },
     { group: 'unmetered-suspect', id: 'Iterator toArray loop', body: `${ARR}var t=0;for(;;){t+=a.values().toArray().length;}` },
     { group: 'unmetered-suspect', id: 'Iterator drop loop', body: `${ARR}var t=0;for(;;){t+=a.values().drop(${K}-1).next().value;}` },
     { group: 'unmetered-suspect', id: 'String isWellFormed loop', body: `${TWO_BYTE}var t=0;for(;;){if(s.isWellFormed())t++;}` },

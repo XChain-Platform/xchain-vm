@@ -281,7 +281,7 @@ class ProcessExecutor {
         if (child !== this._child) return;   // a worker already replaced or shut down
         this._child = null;
         if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
-        this._snapshots.workerLost();
+        const snapshotStuck = this._snapshots.workerLost();
 
         // Settle only DISPATCHED requests. A self-inflicted death is the contract
         // aborting the host: resolve it deterministically so the block advances.
@@ -295,17 +295,17 @@ class ProcessExecutor {
             else entry.reject(new HostFaultError('executor worker terminated externally (' + kind + ')'));
         }
         this._pending.clear();
-        this.afterWorkerLost(!this._everReady);
+        this.afterWorkerLost(!this._everReady, snapshotStuck);
     }
 
     // Respawn after losing a worker, or latch broken. Every worker lost before it
     // signaled ready counts, whatever its age: a cutoff on age let a worker that
     // always died just past it respawn forever. A dispatched worker had reached
-    // ready, so a contract-caused death or a watchdog kill never counts.
-    afterWorkerLost(neverReady) {
+    // ready, so a contract-caused death or a watchdog kill never counts; snapshotStuck is the unacked-snapshot latch.
+    afterWorkerLost(neverReady, snapshotStuck = false) {
         if (this._shuttingDown) return;
         if (neverReady) this._consecutiveSpawnFailures++;
-        if (this._consecutiveSpawnFailures >= MAX_CONSECUTIVE_SPAWN_FAILURES) {
+        if (this._consecutiveSpawnFailures >= MAX_CONSECUTIVE_SPAWN_FAILURES || snapshotStuck) {
             this._broken = true;
             // The worker can't start. This is a LOCAL host fault, not a contract
             // outcome (a contract cannot make fork() fail). REJECT queued

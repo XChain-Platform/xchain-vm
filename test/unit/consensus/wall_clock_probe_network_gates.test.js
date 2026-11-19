@@ -130,6 +130,37 @@ describe('wall-clock calibration probe: callback Array methods', function () {
     }
 });
 
+describe('wall-clock calibration probe: native callbacks and ToNumber coercion', function () {
+    const vectorsById = new Map(probe.VECTORS.map((vector) => [vector.id, vector]));
+
+    for (const [id, shape] of [
+        ['Sparse findIndex native callback loop', /new Array\(100000\).*\.findIndex\(Number\.isNaN\)/],
+        ['Sparse findLast native callback loop', /new Array\(100000\).*\.findLast\(Number\.isNaN\)/],
+        ['TypedArray every native callback loop', /new Uint8Array\(100000\).*\.every\(Number\.isFinite\)/],
+        ['Map forEach native callback loop', /new Map\(\).*m\.forEach\(Math\.abs\)/],
+        ['Set forEach native callback loop', /new Set\(\).*m\.forEach\(Math\.abs\)/],
+        ['Unary plus numeric string loop', /repeat\(100000\).*\+s;/],
+        ['Number(string) loop', /repeat\(100000\).*Number\(s\)/],
+        ['isNaN(string) loop', /repeat\(100000\).*isNaN\(s\)/],
+        ['isFinite(string) loop', /repeat\(100000\).*isFinite\(s\)/],
+        ['Multiply numeric string loop', /repeat\(100000\).*s\*1/],
+        ['Alternating unary plus numeric string loop', /s1=.*s2=.*\+\(i\+\+&1\?s1:s2\)/],
+    ]) {
+        it(`includes the ${id} suspect vector`, function () {
+            const vector = vectorsById.get(id);
+            assert.ok(vector, `${id} must be in the calibration probe`);
+            assert.strictEqual(vector.group, 'unmetered-suspect');
+            assert.match(vector.body, shape);
+        });
+    }
+
+    it('gives every vector a body that compiles as a contract module', function () {
+        for (const vector of probe.VECTORS) {
+            assert.doesNotThrow(() => new Function('module', `${'module.exports = function(xchain) { '}${vector.body} };`), vector.id);
+        }
+    });
+});
+
 describe('wall-clock calibration probe: rebound aliases', function () {
     const vectorsById = new Map(probe.VECTORS.map((vector) => [vector.id, vector]));
 

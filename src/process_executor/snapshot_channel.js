@@ -26,6 +26,11 @@ function hasSerializableCrossChainSnapshot(opts) {
     return !!snap && typeof snap === 'object' && typeof snap.getAttestation !== 'function';
 }
 
+// Consecutive workers lost with a snapshot sent but not acknowledged before
+// the held queue is handed back as a host fault. Reset only by an accepted ack
+// or a new block, so a worker that dies on the snapshot cannot respawn forever.
+const MAX_UNACKED_SNAPSHOT_LOSSES = 3;
+
 // In-block executions should reuse one immutable snapshot object. Equal copies
 // may use the pinned token too. Any different snapshot travels inline so the
 // subprocess observes the same input as the in-process executor.
@@ -48,8 +53,11 @@ class WorkerSnapshotChannel {
         this.clearTimer();
     }
 
+    // True once enough consecutive workers died holding an unacknowledged snapshot.
     workerLost() {
+        if (this.sent && !this.acked) this.unackedLosses += 1;
         this.clearTimer();
+        return this.unackedLosses >= MAX_UNACKED_SNAPSHOT_LOSSES;
     }
 
     beginBlock() {
@@ -57,6 +65,7 @@ class WorkerSnapshotChannel {
         this.snapshot = null;
         this.token = null;
         this.inlineMismatches = 0;
+        this.unackedLosses = 0;
         this.workerSpawned();
     }
 
@@ -72,6 +81,7 @@ class WorkerSnapshotChannel {
         if (!msg || msg.type !== 'snapshotAck') return false;
         if (this.sent && msg.token === this.token) {
             this.acked = true;
+            this.unackedLosses = 0;
             this.clearTimer();
         }
         return true;
@@ -184,4 +194,4 @@ function resolveWorkerCrossChainSnapshot(snap) {
     return workerCrossChainSnapshot;
 }
 
-module.exports = { WorkerSnapshotChannel, resolveWorkerCrossChainSnapshot };
+module.exports = { WorkerSnapshotChannel, resolveWorkerCrossChainSnapshot, MAX_UNACKED_SNAPSHOT_LOSSES };
