@@ -114,7 +114,7 @@ module.exports = {
         this.contracts.set(index, {
             code: src,
             address,
-            state: Object.assign({}, opts.state || {})
+            state: Object.assign(Object.create(null), opts.state || {})
         });
 
         const initResult = await this.runDeployConstructor(index, opts, hasInitialize);
@@ -273,10 +273,10 @@ module.exports = {
 
     // ---- inspection ---------------------------------------------------------
 
-    /** Snapshot a deployed contract's current committed state (a copy). */
+    /** Snapshot committed state as a no-prototype dictionary, matching the VM. */
     getState(contractIndex) {
         const c = this.contracts.get(Number(contractIndex));
-        return c ? Object.assign({}, c.state) : null;
+        return c ? Object.assign(Object.create(null), c.state) : null;
     },
 
     /** Read one committed state value (or null). */
