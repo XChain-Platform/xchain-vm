@@ -12,8 +12,6 @@
  *
  ********************************************************************/
 // @ts-nocheck
-/* eslint-disable no-underscore-dangle */
-
 const S = require('../integration/process_executor.test/support/executor_setup.js');
 const ProcessExecutor = require('../../src/process-executor.js');
 const { HostFaultError } = require('../../src/errors.js');

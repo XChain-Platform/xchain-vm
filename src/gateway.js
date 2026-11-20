@@ -136,8 +136,8 @@ function buildAttestationAPI(gasTracker, emissionCollector, readOnlyData, gasSch
                 // already enforced through the injected map.
                 if (Buffer.byteLength(requestPayload, 'utf8') > 8192)
                     throw new Error('attestation.request: requestPayload exceeds 8192 bytes');
-                let callbackParamsJson = validateAttestCallback(callbackMethod, callbackParams);
-                let envelope = validateAttestOptions(options, providerId, readOnlyData);
+                const callbackParamsJson = validateAttestCallback(callbackMethod, callbackParams);
+                const envelope = validateAttestOptions(options, providerId, readOnlyData);
                 return queueAttestRequest(emissionCollector, readOnlyData, providerId, requestPayload,
                                           callbackMethod, callbackParamsJson, envelope);
             },
@@ -175,9 +175,9 @@ function validateAttestCallback(callbackMethod, callbackParams) {
 // defaulted and range-checked in the order they throw, then held to the named
 // provider's own deadline window. Returns the values the ATTEST emission carries.
 function validateAttestOptions(options, providerId, readOnlyData) {
-    let opts = options || {};
-    let redundancy     = opts.redundancy     !== undefined ? Number(opts.redundancy)     : 1;
-    let deadlineBlocks = opts.deadlineBlocks !== undefined ? Number(opts.deadlineBlocks) : 10;
+    const opts = options || {};
+    const redundancy     = opts.redundancy     !== undefined ? Number(opts.redundancy)     : 1;
+    const deadlineBlocks = opts.deadlineBlocks !== undefined ? Number(opts.deadlineBlocks) : 10;
     if ([1, 3, 5].indexOf(redundancy) === -1)
         throw new Error('attestation.request: redundancy must be 1, 3, or 5');
     if (!Number.isInteger(deadlineBlocks) || deadlineBlocks < 1 || deadlineBlocks > 100)
@@ -187,8 +187,8 @@ function validateAttestOptions(options, providerId, readOnlyData) {
     // tick in v1, amount format, fee-payer balance), keeping the VM
     // agnostic to future tick loosening. Only basic shape checks here
     // so a contract bug throws at call time, not at indexing time.
-    let feeTick   = opts.feeTick   !== undefined && opts.feeTick   !== null ? String(opts.feeTick).trim()   : '';
-    let feeAmount = opts.feeAmount !== undefined && opts.feeAmount !== null ? String(opts.feeAmount).trim() : '';
+    const feeTick   = opts.feeTick   !== undefined && opts.feeTick   !== null ? String(opts.feeTick).trim()   : '';
+    const feeAmount = opts.feeAmount !== undefined && opts.feeAmount !== null ? String(opts.feeAmount).trim() : '';
     if (feeTick.indexOf('|') !== -1 || feeAmount.indexOf('|') !== -1)
         throw new Error('attestation.request: feeTick/feeAmount must not contain "|"');
     if (feeAmount !== '' && !/^\d+(\.\d{1,8})?$/.test(feeAmount))
@@ -202,9 +202,9 @@ function validateAttestOptions(options, providerId, readOnlyData) {
     // silent host-side DEADLINE rejection that strands the callback. The
     // map mirrors the host's provider registry; an unknown providerId is
     // left to the host's own known-provider check.
-    let providerDeadlines = readOnlyData.providerDeadlines;
+    const providerDeadlines = readOnlyData.providerDeadlines;
     if (providerDeadlines && Object.prototype.hasOwnProperty.call(providerDeadlines, providerId)) {
-        let providerLimit = Number(providerDeadlines[providerId]);
+        const providerLimit = Number(providerDeadlines[providerId]);
         if (Number.isFinite(providerLimit) && deadlineBlocks > providerLimit)
             throw new Error('attestation.request: deadlineBlocks ' + deadlineBlocks +
                 ' exceeds the "' + providerId + '" provider window of ' + providerLimit + ' blocks');
@@ -216,7 +216,7 @@ function validateAttestOptions(options, providerId, readOnlyData) {
 // ATTEST emission. Returns the request_id that attestation.request hands back.
 function queueAttestRequest(emissionCollector, readOnlyData, providerId, requestPayload,
                             callbackMethod, callbackParamsJson, envelope) {
-    let { redundancy, deadlineBlocks, feeTick, feeAmount } = envelope;
+    const { redundancy, deadlineBlocks, feeTick, feeAmount } = envelope;
     // Derive deterministic request_id BEFORE pushing the emission so it
     // reflects the current emission index, not the post-push index.
     // The call-path is part of the preimage: without it, two nested
@@ -233,15 +233,15 @@ function queueAttestRequest(emissionCollector, readOnlyData, providerId, request
     // Assembled by buildRequestIdPreimage (gateway-emit.js), which owns the
     // per-field normalization for both preimage classes; raw readOnlyData
     // values go in.
-    let emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
-    let preimage = buildRequestIdPreimage({
+    const emissionIndex = emissionCollector.actions ? emissionCollector.actions.length : 0;
+    const preimage = buildRequestIdPreimage({
         txHash:          readOnlyData.txHash,
         rootActionIndex: readOnlyData.rootActionIndex,
         callPath:        readOnlyData.callPath,
         contractIndex:   readOnlyData.contractIndex,
         emissionIndex:   emissionIndex
     });
-    let requestId = crypto.createHash('sha256').update(preimage).digest('hex');
+    const requestId = crypto.createHash('sha256').update(preimage).digest('hex');
 
     emissionCollector.add('ATTEST', {
         requestId:       requestId,

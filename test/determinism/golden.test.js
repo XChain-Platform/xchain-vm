@@ -55,7 +55,6 @@ async function initializeGoldenManifest() {
     manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
     const res = await runAll();
     live = new Map(res.entries.map(e => [e.id, e]));
-    // eslint-disable-next-line no-console -- intentional test progress output
     console.log(`        [determinism] verifying on ${platformTag()} ` +
         `against manifest generated on ${manifest.generatedOn}`);
 }

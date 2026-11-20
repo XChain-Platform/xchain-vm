@@ -109,7 +109,7 @@ function buildContractStakeAPI(gasTracker, emissionCollector, readOnlyData, gasS
             slash: (pubkey, token, amount) => {
                 gasTracker.charge(gasSchedule.VM_EMISSION);
                 validateSlashArgs(pubkey, token, amount, readOnlyData);
-                let contractIndex = readOnlyData.contractIndex;
+                const contractIndex = readOnlyData.contractIndex;
                 emissionCollector.add('SLASH', {
                     contractIndex: contractIndex,
                     pubkey:        pubkey,

@@ -45,7 +45,7 @@ function timeMs(fn) {
 
 function report(label, n, ms) {
   const ops = Math.round((n / ms) * 1000);
-  // eslint-disable-next-line no-console -- perf tests print timing output to stdout
+  // Perf tests print their timing output to stdout so a run can be compared by eye.
   console.log(`        ${label}: ${n.toLocaleString()} ops in ${ms.toFixed(1)}ms (${ops.toLocaleString()} ops/s)`);
 }
 
