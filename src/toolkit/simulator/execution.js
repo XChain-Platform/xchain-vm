@@ -159,8 +159,9 @@ module.exports = {
      * @param {object} [opts]
      * @param {string} [opts.caller]
      * @param {boolean} [opts.callback] - the method is one the framework calls back
-     *        (an ATTEST response or expiry, an XCALL result, a binding VOTE). From
-     *        CALLBACK_ARGS_EXACT on, its arguments keep a '|' inside one element whole.
+     *        (an ATTEST response or expiry, or a binding VOTE). Use callXcallCallback
+     *        for an XCALL result or expiry. From CALLBACK_ARGS_EXACT on, callback
+     *        arguments keep a '|' inside one element whole.
      * @param {number} [opts.gasLimit] - positive integer below gasCeiling, otherwise gasCeiling applies
      * @param {string} [opts.txHash]   - identity pass-throughs. Forwarded
      * @param {number} [opts.actionIndex]       verbatim; the VM does its own
@@ -175,6 +176,14 @@ module.exports = {
         const args = opts.callback
             ? callbackParams(params, this.network, this.block.timestamp)
             : wireParams(params);
+        if (opts.callback && opts.gasLimit == null && !this._bareCallbackWarned) {
+            this._bareCallbackWarned = true;
+            console.warn(
+                '[xchain-vm simulator] callback mode uses the top-level gas ceiling, matching ATTEST ' +
+                'and binding-VOTE callbacks. Use callXcallCallback() for an XCALL result or expiry; ' +
+                'it uses VM_XCALL_CALLBACK as the chain does.'
+            );
+        }
         this.warnIfParamsReshaped(params, args);
         return this.execute(contractIndex, method, args, opts, null);
     },
@@ -230,7 +239,38 @@ module.exports = {
     },
 
     /**
-     * Shared execute path for call() and callGuard(). `modeOverrides` is applied
+     * Run an XCALL result or expiry callback in the mode used by the indexer.
+     * The chain pins VM_XCALL_CALLBACK, call depth zero and the originating
+     * call's hop count. Params are the fixed outcome tuple followed by the
+     * callback params, in the order delivered by the chain.
+     * @param {number} contractIndex
+     * @param {string} method
+     * @param {string[]} [params=[]]
+     * @param {object} [opts]
+     * @param {number} [opts.crossHops=0]
+     * @returns {Promise<object>}
+     */
+    async callXcallCallback(contractIndex, method, params = [], opts = {}) {
+        const rawCeiling = this.gasSchedule.VM_XCALL_CALLBACK;
+        const ceiling = parseInt(rawCeiling, 10);
+        if (rawCeiling === undefined || rawCeiling === null || !Number.isInteger(ceiling) || ceiling <= 0
+            || String(rawCeiling).trim() !== String(ceiling)) {
+            throw new Error(
+                'GAS_SCHEDULE.VM_XCALL_CALLBACK missing or invalid (expected a positive integer, got ' +
+                JSON.stringify(rawCeiling) + ')'
+            );
+        }
+        const args = callbackParams(params, this.network, this.block.timestamp);
+        this.warnIfParamsReshaped(params, args);
+        return this.execute(contractIndex, method, args, opts, {
+            gasCeiling: opts.gasLimit != null ? Number(opts.gasLimit) : ceiling,
+            callDepth: 0,
+            crossHops: Number.isInteger(opts.crossHops) ? opts.crossHops : 0
+        });
+    },
+
+    /**
+     * Shared execute path for call() and pinned modes. `modeOverrides` is applied
      * LAST so a mode owns the keys it pins; everything else stays exactly as
      * call() has always built it.
      */

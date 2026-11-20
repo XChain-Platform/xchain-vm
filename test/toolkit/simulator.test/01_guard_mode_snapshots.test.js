@@ -267,6 +267,10 @@ module.exports = { guard: function(xchain) {
             await sim.callGuard(dep.contractIndex, { actionType: 'SEND' });
             assert.deepStrictEqual(seen[1], EXPECTED.concat(['gasCeiling', 'isGuard']).sort(),
                 'callGuard() option set drifted');
+
+            await sim.callXcallCallback(dep.contractIndex, 'default', [], { crossHops: 1 });
+            assert.deepStrictEqual(seen[2], EXPECTED.concat(['crossHops', 'gasCeiling']).sort(),
+                'callXcallCallback() option set drifted');
         } finally { await sim.close(); }
     });
 });

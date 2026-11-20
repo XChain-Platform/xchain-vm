@@ -36,6 +36,8 @@
  *     GUARD_GAS_CEILING the coin configs set, so a guard calling
  *     attestation.request / emit.crossExecute fails in simulation exactly as
  *     it fails on chain instead of simulating green at 5x the gas headroom.
+ *   - XCALL-callback mode: callXcallCallback() uses VM_XCALL_CALLBACK, call
+ *     depth zero and the originating call's hop count, matching callback injection.
  *   - failure atomicity: on a reverted / out-of-gas / errored call the VM
  *     returns empty stateChanges + emittedActions, so nothing is committed.
  *   - gas settlement: gasUsed is capped at the effective execution ceiling,
