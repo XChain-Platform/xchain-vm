@@ -46,6 +46,15 @@ function attestationBucket(sim, contractIndex) {
     return sim.attestationDataByIndex.get(index);
 }
 
+// Install a new crossChainData whose `map` holds key -> value, leaving the old
+// object and its sub-maps untouched.
+function replaceCrossChainEntry(sim, map, key, value) {
+    const prev = sim.crossChainData;
+    sim.crossChainData = Object.assign({}, prev,
+        { [map]: Object.assign({}, prev[map], { [key]: value }) });
+    return sim;
+}
+
 module.exports = {
     // ---- read-only-state seeding -------------------------------------------
 
@@ -174,16 +183,22 @@ module.exports = {
         return this;
     },
 
+    // The cross-chain setters replace crossChainData rather than writing into
+    // it. The subprocess executor pins the object it is handed first in a block
+    // and only notices a later change when it receives a different object that
+    // is not deep-equal, so an in-place write would leave later calls reading
+    // the copy taken at the first execute.
+
     /** Seed a cross-chain attestation value (read by crosschain.getAttestation). */
     setCrossChainAttestation(chain, actionIndex, value) {
-        this.crossChainData.attestations[String(chain) + ':' + String(actionIndex)] = value;
-        return this;
+        return replaceCrossChainEntry(this, 'attestations',
+            String(chain) + ':' + String(actionIndex), value);
     },
 
     /** Mark a cross-chain action settled (read by crosschain.isSettled). */
     setCrossChainSettled(chain, actionIndex, settled = true) {
-        this.crossChainData.settled[String(chain) + ':' + String(actionIndex)] = settled === true;
-        return this;
+        return replaceCrossChainEntry(this, 'settled',
+            String(chain) + ':' + String(actionIndex), settled === true);
     },
 
     /**
@@ -192,8 +207,7 @@ module.exports = {
      * matching the accessor's own lookup.
      */
     setCallResult(callId, result) {
-        this.crossChainData.calls[String(callId).toLowerCase()] =
-            { status: String(result && result.status), payload: String(result && result.payload) };
-        return this;
+        return replaceCrossChainEntry(this, 'calls', String(callId).toLowerCase(),
+            { status: String(result && result.status), payload: String(result && result.payload) });
     }
 };

@@ -309,6 +309,7 @@ class ContractSimulator {
         this.tokenInfo = {};       // tick -> info object
         // roundFloor: oldest round the snapshot guarantees; 0 means no history is hidden.
         this.oracle = { snapshotAge: 0, prices: {}, rounds: {}, roundFloor: 0 };
+        // Replaced, never written in place: see the cross-chain setters.
         this.crossChainData = { attestations: {}, settled: {}, calls: {} };
         // The remaining read-only snapshots the gateway reads. Shapes are the
         // ones src/readonly-accessors.js documents; an empty snapshot is
