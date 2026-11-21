@@ -259,17 +259,18 @@ module.exports = { guard: function(xchain) {
             const dep = await sim.deploy('module.exports = function(){ return "x"; };');
             const seen = [];
             const real = sim.vm.execute.bind(sim.vm);
-            sim.vm.execute = (o) => { seen.push(Object.keys(o).sort()); return real(o); };
+            sim.vm.execute = (o) => { seen.push(o); return real(o); };
 
             await sim.call(dep.contractIndex, 'default', []);
-            assert.deepStrictEqual(seen[0], EXPECTED, 'call() option set drifted');
+            assert.deepStrictEqual(Object.keys(seen[0]).sort(), EXPECTED, 'call() option set drifted');
+            assert.deepStrictEqual(seen[0].providerDeadlines, { http_get: 100, llm: 20 });
 
             await sim.callGuard(dep.contractIndex, { actionType: 'SEND' });
-            assert.deepStrictEqual(seen[1], EXPECTED.concat(['gasCeiling', 'isGuard']).sort(),
+            assert.deepStrictEqual(Object.keys(seen[1]).sort(), EXPECTED.concat(['gasCeiling', 'isGuard']).sort(),
                 'callGuard() option set drifted');
 
             await sim.callXcallCallback(dep.contractIndex, 'default', [], { crossHops: 1 });
-            assert.deepStrictEqual(seen[2], EXPECTED.concat(['crossHops', 'gasCeiling']).sort(),
+            assert.deepStrictEqual(Object.keys(seen[2]).sort(), EXPECTED.concat(['crossHops', 'gasCeiling']).sort(),
                 'callXcallCallback() option set drifted');
         } finally { await sim.close(); }
     });

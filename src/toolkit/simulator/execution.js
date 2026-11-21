@@ -41,16 +41,15 @@ function executionOptions(simulator, contract, index, method, params, opts, call
         attestationData: simulator.attestationDataByIndex.get(index) || simulator.attestationData,
         pollData: simulator.pollData,
         contractStakeData: simulator.contractStakeDataByIndex.get(index) || simulator.contractStakeData,
-        // Identity fields. The VM defaults every one of these itself
-        // (txHash '', actionIndex null, rootActionIndex null, callPath '',
-        // callDepth 0, providerDeadlines null), so an omitted opt lands on
-        // exactly the value the simulator produced before they existed.
+        // Identity fields use the VM defaults. Provider deadlines instead use
+        // the simulator's registry-mirrored default unless this call overrides it.
         txHash: opts.txHash != null ? String(opts.txHash) : '',
         actionIndex: opts.actionIndex != null ? Number(opts.actionIndex) : null,
         rootActionIndex: opts.rootActionIndex != null ? opts.rootActionIndex : null,
         callPath: typeof opts.callPath === 'string' ? opts.callPath : '',
         callDepth: Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
-        providerDeadlines: opts.providerDeadlines || null
+        providerDeadlines: opts.providerDeadlines !== undefined
+            ? opts.providerDeadlines : simulator.providerDeadlines
     };
 }
 
@@ -168,7 +167,8 @@ module.exports = {
      * @param {string|number} [opts.rootActionIndex]  normalization. Supply them
      * @param {string} [opts.callPath]          to make a derived request_id /
      * @param {number} [opts.callDepth]         call_id match a real one.
-     * @param {object} [opts.providerDeadlines] - ATTEST provider deadline windows
+     * @param {object|null} [opts.providerDeadlines] - per-call ATTEST provider deadline
+     *        windows; defaults to the simulator's registry-mirrored map
      * @returns {Promise<object>} the VM result with gasUsed capped to the settled ceiling;
      *          gasUsedRaw carries the uncapped value only when the cap applies.
      */

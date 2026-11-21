@@ -27,7 +27,8 @@ const {
     DEFAULT_BLOCK_TIME,
     SCHEDULED_BLOCK_TIME,
     liveBlockTime,
-    GUARD_GAS_CEILING
+    GUARD_GAS_CEILING,
+    DEFAULT_PROVIDER_DEADLINES
 } = require('./simulator.js');
 const { runGate, estimateGas, getExportedMeta, isValidMetaText } = require('./gate.js');
 const { buildScaffold, writeScaffold } = require('./scaffold.js');
@@ -53,6 +54,7 @@ module.exports = {
     SCHEDULED_BLOCK_TIME,
     liveBlockTime,
     GUARD_GAS_CEILING,
+    DEFAULT_PROVIDER_DEADLINES,
     runGate,
     estimateGas,
     // The contract-meta walk behind the `contract-meta` gate rule, so a tool that

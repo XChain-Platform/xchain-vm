@@ -111,6 +111,13 @@ const GUARD_GAS_CEILING = 200000;
 // test/determinism/simulator_gas_ceiling_cross_repo.test.js compares the two.
 const DEFAULT_GAS_CEILING = 1000000;
 
+// Per-provider ATTEST deadline windows mirrored from the indexer registry.
+// test/determinism/simulator_defaults_cross_repo.test.js pins the two maps together.
+const DEFAULT_PROVIDER_DEADLINES = Object.freeze({
+    http_get: 100,
+    llm: 20
+});
+
 // Method name the indexer invokes on a token's bound controller contract
 // (xchain-indexer/src/actions/execute/controller_guard.js GUARD_METHOD).
 const GUARD_METHOD = 'guard';
@@ -222,6 +229,7 @@ module.exports = {
     TIME_NETWORK_GATES,
     GUARD_GAS_CEILING,
     DEFAULT_GAS_CEILING,
+    DEFAULT_PROVIDER_DEADLINES,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 };

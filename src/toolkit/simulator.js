@@ -70,6 +70,8 @@
  *     regtest stays at height 1, since every height gate is on from genesis
  *     there. Pin a lower height to simulate the pre-activation rules (it warns
  *     once).
+ *   - attestation deadlines: provider windows default to the indexer registry's
+ *     http_get and llm limits, with constructor and per-call overrides available.
  *
  * What it does NOT do (out of scope; that is the real indexer + regtest):
  *   - process emitted ACTIONs against the ledger (SEND/ISSUE/... are captured
@@ -138,6 +140,7 @@ const {
     GATE_FALLBACK_BLOCK_TIME,
     GUARD_GAS_CEILING,
     DEFAULT_GAS_CEILING,
+    DEFAULT_PROVIDER_DEADLINES,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 } = require('./simulator/constants.js');
@@ -277,6 +280,8 @@ class ContractSimulator {
      *        there), so a mainnet or testnet simulation runs today's rule set;
      *        a lower value warns once too.
      * @param {string} [opts.defaultCaller]  - caller address used when a call omits one
+     * @param {object|null} [opts.providerDeadlines] - ATTEST provider deadline
+     *        windows. Defaults to the indexer registry mirror; null opts out.
      * @param {string} [opts.execution='in-process'] - VM execution mode. Not a
      *        pure latency knob: the two modes differ on a RESULT. in-process
      *        gives millisecond feedback with no per-block fork, but has no worker
@@ -294,6 +299,8 @@ class ContractSimulator {
         this.gasSchedule = Object.assign({}, DEFAULT_GAS_SCHEDULE, opts.gasSchedule || {});
         this.limits = Object.assign({}, DEFAULT_LIMITS, opts.limits || {});
         this.defaultCaller = opts.defaultCaller || 'sim_caller';
+        this.providerDeadlines = opts.providerDeadlines === undefined
+            ? DEFAULT_PROVIDER_DEADLINES : opts.providerDeadlines;
 
         initializeBlockContext.call(this, opts);
 
@@ -341,5 +348,6 @@ Object.assign(
 module.exports = {
     ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME,
     SCHEDULED_BLOCK_TIME, liveBlockTime,
-    GUARD_GAS_CEILING, DEFAULT_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER
+    GUARD_GAS_CEILING, DEFAULT_GAS_CEILING, DEFAULT_PROVIDER_DEADLINES,
+    GUARD_METHOD, GUARD_PARAM_ORDER
 };

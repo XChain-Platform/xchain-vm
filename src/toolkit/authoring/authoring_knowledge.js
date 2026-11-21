@@ -71,7 +71,7 @@ const CONCEPT_MAP = [
     { solidity: 'ReentrancyGuard', xchain: 'usually unnecessary', note: 'snapshot semantics; keep state-before-emit discipline' },
     { solidity: 'view / pure', xchain: 'a method that only reads', note: 'just do not write state or emit' },
     { solidity: 'oracle price feed (Chainlink)', xchain: 'xchain.oracle.getPrice(coinPair)', note: 'validator-attested, built in' },
-    { solidity: 'external data / API', xchain: 'xchain.attestation.request(providerId, payload, callbackMethod, callbackParams, opts)', note: 'PBFT-certified; http_get and llm providers' },
+    { solidity: 'external data / API', xchain: 'xchain.attestation.request(providerId, payload, callbackMethod, callbackParams, opts)', note: 'PBFT-certified; deadline windows: http_get up to 100 blocks, llm up to 20 blocks' },
     { solidity: 'payable receive()', xchain: '(none)', note: 'DEPOSIT' },
     { solidity: 'selfdestruct / delegatecall', xchain: '(none)', note: 'not in the model' },
     { solidity: 'gas limit', xchain: 'GAS_LIMIT on deploy/execute; sdk.suggestGasLimit(...)', note: 'metered per the gas schedule' }
