@@ -221,8 +221,7 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
     });
 });
 
-describe('toolkit simulator defaults agree with the chain that charges them', function () {
-
+function registerCoinScheduleTests() {
     for (const coin of COINS) {
         it('sibling xchain-indexer ' + coin + ' coin config charges the same gas', function () {
             const rel  = path.join('xchain-indexer', 'src', 'coins', coin + '.js');
@@ -270,7 +269,9 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
                 'or move neither');
         });
     }
+}
 
+function registerProviderDeadlineTest() {
     it('sibling provider registry carries the same deadline windows', function () {
         const rel = path.join('xchain-indexer', 'src', 'attestation', 'provider_registry.js');
         const file = path.join(PLATFORM_ROOT, rel);
@@ -283,6 +284,11 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
             rel + ': provider deadline windows disagree with the simulator default; ' +
             'move both maps together or the simulator accepts requests the chain rejects');
     });
+}
+
+describe('toolkit simulator defaults agree with the chain that charges them', function () {
+    registerCoinScheduleTests();
+    registerProviderDeadlineTest();
 });
 
 describe('toolkit simulator defaults agree with the chain that charges them', function () {
