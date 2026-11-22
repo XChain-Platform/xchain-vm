@@ -48,6 +48,29 @@ function metaErrors(gate) {
     return gate.errors.filter((e) => e.rule === 'contract-meta');
 }
 
+function assertLastDuplicatePropertiesWin() {
+    const duplicateMetaBadLast = 'module.exports = { meta: ' + VALID_META +
+        ', meta: { name: "", description: "D" } };';
+    const duplicateMetaGoodLast = 'module.exports = { meta: { name: "", description: "D" }, meta: ' +
+        VALID_META + ' };';
+    assert(metaErrors(runGate(duplicateMetaBadLast)).some((e) => e.message === NAME_BAD));
+    assert.strictEqual(runGate(duplicateMetaGoodLast).ok, true);
+
+    const duplicateNameBadLast = contractWith('{ name: "Valid", name: 123, description: "D" }');
+    const duplicateNameGoodLast = contractWith('{ name: 123, name: "Valid", description: "D" }');
+    assert(metaErrors(runGate(duplicateNameBadLast)).some((e) => e.message === NAME_BAD));
+    assert.strictEqual(runGate(duplicateNameGoodLast).ok, true);
+
+    const computedLast = getExportedMeta('var N = "Valid";\n' +
+        contractWith('{ name: "old", name: N, description: "D" }'));
+    assert.deepStrictEqual(computedLast.computed, ['name']);
+    assert.deepStrictEqual(computedLast.nonStringLiteral, []);
+    const getterLast = 'module.exports = { meta: { name: "old", get name() { return "Valid"; }, description: "D" } };';
+    assert.deepStrictEqual(getExportedMeta(getterLast).computed, ['name']);
+    const metaGetterLast = 'module.exports = { meta: ' + VALID_META + ', get meta() { return {}; } };';
+    assert.deepStrictEqual(getExportedMeta(metaGetterLast), { status: 'undecidable' });
+}
+
 describe('Toolkit gate: contract identity (contract-meta)', function () {
 
     it('blocks a nameless object-export contract with the consensus string', function () {
@@ -151,27 +174,7 @@ describe('Toolkit gate: contract identity (contract-meta)', function () {
         const ok = 'module.exports = { meta: ' + VALID_META + ', permissions: [] };\n';
         assert.strictEqual(getExportedMeta(ok).status, 'present');
         assert.strictEqual(getExportedMeta('module.exports = { permissions: [] };\n').status, 'absent');
-
-        const duplicateMetaBadLast = 'module.exports = { meta: ' + VALID_META +
-            ', meta: { name: "", description: "D" } };';
-        const duplicateMetaGoodLast = 'module.exports = { meta: { name: "", description: "D" }, meta: ' +
-            VALID_META + ' };';
-        assert(metaErrors(runGate(duplicateMetaBadLast)).some((e) => e.message === NAME_BAD));
-        assert.strictEqual(runGate(duplicateMetaGoodLast).ok, true);
-
-        const duplicateNameBadLast = contractWith('{ name: "Valid", name: 123, description: "D" }');
-        const duplicateNameGoodLast = contractWith('{ name: 123, name: "Valid", description: "D" }');
-        assert(metaErrors(runGate(duplicateNameBadLast)).some((e) => e.message === NAME_BAD));
-        assert.strictEqual(runGate(duplicateNameGoodLast).ok, true);
-
-        const computedLast = getExportedMeta('var N = "Valid";\n' +
-            contractWith('{ name: "old", name: N, description: "D" }'));
-        assert.deepStrictEqual(computedLast.computed, ['name']);
-        assert.deepStrictEqual(computedLast.nonStringLiteral, []);
-        const getterLast = 'module.exports = { meta: { name: "old", get name() { return "Valid"; }, description: "D" } };';
-        assert.deepStrictEqual(getExportedMeta(getterLast).computed, ['name']);
-        const metaGetterLast = 'module.exports = { meta: ' + VALID_META + ', get meta() { return {}; } };';
-        assert.deepStrictEqual(getExportedMeta(metaGetterLast), { status: 'undecidable' });
+        assertLastDuplicatePropertiesWin();
     });
 
     it('advises on an export object using a spread', function () {
