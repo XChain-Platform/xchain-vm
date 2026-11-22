@@ -111,6 +111,13 @@ const GUARD_GAS_CEILING = 200000;
 // test/determinism/simulator_gas_ceiling_cross_repo.test.js compares the two.
 const DEFAULT_GAS_CEILING = 1000000;
 
+// Per-provider ATTEST deadline windows mirrored from the indexer registry.
+// test/determinism/simulator_defaults_cross_repo.test.js pins the two maps together.
+const DEFAULT_PROVIDER_DEADLINES = Object.freeze({
+    http_get: 100,
+    llm: 20
+});
+
 // Method name the indexer invokes on a token's bound controller contract
 // (xchain-indexer/src/actions/execute/controller_guard.js GUARD_METHOD).
 const GUARD_METHOD = 'guard';
@@ -180,6 +187,9 @@ const TIME_NETWORK_GATES = Object.freeze([
     { label: 'iter/Set meter', source: 'ITER_SET_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.ITER_SET_METER_ACTIVATION, network)
             ? XChainVM.ITER_SET_METER_ACTIVATION[network] : null) },
+    { label: 'lint regex group depth', source: 'LINT_REGEX_GROUP_DEPTH_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.LINT_REGEX_GROUP_DEPTH_ACTIVATION, network)
+            ? XChainVM.LINT_REGEX_GROUP_DEPTH_ACTIVATION[network] : null) },
     { label: 'apply-length meter', source: 'APPLY_LENGTH_METER_ACTIVATION',
         resolve: (network) => (Object.hasOwn(XChainVM.APPLY_LENGTH_METER_ACTIVATION, network)
             ? XChainVM.APPLY_LENGTH_METER_ACTIVATION[network] : null) },
@@ -200,7 +210,11 @@ const TIME_NETWORK_GATES = Object.freeze([
         resolve: (network) => (Object.hasOwn(XChainVM.STRING_RESULT_METER_ACTIVATION, network)
             ? XChainVM.STRING_RESULT_METER_ACTIVATION[network] : null) },
     { label: 'toString size meter', source: 'TOSTRING_SIZE_METER_ACTIVATION',
-        resolve: (network) => XChainVM.toStringSizeMeterGateTime(network) }
+        resolve: (network) => XChainVM.toStringSizeMeterGateTime(network) },
+    // Storable state keys; a network the map does not name is unarmed, as in its predicate.
+    { label: 'storable state keys', source: 'STATE_KEY_STORABLE_ACTIVATION',
+        resolve: (network) => (Object.hasOwn(XChainVM.STATE_KEY_STORABLE_ACTIVATION, network)
+            ? XChainVM.STATE_KEY_STORABLE_ACTIVATION[network] : null) }
 ]);
 
 module.exports = {
@@ -215,6 +229,7 @@ module.exports = {
     TIME_NETWORK_GATES,
     GUARD_GAS_CEILING,
     DEFAULT_GAS_CEILING,
+    DEFAULT_PROVIDER_DEADLINES,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 };

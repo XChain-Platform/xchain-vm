@@ -24,7 +24,7 @@
 
 const ivm = require('isolated-vm');
 const { HostFaultError } = require('./errors.js');
-const { lintSource, nestingDepthFinding, syntaxDepthFinding, isHostStackOverflow, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
+const { lintSource, nestingDepthFinding, syntaxDepthFinding, regexGroupDepthFinding, isHostStackOverflow, findFloatWarnings, findBannedMathCalls, findBannedLiterals, findBannedAsync, findBannedGenerator, findBannedWasm, findBannedRest, CONSENSUS_RULES } = require('./lint-core.js');
 
 function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWasm, bannedRest, bannedWith) {
     if (error.rule === 'banned-async' && !bannedAsync) return false;
@@ -60,8 +60,10 @@ function checkV8Syntax(code, overflowIsHostFault) {
 
 // The non-recursive depth rules, run before any parser: delimiter nesting, then the
 // syntax-depth bound over every construct the parsers and the metering pass recurse on.
-function preParseFinding(code, nesting, syntaxDepth) {
-    return (nesting && nestingDepthFinding(code)) || (syntaxDepth && syntaxDepthFinding(code)) || null;
+function preParseFinding(code, nesting, syntaxDepth, regexGroupDepth) {
+    return (nesting && nestingDepthFinding(code, regexGroupDepth)) ||
+        (syntaxDepth && syntaxDepthFinding(code, regexGroupDepth)) ||
+        (regexGroupDepth && !syntaxDepth && regexGroupDepthFinding(code)) || null;
 }
 
 // The acorn rules, with a host stack overflow surfaced as HostFaultError when
@@ -148,6 +150,10 @@ function lintAcornRules(code, opts) {
  *        recursive pass; and a host stack overflow in any later pass throws
  *        HostFaultError instead of becoming a verdict. CONSENSUS-GATED on its own
  *        per-coin block-height activation. Defaults to true for author-facing callers.
+ * @param {boolean} [opts.enforceLintRegexGroupDepth=true] - whether a regex literal
+ *        nested past MAX_REGEX_GROUP_DEPTH is refused before recursive parsing.
+ *        CONSENSUS-GATED on its own block-time activation. Defaults to true for
+ *        author-facing callers.
  * @returns {{ valid: boolean, error?: string }}
  * @throws {HostFaultError} when the V8 isolate cannot be SPAWNED on this host
  *         (code 'EXECUTOR_UNAVAILABLE'). Never a contract outcome: callers on
@@ -165,10 +171,12 @@ function validateSyntax(code, opts) {
     const enforceBannedRest      = !opts || opts.enforceBannedRest !== false;
     const enforceBannedWith      = !opts || opts.enforceBannedWith !== false;
     const enforceLintSyntaxDepth = !opts || opts.enforceLintSyntaxDepth !== false;
+    const enforceLintRegexGroupDepth = !opts || opts.enforceLintRegexGroupDepth !== false;
     const enforceLintNestingDepth = enforceLintSyntaxDepth || !opts || opts.enforceLintNestingDepth !== false;
     const enforceLintDestructure = !opts || opts.enforceLintDestructure !== false;
 
-    const preParse = preParseFinding(code, enforceLintNestingDepth, enforceLintSyntaxDepth);
+    const preParse = preParseFinding(code, enforceLintNestingDepth, enforceLintSyntaxDepth,
+        enforceLintRegexGroupDepth);
     if (preParse) return { valid: false, error: preParse.message };
 
     // 1. V8 syntax check (the only step that requires isolated-vm).
@@ -201,6 +209,7 @@ function validateSyntax(code, opts) {
         optionalChain: enforceLintOptionalChain,
         enforceLintNestingDepth: false,
         enforceLintSyntaxDepth: false,
+        enforceLintRegexGroupDepth: false,
         overflowIsHostFault: enforceLintSyntaxDepth,
         destructure: enforceLintDestructure
     }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,

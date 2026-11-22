@@ -17,6 +17,8 @@
 
 const { HostFaultError } = require('../errors.js');
 const { newDispatchToken } = require('./frames.js');
+const { closureAccessorField } = require('./opts_guard.js');
+const { isDeepStrictEqual } = require('util');
 
 function hasSerializableCrossChainSnapshot(opts) {
     if (!opts || !Object.prototype.hasOwnProperty.call(opts, 'crossChainData')) return false;
@@ -24,6 +26,14 @@ function hasSerializableCrossChainSnapshot(opts) {
     return !!snap && typeof snap === 'object' && typeof snap.getAttestation !== 'function';
 }
 
+// Consecutive workers lost with a snapshot sent but not acknowledged before
+// the held queue is handed back as a host fault. Reset only by an accepted ack
+// or a new block, so a worker that dies on the snapshot cannot respawn forever.
+const MAX_UNACKED_SNAPSHOT_LOSSES = 3;
+
+// In-block executions should reuse one immutable snapshot object. Equal copies
+// may use the pinned token too. Any different snapshot travels inline so the
+// subprocess observes the same input as the in-process executor.
 class WorkerSnapshotChannel {
     constructor(send, kill, timeoutMs) {
         this.send = send;
@@ -43,14 +53,19 @@ class WorkerSnapshotChannel {
         this.clearTimer();
     }
 
+    // True once enough consecutive workers died holding an unacknowledged snapshot.
     workerLost() {
+        if (this.sent && !this.acked) this.unackedLosses += 1;
         this.clearTimer();
+        return this.unackedLosses >= MAX_UNACKED_SNAPSHOT_LOSSES;
     }
 
     beginBlock() {
         this.set = false;
         this.snapshot = null;
         this.token = null;
+        this.inlineMismatches = 0;
+        this.unackedLosses = 0;
         this.workerSpawned();
     }
 
@@ -66,6 +81,7 @@ class WorkerSnapshotChannel {
         if (!msg || msg.type !== 'snapshotAck') return false;
         if (this.sent && msg.token === this.token) {
             this.acked = true;
+            this.unackedLosses = 0;
             this.clearTimer();
         }
         return true;
@@ -97,6 +113,16 @@ class WorkerSnapshotChannel {
 
     reference(opts) {
         if (!this.set || !hasSerializableCrossChainSnapshot(opts)) return opts;
+        if (opts.crossChainData !== this.snapshot &&
+            !isDeepStrictEqual(opts.crossChainData, this.snapshot)) {
+            this.inlineMismatches += 1;
+            if (this.inlineMismatches === 1) {
+                process.emitWarning(
+                    'in-block cross-chain snapshot differs from the pinned snapshot; sending inline',
+                    'XChainVMSnapshotWarning');
+            }
+            return opts;
+        }
         return Object.assign({}, opts, {
             crossChainData: { __xchainWorkerSnapshot: this.token }
         });
@@ -108,6 +134,13 @@ class WorkerSnapshotChannel {
         while (exec._queue.length && exec._pending.size === 0 &&
                exec._child && exec._sawReady && exec._child.connected) {
             const entry = exec._queue[0];
+            const closure = closureAccessorField(entry.opts);
+            if (closure) {
+                exec._queue.shift();
+                entry.reject(new HostFaultError('executor input not serializable: ' + closure +
+                    ' is a closure accessor and cannot cross the worker channel; pass a plain snapshot'));
+                continue;
+            }
             if (this.hold(entry.opts, exec._inBlock)) return;
             const token = newDispatchToken();
             const opts = this.reference(entry.opts);
@@ -161,4 +194,4 @@ function resolveWorkerCrossChainSnapshot(snap) {
     return workerCrossChainSnapshot;
 }
 
-module.exports = { WorkerSnapshotChannel, resolveWorkerCrossChainSnapshot };
+module.exports = { WorkerSnapshotChannel, resolveWorkerCrossChainSnapshot, MAX_UNACKED_SNAPSHOT_LOSSES };

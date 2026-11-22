@@ -14,17 +14,15 @@
 // @ts-nocheck
 
 const XChainVM = require('../../index.js');
-const { isLintOptionalChainActive } = require('../../index/lint_optional_chain_heights.js');
-const { isLintBannedWithActive } = require('../../index/lint_banned_with_heights.js');
-const { isLintDestructureActive } = require('../../index/lint_destructure_heights.js');
-const { isLintSyntaxDepthActive, resolveSyntaxDepthActive } = require('../../index/lint_syntax_depth_heights.js');
-const { HEIGHT_GATES, LINT_NESTING_DEPTH_HEIGHTS } = require('./constants.js');
+const { HEIGHT_GATES } = require('./constants.js');
 const { heightGateThreshold, heightGateNeed, defaultBlockHeight } = require('./block_time_gates.js');
+const { resolveDeployLintFlags } = require('./deploy_lint_flags.js');
 const {
     isContractMetaRequiredActive,
     manifestPolicyError,
     contractMetaError
 } = require('./manifest_gate.js');
+const { isStakeDecimalStringsActive, stakeDecimalStringsTime } = require('./stake_shape_gate.js');
 
 // Judge a manifest read: the policy rows first, then the meta ladder once it is armed.
 function manifestLegVerdict(read, network, blockTime) {
@@ -160,6 +158,29 @@ module.exports = {
     },
 
     /**
+     * Warn once when seeded stake amounts read back here as decimal strings while a
+     * node at this network, block time and path hands the contract mathjs JSON
+     * objects instead (see stake_shape_gate.js). Advisory, like the scope warnings:
+     * the simulator keeps serving strings, the shape the chain is moving to.
+     */
+    warnIfStakeShapeDiverges(contractStakeData, isGuard) {
+        if (this._stakeShapeWarned || !contractStakeData) return;
+        if (!Object.keys(contractStakeData.stakeByPubkeyTick || {}).length) return;
+        if (isStakeDecimalStringsActive(this.network, this.block.timestamp, isGuard)) return;
+        this._stakeShapeWarned = true;
+        const row = (isGuard ? 'GUARD_' : '') + 'STAKE_SNAPSHOT_DECIMAL_STRINGS';
+        const at = stakeDecimalStringsTime(this.network, isGuard);
+        console.warn(
+            '[xchain-vm simulator] stake amounts read back here as decimal strings, but ' + row +
+            ' is ' + (at === null ? 'unarmed' : 'not active until block time ' + at) + ' on ' +
+            JSON.stringify(this.network) + ', so a node hands getStake, getTotalStaked and ' +
+            'getStakers amounts as {"mathjs":"BigNumber","value":"..."} objects on this ' +
+            (isGuard ? 'controller-guard' : 'call') + ' path. A contract that treats them as ' +
+            'strings passes here and behaves differently on chain.'
+        );
+    },
+
+    /**
      * Run the first two legs of the chain's DEPLOY gate (size cap, validateSyntax)
      * over already-transpiled source and return their verdict as `{ valid, error }`;
      * manifestGateVerdict is the third leg. ADVISORY: deploy() reports it and warns once,
@@ -190,25 +211,13 @@ module.exports = {
     deployGateVerdict(src) {
         if (Buffer.byteLength(src, 'utf8') > this.limits.maxCodeSize)
             return { valid: false, error: 'exceeds max size' };
-        const time   = Number(this.block.timestamp);
-        const height = Number(this.block.height);
-        const pkg3   = XChainVM.isPkg3SandboxActive(this.network, this.coin, height);
         try {
-            // Keep every flag an ordinary (enumerable) property so the key-set guards see all of them.
-            const options = {
-                enforceBannedAsync:       XChainVM.isAsyncSurfaceActive(this.network, time),
-                enforceLintHardening:     XChainVM.isLintHardeningActive(this.network, time),
-                enforceBannedGenerator:   pkg3,
-                enforceBannedWasm:        pkg3,
-                enforceLintGlobalAlias:   XChainVM.isLintGlobalAliasActive(this.network, this.coin, height),
-                enforceLintOptionalChain: isLintOptionalChainActive(this.network, this.coin, height),
-                enforceBannedWith:        isLintBannedWithActive(this.network, this.coin, height),
-                enforceLintNestingDepth:  resolveSyntaxDepthActive(
-                    LINT_NESTING_DEPTH_HEIGHTS, this.network, this.coin, height),
-                enforceLintDestructure:   isLintDestructureActive(this.network, this.coin, height),
-                enforceBannedRest:        XChainVM.isRestPatternMeterActive(this.network, time),
-                enforceLintSyntaxDepth:   isLintSyntaxDepthActive(this.network, this.coin, height)
-            };
+            const options = resolveDeployLintFlags({
+                network: this.network,
+                coin: this.coin,
+                height: Number(this.block.height),
+                time: Number(this.block.timestamp)
+            });
             return this.vm.validateSyntax(src, options);
         } catch (e) {
             // The V8 leg of validateSyntax spawns an isolate, and a spawn failure is a

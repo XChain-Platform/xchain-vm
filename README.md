@@ -4,8 +4,8 @@
 # XChain Platform Virtual Machine (VM)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.27.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/tests-3%2C575%2B%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/version-0.28.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/tests-3%2C700%2B%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green" alt="Node">
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License">
 </p>
@@ -26,7 +26,7 @@ Deterministic smart contract execution engine for the XChain Platform. Runs Java
 - **External attestation**: `xchain.attestation.request(...)` namespace lets contracts emit `ATTEST` v0 (request) against a registered provider (`http_get`, `llm`) with a deterministic `request_id`; the hub federation reaches PBFT quorum off-chain and submits `ATTEST` v1 (response) to invoke the contract's callback. Payload cap: 8192 bytes.
 - **Deterministic math**: `xchain.math.*` wraps mathjs bignumber with string I/O; no floating-point; native `Math.sqrt/pow/log/log2/log10` rejected at deploy time
 - **Contract state management**: key-value state with dirty tracking, key count limits, and value size limits
-- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly checks (see `CONSENSUS_RULES` in `src/lint_core.js`), float usage warnings
+- **Deploy-time validation**: syntax checking via V8 + acorn, reserved identifier detection, banned Math/literal/async/generator/WebAssembly/rest-pattern/`with` checks, plus nesting-depth, unsupported-syntax and invalid-type rejects (the deploy-blocking set is `CONSENSUS_RULES` in `src/lint-core/constants.js`), float usage warnings
 - **Per-block compilation cache**: V8 cached compilation data eliminates redundant parsing for hot contracts
 - **Resource limits**: configurable memory (MB), gas ceiling, emission cap, state key cap, value size cap
 - **Consensus wall-clock bound**: one execution's wall-clock budget is a protocol constant (`CONSENSUS_MAX_WALL_MS`), not a per-node setting; see below
@@ -170,7 +170,8 @@ re-goldened determinism baselines, and an atomic fleet deploy.
 Some native built-ins do work per element while the legacy schedule charged
 them a constant per call, so their wall time per gas grew with the input. From
 the `PER_ELEMENT_METER_ACTIVATION` block time on each network (regtest from
-genesis; mainnet and testnet unarmed until a coordinated release arms them),
+genesis; testnet from block time 1792303200; mainnet unarmed until a
+coordinated release arms it),
 the harness charges them per element. One gas unit is one `VM_COMPUTATION`.
 
 | Built-in | Legacy charge | Charge once armed |
@@ -184,9 +185,9 @@ the harness charges them per element. One gas unit is one `VM_COMPUTATION`.
 
 The set-like argument is read once, in spec order (`size`, `has`, `keys`), and
 its `has` and `keys` run with the argument as `this`, so results, read order
-and errors match the bare built-in. The one visible difference from the
-earlier testnet charge is that it read a set-like argument's `size` a second
-time; the armed path does not.
+and errors match the bare built-in. The one visible difference from the legacy
+pre-activation testnet charge is that it read a set-like argument's `size` a
+second time; the armed path does not.
 
 ### String receiver charges (`STRING_RECEIVER_METER_ACTIVATION`)
 
@@ -196,7 +197,8 @@ native method performs its work on `String(receiver)`. A receiver could
 therefore report a short or absent `length` while coercing to a long string.
 
 From the `STRING_RECEIVER_METER_ACTIVATION` block time on each network
-(regtest from genesis; mainnet and testnet unarmed), `repeat`, `concat`,
+(regtest from genesis; testnet from block time 1792454400; mainnet unarmed),
+`repeat`, `concat`,
 `replace`, `replaceAll`, and the string methods installed through
 `__meterLen` charge against `String(receiver).length`. Array methods installed
 through the shared helper retain their element-count charge. The activation
@@ -209,9 +211,9 @@ coerce an object to a long string while the legacy harness charges only a
 primitive string argument. The toString size meter charges the length of the
 coerced string before those native functions run.
 
-The rule is active from genesis on regtest. Mainnet and testnet use the
-`9999999999` unarmed sentinel until a coordinated release assigns a live block
-time. `TOSTRING_SIZE_METER_GATE_BLOCK_TIME`, the sealed
+The rule is active from genesis on regtest and from block time 1792454400 on
+testnet. Mainnet uses the `9999999999` unarmed sentinel until a coordinated
+release assigns a live block time. `TOSTRING_SIZE_METER_GATE_BLOCK_TIME`, the sealed
 `TOSTRING_SIZE_METER_ACTIVATION` map, `toStringSizeMeterGateTime`, and
 `isToStringSizeMeterActive` are exported from `xchain-vm`. Unknown networks
 resolve like mainnet and therefore remain unarmed.
@@ -290,23 +292,23 @@ an isolated-vm binding for the current platform and Node 22. See the
 
 | Command | Description |
 |---|---|
-| `npm test` | Unit tests (1,860 tests, 30s timeout) |
-| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator requires a Node 22 isolated-vm binding) (223 tests) |
-| `npm run test:integration` | Integration tests (231 tests) |
-| `npm run test:security` | Security tests (519 tests) |
+| `npm test` | Unit tests (1,968 tests, 30s timeout) |
+| `npm run test:toolkit` | Developer-toolkit tests (gate/scaffold/transpile run anywhere; simulator requires a Node 22 isolated-vm binding) (267 tests) |
+| `npm run test:integration` | Integration tests (234 tests) |
+| `npm run test:security` | Security tests (526 tests) |
 | `npm run test:boundary` | Boundary condition tests (125 tests) |
-| `npm run test:determinism` | Determinism tests (256 tests) |
+| `npm run test:determinism` | Determinism tests (258 tests) |
 | `npm run test:performance` | Performance benchmarks-as-tests (5 tests) |
-| `npm run test:all` | Every `*.test.js` under `test/` (3,575+ tests) |
-| `npm run test:e2e` | E2E tests only (75 tests) |
+| `npm run test:all` | Every `*.test.js` under `test/` (3,700+ tests) |
+| `npm run test:e2e` | E2E tests only (78 tests) |
 | `npm run smoke` | Smoke tests (20 tests, < 5s) |
 | `npm run test:fuzz` | Fuzz / property-based tests (104 tests) |
 | `npm run test:chaos` | Chaos engineering tests (103 tests) |
 | `npm run test:regression:smoke` | P0 regression (11 tests, < 50ms) |
 | `npm run test:regression:core` | P0+P1 regression (45 tests, < 200ms) |
 | `npm run test:regression:full` | P0-P3 + gate/pin regression (158 tests, < 1s) |
-| `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 (355 tests) |
-| `npm run test:regression:release` | All tests + mutation testing (3,575 tests) |
+| `npm run test:regression:nightly` | Regression + E2E + fuzz + chaos phase 1 (358 tests) |
+| `npm run test:regression:release` | All tests + mutation testing (3,700 tests) |
 | `npm run mutation` | Mutation testing (Stryker, full suite) |
 | `npm run bench:quick` | Pipeline + gateway benchmarks |
 | `npm run bench:full` | All benchmarks except soak |
@@ -498,7 +500,8 @@ this.vm = new XChainVM({
 });
 ```
 
-Per-block compilation caching:
+Per-block lifecycle, including compilation caching and the subprocess executor's
+pinned cross-chain snapshot:
 ```javascript
 this.actions.vm.beginBlock();   // before processing block transactions
 // ... process transactions ...

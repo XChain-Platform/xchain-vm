@@ -43,13 +43,8 @@ const GAS_CEILING_EXHAUSTED_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-// Regtest is active from genesis. An unknown network, an unresolvable coin, a
-// non-finite height or an unarmed (null) entry all resolve to inactive, the
-// replay-safe default.
-const resolveGasCeilingExhaustedActive = resolveRegtestGenesisHeightGate;
-
 function isGasCeilingExhaustedActive(network, coin, blockHeight) {
-    return resolveGasCeilingExhaustedActive(
+    return resolveRegtestGenesisHeightGate(
         GAS_CEILING_EXHAUSTED_ACTIVATION,
         network,
         coin,
@@ -59,6 +54,5 @@ function isGasCeilingExhaustedActive(network, coin, blockHeight) {
 
 module.exports = {
     GAS_CEILING_EXHAUSTED_ACTIVATION,
-    resolveGasCeilingExhaustedActive,
     isGasCeilingExhaustedActive,
 };

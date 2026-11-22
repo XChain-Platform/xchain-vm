@@ -18,9 +18,9 @@
 const assert = require('assert');
 const {
     LINT_SYNTAX_DEPTH_ACTIVATION,
-    resolveSyntaxDepthActive,
     isLintSyntaxDepthActive,
 } = require('../../../../src/index/lint_syntax_depth_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('../../../../src/index/height_gates/regtest_genesis.js');
 const XChainVM = require('../../../../src/index.js');
 
 // The v0.24.0 cut arms testnet at BTC 156908, LTC 4927400 and DOGE 68005165; mainnet stays unarmed.
@@ -65,8 +65,8 @@ describe('syntax-depth lint activation', function () {
 
     it('resolves local armed thresholds and absent keys', function () {
         const armed = { 'BTC:testnet': 100 };
-        assert.strictEqual(resolveSyntaxDepthActive(armed, 'testnet', 'BTC', 99), false);
-        assert.strictEqual(resolveSyntaxDepthActive(armed, 'testnet', 'BTC', 100), true);
-        assert.strictEqual(resolveSyntaxDepthActive(armed, 'testnet', 'LTC', 100), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 99), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 100), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'LTC', 100), false);
     });
 });

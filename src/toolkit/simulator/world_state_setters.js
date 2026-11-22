@@ -46,6 +46,15 @@ function attestationBucket(sim, contractIndex) {
     return sim.attestationDataByIndex.get(index);
 }
 
+// Install a new crossChainData whose `map` holds key -> value, leaving the old
+// object and its sub-maps untouched.
+function replaceCrossChainEntry(sim, map, key, value) {
+    const prev = sim.crossChainData;
+    sim.crossChainData = Object.assign({}, prev,
+        { [map]: Object.assign({}, prev[map], { [key]: value }) });
+    return sim;
+}
+
 module.exports = {
     // ---- read-only-state seeding -------------------------------------------
 
@@ -134,12 +143,17 @@ module.exports = {
      * Seed one staker's stake, keeping the three derived views the accessor
      * reads in agreement. With contractIndex, only that contract sees the
      * stake, matching the chain. Without it, every contract without its own
-     * scoped bucket sees the stake. Mirrors the indexer snapshot
+     * scoped bucket sees the stake. Mirrors the indexer snapshot layout
      * with exact BigNumber arithmetic: `stakersByTick` (what getStakers
      * returns verbatim) is sorted by descending amount with an ascending
      * pubkey tiebreak and capped at 1000, and `totalByTick` sums every
      * staker. Re-seeding a pubkey replaces its stake; a zero stake removes
      * it. Amounts are taken as given, so seed them at the token's precision.
+     * Amounts always read back as decimal strings, the shape the indexer hands a
+     * contract only once its decimal-string stake snapshot row is active for the
+     * network, block time and path. Below that row a node hands mathjs JSON objects
+     * instead, which the simulator does not reproduce; it warns once when a call
+     * or callGuard reads seeded stakes there (see stake_shape_gate.js).
      * @param {string} pubkey
      * @param {string} tick
      * @param {string|number} amount
@@ -169,16 +183,22 @@ module.exports = {
         return this;
     },
 
+    // The cross-chain setters replace crossChainData rather than writing into
+    // it. The subprocess executor pins the object it is handed first in a block
+    // and only notices a later change when it receives a different object that
+    // is not deep-equal, so an in-place write would leave later calls reading
+    // the copy taken at the first execute.
+
     /** Seed a cross-chain attestation value (read by crosschain.getAttestation). */
     setCrossChainAttestation(chain, actionIndex, value) {
-        this.crossChainData.attestations[String(chain) + ':' + String(actionIndex)] = value;
-        return this;
+        return replaceCrossChainEntry(this, 'attestations',
+            String(chain) + ':' + String(actionIndex), value);
     },
 
     /** Mark a cross-chain action settled (read by crosschain.isSettled). */
     setCrossChainSettled(chain, actionIndex, settled = true) {
-        this.crossChainData.settled[String(chain) + ':' + String(actionIndex)] = settled === true;
-        return this;
+        return replaceCrossChainEntry(this, 'settled',
+            String(chain) + ':' + String(actionIndex), settled === true);
     },
 
     /**
@@ -187,8 +207,7 @@ module.exports = {
      * matching the accessor's own lookup.
      */
     setCallResult(callId, result) {
-        this.crossChainData.calls[String(callId).toLowerCase()] =
-            { status: String(result && result.status), payload: String(result && result.payload) };
-        return this;
+        return replaceCrossChainEntry(this, 'calls', String(callId).toLowerCase(),
+            { status: String(result && result.status), payload: String(result && result.payload) });
     }
 };

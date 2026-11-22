@@ -35,6 +35,8 @@ const {
     METERING_EVAL_ORDER_GATE_BLOCK_TIME, CALL_SPREAD_METER_GATE_BLOCK_TIME,
     REST_PATTERN_METER_GATE_BLOCK_TIME, isRestPatternMeterActive, isSlashTokenDelimGuardActive,
     ITER_SET_METER_ACTIVATION, isIterSetMeterActive, isSlashAmountPrecisionActive,
+    STATE_KEY_STORABLE_ACTIVATION, isStateKeyStorableActive,
+    LINT_REGEX_GROUP_DEPTH_ACTIVATION, isLintRegexGroupDepthActive,
     isConsensusWallClockActive, PKG3_SANDBOX_ACTIVATION,
     pkg3CoinFromAddress, isPkg3SandboxActive, EXEC_LINT_ACTIVATION, LINT_GLOBAL_ALIAS_ACTIVATION,
     isLintGlobalAliasActive, EXEC_LINT_GAS_BYTES_PER_UNIT, isExecLintActive,
@@ -112,6 +114,8 @@ function attachTimeGates(target) {
     // Expose the iter/Set/apply meter map and resolver for tooling to read, so it derives arming.
     target.ITER_SET_METER_ACTIVATION = ITER_SET_METER_ACTIVATION;
     target.isIterSetMeterActive = isIterSetMeterActive;
+    target.LINT_REGEX_GROUP_DEPTH_ACTIVATION = LINT_REGEX_GROUP_DEPTH_ACTIVATION;
+    target.isLintRegexGroupDepthActive = isLintRegexGroupDepthActive;
     // Coordinated flag-day (block time) that activates the async/Promise contract
     // surface change (Promise strip + banned-async deploy rejection) fleet-wide.
     // Exposed so the consensus-params freeze guard can pin it; consensus-critical.
@@ -244,6 +248,8 @@ function attachStatics(target) {
         TOSTRING_SIZE_METER_ACTIVATION: { value: TOSTRING_SIZE_METER_ACTIVATION },
         toStringSizeMeterGateTime: { value: toStringSizeMeterGateTime },
         isToStringSizeMeterActive: { value: isToStringSizeMeterActive },
+        STATE_KEY_STORABLE_ACTIVATION: { value: STATE_KEY_STORABLE_ACTIVATION },
+        isStateKeyStorableActive: { value: isStateKeyStorableActive },
     });
     Object.setPrototypeOf(target, applyLengthMeterExports);
 }

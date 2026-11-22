@@ -114,6 +114,7 @@ class XChainVM {
      * @param {number} config.maxLiveExecutors - Process-wide subprocess cap
      */
     constructor(config) {
+        GasTracker.validateGasSchedule(config.gasSchedule);
         this.gasSchedule = config.gasSchedule;
         this.gasCeiling  = config.gasCeiling || 1000000;
         this.limits      = resolveLimits(config.limits);

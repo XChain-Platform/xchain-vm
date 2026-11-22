@@ -179,7 +179,9 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
     describe('every consensus rule is covered', function () {
         it('invalid-type: both engines reject a non-string (verdict only)', function () {
             assert.strictEqual(validateSyntax(null).valid, false, 'deploy validator must reject a non-string source');
-            assert.strictEqual(lintSource(null).errors[0].rule, 'invalid-type');
+            const finding = lintSource(null).errors[0];
+            assert.strictEqual(finding.rule, 'invalid-type');
+            assert.strictEqual(finding.severity, 'error');
         });
 
         it('the fixtures plus the verdict-only set are exactly CONSENSUS_RULES', function () {
@@ -220,10 +222,15 @@ describe('lint parity (validateSyntax ⇆ lintSource) + drift', function () {
         });
 
         it('every CONSENSUS_RULES member is an error-severity finding', function () {
-            // banned-math fixture trips a consensus rule; confirm severity tagging.
-            const e = lintSource('function f(){ return Math.sqrt(4); }').errors[0];
-            assert.strictEqual(e.severity, 'error');
-            assert.ok(CONSENSUS_RULES.has(e.rule));
+            const findings = BAD_FIXTURES.map((fx) => lintSource(fx.code).errors[0]);
+            findings.push(lintSource(null).errors[0]);
+            const covered = new Set();
+            for (const finding of findings) {
+                assert.strictEqual(finding.severity, 'error', finding.rule);
+                assert.ok(CONSENSUS_RULES.has(finding.rule), finding.rule);
+                covered.add(finding.rule);
+            }
+            assert.deepStrictEqual([...covered].sort(), [...CONSENSUS_RULES].sort());
         });
     });
 

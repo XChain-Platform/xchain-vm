@@ -85,7 +85,7 @@ function requestShapeCases() {
                 };`
             }));
             assert.strictEqual(result.success, true, 'execution should succeed: ' + result.error);
-            let requestId = JSON.parse(result.returnValue);
+            const requestId = JSON.parse(result.returnValue);
             assert.strictEqual(typeof requestId, 'string');
             assert.strictEqual(requestId.length, 64);
             assert.match(requestId, /^[0-9a-f]{64}$/);
@@ -106,7 +106,7 @@ function requestShapeCases() {
             }));
             assert.strictEqual(result.success, true, 'execution should succeed: ' + result.error);
             assert.strictEqual(result.emittedActions.length, 1);
-            let emission = result.emittedActions[0];
+            const emission = result.emittedActions[0];
             assert.strictEqual(emission.action, 'ATTEST');
             assert.strictEqual(emission.params.providerId, 'http_get');
             assert.strictEqual(emission.params.requestPayload, 'https://example.com/bar');
@@ -137,7 +137,7 @@ function requestFeeCases() {
                 };`
             }));
             assert.strictEqual(result.success, true, 'execution should succeed: ' + result.error);
-            let emission = result.emittedActions[0];
+            const emission = result.emittedActions[0];
             assert.strictEqual(emission.params.feeTick, 'XCHAIN');
             assert.strictEqual(emission.params.feeAmount, '2.5');
         });
@@ -182,7 +182,7 @@ function requestIdentityCases() {
                 };`
             }));
             assert.strictEqual(result.success, true, result.error);
-            let [a, b] = JSON.parse(JSON.parse(result.returnValue));
+            const [a, b] = JSON.parse(JSON.parse(result.returnValue));
             assert.notStrictEqual(a, b, 'two emissions in same tx must produce distinct request_ids');
             assert.strictEqual(result.emittedActions.length, 2);
         });
@@ -377,7 +377,7 @@ function responseCases() {
                 }
             }));
             assert.strictEqual(result.success, true, result.error);
-            let returned = JSON.parse(result.returnValue);
+            const returned = JSON.parse(result.returnValue);
             assert.strictEqual(returned.status, 'ok');
             assert.strictEqual(returned.payload, '{"score":7}');
             assert.strictEqual(returned.providerId, 'http_get');

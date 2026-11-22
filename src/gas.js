@@ -23,10 +23,11 @@ const { GasExhaustedError } = require('./errors.js');
 // and gateway-emit.js). A schedule handed to the VM MUST define all of these:
 // a missing key resolves to `undefined` the first time that operation is metered,
 // which charge() then rejects deep inside execution. Validating membership up
-// front turns that latent, execution-time failure into a deterministic
-// construction-time error. Two operators whose schedules disagree on any of
-// these keys fail loudly at startup instead of silently reaching divergent
-// contract outcomes on the same block.
+// front turns that latent, execution-time failure into a deterministic error.
+// XChainVM validates before choosing or starting an execution host, and
+// GasTracker validates again for every execution. Two operators whose schedules
+// disagree on any of these keys fail loudly at startup instead of silently
+// reaching divergent contract outcomes on the same block.
 //
 // Extra keys are intentionally tolerated. The VM is a generic library; its caller
 // (the indexer) passes the full protocol fee schedule, which also carries keys the
@@ -65,6 +66,26 @@ function effectiveCeiling(requested, configCeiling) {
     return configCeiling;
 }
 
+function validateGasSchedule(gasSchedule) {
+    // Validate schedule: all values must be non-negative integers
+    for (const key in gasSchedule) {
+        const val = gasSchedule[key];
+        // `typeof val !== 'number'` is redundant defense: Number.isInteger
+        // never coerces, so !Number.isInteger(val) already rejects every
+        // non-number. Kept for clarity/intent. Equivalent mutant, proven
+        // exhaustively, see test/unit/metering/gas.test.js boundary tests.
+        // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
+        if (typeof val !== 'number' || !Number.isInteger(val) || val < 0)
+            throw new Error('gas schedule value for ' + key + ' must be a non-negative integer, got: ' + val);
+    }
+    // Validate schedule: every key the VM charges against must be present, so a
+    // schedule gap surfaces at construction rather than mid-execution.
+    for (const key of CANONICAL_GAS_KEYS) {
+        if (!(key in gasSchedule))
+            throw new Error('gas schedule is missing required key: ' + key);
+    }
+}
+
 // Activation for failing a run that reached the host as a success although a charge
 // crossed the ceiling inside the isolate (a contract-side catch, or an Object.* statics
 // wrapper, swallowed the exhaustion fault). It moves a run's status and gasUsed, so it
@@ -88,27 +109,12 @@ class GasTracker {
     // has one export shape and `require('./gas.js').effectiveCeiling` still reads them.
     static CANONICAL_GAS_KEYS = CANONICAL_GAS_KEYS;
     static effectiveCeiling = effectiveCeiling;
+    static validateGasSchedule = validateGasSchedule;
     static GAS_CEILING_SUCCESS_ACTIVATION = GAS_CEILING_SUCCESS_ACTIVATION;
     static isGasCeilingSuccessActive = isGasCeilingSuccessActive;
 
     constructor(gasSchedule, gasCeiling) {
-        // Validate schedule: all values must be non-negative integers
-        for (const key in gasSchedule) {
-            const val = gasSchedule[key];
-            // `typeof val !== 'number'` is redundant defense: Number.isInteger
-            // never coerces, so !Number.isInteger(val) already rejects every
-            // non-number. Kept for clarity/intent. Equivalent mutant, proven
-            // exhaustively, see test/unit/metering/gas.test.js boundary tests.
-            // Stryker disable next-line ConditionalExpression: redundant typeof guard (equivalent mutant)
-            if (typeof val !== 'number' || !Number.isInteger(val) || val < 0)
-                throw new Error('gas schedule value for ' + key + ' must be a non-negative integer, got: ' + val);
-        }
-        // Validate schedule: every key the VM charges against must be present, so a
-        // schedule gap surfaces at construction rather than mid-execution.
-        for (const key of CANONICAL_GAS_KEYS) {
-            if (!(key in gasSchedule))
-                throw new Error('gas schedule is missing required key: ' + key);
-        }
+        validateGasSchedule(gasSchedule);
         this.schedule = gasSchedule;
         this.ceiling  = gasCeiling;
         this.used     = 0;

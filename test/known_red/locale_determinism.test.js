@@ -59,29 +59,47 @@ async function run(code) {
     return r;
 }
 
+function assertNeutered(vector, result) {
+    const detail = `${vector.id}: ${JSON.stringify(result.error)}`;
+    assert.strictEqual(result.success, false, detail);
+    assert.ok(typeof result.error === 'string' && result.error.startsWith('error: '), detail);
+    assert.ok(result.error.includes(vector.method + ' is not a function'), detail);
+}
+
+async function assertSuccessful(body, expected) {
+    const result = await run(wrap(body));
+    assert.strictEqual(result.success, true, JSON.stringify(result.error));
+    assert.deepStrictEqual(JSON.parse(result.returnValue), expected);
+}
+
+describe('locale determinism harness positive controls', function () {
+    this.timeout(30000);
+
+    it('returns a simple string through the shared run and wrap helpers', async function () {
+        await assertSuccessful(`return 'ok';`, 'ok');
+    });
+
+    it('allows a non-stripped String prototype method', async function () {
+        await assertSuccessful(`return 'abc'.indexOf('b');`, 1);
+    });
+});
+
 describe('locale/unicode prototype methods must be neutered', function () {
     this.timeout(30000);
 
     const VECTORS = [
-        { id: 'String.prototype.normalize',      code: wrap(`return '\\uFB00'.normalize('NFKC');`) },
-        { id: 'String.prototype.localeCompare',  code: wrap(`return String('a'.localeCompare('B'));`) },
-        { id: 'Number.prototype.toLocaleString', code: wrap(`return (1234567.89).toLocaleString();`) },
-        { id: 'Array.prototype.toLocaleString',  code: wrap(`return [1234.5, 6789].toLocaleString();`) }
+        { id: 'String.prototype.normalize',      method: 'normalize',      code: wrap(`return '\\uFB00'.normalize('NFKC');`) },
+        { id: 'String.prototype.localeCompare',  method: 'localeCompare',  code: wrap(`return String('a'.localeCompare('B'));`) },
+        { id: 'Number.prototype.toLocaleString', method: 'toLocaleString', code: wrap(`return (1234567.89).toLocaleString();`) },
+        { id: 'Array.prototype.toLocaleString',  method: 'toLocaleString', code: wrap(`return [1234.5, 6789].toLocaleString();`) }
     ];
 
     for (const v of VECTORS) {
         it(`${v.id} must not produce locale/ICU-dependent output`, async function () {
             const r = await run(v.code);
-            // Neutered => the method is undefined => calling it throws a TypeError
-            // => execute() returns success:false (deterministic failure). Reachable
-            // => success:true with an ICU-dependent string in returnValue (today).
-            const neutered = r.success === false;
-            assert(
-                neutered,
-                `${v.id} is reachable and returned ${JSON.stringify(r.returnValue)} ` +
-                `(success=${r.success}). ICU-version-dependent output can reach hashed ` +
-                `state -> consensus fork. It must be neutered in sandbox.js.`
-            );
+            // Require this method's own deterministic failure. Harness, compilation,
+            // metering, and resource failures are not proof of neutering.
+            assertNeutered(v, r);
         });
     }
 });
@@ -94,22 +112,15 @@ describe('String regex methods must be neutered (ReDoS / %RegExp% coercion)', fu
     // throws a TypeError => success:false. Reachable => the call returns a value
     // (match array / search index / iterator) => success:true.
     const REGEX_VECTORS = [
-        { id: 'String.prototype.match',    code: wrap(`return JSON.stringify('abc'.match('b'));`) },
-        { id: 'String.prototype.matchAll', code: wrap(`return String('abc'.matchAll('b'));`) },
-        { id: 'String.prototype.search',   code: wrap(`return String('abc'.search('b'));`) }
+        { id: 'String.prototype.match',    method: 'match',    code: wrap(`return JSON.stringify('abc'.match('b'));`) },
+        { id: 'String.prototype.matchAll', method: 'matchAll', code: wrap(`return String('abc'.matchAll('b'));`) },
+        { id: 'String.prototype.search',   method: 'search',   code: wrap(`return String('abc'.search('b'));`) }
     ];
 
     for (const v of REGEX_VECTORS) {
         it(`${v.id} must be neutered (deterministic TypeError)`, async function () {
             const r = await run(v.code);
-            const neutered = r.success === false;
-            assert(
-                neutered,
-                `${v.id} is reachable and returned ${JSON.stringify(r.returnValue)} ` +
-                `(success=${r.success}). Regex methods coerce to %RegExp% and run ReDoS ` +
-                `the gas meter cannot see -> wall-clock-dependent divergence. It must be ` +
-                `neutered in sandbox.js.`
-            );
+            assertNeutered(v, r);
         });
     }
 });

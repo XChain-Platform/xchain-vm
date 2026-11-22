@@ -25,9 +25,9 @@ const GasTracker = require('../../../src/gas.js');
 const vmModule = require('../../../src/index.js');
 const {
     GAS_CEILING_EXHAUSTED_ACTIVATION,
-    resolveGasCeilingExhaustedActive,
     isGasCeilingExhaustedActive,
 } = require('../../../src/index/gas_ceiling_exhausted_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('../../../src/index/height_gates/regtest_genesis.js');
 const { createVM, execute } = require('../../fuzz/helpers/harness.js');
 
 const CEILING = 5000;
@@ -85,12 +85,12 @@ describe('gas-ceiling exhaustion gate resolver', function () {
 
     it('resolves an unknown network, a missing coin or a non-finite height as inactive', function () {
         const armed = Object.freeze({ 'BTC:testnet': 10 });
-        assert.strictEqual(resolveGasCeilingExhaustedActive(armed, 'testnet', 'BTC', 9), false);
-        assert.strictEqual(resolveGasCeilingExhaustedActive(armed, 'testnet', 'BTC', 10), true);
-        assert.strictEqual(resolveGasCeilingExhaustedActive(armed, 'testnet', null, 10), false);
-        assert.strictEqual(resolveGasCeilingExhaustedActive(armed, 'testnet', 'BTC', NaN), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 9), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 10), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', null, 10), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', NaN), false);
         for (const net of [undefined, null, 'unknown', '__proto__']) {
-            assert.strictEqual(resolveGasCeilingExhaustedActive(armed, net, 'BTC', 10), false, String(net));
+            assert.strictEqual(resolveRegtestGenesisHeightGate(armed, net, 'BTC', 10), false, String(net));
         }
     });
 

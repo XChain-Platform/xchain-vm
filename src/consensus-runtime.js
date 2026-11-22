@@ -44,7 +44,9 @@
  * test/determinism/helpers/probe_wall_clock_calibration.js on the new engine,
  * updating the measured gas-ceiling burn figures wherever they are quoted
  * (src/consensus-wall-clock.js, the probe's DOCUMENTED_MS, the xchain-indexer
- * EXECUTE weight comment in src/actions/batch/limits.js) AND coordinate an
+ * vmFailureStatus comment in src/utility/general.js), re-running xchain-indexer
+ * bin/measure-batch-execute-cost.js for the exec-worst arm that grounds the
+ * EXECUTE weight in src/actions/batch/limits.js, AND coordinate an
  * atomic fleet activation (a mixed-engine fleet can fork). The canonical runtime
  * below was confirmed BYTE-IDENTICAL on linux/arm64 and linux/amd64
  * (node:22-bookworm) on 2026-06-07, and the epoch-8 node.57 build again on

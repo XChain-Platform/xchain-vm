@@ -55,7 +55,8 @@
  * the deploy verdict forks from the runtime strip.
  *
  * SCOPE, stated so nobody reads this guard as broader than it is: it covers the
- * numbers the SIMULATOR quotes. maxCodeSize is excluded from the indexer scrape
+ * numbers the SIMULATOR quotes, including provider deadline windows. maxCodeSize
+ * is excluded from the indexer scrape
  * because both sides single-source it (deploy.MAX_CODE_SIZE / lint-core.js), so
  * there is no literal to compare, and the EXEC_LINT / LINT_GLOBAL_ALIAS twins are
  * pinned by each repo's consensus-params freeze guard (here
@@ -67,7 +68,10 @@ const fs     = require('fs');
 const path   = require('path');
 const { siblingCheckout, skipOrFail } = require('../helpers/sibling_checkout.js');
 
-const { ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, GUARD_GAS_CEILING } =
+const {
+    ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS,
+    DEFAULT_PROVIDER_DEADLINES, GUARD_GAS_CEILING
+} =
     require('../../src/toolkit/simulator.js');
 const XChainVM = require('../../src/index.js');
 const { CANONICAL_GAS_KEYS } = require('../../src/gas.js');
@@ -102,6 +106,8 @@ const GOLDEN_LIMITS = {
     maxCallDepth:      4,
     minCallGas:        5000
 };
+
+const GOLDEN_PROVIDER_DEADLINES = { http_get: 100, llm: 20 };
 
 const COINS = ['BTC', 'LTC', 'DOGE'];
 
@@ -173,6 +179,16 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
         assert.deepStrictEqual(Object.assign({}, DEFAULT_LIMITS), GOLDEN_LIMITS);
     });
 
+    it('pins provider deadline defaults and applies them to new simulators', async function () {
+        assert.deepStrictEqual(
+            Object.assign({}, DEFAULT_PROVIDER_DEADLINES), GOLDEN_PROVIDER_DEADLINES);
+        const sim = new ContractSimulator();
+        try {
+            assert.deepStrictEqual(
+                Object.assign({}, sim.providerDeadlines), GOLDEN_PROVIDER_DEADLINES);
+        } finally { await sim.close(); }
+    });
+
     it('charges exactly the keys the VM declares canonical', function () {
         // Catches the other direction: a newly-charged VM gas key that never
         // reached the simulator would make every simulate() throw on a missing
@@ -205,8 +221,7 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
     });
 });
 
-describe('toolkit simulator defaults agree with the chain that charges them', function () {
-
+function registerCoinScheduleTests() {
     for (const coin of COINS) {
         it('sibling xchain-indexer ' + coin + ' coin config charges the same gas', function () {
             const rel  = path.join('xchain-indexer', 'src', 'coins', coin + '.js');
@@ -254,6 +269,26 @@ describe('toolkit simulator defaults agree with the chain that charges them', fu
                 'or move neither');
         });
     }
+}
+
+function registerProviderDeadlineTest() {
+    it('sibling provider registry carries the same deadline windows', function () {
+        const rel = path.join('xchain-indexer', 'src', 'attestation', 'provider_registry.js');
+        const file = path.join(PLATFORM_ROOT, rel);
+        if (!siblingOrSkip(this, file, rel)) return;
+
+        const ProviderRegistry = loadFresh(file);
+        assert.deepStrictEqual(
+            new ProviderRegistry().getDeadlineWindows(),
+            Object.assign({}, DEFAULT_PROVIDER_DEADLINES),
+            rel + ': provider deadline windows disagree with the simulator default; ' +
+            'move both maps together or the simulator accepts requests the chain rejects');
+    });
+}
+
+describe('toolkit simulator defaults agree with the chain that charges them', function () {
+    registerCoinScheduleTests();
+    registerProviderDeadlineTest();
 });
 
 describe('toolkit simulator defaults agree with the chain that charges them', function () {

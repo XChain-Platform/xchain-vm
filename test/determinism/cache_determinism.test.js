@@ -26,31 +26,49 @@
 // @ts-nocheck
 
 const assert = require('assert');
-const { createVM, execute, hashResult } = require('../fuzz/helpers/harness.js');
+const { createVM, execute, hashResult, XChainVM } = require('../fuzz/helpers/harness.js');
 
 const CONTRACTS = {
-    compute:  `module.exports = function(x){ var a=[]; for(var i=0;i<40;i++)a.push((i*7)%13); a.sort(); return a.indexOf(5)+':'+a.join(','); }`,
-    stateful: `module.exports = function(x){ var n=Number(x.state.get('c')||'0'); x.state.set('c', String(n+1)); x.emit.send({destination:'BTC:a',tick:'T',quantity:'1'}); return 'n='+n; }`,
-    branchy:  `module.exports = function(x){ var s=0; for(var i=0;i<30;i++){ if(i%2){ s+=i; } else if(i%3){ s-=1; } else { s*=2; } } try { return String(s); } catch(e){ return 'e'; } }`
+    compute: {
+        code: `module.exports = function(x){ var a=[]; for(var i=0;i<40;i++)a.push((i*7)%13); a.sort(); return a.indexOf(5)+':'+a.join(','); }`,
+        expected: JSON.stringify('25:0,0,0,0,1,1,1,10,10,10,11,11,11,12,12,12,2,2,2,3,3,3,4,4,4,5,5,5,6,6,6,7,7,7,8,8,8,9,9,9')
+    },
+    stateful: {
+        code: `module.exports = function(x){ var n=Number(x.state.get('c')||'0'); x.state.set('c', String(n+1)); x.emit.send({destination:'BTC:a',tick:'T',quantity:'1'}); return 'n='+n; }`,
+        expected: JSON.stringify('n=5')
+    },
+    branchy: {
+        code: `module.exports = function(x){ var s=0; for(var i=0;i<30;i++){ if(i%2){ s+=i; } else if(i%3){ s-=1; } else { s*=2; } } try { return String(s); } catch(e){ return 'e'; } }`,
+        expected: JSON.stringify('685')
+    }
 };
 const BASE = { method: 'default', state: { c: '5' }, contractIndex: 7 };
 const run = (vm, code, extra) => execute(vm, code, Object.assign({}, BASE, extra));
 
-(createVM ? describe : describe.skip)('compilation-cache determinism', function () {
+async function runChecked(vm, name, code, expected, extra) {
+    const result = await run(vm, code, extra);
+    assert.strictEqual(result.success, true,
+        `${name}: execution did not succeed (${result.error}); hash comparison would be vacuous`);
+    assert.strictEqual(result.returnValue, expected,
+        `${name}: unexpected returnValue ${JSON.stringify(result.returnValue)}`);
+    return hashResult(result);
+}
+
+(XChainVM ? describe : describe.skip)('compilation-cache determinism', function () {
     this.timeout(30000);
 
-    for (const [name, code] of Object.entries(CONTRACTS)) {
+    for (const [name, { code, expected }] of Object.entries(CONTRACTS)) {
         it(`${name}: warm-cache result is byte-identical to cold`, async function () {
             const vm = createVM();
             vm.beginBlock();
-            const cold = hashResult(await run(vm, code));   // compiles cold, stores cachedData
-            const warm1 = hashResult(await run(vm, code));  // compiles warm
-            const warm2 = hashResult(await run(vm, code));
+            const cold = await runChecked(vm, name, code, expected);   // compiles cold, stores cachedData
+            const warm1 = await runChecked(vm, name, code, expected);  // compiles warm
+            const warm2 = await runChecked(vm, name, code, expected);
             vm.endBlock();
 
             const vm2 = createVM();
             vm2.beginBlock();
-            const freshCold = hashResult(await run(vm2, code));
+            const freshCold = await runChecked(vm2, name, code, expected);
             vm2.endBlock();
 
             assert.strictEqual(warm1, cold, `${name}: warm1 != cold (cache changed behavior)`);
@@ -60,11 +78,11 @@ const run = (vm, code, extra) => execute(vm, code, Object.assign({}, BASE, extra
     }
 
     it('same code at different contractIndex does not bleed cachedData', async function () {
-        const code = CONTRACTS.compute;
+        const { code, expected } = CONTRACTS.compute;
         const vm = createVM();
         vm.beginBlock();
-        const idxA = hashResult(await run(vm, code, { contractIndex: 1 }));
-        const idxB = hashResult(await run(vm, code, { contractIndex: 2 }));
+        const idxA = await runChecked(vm, 'compute index 1', code, expected, { contractIndex: 1 });
+        const idxB = await runChecked(vm, 'compute index 2', code, expected, { contractIndex: 2 });
         vm.endBlock();
         assert.strictEqual(idxA, idxB, 'same code+state at different index must produce identical results');
     });

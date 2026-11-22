@@ -1,3 +1,16 @@
+/*********************************************************************
+ *
+ * Copyright © 2025–2026 Dankest, LLC
+ * Based on XChain Platform by Dankest, LLC – https://dankest.llc
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * This file is part of XChain Platform. Licensed under the GNU Affero
+ * General Public License v3.0 or later; see LICENSE.md. A commercial
+ * license (without AGPL source-disclosure terms) is available -
+ * contact legal@dankest.llc.
+ *
+ **********************************************************************/
 // Canonical knowledge base. Sourced from developer-guide/Solidity_To_XChain.md
 // (itself verified against src/gateway.js / gateway-emit.js). Kept as structured
 // data so it drives the prompt AND is assertable in tests; a drift here is a
@@ -58,7 +71,7 @@ const CONCEPT_MAP = [
     { solidity: 'ReentrancyGuard', xchain: 'usually unnecessary', note: 'snapshot semantics; keep state-before-emit discipline' },
     { solidity: 'view / pure', xchain: 'a method that only reads', note: 'just do not write state or emit' },
     { solidity: 'oracle price feed (Chainlink)', xchain: 'xchain.oracle.getPrice(coinPair)', note: 'validator-attested, built in' },
-    { solidity: 'external data / API', xchain: 'xchain.attestation.request(providerId, payload, callbackMethod, callbackParams, opts)', note: 'PBFT-certified; http_get and llm providers' },
+    { solidity: 'external data / API', xchain: 'xchain.attestation.request(providerId, payload, callbackMethod, callbackParams, opts)', note: 'PBFT-certified; deadline windows: http_get up to 100 blocks, llm up to 20 blocks' },
     { solidity: 'payable receive()', xchain: '(none)', note: 'DEPOSIT' },
     { solidity: 'selfdestruct / delegatecall', xchain: '(none)', note: 'not in the model' },
     { solidity: 'gas limit', xchain: 'GAS_LIMIT on deploy/execute; sdk.suggestGasLimit(...)', note: 'metered per the gas schedule' }

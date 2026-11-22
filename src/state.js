@@ -19,6 +19,16 @@
  ********************************************************************/
 // @ts-nocheck
 
+// The indexer stores every written key in contract_state.state_key, VARCHAR(256) in
+// utf8mb3: at most 256 characters, each a code point at or below U+FFFF. A key outside
+// that passed every guard here and then failed the indexer's INSERT, halting every
+// indexer at that block, so once STATE_KEY_STORABLE_ACTIVATION is active set() refuses
+// it as an ordinary contract error. With no surrogate pair in the key, each UTF-16 unit
+// is one column character (Node's UTF-8 encoder writes a lone surrogate as U+FFFD,
+// also one), so key.length is the count the column applies.
+const MAX_STATE_KEY_CHARS = 256;
+const SURROGATE_PAIR = /[\uD800-\uDBFF][\uDC00-\uDFFF]/;
+
 class StateManager {
     constructor(initialState, limits, opts) {
         // Use Object.create(null) to prevent prototype pollution (RISK-11).
@@ -46,6 +56,9 @@ class StateManager {
         // so every guard applies to the canonical form; non-primitives throw
         // deterministically (String() would collapse them to '[object Object]').
         this.normalizeKeys = !!(opts && opts.normalizeKeys);
+        // Consensus-gated (index.js isStateKeyStorableActive): post-gate set() refuses a
+        // key the indexer's state_key column cannot hold (see MAX_STATE_KEY_CHARS above).
+        this.rejectUnstorableKeys = !!(opts && opts.rejectUnstorableKeys);
     }
 
     // Single key choke point (see normalizeKeys above). Pre-gate this is the
@@ -84,6 +97,12 @@ class StateManager {
         if (this.rejectNulKeys && typeof key === 'string' && key.indexOf('\u0000') !== -1)
             throw new Error('state key contains a NUL (0x00) byte');
 
+        // After the size and NUL checks, so every key an older guard refused fails as before.
+        if (this.rejectUnstorableKeys && typeof key === 'string' && SURROGATE_PAIR.test(key))
+            throw new Error('state key contains a code point above U+FFFF');
+        if (this.rejectUnstorableKeys && typeof key === 'string' && key.length > MAX_STATE_KEY_CHARS)
+            throw new Error('state key exceeds max length (' + MAX_STATE_KEY_CHARS + ' characters)');
+
         // Reject null/undefined: use delete() to remove keys
         if (value === null || value === undefined)
             throw new Error('state value cannot be null or undefined; use state.delete() to remove keys');
@@ -110,6 +129,9 @@ class StateManager {
         if (!isLive) this.keyCount++;
     }
 
+    // No column bound here: delete() writes a row only for a live key, and every live key
+    // came through set() or from the indexed snapshot, so it already fits. Refusing a
+    // longer key would turn a no-op delete, which never reached the indexer, into a failure.
     delete(key) {
         key = this.normKey(key);
         const maxKeySize = this.limits.maxStateKeySize || 1024;

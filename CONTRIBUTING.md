@@ -66,7 +66,7 @@ No database or external service is required for the unit, security, boundary, de
 `xchain-vm` is a library, not a standalone server. It is consumed by `xchain-indexer`. For ad-hoc experiments, require it directly:
 
 ```bash
-node -e "const XChainVM = require('.'); console.log(new XChainVM({ gasSchedule: {}, gasCeiling: 1000 }));"
+node -e "const XChainVM = require('.'); const GasTracker = require('./src/gas.js'); const gasSchedule = Object.fromEntries(GasTracker.CANONICAL_GAS_KEYS.map((key) => [key, 1])); console.log(new XChainVM({ gasSchedule, gasCeiling: 1000 }));"
 ```
 
 The `xchain-lint` CLI runs deploy-time syntax, float-detection and contract-identity (`meta`) checks:

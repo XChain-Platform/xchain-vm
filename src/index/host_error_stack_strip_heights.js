@@ -27,7 +27,7 @@
  ********************************************************************/
 'use strict';
 
-const { resolveBigIntSurfaceStripActive } = require('./bigint_surface_strip_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('./height_gates/regtest_genesis.js');
 
 const HOST_ERROR_STACK_STRIP_ACTIVATION = Object.freeze({
     'BTC:mainnet':  null,
@@ -38,10 +38,8 @@ const HOST_ERROR_STACK_STRIP_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-// Same resolution rule as the BigInt surface strip: regtest on from genesis,
-// mainnet/testnet by the per-coin threshold, anything else off.
 function isHostErrorStackStripActive(network, coin, blockHeight) {
-    return resolveBigIntSurfaceStripActive(
+    return resolveRegtestGenesisHeightGate(
         HOST_ERROR_STACK_STRIP_ACTIVATION,
         network,
         coin,

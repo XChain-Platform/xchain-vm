@@ -28,7 +28,7 @@ const EXPECTED = [
     'enforceBannedAsync', 'enforceBannedGenerator', 'enforceBannedRest',
     'enforceBannedWasm', 'enforceBannedWith', 'enforceLintDestructure',
     'enforceLintGlobalAlias', 'enforceLintHardening', 'enforceLintNestingDepth',
-    'enforceLintOptionalChain', 'enforceLintSyntaxDepth'
+    'enforceLintOptionalChain', 'enforceLintRegexGroupDepth', 'enforceLintSyntaxDepth'
 ].sort();
 
 // Keys the execute path leaves out on purpose, each with its reason.
@@ -46,7 +46,8 @@ const PARAM_KEYS = {
     6: ['enforceLintOptionalChain'],
     8: ['enforceBannedWith'],
     9: ['enforceLintDestructure'],
-    10: ['enforceLintSyntaxDepth']
+    10: ['enforceLintSyntaxDepth'],
+    11: ['enforceLintRegexGroupDepth']
 };
 const MISSING_KEY_HINT = 'a validateSyntax option missing from the execute path is enforced at every height ' +
     'regardless of its activation: forward it from a gated parameter with a cache-key bit, or list it in ' +
@@ -91,10 +92,10 @@ function withSyntaxSpy(fn) {
     }
 }
 
-// Build the ten arguments after code: every flag set to `on` except the codeHash slot.
+// Build the eleven arguments after code: every flag set to `on` except the codeHash slot.
 function flagArgs(on, only) {
     const args = [];
-    for (let pos = 1; pos <= 10; pos++) {
+    for (let pos = 1; pos <= 11; pos++) {
         if (pos === 7) args.push(undefined);
         else args.push(only === undefined ? on : pos === only);
     }

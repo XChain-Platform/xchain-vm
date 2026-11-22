@@ -16,9 +16,9 @@
 const assert = require('assert');
 const {
     RESOURCE_FAULT_SIGNAL_ACTIVATION,
-    resolveResourceFaultSignalActive,
     isResourceFaultSignalActive,
 } = require('../../../src/index/resource_fault_signal_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('../../../src/index/height_gates/regtest_genesis.js');
 const XChainVM = require('../../../src/index.js');
 
 describe('resource fault signal activation', function () {
@@ -73,10 +73,10 @@ describe('resource fault signal activation', function () {
 
     it('resolves local armed thresholds and absent keys', function () {
         const armed = { 'BTC:mainnet': 100 };
-        assert.strictEqual(resolveResourceFaultSignalActive(armed, 'mainnet', 'BTC', 99), false);
-        assert.strictEqual(resolveResourceFaultSignalActive(armed, 'mainnet', 'BTC', 100), true);
-        assert.strictEqual(resolveResourceFaultSignalActive(armed, 'mainnet', 'BTC', 101), true);
-        assert.strictEqual(resolveResourceFaultSignalActive(armed, 'mainnet', 'LTC', 100), false);
-        assert.strictEqual(resolveResourceFaultSignalActive(armed, 'mainnet', 'BTC', '100'), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'mainnet', 'BTC', 99), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'mainnet', 'BTC', 100), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'mainnet', 'BTC', 101), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'mainnet', 'LTC', 100), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'mainnet', 'BTC', '100'), true);
     });
 });

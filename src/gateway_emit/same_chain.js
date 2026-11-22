@@ -213,7 +213,7 @@ function buildGovernanceEmits(charge, emissionCollector) {
         vote: (params) => {
             charge();
             if (typeof params !== 'object' || params === null) params = {};
-            let version = Number(params.version);
+            const version = Number(params.version);
             if (version === 1) {
                 validateRequired(params, ['pollRef', 'ballot']);
                 validateTypes(params, { ballot: 'string' });

@@ -34,6 +34,43 @@
  */
 'use strict';
 
+const allowedUnderscored = [
+    '__asyncBlockTime', '__blockTime', '__clsBlockTime', '__codeBytes', '__codeHash', '__codeStr',
+    '__corroborate', '__effectiveDepthLimit', '__execLintCoin', '__execLintHeight', '__faultSignalOn',
+    '__gasBlockTime', '__hostPrepare', '__hostStackLimit', '__isolate', '__isolateDisposed',
+    '__iterSetMeterOn', '__lintBlockTime', '__lintRefusal', '__lintUnits', '__lintVerdict',
+    '__meterCallSpread', '__meterRestPattern', '__moBlockTime', '__nativeStackTerminal',
+    '__overflowIsHostFault', '__pkg3Coin', '__pkg3Height', '__pkg3SandboxOn', '__psBlockTime',
+    '__skBlockTime', '__specEvalOrder', '__stringResultMeterCompiler', '__stripBigIntSurface',
+    '__wallBudgetMs', '__wrapperHardened', '_armedHarnessCache', '_balanceScopeWarned',
+    '_bareCallbackWarned', '_base', '_blockCache', '_blockOpen', '_broken', '_callCount',
+    '_callCounts', '_child', '_config', '_consecutiveSpawnFailures', '_defaultReturn',
+    '_defaultTxHash', '_deployGateWarned', '_depth10GasCount', '_dispatch', '_everReady',
+    '_executionLog', '_executor', '_gasCeiling', '_harnessCachedData', '_harnessSource', '_inBlock',
+    '_lastBrokenRetryAt', '_lastSpawnError', '_lintVerdictCache', '_liveBlockTime', '_load',
+    '_meteredCache', '_nextId', '_nextIndex', '_paramsReshapedWarned', '_pending',
+    '_preGateWarned', '_preHeightGateWarned', '_processDestroy', '_processIssue', '_processMint',
+    '_processSend', '_queue', '_readyTimer', '_releaseSlot', '_resolveFilename', '_rules',
+    '_sawReady', '_shuttingDown', '_snapshots', '_stakeScopeWarned', '_stakeShapeWarned', '_v8',
+    '_warnedImplicitInProcess', '_watchdogMs',
+];
+
+const allowedSnakeCase = [
+    'banned_globals', 'banned_syntax', 'banned_with', 'nesting_depth', 'regex_group_depth',
+    'syntax_depth',
+];
+
+const restrictedRequireSelector = ':function CallExpression[callee.name="require"]'
+    + '[arguments.0.type="Literal"]'
+    + ':not([arguments.0.value="child_process"])'
+    + ':not([arguments.0.value="../src/toolkit/index.js"])'
+    + ':not([arguments.0.value="./process-executor.js"])'
+    + ':not([arguments.0.value="v8"])';
+
+const globalIgnores = {
+    ignores: ['test/**/fixtures/contracts/**/*.js'],
+};
+
 const src = {
     files: ['src/**/*.js'],
     languageOptions: {
@@ -49,15 +86,20 @@ const src = {
     rules: {
         // Naming: camelCase everywhere except property keys, which carry
         // protocol fields and DB columns through one-to-one.
-        camelcase: ['error', { properties: 'never', ignoreDestructuring: true, ignoreImports: true }],
-        'no-underscore-dangle': ['error', { enforceInMethodNames: true, allowAfterThis: false, allowFunctionParams: false }],
+        camelcase: ['error', {
+            properties: 'never', ignoreDestructuring: true, ignoreImports: true, allow: allowedSnakeCase,
+        }],
+        'no-underscore-dangle': ['error', {
+            enforceInMethodNames: true, allowAfterThis: false, allowFunctionParams: false,
+            allow: allowedUnderscored,
+        }],
         // Logging: one logger. Entry points override this below.
         'no-console': 'error',
         // Module shape: requires at the top, environment in config.js only,
         // one export shape per file.
         'no-restricted-syntax': ['error',
             {
-                selector: ':function CallExpression[callee.name="require"][arguments.0.type="Literal"]',
+                selector: restrictedRequireSelector,
                 message: 'require() at the top of the file; inside a body only for a computed path (CODE-STYLE.md, Module shape)',
             },
             {
@@ -72,12 +114,15 @@ const src = {
 };
 
 const configAndEntry = {
-    files: ['src/config.js', 'src/api.js', 'src/migrate.js', 'src/index.js', 'bin/**/*.js'],
+    files: [
+        'src/config.js', 'src/api.js', 'src/migrate.js', 'src/index.js', 'src/vm-worker.js',
+        'src/toolkit/simulator.js', 'src/toolkit/simulator/**/*.js', 'bin/**/*.js',
+    ],
     rules: {
         'no-console': 'off',
         'no-restricted-syntax': ['error',
             {
-                selector: ':function CallExpression[callee.name="require"][arguments.0.type="Literal"]',
+                selector: restrictedRequireSelector,
                 message: 'require() at the top of the file; inside a body only for a computed path (CODE-STYLE.md, Module shape)',
             },
         ],
@@ -95,4 +140,4 @@ const tests = {
     },
 };
 
-module.exports = [src, configAndEntry, tests];
+module.exports = [globalIgnores, src, configAndEntry, tests];

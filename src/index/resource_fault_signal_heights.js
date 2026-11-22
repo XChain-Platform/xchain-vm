@@ -37,11 +37,8 @@ const RESOURCE_FAULT_SIGNAL_ACTIVATION = Object.freeze({
     'DOGE:testnet': 68005165,
 });
 
-// Resolve this gate through the shared regtest-genesis per-coin height rule.
-const resolveResourceFaultSignalActive = resolveRegtestGenesisHeightGate;
-
 function isResourceFaultSignalActive(network, coin, blockHeight) {
-    return resolveResourceFaultSignalActive(
+    return resolveRegtestGenesisHeightGate(
         RESOURCE_FAULT_SIGNAL_ACTIVATION,
         network,
         coin,
@@ -51,6 +48,5 @@ function isResourceFaultSignalActive(network, coin, blockHeight) {
 
 module.exports = {
     RESOURCE_FAULT_SIGNAL_ACTIVATION,
-    resolveResourceFaultSignalActive,
     isResourceFaultSignalActive,
 };

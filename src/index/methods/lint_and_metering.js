@@ -111,6 +111,8 @@ module.exports = {
      * @param {boolean} [enforceLintSyntaxDepth] - syntax-depth bound, host-fault overflow
      *        and deploy-equal nesting (own per-coin height gate); omitted means off.
      *        The delimiter rule needs no bit: this path has always enforced it.
+     * @param {boolean} [enforceLintRegexGroupDepth] - regex group-depth bound; omitted
+     *        means off so historical execute-time verdicts stay unchanged.
      * @returns {{valid: boolean, error?: string}}
      */
     getLintVerdict(
@@ -124,11 +126,13 @@ module.exports = {
         codeHash,
         enforceBannedWith,
         enforceLintDestructure,
-        enforceLintSyntaxDepth
+        enforceLintSyntaxDepth,
+        enforceLintRegexGroupDepth
     ) {
         const bannedWith = enforceBannedWith === true;
         const lintDestructure = enforceLintDestructure === true;
         const syntaxDepth = enforceLintSyntaxDepth === true;
+        const regexGroupDepth = enforceLintRegexGroupDepth === true;
         const key = (codeHash || crypto.createHash('sha256').update(code).digest('hex')) +
             ':' + (enforceBannedAsync ? '1' : '0') +
             (enforceLintHardening ? '1' : '0') +
@@ -138,7 +142,8 @@ module.exports = {
             (enforceLintOptionalChain === true ? '1' : '0') +
             (bannedWith ? '1' : '0') +
             (lintDestructure ? '1' : '0') +
-            (syntaxDepth ? '1' : '0');
+            (syntaxDepth ? '1' : '0') +
+            (regexGroupDepth ? '1' : '0');
         const hit = this._lintVerdictCache.get(key);
         if (hit !== undefined) return hit;
         const verdict = validateSyntax(code, {
@@ -151,7 +156,8 @@ module.exports = {
             enforceLintOptionalChain: enforceLintOptionalChain === true,
             enforceBannedWith:       bannedWith,
             enforceLintDestructure:  lintDestructure,
-            enforceLintSyntaxDepth:  syntaxDepth
+            enforceLintSyntaxDepth:  syntaxDepth,
+            enforceLintRegexGroupDepth: regexGroupDepth
         });
         if (this._lintVerdictCache.size >= this.limits.maxMeteredCacheSize) {
             const oldest = this._lintVerdictCache.keys().next().value;

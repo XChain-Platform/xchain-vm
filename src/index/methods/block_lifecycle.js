@@ -13,15 +13,16 @@
  **********************************************************************
  * XChain VM: block lifecycle
  *
- * The per-block compilation-cache boundaries and the executor teardown,
- * each delegated to the subprocess executor when one is configured.
+ * Per-block compilation-cache and cross-chain snapshot boundaries, plus
+ * executor teardown. Lifecycle calls delegate to a configured subprocess.
  * XChainVM prototype methods, installed by the entry (../../index.js).
  ********************************************************************/
 // @ts-nocheck
 
 module.exports = {
     /**
-     * Called at the start of each block to initialize the compilation cache.
+     * Start the compilation-cache scope and, in subprocess mode, the pinned
+     * cross-chain snapshot scope. Call before executing each block.
      */
     beginBlock() {
         if (this._executor) return this._executor.beginBlock();
@@ -29,7 +30,8 @@ module.exports = {
     },
 
     /**
-     * Called at the end of each block to clear the compilation cache.
+     * Clear the compilation cache and close any subprocess snapshot scope.
+     * Call after executing each block.
      */
     endBlock() {
         if (this._executor) return this._executor.endBlock();

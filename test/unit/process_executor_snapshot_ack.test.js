@@ -15,6 +15,9 @@
 
 const S = require('../integration/process_executor.test/support/executor_setup.js');
 const ProcessExecutor = require('../../src/process-executor.js');
+const { HostFaultError } = require('../../src/errors.js');
+const { WorkerSnapshotChannel, MAX_UNACKED_SNAPSHOT_LOSSES } =
+    require('../../src/process_executor/snapshot_channel.js');
 
 const assert = S.assert;
 const CODE = "module.exports = function(){ return xchain.crossChain.getAttestation('BTC', 7); };";
@@ -44,6 +47,12 @@ function opts() {
         code: CODE,
         crossChainData: JSON.parse(JSON.stringify(SNAPSHOT))
     });
+}
+
+function optsWithAttestation(value) {
+    const out = opts();
+    out.crossChainData.attestations['BTC:7'] = value;
+    return out;
 }
 
 let exec;
@@ -106,6 +115,32 @@ async function sendsFreshSnapshotForNextBlock() {
     assert.notStrictEqual(snapshots[0].token, snapshots[1].token);
 }
 
+async function sendsChangedSnapshotInline() {
+    exec = newExecutor();
+    await waitReady(exec);
+    const { frames } = captureFrames();
+    const warnings = [];
+    const realWarn = process.emitWarning;
+    process.emitWarning = (msg) => warnings.push(msg);
+    try {
+        exec.beginBlock();
+        const first = await exec.execute(optsWithAttestation('attested-value-7'));
+        const second = await exec.execute(optsWithAttestation('other-value'));
+        assert.strictEqual(JSON.parse(first.returnValue), 'attested-value-7');
+        assert.strictEqual(JSON.parse(second.returnValue), 'other-value');
+        const snapshots = frames.filter((frame) => frame.type === 'snapshot');
+        const executes = frames.filter((frame) => frame.type === 'execute');
+        assert.strictEqual(snapshots.length, 1);
+        assert.deepStrictEqual(executes[0].opts.crossChainData,
+            { __xchainWorkerSnapshot: snapshots[0].token });
+        assert.deepStrictEqual(executes[1].opts.crossChainData,
+            optsWithAttestation('other-value').crossChainData);
+        assert.strictEqual(exec._snapshots.inlineMismatches, 1);
+        assert.strictEqual(warnings.length, 1);
+        exec.endBlock();
+    } finally { process.emitWarning = realWarn; }
+}
+
 function holdSnapshots() {
     const { child, frames, realSend } = captureFrames();
     let heldSnapshot;
@@ -153,6 +188,73 @@ async function ignoresStaleSnapshotAcknowledgement() {
     assert.strictEqual(result.success, true, JSON.stringify(result));
 }
 
+async function waitFor(predicate, what) {
+    const end = Date.now() + 15000;
+    while (!predicate() && Date.now() < end)
+        await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.ok(predicate(), 'timed out waiting for ' + what);
+}
+
+async function settlesHeldQueueWhenWorkerKeepsDyingUnacked() {
+    exec = newExecutor();
+    await waitReady(exec);
+    const realSend = exec.send.bind(exec);
+    exec.send = (msg) => (msg.type === 'snapshot' ? true : realSend(msg));
+
+    exec.beginBlock();
+    const outcome = exec.execute(opts()).then(() => null, (err) => err);
+    let previous = null;
+    for (let loss = 0; loss < MAX_UNACKED_SNAPSHOT_LOSSES; loss++) {
+        await waitFor(() => exec._child && exec._child !== previous && exec._sawReady &&
+            exec._snapshots.sent, 'a worker holding an unacknowledged snapshot');
+        previous = exec._child;
+        previous.kill('SIGKILL');
+        await waitFor(() => exec._child !== previous, 'the lost worker to be handled');
+    }
+
+    const err = await outcome;
+    assert.ok(err instanceof HostFaultError, 'held execution must reject with a host fault');
+    assert.strictEqual(exec._broken, true);
+    assert.strictEqual(exec._child, null, 'no further respawn once latched');
+    assert.strictEqual(exec._queue.length, 0);
+}
+
+function newChannel() {
+    const channel = new WorkerSnapshotChannel(() => true, () => {}, 60000);
+    channel.hold(opts(), true);
+    return channel;
+}
+
+function countsOnlyUnacknowledgedLosses() {
+    const channel = newChannel();
+    for (let loss = 1; loss < MAX_UNACKED_SNAPSHOT_LOSSES; loss++) {
+        assert.strictEqual(channel.workerLost(), false);
+        channel.workerSpawned();
+        channel.hold(opts(), true);
+    }
+    assert.strictEqual(channel.workerLost(), true);
+    channel.close();
+}
+
+function resetsLossCountOnAcknowledgement() {
+    const channel = newChannel();
+    for (let loss = 1; loss < MAX_UNACKED_SNAPSHOT_LOSSES; loss++) {
+        channel.workerLost();
+        channel.workerSpawned();
+        channel.hold(opts(), true);
+    }
+    channel.onMessage({ type: 'snapshotAck', token: channel.token });
+    assert.strictEqual(channel.workerLost(), false, 'a worker lost after its ack is not a stuck snapshot');
+    channel.close();
+}
+
+function ignoresLossWithNoSnapshotOutstanding() {
+    const channel = new WorkerSnapshotChannel(() => true, () => {}, 60000);
+    for (let loss = 0; loss < MAX_UNACKED_SNAPSHOT_LOSSES + 2; loss++)
+        assert.strictEqual(channel.workerLost(), false);
+    channel.close();
+}
+
 function snapshotAcknowledgementTests() {
     this.timeout(30000);
 
@@ -160,9 +262,18 @@ function snapshotAcknowledgementTests() {
     it('sends one snapshot per block and keeps snapshot bytes out of execute frames',
         sendsOneSnapshotPerBlock);
     it('sends a fresh snapshot after the next block begins', sendsFreshSnapshotForNextBlock);
+    it('sends a changed snapshot inline when endBlock was omitted', sendsChangedSnapshotInline);
     it('does not dispatch until the worker acknowledges the snapshot token',
         waitsForSnapshotAcknowledgement);
     it('ignores an acknowledgement carrying a stale token', ignoresStaleSnapshotAcknowledgement);
+    it('rejects the held queue when workers keep dying before acknowledging the snapshot',
+        settlesHeldQueueWhenWorkerKeepsDyingUnacked);
+    it('latches only after consecutive losses with an unacknowledged snapshot',
+        countsOnlyUnacknowledgedLosses);
+    it('clears the unacknowledged-loss count on an accepted acknowledgement',
+        resetsLossCountOnAcknowledgement);
+    it('does not count worker losses when no snapshot is outstanding',
+        ignoresLossWithNoSnapshotOutstanding);
 }
 
 (S.HAVE_IVM ? describe : describe.skip)('process executor snapshot acknowledgement',

@@ -71,7 +71,6 @@ let corpusParamsLogged = false;
 
 function logCorpusParams() {
     if (corpusParamsLogged) return;
-    // eslint-disable-next-line no-console -- record the corpus params so a red run is reproducible
     console.log(`        [differential] seed=${SEED} cases=${DIFF_CASES}` +
         (process.env.DIFF_SEED ? ' (pinned via DIFF_SEED)' : ' (default seed)'));
     corpusParamsLogged = true;

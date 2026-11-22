@@ -36,8 +36,13 @@
  *     GUARD_GAS_CEILING the coin configs set, so a guard calling
  *     attestation.request / emit.crossExecute fails in simulation exactly as
  *     it fails on chain instead of simulating green at 5x the gas headroom.
+ *   - XCALL-callback mode: callXcallCallback() uses VM_XCALL_CALLBACK, call
+ *     depth zero and the originating call's hop count, matching callback injection.
  *   - failure atomicity: on a reverted / out-of-gas / errored call the VM
  *     returns empty stateChanges + emittedActions, so nothing is committed.
+ *   - gas settlement: gasUsed is capped at the effective execution ceiling,
+ *     matching indexer fee settlement. gasUsedRaw is present only when the VM
+ *     returned a larger value after a gas-exhaustion fault was swallowed.
  *   - metering activation: the default block time sits at the VM's newest
  *     ELAPSED block-time flag-day, the configured network's own per-network time
  *     gates included (testnet's armed JSON.stringify hook and meta-required
@@ -51,6 +56,12 @@
  *     gas exhaustion the status, can differ from what a live chain settles. Pass
  *     network: 'mainnet' (`xchain-foundry simulate --network mainnet`) to
  *     reproduce mainnet.
+ *   - stake read shape: seeded stake amounts always read back as decimal
+ *     strings. A node delivers that shape only once its decimal-string stake
+ *     snapshot row is active for the path (unarmed on mainnet today, and unarmed
+ *     on a stock regtest node's controller-guard path); below it, contracts read
+ *     mathjs JSON objects. A call or callGuard that reads seeded stakes there
+ *     warns once (see simulator/stake_shape_gate.js).
  *   - height-gate activation: the default block HEIGHT sits at the newest armed
  *     per-coin activation for the configured (coin, network), so a mainnet
  *     simulation runs the Package-3 sandbox and the other height-keyed gates the
@@ -59,6 +70,8 @@
  *     regtest stays at height 1, since every height gate is on from genesis
  *     there. Pin a lower height to simulate the pre-activation rules (it warns
  *     once).
+ *   - attestation deadlines: provider windows default to the indexer registry's
+ *     http_get and llm limits, with constructor and per-call overrides available.
  *
  * What it does NOT do (out of scope; that is the real indexer + regtest):
  *   - process emitted ACTIONs against the ledger (SEND/ISSUE/... are captured
@@ -103,7 +116,7 @@
  *     execution: 'subprocess' (xchain-indexer/src/actions/index.js), where the same
  *     contract kills only the worker and the executor returns the deterministic
  *     `out_of_resource: execution host terminated (...)` with gasUsed at the
- *     ceiling (src/process-executor.js hostTerminatedResult). Pass
+ *     ceiling (src/process_executor/termination.js hostTerminatedResult). Pass
  *     execution: 'subprocess' (or `xchain-foundry simulate --execution
  *     subprocess`) to see that result. The wall-clock half of this seam IS
  *     faithful: DEFAULT_LIMITS.maxCpuTimeMs equals CONSENSUS_MAX_WALL_MS.
@@ -127,6 +140,7 @@ const {
     GATE_FALLBACK_BLOCK_TIME,
     GUARD_GAS_CEILING,
     DEFAULT_GAS_CEILING,
+    DEFAULT_PROVIDER_DEADLINES,
     GUARD_METHOD,
     GUARD_PARAM_ORDER
 } = require('./simulator/constants.js');
@@ -266,6 +280,8 @@ class ContractSimulator {
      *        there), so a mainnet or testnet simulation runs today's rule set;
      *        a lower value warns once too.
      * @param {string} [opts.defaultCaller]  - caller address used when a call omits one
+     * @param {object|null} [opts.providerDeadlines] - ATTEST provider deadline
+     *        windows. Defaults to the indexer registry mirror; null opts out.
      * @param {string} [opts.execution='in-process'] - VM execution mode. Not a
      *        pure latency knob: the two modes differ on a RESULT. in-process
      *        gives millisecond feedback with no per-block fork, but has no worker
@@ -283,6 +299,8 @@ class ContractSimulator {
         this.gasSchedule = Object.assign({}, DEFAULT_GAS_SCHEDULE, opts.gasSchedule || {});
         this.limits = Object.assign({}, DEFAULT_LIMITS, opts.limits || {});
         this.defaultCaller = opts.defaultCaller || 'sim_caller';
+        this.providerDeadlines = opts.providerDeadlines === undefined
+            ? DEFAULT_PROVIDER_DEADLINES : opts.providerDeadlines;
 
         initializeBlockContext.call(this, opts);
 
@@ -291,6 +309,7 @@ class ContractSimulator {
         this.tokenInfo = {};       // tick -> info object
         // roundFloor: oldest round the snapshot guarantees; 0 means no history is hidden.
         this.oracle = { snapshotAge: 0, prices: {}, rounds: {}, roundFloor: 0 };
+        // Replaced, never written in place: see the cross-chain setters.
         this.crossChainData = { attestations: {}, settled: {}, calls: {} };
         // The remaining read-only snapshots the gateway reads. Shapes are the
         // ones src/readonly-accessors.js documents; an empty snapshot is
@@ -330,5 +349,6 @@ Object.assign(
 module.exports = {
     ContractSimulator, DEFAULT_GAS_SCHEDULE, DEFAULT_LIMITS, DEFAULT_BLOCK_TIME,
     SCHEDULED_BLOCK_TIME, liveBlockTime,
-    GUARD_GAS_CEILING, DEFAULT_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER
+    GUARD_GAS_CEILING, DEFAULT_GAS_CEILING, DEFAULT_PROVIDER_DEADLINES,
+    GUARD_METHOD, GUARD_PARAM_ORDER
 };

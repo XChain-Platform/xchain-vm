@@ -211,6 +211,10 @@ function testJs(name, contractFile) {
         });
         addr = dep.contractIndex;
         assert.strictEqual(dep.initResult.success, true, 'deploy/initialize should succeed');
+        // The simulator registers a contract the chain would refuse to DEPLOY and only
+        // warns; deployGate is the chain's verdict, and null means the gate could not
+        // run on this host, which is not a pass.
+        assert.strictEqual(dep.deployGate.valid, true, 'the chain would refuse this deploy: ' + dep.deployGate.error);
     });
 
     afterEach(async function() { if (sim) await sim.close(); });

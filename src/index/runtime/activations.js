@@ -248,6 +248,28 @@ function isIterSetMeterActive(network, blockTime) {
     return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
 }
 
+// Activation for refusing state keys the indexer cannot store. contract_state.state_key is
+// VARCHAR(256) in utf8mb3, so a key over 256 characters, or one holding a code point above
+// U+FFFF, passed the VM and then failed the indexer's INSERT, halting every indexer at that
+// block. While active, StateManager.set() refuses such a key as an ordinary contract error.
+// A rejected write turns a success into a failure, so it is gated. Each entry is the
+// block-time instant the rule arms at on that network (null leaves it unarmed, 0 runs it
+// from genesis); unknown or missing networks resolve like mainnet. The indexer twin is the
+// STATE_KEY_STORABLE registry row.
+const STATE_KEY_STORABLE_ACTIVATION = Object.seal({
+    mainnet: null,
+    testnet: 1794873600,
+    regtest: 0,
+});
+
+// The regex group-nesting gate lives in a part file; re-exported below unchanged.
+const { LINT_REGEX_GROUP_DEPTH_ACTIVATION, isLintRegexGroupDepthActive } = require('./lint_gates/regex_group_depth');
+function isStateKeyStorableActive(network, blockTime) {
+    const gate = STATE_KEY_STORABLE_ACTIVATION[network];
+    if (!Number.isFinite(gate)) return false;
+    return gate === 0 || (Number.isFinite(blockTime) && blockTime >= gate);
+}
+
 // Activation for the contract.slash `token` wire-delimiter guard. Every
 // other emit validator rejects a '|' in a field the indexer may pipe-join;
 // contract.slash never had that check. It is inert against today's consumer (SLASH
@@ -271,12 +293,10 @@ function isSlashTokenDelimGuardActive(network, blockTime) {
 const { MAX_SLASH_AMOUNT_DECIMALS } = require('../../gateway/slash_limits.js');
 const {
     BIGINT_SURFACE_STRIP_ACTIVATION,
-    resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
 } = require('../bigint_surface_strip_heights.js');
 const {
     RESOURCE_FAULT_SIGNAL_ACTIVATION,
-    resolveResourceFaultSignalActive,
     isResourceFaultSignalActive,
 } = require('../resource_fault_signal_heights.js');
 const {
@@ -285,7 +305,6 @@ const {
 } = require('../host_error_stack_strip_heights.js');
 const {
     NATIVE_STACK_TERMINAL_ACTIVATION,
-    resolveNativeStackTerminalActive,
     isNativeStackTerminalActive,
 } = require('../native_stack/activation.js');
 
@@ -323,9 +342,10 @@ function isSlashAmountPrecisionActive(network, blockTime) {
 // below the gate. TIGHTENING the value later is a different change and needs
 // its own future flag-day (see consensus-wall-clock.js).
 //
-// NOTE for a future reader: three comments inside HARNESS_SOURCE (the F3-globals,
-// Set/Map and TypedArray metering notes) still describe maxCpuTimeMs as "the
-// binding constraint" and "not a consensus value". They are deliberately left
+// NOTE for a future reader: four comments inside HARNESS_SOURCE (the F3-globals,
+// Set/Map, replace/replaceAll and TypedArray metering notes) still describe the
+// per-node maxCpuTimeMs net as "the binding constraint" or "not a consensus
+// value". They are deliberately left
 // byte-identical: HARNESS_SOURCE is concatenated ahead of the contract before
 // compilation, so editing a comment in it shifts every in-isolate line number and
 // with it the positions V8 reports in error text a contract can read. Their
@@ -360,18 +380,19 @@ module.exports = {
     isRestPatternMeterActive,
     ITER_SET_METER_ACTIVATION,
     isIterSetMeterActive,
+    STATE_KEY_STORABLE_ACTIVATION,
+    isStateKeyStorableActive,
+    LINT_REGEX_GROUP_DEPTH_ACTIVATION,
+    isLintRegexGroupDepthActive,
     isSlashTokenDelimGuardActive,
     isSlashAmountPrecisionActive,
     isConsensusWallClockActive,
     BIGINT_SURFACE_STRIP_ACTIVATION,
-    resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
     RESOURCE_FAULT_SIGNAL_ACTIVATION,
-    resolveResourceFaultSignalActive,
     isResourceFaultSignalActive,
     HOST_ERROR_STACK_STRIP_ACTIVATION,
     isHostErrorStackStripActive,
     NATIVE_STACK_TERMINAL_ACTIVATION,
-    resolveNativeStackTerminalActive,
     isNativeStackTerminalActive,
 };

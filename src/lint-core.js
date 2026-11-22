@@ -42,6 +42,7 @@ const banned_globals = require('./lint-core/banned_globals.js');
 const banned_with = require('./lint-core/banned_with.js');
 const nesting_depth = require('./lint-core/nesting_depth.js');
 const syntax_depth = require('./lint-core/syntax_depth.js');
+const regex_group_depth = require('./lint-core/regex_group_depth.js');
 const { analyzeContract } = require('./lint-core/contract_analysis.js');
 const { lintSource: composeLintSource, isHostStackOverflow } = require('./lint-core/result_composition.js');
 
@@ -52,12 +53,16 @@ const { lintSource: composeLintSource, isHostStackOverflow } = require('./lint-c
 function lintSource(code, opts) {
     const enforceLintSyntaxDepth = !opts || opts.enforceLintSyntaxDepth !== false;
     const enforceLintNestingDepth = !opts || opts.enforceLintNestingDepth !== false;
+    const enforceLintRegexGroupDepth = !opts || opts.enforceLintRegexGroupDepth !== false;
     if (enforceLintNestingDepth) {
-        const finding = nesting_depth.nestingDepthFinding(code);
+        const finding = nesting_depth.nestingDepthFinding(code, enforceLintRegexGroupDepth);
         if (finding) return { errors: [finding], warnings: [] };
     }
     if (enforceLintSyntaxDepth) {
-        const finding = syntax_depth.syntaxDepthFinding(code);
+        const finding = syntax_depth.syntaxDepthFinding(code, enforceLintRegexGroupDepth);
+        if (finding) return { errors: [finding], warnings: [] };
+    } else if (enforceLintRegexGroupDepth) {
+        const finding = regex_group_depth.regexGroupDepthFinding(code);
         if (finding) return { errors: [finding], warnings: [] };
     }
     return composeLintSource(code, opts);
@@ -77,6 +82,7 @@ module.exports = {
     findSyntaxDepth: syntax_depth.findSyntaxDepth,
     measureSyntaxDepth: syntax_depth.measureSyntaxDepth,
     syntaxDepthFinding: syntax_depth.syntaxDepthFinding,
+    regexGroupDepthFinding: regex_group_depth.regexGroupDepthFinding,
     isHostStackOverflow,
     findBannedRest: banned_syntax.findBannedRest,
     findBannedExponentiation: banned_syntax.findBannedExponentiation,
@@ -87,6 +93,7 @@ module.exports = {
     MAX_CODE_SIZE: constants.MAX_CODE_SIZE,
     MAX_NESTING_DEPTH: constants.MAX_NESTING_DEPTH,
     MAX_SYNTAX_DEPTH: constants.MAX_SYNTAX_DEPTH,
+    MAX_REGEX_GROUP_DEPTH: constants.MAX_REGEX_GROUP_DEPTH,
     STRIPPED_PROTO_METHOD_NAMES: constants.STRIPPED_PROTO_METHOD_NAMES,
     STRIPPED_GLOBAL_NAMES,
     STRIPPED_GLOBAL_NAMES_MIRROR: STRIPPED_GLOBAL_NAMES,

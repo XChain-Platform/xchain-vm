@@ -1,9 +1,8 @@
 // Non-recursive syntactic-depth scanner for the deploy lint pre-parse guard.
 // @ts-nocheck
 
-const acorn = require('acorn');
-const { CONTRACT_ECMA_VERSION } = require('../metering.js');
 const { MAX_SYNTAX_DEPTH } = require('./constants.js');
+const { RegexGroupDepthExceeded, boundedTokenizer, regexGroupDepthFindingAt } = require('./regex_group_depth.js');
 
 // Why this exists: the delimiter scan (nesting_depth.js) sees only ( [ { ${, but the
 // parser, the metering walk, the code generator and V8 also recurse once per level of
@@ -169,17 +168,13 @@ function finalDepth(stack) {
 // Returns { line, depth }: the full bound, or the running bound where the scan stopped.
 // A tokenizer error ends the scan and the open frames are measured as if closed there,
 // which still bounds what any parser reaches before that error.
-function scanSyntaxDepth(code, limit) {
+function scanSyntaxDepth(code, limit, enforceRegexGroupDepth) {
     const stack = [newFrame('top')];
     let line = 1;
     let prev = null;
     let prevPrev = null;
     try {
-        const tokenizer = acorn.tokenizer(code, {
-            ecmaVersion: CONTRACT_ECMA_VERSION,
-            sourceType: 'script',
-            locations: true
-        });
+        const tokenizer = boundedTokenizer(code, enforceRegexGroupDepth);
         for (;;) {
             const token = tokenizer.getToken();
             const label = token.type.label;
@@ -193,7 +188,12 @@ function scanSyntaxDepth(code, limit) {
             prev = label;
         }
     } catch (e) {
-        // Measure what was scanned, as if every open frame closed here.
+        // Measure what was scanned, as if every open frame closed here. When the
+        // regex gate is on, prefer its line if the earlier syntax stays in bounds.
+        const depth = finalDepth(stack);
+        if (e instanceof RegexGroupDepthExceeded && depth <= limit)
+            return { line: e.line, depth: depth, regexGroupDepth: e.depth };
+        return { line: line, depth: depth };
     }
     return { line: line, depth: finalDepth(stack) };
 }
@@ -204,11 +204,11 @@ function scanSyntaxDepth(code, limit) {
  * @param {number} [limit=MAX_SYNTAX_DEPTH]
  * @returns {Array<{line: number, depth: number}>}
  */
-function findSyntaxDepth(code, limit) {
+function findSyntaxDepth(code, limit, enforceRegexGroupDepth) {
     if (typeof code !== 'string') return [];
     const maxDepth = limit === undefined ? MAX_SYNTAX_DEPTH : limit;
-    const hit = scanSyntaxDepth(code, maxDepth);
-    return hit.depth > maxDepth ? [hit] : [];
+    const hit = scanSyntaxDepth(code, maxDepth, enforceRegexGroupDepth);
+    return hit.depth > maxDepth || hit.regexGroupDepth !== undefined ? [hit] : [];
 }
 
 /**
@@ -218,12 +218,13 @@ function findSyntaxDepth(code, limit) {
  */
 function measureSyntaxDepth(code) {
     if (typeof code !== 'string') return 0;
-    return scanSyntaxDepth(code, Infinity).depth;
+    return scanSyntaxDepth(code, Infinity, true).depth;
 }
 
-function syntaxDepthFinding(code) {
-    const hit = findSyntaxDepth(code)[0];
+function syntaxDepthFinding(code, enforceRegexGroupDepth) {
+    const hit = findSyntaxDepth(code, undefined, enforceRegexGroupDepth)[0];
     if (!hit) return null;
+    if (hit.regexGroupDepth !== undefined) return regexGroupDepthFindingAt(hit.line);
     return {
         rule: 'nesting-depth',
         message: 'syntax depth exceeds limit (' + MAX_SYNTAX_DEPTH + ') at line ' + hit.line,

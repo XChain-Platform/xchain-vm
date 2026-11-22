@@ -25,6 +25,7 @@ const { isLintDestructureActive } = require('../lint_destructure_heights.js');
 const { isLintSyntaxDepthActive } = require('../lint_syntax_depth_heights.js');
 const {
     isAsyncSurfaceActive, isLintHardeningActive, isRestPatternMeterActive,
+    isLintRegexGroupDepthActive,
     isPkg3SandboxActive, isLintGlobalAliasActive, EXEC_LINT_GAS_BYTES_PER_UNIT,
     isExecLintActive,
 } = require('./activations.js');
@@ -87,7 +88,8 @@ function checkExecLint(vm, opts, gasTracker, emissionCollector, codeStr, codeByt
             codeHash,
             isLintBannedWithActive(opts.network, coin, height),
             isLintDestructureActive(opts.network, coin, height),
-            isLintSyntaxDepthActive(opts.network, coin, height)
+            isLintSyntaxDepthActive(opts.network, coin, height),
+            isLintRegexGroupDepthActive(opts.network, __lintBlockTime)
         );
         if (!__lintVerdict.valid) {
             // 'error:' is one of the frozen STATUS_ERROR_PREFIXES (consensus-runtime.js);

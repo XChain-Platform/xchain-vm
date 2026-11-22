@@ -14,8 +14,10 @@
 // @ts-nocheck
 
 const { toContractJs } = require('../transpile.js');
+const GasTracker = require('../../gas.js');
 const { GUARD_GAS_CEILING, GUARD_METHOD, GUARD_PARAM_ORDER } = require('./constants.js');
 const { isDeployInitStrictActive } = require('./manifest_gate.js');
+const { wireParams, callbackParams, paramsReshaped } = require('./wire_params.js');
 
 function executionOptions(simulator, contract, index, method, params, opts, caller) {
     return {
@@ -39,16 +41,15 @@ function executionOptions(simulator, contract, index, method, params, opts, call
         attestationData: simulator.attestationDataByIndex.get(index) || simulator.attestationData,
         pollData: simulator.pollData,
         contractStakeData: simulator.contractStakeDataByIndex.get(index) || simulator.contractStakeData,
-        // Identity fields. The VM defaults every one of these itself
-        // (txHash '', actionIndex null, rootActionIndex null, callPath '',
-        // callDepth 0, providerDeadlines null), so an omitted opt lands on
-        // exactly the value the simulator produced before they existed.
+        // Identity fields use the VM defaults. Provider deadlines instead use
+        // the simulator's registry-mirrored default unless this call overrides it.
         txHash: opts.txHash != null ? String(opts.txHash) : '',
         actionIndex: opts.actionIndex != null ? Number(opts.actionIndex) : null,
         rootActionIndex: opts.rootActionIndex != null ? opts.rootActionIndex : null,
         callPath: typeof opts.callPath === 'string' ? opts.callPath : '',
         callDepth: Number.isInteger(opts.callDepth) ? opts.callDepth : 0,
-        providerDeadlines: opts.providerDeadlines || null
+        providerDeadlines: opts.providerDeadlines !== undefined
+            ? opts.providerDeadlines : simulator.providerDeadlines
     };
 }
 
@@ -112,7 +113,7 @@ module.exports = {
         this.contracts.set(index, {
             code: src,
             address,
-            state: Object.assign({}, opts.state || {})
+            state: Object.assign(Object.create(null), opts.state || {})
         });
 
         const initResult = await this.runDeployConstructor(index, opts, hasInitialize);
@@ -127,12 +128,10 @@ module.exports = {
      * @returns {Promise<?object>} the constructor's execute() result, or null when it does not run
      */
     async runDeployConstructor(index, opts, hasInitialize) {
-        const given = opts.constructorParams;
-        const paramStr = (given === undefined || given === null) ? ''
-            : (Array.isArray(given) ? given.join('|') : String(given));
+        const args = wireParams(opts.constructorParams);
         const strict = isDeployInitStrictActive(this.network, this.block.timestamp);
-        if (!(strict ? (hasInitialize || paramStr !== '') : paramStr !== '')) return null;
-        return this.execute(index, 'initialize', paramStr !== '' ? given : [],
+        if (!(strict ? (hasInitialize || args.length > 0) : args.length > 0)) return null;
+        return this.execute(index, 'initialize', args,
             { caller: opts.caller }, { attestationData: null, contractStakeData: null });
     },
 
@@ -152,20 +151,56 @@ module.exports = {
      * Execute a method on a deployed contract against its persisted state.
      * @param {number} contractIndex
      * @param {string} [method='default']
-     * @param {string[]} [params=[]]
+     * @param {string[]} [params=[]] - delivered as the chain delivers a user
+     *        EXECUTE's arguments: joined with '|' and split back (see wireParams).
+     *        With opts.callback they are delivered as a framework-injected callback's
+     *        arguments instead (see callbackParams).
      * @param {object} [opts]
      * @param {string} [opts.caller]
-     * @param {number} [opts.gasLimit] - per-call ceiling (clamped to gasCeiling)
+     * @param {boolean} [opts.callback] - the method is one the framework calls back
+     *        (an ATTEST response or expiry, or a binding VOTE). Use callXcallCallback
+     *        for an XCALL result or expiry. From CALLBACK_ARGS_EXACT on, callback
+     *        arguments keep a '|' inside one element whole.
+     * @param {number} [opts.gasLimit] - positive integer below gasCeiling, otherwise gasCeiling applies
      * @param {string} [opts.txHash]   - identity pass-throughs. Forwarded
      * @param {number} [opts.actionIndex]       verbatim; the VM does its own
      * @param {string|number} [opts.rootActionIndex]  normalization. Supply them
      * @param {string} [opts.callPath]          to make a derived request_id /
      * @param {number} [opts.callDepth]         call_id match a real one.
-     * @param {object} [opts.providerDeadlines] - ATTEST provider deadline windows
-     * @returns {Promise<object>} the VM execute() result, unchanged.
+     * @param {object|null} [opts.providerDeadlines] - per-call ATTEST provider deadline
+     *        windows; defaults to the simulator's registry-mirrored map
+     * @returns {Promise<object>} the VM result with gasUsed capped to the settled ceiling;
+     *          gasUsedRaw carries the uncapped value only when the cap applies.
      */
     async call(contractIndex, method = 'default', params = [], opts = {}) {
-        return this.execute(contractIndex, method, params, opts, null);
+        const args = opts.callback
+            ? callbackParams(params, this.network, this.block.timestamp)
+            : wireParams(params);
+        if (opts.callback && opts.gasLimit == null && !this._bareCallbackWarned) {
+            this._bareCallbackWarned = true;
+            console.warn(
+                '[xchain-vm simulator] callback mode uses the top-level gas ceiling, matching ATTEST ' +
+                'and binding-VOTE callbacks. Use callXcallCallback() for an XCALL result or expiry; ' +
+                'it uses VM_XCALL_CALLBACK as the chain does.'
+            );
+        }
+        this.warnIfParamsReshaped(params, args);
+        return this.execute(contractIndex, method, args, opts, null);
+    },
+
+    /**
+     * Warn once per simulator when the arguments a contract receives differ from the
+     * ones the caller passed (a number became a string, a '|' split an element, an
+     * empty string became no argument), so a local result is read against the wire form.
+     */
+    warnIfParamsReshaped(given, delivered) {
+        if (this._paramsReshapedWarned || !paramsReshaped(given, delivered)) return;
+        this._paramsReshapedWarned = true;
+        console.warn(
+            '[xchain-vm simulator] call params were reshaped to the arguments the chain delivers: ' +
+            'strings, split on \'|\', an empty string meaning none. Pass strings without \'|\' to ' +
+            'avoid it, or set opts.callback for a framework-injected callback method.'
+        );
     },
 
     /**
@@ -182,7 +217,8 @@ module.exports = {
      *        proceedsTick }; each is coerced to a string, absent becomes ''.
      * @param {object} [opts] - as call(), except attestationData is forced null
      *        and callPath is forced ''. gasLimit still overrides the ceiling.
-     * @returns {Promise<object>} the VM execute() result, unchanged.
+     * @returns {Promise<object>} the VM result with gasUsed capped to the settled ceiling;
+     *          gasUsedRaw carries the uncapped value only when the cap applies.
      */
     async callGuard(contractIndex, action = {}, opts = {}) {
         const params = GUARD_PARAM_ORDER.map((k) => {
@@ -203,7 +239,38 @@ module.exports = {
     },
 
     /**
-     * Shared execute path for call() and callGuard(). `modeOverrides` is applied
+     * Run an XCALL result or expiry callback in the mode used by the indexer.
+     * The chain pins VM_XCALL_CALLBACK, call depth zero and the originating
+     * call's hop count. Params are the fixed outcome tuple followed by the
+     * callback params, in the order delivered by the chain.
+     * @param {number} contractIndex
+     * @param {string} method
+     * @param {string[]} [params=[]]
+     * @param {object} [opts]
+     * @param {number} [opts.crossHops=0]
+     * @returns {Promise<object>}
+     */
+    async callXcallCallback(contractIndex, method, params = [], opts = {}) {
+        const rawCeiling = this.gasSchedule.VM_XCALL_CALLBACK;
+        const ceiling = parseInt(rawCeiling, 10);
+        if (rawCeiling === undefined || rawCeiling === null || !Number.isInteger(ceiling) || ceiling <= 0
+            || String(rawCeiling).trim() !== String(ceiling)) {
+            throw new Error(
+                'GAS_SCHEDULE.VM_XCALL_CALLBACK missing or invalid (expected a positive integer, got ' +
+                JSON.stringify(rawCeiling) + ')'
+            );
+        }
+        const args = callbackParams(params, this.network, this.block.timestamp);
+        this.warnIfParamsReshaped(params, args);
+        return this.execute(contractIndex, method, args, opts, {
+            gasCeiling: opts.gasLimit != null ? Number(opts.gasLimit) : ceiling,
+            callDepth: 0,
+            crossHops: Number.isInteger(opts.crossHops) ? opts.crossHops : 0
+        });
+    },
+
+    /**
+     * Shared execute path for call() and pinned modes. `modeOverrides` is applied
      * LAST so a mode owns the keys it pins; everything else stays exactly as
      * call() has always built it.
      */
@@ -222,8 +289,14 @@ module.exports = {
         if (opts.gasLimit != null) execOpts.gasCeiling = Number(opts.gasLimit);
         if (modeOverrides) Object.assign(execOpts, modeOverrides);
         this.warnIfStakeOutOfScope(execOpts.contractStakeData, execOpts.attestationData);
+        this.warnIfStakeShapeDiverges(execOpts.contractStakeData, execOpts.isGuard === true);
 
         const result = await this.vm.execute(execOpts);
+        const ceiling = GasTracker.effectiveCeiling(execOpts.gasCeiling, this.vm.gasCeiling);
+        if (result && Number.isFinite(result.gasUsed) && result.gasUsed > ceiling) {
+            result.gasUsedRaw = result.gasUsed;
+            result.gasUsed = ceiling;
+        }
 
         // Commit committed state exactly as the indexer does. On failure the VM
         // returns empty change/delete arrays, so this is a no-op then (atomicity).
@@ -240,10 +313,10 @@ module.exports = {
 
     // ---- inspection ---------------------------------------------------------
 
-    /** Snapshot a deployed contract's current committed state (a copy). */
+    /** Snapshot committed state as a no-prototype dictionary, matching the VM. */
     getState(contractIndex) {
         const c = this.contracts.get(Number(contractIndex));
-        return c ? Object.assign({}, c.state) : null;
+        return c ? Object.assign(Object.create(null), c.state) : null;
     },
 
     /** Read one committed state value (or null). */

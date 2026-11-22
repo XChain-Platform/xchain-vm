@@ -16,9 +16,9 @@
 const assert = require('assert');
 const {
     BIGINT_SURFACE_STRIP_ACTIVATION,
-    resolveBigIntSurfaceStripActive,
     isBigIntSurfaceStripActive,
 } = require('../../../src/index/bigint_surface_strip_heights.js');
+const { resolveRegtestGenesisHeightGate } = require('../../../src/index/height_gates/regtest_genesis.js');
 const XChainVM = require('../../../src/index.js');
 
 describe('BigInt surface strip activation', function () {
@@ -73,9 +73,9 @@ describe('BigInt surface strip activation', function () {
 
     it('resolves local armed thresholds and absent keys', function () {
         const armed = { 'BTC:testnet': 100 };
-        assert.strictEqual(resolveBigIntSurfaceStripActive(armed, 'testnet', 'BTC', 99), false);
-        assert.strictEqual(resolveBigIntSurfaceStripActive(armed, 'testnet', 'BTC', 100), true);
-        assert.strictEqual(resolveBigIntSurfaceStripActive(armed, 'testnet', 'BTC', 101), true);
-        assert.strictEqual(resolveBigIntSurfaceStripActive(armed, 'testnet', 'LTC', 100), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 99), false);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 100), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'BTC', 101), true);
+        assert.strictEqual(resolveRegtestGenesisHeightGate(armed, 'testnet', 'LTC', 100), false);
     });
 });
