@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-22
+
+### Changed
+- Added STATE_KEY_STORABLE on testnet to reject state keys the indexer cannot store, with mainnet unarmed.
+- Added the testnet LINT_REGEX_GROUP_DEPTH bound for deploy-time regular expression nesting, with mainnet unarmed.
+
+### Fixed
+- Retired live executor workers before recovery forks and strengthened sandbox and activation checks.
+- Took the regtest stake shape guard time from the host instead of a fixed value.
+
+### Security
+- Updated vulnerable development dependencies, including zod, qs, serialize-javascript, brace-expansion, minimatch, glob, diff and mocha.
+
 ## [0.27.0] - 2026-11-01
 
 ### Changed
