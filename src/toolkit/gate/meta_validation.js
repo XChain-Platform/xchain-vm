@@ -132,9 +132,21 @@ function readMetaLiterals(metaObj) {
         nonStringLiteral: [],   // keys present whose value is a literal but not a string
         line: (metaObj.loc && metaObj.loc.start && metaObj.loc.start.line) || null
     };
-    for (const p of metaObj.properties) {
+    const lastIndexByKey = new Map();
+    for (let i = 0; i < metaObj.properties.length; i++) {
+        const p = metaObj.properties[i];
+        const key = p.key && (p.key.name || p.key.value);
+        if (key === 'name' || key === 'description' || key === 'version') {
+            lastIndexByKey.set(key, i);
+        }
+    }
+    for (let i = 0; i < metaObj.properties.length; i++) {
+        const p = metaObj.properties[i];
         const key = p.key && (p.key.name || p.key.value);
         if (key !== 'name' && key !== 'description' && key !== 'version') continue;
+        // Object literal properties are evaluated in source order, so only the
+        // last occurrence determines the value the chain observes.
+        if (lastIndexByKey.get(key) !== i) continue;
         const v = p.value;
         if (v && v.type === 'Literal' && typeof v.value === 'string') {
             out[key] = v.value;
@@ -179,6 +191,14 @@ function readExportAssignments(ast) {
     });
 
     return { exportObj, exportName, exportAssignments, metaAssignments, metaAssignmentCounts };
+}
+
+function lastObjectProperty(properties, name) {
+    for (let i = properties.length - 1; i >= 0; i--) {
+        const property = properties[i];
+        if ((property.key && (property.key.name || property.key.value)) === name) return property;
+    }
+    return null;
 }
 
 /**
@@ -226,7 +246,7 @@ function getExportedMeta(source) {
         for (const p of exportObj.properties) {
             if (p.type !== 'Property' || p.computed) return { status: 'undecidable' };
         }
-        const metaProp = exportObj.properties.find((p) => (p.key && (p.key.name || p.key.value)) === 'meta');
+        const metaProp = lastObjectProperty(exportObj.properties, 'meta');
         if (!metaProp) return { status: 'absent' };
         if (!metaProp.value || metaProp.value.type !== 'ObjectExpression') return { status: 'undecidable' };
         return readMetaLiterals(metaProp.value);
