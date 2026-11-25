@@ -35,9 +35,15 @@ function isBlockingConsensusError(error, bannedAsync, bannedGenerator, bannedWas
     return CONSENSUS_RULES.has(error.rule);
 }
 
-// With overflowIsHostFault a V8 stack overflow is a HostFaultError, never a verdict:
+// Map only an independently confirmed over-bound regex when its activation is on.
+// A source that parsed cannot reach this overflow-only branch, so its verdict cannot change.
+function overflowRegexFinding(code, enforceRegexGroupDepth) {
+    return enforceRegexGroupDepth ? regexGroupDepthFinding(code) : null;
+}
+
+// With overflowIsHostFault an unexplained V8 stack overflow is a HostFaultError:
 // the syntax-depth scan has already bounded the source, so only a host fault reaches it.
-function checkV8Syntax(code, overflowIsHostFault) {
+function checkV8Syntax(code, overflowIsHostFault, enforceRegexGroupDepth) {
     let testIsolate;
     try {
         try {
@@ -48,8 +54,11 @@ function checkV8Syntax(code, overflowIsHostFault) {
         try {
             testIsolate.compileScriptSync(code);
         } catch (e) {
-            if (overflowIsHostFault && isHostStackOverflow(e))
+            if (overflowIsHostFault && isHostStackOverflow(e)) {
+                const finding = overflowRegexFinding(code, enforceRegexGroupDepth);
+                if (finding) return { valid: false, error: finding.message };
                 throw new HostFaultError('syntax validation stack overflow: ' + e.message);
+            }
             return { valid: false, error: 'syntax error: ' + e.message };
         }
     } finally {
@@ -68,12 +77,15 @@ function preParseFinding(code, nesting, syntaxDepth, regexGroupDepth) {
 
 // The acorn rules, with a host stack overflow surfaced as HostFaultError when
 // opts.overflowIsHostFault is set (lintSource rethrows it from the parse step then).
-function lintAcornRules(code, opts) {
+function lintAcornRules(code, opts, enforceRegexGroupDepth) {
     try {
         return lintSource(code, opts);
     } catch (e) {
-        if (opts.overflowIsHostFault && isHostStackOverflow(e))
+        if (opts.overflowIsHostFault && isHostStackOverflow(e)) {
+            const finding = overflowRegexFinding(code, enforceRegexGroupDepth);
+            if (finding) return { errors: [finding], warnings: [] };
             throw new HostFaultError('syntax validation stack overflow: ' + e.message);
+        }
         throw e;
     }
 }
@@ -193,7 +205,8 @@ function validateSyntax(code, opts) {
     // failed to load at all. HostFaultError carries that code, which
     // faultGuard.rethrowIfInfraFault treats as an infra halt, so the block
     // rolls back and retries and NO verdict is written.
-    const syntaxError = checkV8Syntax(code, enforceLintSyntaxDepth);
+    const syntaxError = checkV8Syntax(code, enforceLintSyntaxDepth,
+        enforceLintRegexGroupDepth);
     if (syntaxError) return syntaxError;
 
     // 2-5. Acorn-coverable consensus rules. Block ONLY on consensus rules;
@@ -212,7 +225,7 @@ function validateSyntax(code, opts) {
         enforceLintRegexGroupDepth: false,
         overflowIsHostFault: enforceLintSyntaxDepth,
         destructure: enforceLintDestructure
-    }).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
+    }, enforceLintRegexGroupDepth).errors.filter((error) => isBlockingConsensusError(error, enforceBannedAsync,
         enforceBannedGenerator, enforceBannedWasm, enforceBannedRest, enforceBannedWith));
     if (blocking.length > 0)
         return { valid: false, error: blocking[0].message };

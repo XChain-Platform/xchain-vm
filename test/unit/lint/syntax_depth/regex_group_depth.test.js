@@ -18,6 +18,7 @@ const { validateSyntax } = require('../../../../src/syntax.js');
 
 const wrap = (body) => 'module.exports = function(xchain) {\n' + body + '\nreturn 1;\n};';
 const nestedRegex = (n) => 'var x = /' + '('.repeat(n) + 'a' + ')'.repeat(n) + '/;';
+const regexLiteral = (n) => '/' + '('.repeat(n) + 'a' + ')'.repeat(n) + '/';
 const REFUSAL = 'regex group depth exceeds limit (64) at line 2';
 const BANNED_REGEX = 'banned literal: regex literal at line 2; regular-expression literals ' +
     'can backtrack catastrophically and are unmetered';
@@ -29,6 +30,43 @@ const ARMED = {
     enforceBannedRest: true, enforceLintSyntaxDepth: true, enforceLintRegexGroupDepth: true
 };
 const UNARMED = Object.fromEntries(Object.keys(ARMED).map((key) => [key, false]));
+
+function withOverflowAndMissedPreParse(stage, run) {
+    const ivmPath = require.resolve('isolated-vm');
+    const lintPath = require.resolve('../../../../src/lint-core.js');
+    const syntaxPath = require.resolve('../../../../src/syntax.js');
+    const saved = new Map([[ivmPath, require.cache[ivmPath]], [lintPath, require.cache[lintPath]],
+        [syntaxPath, require.cache[syntaxPath]]]);
+    const lint = require(lintPath);
+    require.cache[ivmPath] = { id: ivmPath, filename: ivmPath, loaded: true, exports: {
+        Isolate: function () {
+            return {
+                compileScriptSync: function () {
+                    if (stage === 'compile') throw new RangeError('Maximum call stack size exceeded');
+                },
+                dispose: function () {}
+            };
+        }
+    } };
+    require.cache[lintPath] = { id: lintPath, filename: lintPath, loaded: true, exports: {
+        ...lint,
+        nestingDepthFinding: function () { return null; },
+        syntaxDepthFinding: function () { return null; },
+        lintSource: function () {
+            if (stage === 'acorn') throw new RangeError('Maximum call stack size exceeded');
+            return lint.lintSource.apply(this, arguments);
+        }
+    } };
+    delete require.cache[syntaxPath];
+    try {
+        return run(require(syntaxPath));
+    } finally {
+        for (const [path, entry] of saved) {
+            if (entry) require.cache[path] = entry;
+            else delete require.cache[path];
+        }
+    }
+}
 
 describe('deploy-lint: gated regex group depth', function () {
     this.timeout(30000);
@@ -50,6 +88,46 @@ describe('deploy-lint: gated regex group depth', function () {
         assert.strictEqual(regexGroupDepth('[(((]'), 0);
         assert.strictEqual(regexGroupDepth('\\(\\(\\('), 0);
         assert.strictEqual(regexGroupDepth('[\\]((]((a))'), 2);
+    });
+
+    it('recognizes regex literals at every expression-start goal boundary', function () {
+        const re = regexLiteral(MAX_REGEX_GROUP_DEPTH + 1);
+        const tick = String.fromCharCode(96);
+        const sources = {
+            await: 'async function f(){ await ' + re + '; }',
+            yield: 'function* f(){ yield ' + re + '; }',
+            typeof: 'typeof ' + re + ';',
+            void: 'void ' + re + ';',
+            delete: 'delete ' + re + '.x;',
+            instanceof: 'x instanceof ' + re + ';',
+            in: 'x in ' + re + ';',
+            of: 'for (x of ' + re + ') {}',
+            case: 'switch (x) { case ' + re + ': break; }',
+            return: 'function f(){ return ' + re + '; }',
+            throw: 'function f(){ throw ' + re + '; }',
+            new: 'new ' + re + ';',
+            do: 'do ' + re + '.test(x); while (false);',
+            else: 'if (x) y(); else ' + re + '.test(x);',
+            arrow: 'const f = () => ' + re + ';',
+            blockClose: 'if (x) {} ' + re + '.test(x);',
+            statementParenClose: 'if (x) ' + re + '.test(x);',
+            templateExpression: 'const x = ' + tick + '${' + re + '}' + tick + ';',
+            templateClose: 'const x = ' + tick + 'x' + tick + '; ' + re + '.test(x);',
+            assignment: 'x = ' + re + ';',
+            comma: 'x, ' + re + ';',
+            propertyColon: '({ x: ' + re + ' });',
+            conditional: 'x ? ' + re + ' : y;',
+            logical: 'x && ' + re + ';',
+            parenOpen: '(' + re + ');'
+        };
+        for (const [context, code] of Object.entries(sources)) {
+            assert.deepStrictEqual(regexGroupDepthFinding(code), {
+                rule: 'nesting-depth',
+                message: 'regex group depth exceeds limit (64) at line 1',
+                line: 1,
+                severity: 'error'
+            }, context);
+        }
     });
 });
 
@@ -82,6 +160,41 @@ describe('deploy-lint: gated regex group depth', function () {
         assert.deepStrictEqual(regexGroupDepthFinding(code), {
             rule: 'nesting-depth', message: REFUSAL, line: 2, severity: 'error'
         });
+    });
+
+    it('returns the pinned refusal for a hostile regex following await', function () {
+        const re = regexLiteral(1500);
+        const code = 'async function f(){ await ' + re + '; }';
+        assert.deepStrictEqual(validateSyntax(code, ARMED), {
+            valid: false,
+            error: 'regex group depth exceeds limit (64) at line 1'
+        });
+    });
+
+    it('maps a confirmed validation overflow only while the regex gate is active', function () {
+        const { HostFaultError } = require('../../../../src/errors.js');
+        for (const stage of ['compile', 'acorn']) {
+            withOverflowAndMissedPreParse(stage, (syntax) => {
+                const code = 'async function f(){ await ' + regexLiteral(1500) + '; }';
+                assert.deepStrictEqual(syntax.validateSyntax(code, ARMED), {
+                    valid: false,
+                    error: 'regex group depth exceeds limit (64) at line 1'
+                }, stage);
+                assert.throws(() => syntax.validateSyntax(code, {
+                    ...ARMED,
+                    enforceLintRegexGroupDepth: false
+                }), (e) => e instanceof HostFaultError, stage);
+                assert.throws(() => syntax.validateSyntax('var x = 1;', ARMED),
+                    (e) => e instanceof HostFaultError, stage);
+            });
+        }
+    });
+
+    it('keeps await identifiers followed by division out of the regex bound', function () {
+        const groups = '('.repeat(MAX_REGEX_GROUP_DEPTH + 1) + 'x' +
+            ')'.repeat(MAX_REGEX_GROUP_DEPTH + 1);
+        const code = 'function f(await, d){ return await / ' + groups + ' / d; }';
+        assert.strictEqual(regexGroupDepthFinding(code), null);
     });
 
     it('keeps an earlier depth refusal ahead of a later deep regex', function () {
