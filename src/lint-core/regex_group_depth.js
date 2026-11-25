@@ -9,10 +9,11 @@ const { MAX_REGEX_GROUP_DEPTH } = require('./constants.js');
 // per group level, before the token reaches a scanner. RegexBoundParser measures the
 // body first without recursion and stops before acorn validates an over-bound body.
 class RegexGroupDepthExceeded extends Error {
-    constructor(line, depth) {
+    constructor(line, depth, offset) {
         super('regex group depth ' + depth + ' at line ' + line);
         this.line = line;
         this.depth = depth;
+        this.offset = offset;
     }
 }
 
@@ -33,12 +34,42 @@ function regexGroupDepth(pattern) {
     return max;
 }
 
-const RegexBoundParser = acorn.Parser.extend((Parser) => class extends Parser {
+const RegexDepthParser = acorn.Parser.extend((Parser) => class extends Parser {
     validateRegExpPattern(state) {
         const depth = regexGroupDepth(state.source);
         if (depth > MAX_REGEX_GROUP_DEPTH)
-            throw new RegexGroupDepthExceeded(this.startLoc.line, depth);
+            throw new RegexGroupDepthExceeded(this.startLoc.line, depth, this.start);
         return super.validateRegExpPattern(state);
+    }
+});
+
+// Ask the grammar-driven parser which slashes use the regular-expression goal.
+// This resolves contextual keywords and statement boundaries that a standalone
+// tokenizer cannot decide from the preceding token alone.
+function regexStartsByGoal(code) {
+    const starts = new Set();
+    try {
+        RegexDepthParser.parse(code, {
+            ecmaVersion: CONTRACT_ECMA_VERSION,
+            sourceType: 'script',
+            locations: true,
+            onToken: (token) => {
+                if (token.type === acorn.tokTypes.regexp) starts.add(token.start);
+            }
+        });
+    } catch (e) {
+        if (e instanceof RegexGroupDepthExceeded) starts.add(e.offset);
+    }
+    return starts;
+}
+
+const RegexBoundParser = RegexDepthParser.extend((Parser) => class extends Parser {
+    readToken_slash() {
+        if (!this.exprAllowed) {
+            if (!this.regexGoalStarts) this.regexGoalStarts = regexStartsByGoal(this.input);
+            if (this.regexGoalStarts.has(this.pos)) this.exprAllowed = true;
+        }
+        return super.readToken_slash();
     }
 });
 

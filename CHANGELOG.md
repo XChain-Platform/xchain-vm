@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-11-25
+
+### Fixed
+- Bounded deep regular expression literals that follow `await` in deploy lint, so they are refused instead of overflowing the host stack.
+- Read the last of duplicate meta properties in the toolkit gate, as the chain does.
+
 ## [0.28.0] - 2026-11-22
 
 ### Changed
