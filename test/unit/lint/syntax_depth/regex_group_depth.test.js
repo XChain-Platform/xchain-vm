@@ -91,9 +91,24 @@ describe('deploy-lint: gated regex group depth', function () {
     });
 
     it('recognizes regex literals at every expression-start goal boundary', function () {
-        const re = regexLiteral(MAX_REGEX_GROUP_DEPTH + 1);
-        const tick = String.fromCharCode(96);
-        const sources = {
+        const sources = goalBoundarySources(regexLiteral(MAX_REGEX_GROUP_DEPTH + 1));
+        for (const [context, code] of Object.entries(sources)) {
+            assert.deepStrictEqual(regexGroupDepthFinding(code), {
+                rule: 'nesting-depth',
+                message: 'regex group depth exceeds limit (64) at line 1',
+                line: 1,
+                severity: 'error'
+            }, context);
+        }
+    });
+});
+
+// One source per expression-start context, each placing the regex literal `re`
+// where the standalone tokenizer must choose between regex and division; await
+// was the one context it misread before the grammar-goal fix.
+function goalBoundarySources(re) {
+    const tick = String.fromCharCode(96);
+    return {
             await: 'async function f(){ await ' + re + '; }',
             yield: 'function* f(){ yield ' + re + '; }',
             typeof: 'typeof ' + re + ';',
@@ -119,17 +134,8 @@ describe('deploy-lint: gated regex group depth', function () {
             conditional: 'x ? ' + re + ' : y;',
             logical: 'x && ' + re + ';',
             parenOpen: '(' + re + ');'
-        };
-        for (const [context, code] of Object.entries(sources)) {
-            assert.deepStrictEqual(regexGroupDepthFinding(code), {
-                rule: 'nesting-depth',
-                message: 'regex group depth exceeds limit (64) at line 1',
-                line: 1,
-                severity: 'error'
-            }, context);
-        }
-    });
-});
+    };
+}
 
 // Same suite name as above, split only to keep each callback inside the
 // 60-line function budget; the full test titles are unchanged.
@@ -189,6 +195,10 @@ describe('deploy-lint: gated regex group depth', function () {
             });
         }
     });
+});
+
+describe('deploy-lint: gated regex group depth', function () {
+    this.timeout(30000);
 
     it('keeps await identifiers followed by division out of the regex bound', function () {
         const groups = '('.repeat(MAX_REGEX_GROUP_DEPTH + 1) + 'x' +
